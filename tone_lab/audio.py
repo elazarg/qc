@@ -78,11 +78,31 @@ def distance(candidate, reference):
     return round(float(np.mean(np.minimum(np.abs(bands), 30))), 2)
 
 
+def loudness_plan(metrics, *, target_lufs=-23.0, offset_db=0.0, ceiling_db=-3.0, max_boost_db=0.0):
+    """Plan a static common loudness with headroom for every participating tone."""
+    metrics = tuple(metrics)
+    if not all(math.isfinite(value) for value in (target_lufs, offset_db, ceiling_db, max_boost_db)):
+        raise ValueError("Use finite loudness targets and limits.")
+    if not metrics:
+        return {"reference_lufs": None, "requested_lufs": None, "target_lufs": None, "trims_db": []}
+    lufs = [item["lufs"] for item in metrics]
+    peaks = [item.get("true_peak_dbtp_estimate", item.get("peak_dbfs")) for item in metrics]
+    lane_limits = [item.get("max_gain_db", 6.) for item in metrics]
+    if any(not isinstance(value, (int, float)) or not math.isfinite(value)
+           for value in (*lufs, *peaks, *lane_limits)):
+        raise ValueError("Use audible measurements with verified peak levels.")
+    headroom = min(level + ceiling_db - peak for level, peak in zip(lufs, peaks))
+    reference = min(target_lufs, min(lufs), headroom)
+    requested = reference + offset_db
+    allowed_boost = max(0., min(offset_db, max_boost_db, 6.))
+    gain_ceiling = min(level + max(0., min(allowed_boost, limit)) for level, limit in zip(lufs, lane_limits))
+    target = min(requested, headroom, gain_ceiling)
+    return {"reference_lufs": reference, "requested_lufs": requested, "target_lufs": target,
+            "trims_db": [target - level for level in lufs]}
+
+
 def audition_gains(metrics):
-    # Attenuate to the quietest feasible common loudness. Never boost.
-    target = min(-23.0, *(min(m["lufs"], m["lufs"] - m["peak_dbfs"] - 3)
-                           for m in metrics))
-    return [10 ** ((target - m["lufs"]) / 20) for m in metrics]
+    return [10 ** (db / 20) for db in loudness_plan(metrics)["trims_db"]]
 
 
 def asio_device():

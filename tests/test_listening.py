@@ -1,11 +1,12 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import numpy as np
 
-from tone_lab import audio, capture, device, listening, session
+from tone_lab import audio, capture, device, level_plan, listening, session, volume_ui
 
 
 class ListeningSessionTest(unittest.TestCase):
@@ -45,6 +46,71 @@ class ListeningSessionTest(unittest.TestCase):
         loop.process(chunk, match=False)
         self.assertEqual(chunk[:, 0].tolist(), [3, 4])
         self.assertEqual(loop.cursor, 4)
+
+    def test_volume_requests_use_the_same_persisted_direction_as_the_controls(self):
+        settings = volume_ui.saved_settings({"master_db": -10})
+        self.assertEqual(settings["loudness_db"], -10)
+        self.assertEqual(volume_ui.saved_settings({"master_db": -10, "match": False})["loudness_db"], 0)
+        action, command = listening.route("A little louder.", has_draft=True)
+        self.assertEqual(action, "volume")
+        self.assertEqual(volume_ui.listening_command(settings, command)["loudness_db"], -9)
+        self.assertEqual(volume_ui.listening_command(settings, "normal")["loudness_db"], 0)
+        self.assertEqual(volume_ui.listening_command({**settings, "loudness_db": 6}, "louder")["loudness_db"], 6)
+        self.assertEqual(listening.route("Make me a louder solo preset", has_draft=True)[0], "create")
+
+    def test_captured_volume_matches_played_channels_and_keeps_the_playhead(self):
+        with TemporaryDirectory() as folder:
+            root = Path(folder)
+            time = np.arange(audio.RATE, dtype=np.float32) / audio.RATE
+            wave = (.05 * np.sin(2 * np.pi * 220 * time))[:, None]
+            a = listening.Sound("Mono", root / "a.wav", "phrase", (0, 1))
+            b = listening.Sound("Stereo", root / "b.wav", "phrase", (0, 1))
+            audio.write_wave(a.path, wave)
+            audio.write_wave(b.path, np.repeat(wave * 2, 2, axis=1))
+            tracks, metrics = listening.playback_material((a, b))
+
+        self.assertAlmostEqual(metrics[1]["lufs"] - metrics[0]["lufs"], 6.02, places=2)
+        player = listening.Player()
+        settings = volume_ui.saved_settings(None)
+        args = {"query_hostapis.return_value": [{"name": "Windows WASAPI", "default_output_device": 0}],
+                "query_devices.return_value": {"name": "Test output"}}
+        with patch.dict("sys.modules", sounddevice=Mock(**args)) as modules:
+            sd = modules["sounddevice"]
+            player.open(tracks, 0, metrics=metrics)
+            render = sd.OutputStream.call_args.kwargs["callback"]
+            output = np.empty((2048, 2), dtype=np.float32)
+            status = SimpleNamespace(output_underflow=False)
+            render(output, len(output), None, status)
+            player.set_volume({**settings, "loudness_db": 6})
+            player.loop.selected = 1
+            render(output, len(output), None, status)
+            self.assertEqual(player.loop.cursor, 2 * len(output))
+            np.testing.assert_allclose(output[-512:], 10 ** (.3) * tracks[0][3584:4096], atol=1e-7)
+            self.assertEqual(player.level_feedback["status"], "matched")
+            player.set_volume({**settings, "muted": True})
+            render(output, len(output), None, status)
+            np.testing.assert_array_equal(output[-512:], 0.)
+            player.close()
+            self.assertEqual(sd.OutputStream.call_count, 1)
+
+    def test_captured_louder_and_manual_trim_respect_intersample_peaks(self):
+        time = np.arange(audio.RATE) / audio.RATE
+        signal = (.08 * np.sin(2 * np.pi * 220 * time)).astype(np.float32)
+        signal[1024:1056] = np.tile([.69, .69, -.69, -.69], 8)
+        track = np.repeat(signal[:, None], 2, axis=1)
+        metrics = level_plan.measure(track)
+        self.assertLess(metrics["sample_peak_dbfs"], -3)
+        self.assertGreater(metrics["true_peak_dbtp_estimate"], -3)
+        player = listening.Player()
+        player.metrics = (metrics,)
+        settings = volume_ui.saved_settings({"loudness_db": 6})
+        player.set_volume(settings)
+        self.assertTrue(player.level_feedback["limited"])
+        base = audio.audition_gains((metrics,))[0]
+        self.assertLessEqual(metrics["true_peak_dbtp_estimate"] + audio.db(base * player.mix[1]), -3 + 1e-8)
+        player.set_volume({**settings, "match": False})
+        self.assertTrue(player.level_feedback["limited"])
+        self.assertAlmostEqual(metrics["true_peak_dbtp_estimate"] + audio.db(player.mix[1]), -3)
 
     def test_common_level_and_disagreement_between_performances(self):
         with TemporaryDirectory() as folder:

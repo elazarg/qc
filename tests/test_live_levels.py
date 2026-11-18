@@ -21,6 +21,87 @@ def grid():
 
 
 class LiveLevelsTest(unittest.TestCase):
+    def test_shared_smart_plan_limits_a_user_lift_by_true_peak_and_lane_headroom(self):
+        a = {"lufs": -18., "peak_dbfs": -12., "true_peak_dbtp_estimate": -1.}
+        b = {"lufs": -22., "peak_dbfs": -10., "max_gain_db": 1.}
+        initial = audio.loudness_plan([a, b])
+        self.assertEqual(initial, {"reference_lufs": -23., "requested_lufs": -23., "target_lufs": -23.,
+                                  "trims_db": [-5., -1.]})
+        raised = audio.loudness_plan([a, b], offset_db=6., max_boost_db=6.)
+        self.assertEqual(raised, {"reference_lufs": -23., "requested_lufs": -17., "target_lufs": -21.,
+                                 "trims_db": [-3., 1.]})
+        no_permission = audio.loudness_plan([a, b], offset_db=6.)
+        self.assertEqual(no_permission["trims_db"], [-4., 0.])
+        self.assertEqual(audio.loudness_plan([a], offset_db=6., max_boost_db=6.)["target_lufs"], -20.)
+
+    def test_one_measured_live_tone_uses_an_explicit_bounded_lift(self):
+        reading = {"lufs": -30., "peak_dbfs": -4., "clipped_samples": 0}
+        levels = live_levels.Levels({"loudness_db": 6, "measurements": {"a": reading}})
+        levels.select({"tone_id": "a"}, {}, "phrase")
+        levels.bind(grid(), 1, [(1, 19), (0, 0), (0, 0), (0, 0)])
+        qc, verify, events = Mock(), Mock(), Mock()
+        levels.apply(qc, verify, events)
+        actual = events.call_args.args[0]
+        self.assertEqual(actual["status"], "leveled")
+        self.assertEqual(actual["reference_lufs"], -30.)
+        self.assertEqual(actual["requested_lufs"], -24.)
+        self.assertEqual(actual["estimated_lufs"], -29.)
+        self.assertEqual(actual["applied_db"], 1.)
+        self.assertTrue(actual["limited"])
+        self.assertAlmostEqual(leveling.db_of(qc.set_lane_param.call_args.args[-1]), 1., places=5)
+
+    def test_unmeasured_shape_holds_its_settled_cut_without_reusing_a_boost(self):
+        pair = {"a": {"lufs": -17., "peak_dbfs": -4., "clipped_samples": 0},
+                "b": {"lufs": -24., "peak_dbfs": -8., "clipped_samples": 0}}
+        a, b = {"tone_id": "a"}, {"tone_id": "b", "scene": 1}
+        levels = live_levels.Levels({"measurements": pair, "contexts": {"a": a, "b": b}})
+        levels.select(a, {}, "phrase")
+        levels.bind(grid(), 1, [(1, 19), (0, 0), (0, 0), (0, 0)])
+        qc, verify, events = Mock(), Mock(), Mock()
+        levels.apply(qc, verify, events)
+        prior = events.call_args.args[0]
+        self.assertEqual(prior["status"], "matched")
+        self.assertEqual(prior["applied_db"], -7.)
+
+        levels.configure({"loudness_db": 6., "measurements": pair,
+                          "contexts": {"a": {**a, "values": {"drive": .4}}, "b": b}})
+        levels.select(a, {"drive": .4}, "phrase")
+        levels.apply(qc, verify, events)
+        changed = events.call_args.args[0]
+        self.assertEqual(changed["status"], "pending")
+        self.assertEqual(changed["applied_db"], -7.)
+        self.assertTrue(changed["held"])
+        self.assertTrue(changed["limited"])
+        self.assertIsNone(changed["estimated_lufs"])
+
+        levels.configure({"loudness_db": -4., "contexts": {"a": a, "b": b}})
+        levels.apply(qc, verify, events)
+        self.assertEqual(events.call_args.args[0]["applied_db"], -11.)
+        levels.select(a, {"drive": .4}, "new phrase")
+        levels.apply(qc, verify, events)
+        self.assertEqual(events.call_args.args[0]["applied_db"], -11.)
+
+    def test_guitar_does_not_authorize_boost_from_exact_phrase_measurements(self):
+        reading = {"lufs": -28., "peak_dbfs": -12., "clipped_samples": 0}
+        tone = {"tone_id": "a"}
+        levels = live_levels.Levels({"loudness_db": 6, "measurements": {"a": reading}})
+        levels.select(tone, {}, "phrase", source="phrase")
+        levels.bind(grid(), 1, [(1, 19), (0, 0), (0, 0), (0, 0)])
+        qc, verify, events = Mock(), Mock(), Mock()
+        levels.apply(qc, verify, events)
+        self.assertEqual(events.call_args.args[0]["applied_db"], 6.)
+        levels.clear_boost(qc, verify)
+        self.assertEqual(levels.gain, 0.)
+        self.assertAlmostEqual(leveling.db_of(qc.set_lane_param.call_args.args[-1]), 0., places=5)
+        levels.apply(qc, verify, events)
+        levels.select(tone, {}, "phrase", source="guitar")
+        levels.apply(qc, verify, events)
+        actual = events.call_args.args[0]
+        self.assertEqual(actual["applied_db"], 0.)
+        self.assertIsNone(actual["estimated_lufs"])
+        self.assertTrue(actual["limited"])
+        self.assertAlmostEqual(leveling.db_of(qc.set_lane_param.call_args.args[-1]), 0., places=5)
+
     def test_loudness_matching_only_uses_two_measurable_tracks_and_preserves_headroom(self):
         a = {"clipped_samples": 0, "lufs": -17., "peak_dbfs": -2.}
         b = {"clipped_samples": 0, "lufs": -24., "peak_dbfs": -8.}

@@ -15,7 +15,7 @@ from .audio import RATE
 from .knob_panel import KnobPanel
 from .tone_identity import Tone
 from .tone_space_ui import ToneSpacePanel
-from .volume_ui import VolumePanel, saved_settings
+from .volume_ui import VolumePanel, listening_command, saved_settings
 
 
 PAPER = "#14151a"
@@ -514,12 +514,13 @@ class Desk:
         self.remember()
 
     def set_player_level(self):
-        settings = self.volume_settings
-        self.player.gain = 0. if settings["muted"] else 10 ** (settings["master_db"] / 20.)
-        self.player.match = settings["match"]
+        self.player.set_volume(self.volume_settings)
 
     def change_volume(self, settings):
-        self.volume_settings = saved_settings(settings)
+        settings = saved_settings(settings)
+        if settings == self.volume_settings:
+            return
+        self.volume_settings = settings
         self.set_player_level()
         self.send_levels()
         self.schedule_state_save()
@@ -536,25 +537,29 @@ class Desk:
 
     def sync_volume(self):
         settings = self.volume_settings
-        level = self.level_feedback.get(self.side, {})
-        status = level.get("status") if self.task_if_active("monitor") else None
-        text = "Plays at each tone’s own loudness."
-        if settings["match"]:
-            if status == "matched":
-                text = f"Loudness matched · {self.side.upper()} trim {level['match_db']:+.1f} dB"
-            elif status == "unavailable":
-                text = level.get("reason") or "Loudness matching is unavailable for this tone."
-            elif self.playing and self.play_group and len(self.play_group) == 2:
-                text = "Captured A and B are loudness matched."
-            elif self.active_source == "phrase":
-                text = "Measuring · let the same phrase loop once on A and on B."
+        live = self.task_if_active("monitor")
+        level = self.level_feedback.get(self.side, {}) if live else self.player.level_feedback if self.playing else {}
+        status = level.get("status")
+        if status in ("unavailable", "limited"):
+            note = level.get("reason") or "The output reached its adjustment limit."
+        elif not settings["match"]:
+            note = "Manual output trim"
+        elif status == "matched":
+            note = "A/B matched from phrase" if live and self.active_source == "guitar" else "A/B matched"
+        elif status in ("leveled", "measured"):
+            note = "Level set from phrase" if live and self.active_source == "guitar" else "Loudness measured"
+        elif live:
+            if not self.take:
+                note = "Choose a phrase to measure loudness."
+            elif self.selectable("a") and self.selectable("b"):
+                note = "Let Phrase loop on A and B to measure loudness."
             else:
-                text = "Match by playing the same recorded phrase through A and B."
-        elif status == "unavailable":
-            text = level.get("reason") or "Volume is unavailable for this tone."
-        if level.get("limited") and self.task_if_active("monitor"):
-            text += f"  ·  Output limit {level['applied_db']:+.1f} dB"
-        self.volume.sync(settings, text)
+                note = "Let Phrase loop to measure this tone."
+        else:
+            note = "Smart level across tones"
+        if status in ("matched", "leveled", "measured", "manual") and level.get("limited"):
+            note += " · Guitar output limit" if live and self.active_source == "guitar" else " · Headroom limit"
+        self.volume.sync(settings, note)
 
     def toggle_base(self):
         if (self.task_if_active("monitor") and self.active_side == self.side and self.active_source
@@ -677,9 +682,9 @@ class Desk:
         return "break"
 
     def prepare_playback(self, pair, index, cancel):
-        tracks, gains = listening.playback_material(pair)
+        tracks, metrics = listening.playback_material(pair)
         if not cancel.is_set():
-            return self.player.open(tracks, index, gains=gains)
+            return self.player.open(tracks, index, metrics=metrics)
 
     def started_playing(self, sound):
         self.last_heard = self.playing = sound
@@ -1002,6 +1007,10 @@ class Desk:
             self.set_status("Finish or stop the current hardware action, then try that request again.")
             return
         self.request.set("")
+        if action == "volume":
+            self.change_volume(listening_command(self.volume_settings, value))
+            self.set_status("Listening level updated.")
+            return
         if action == "stop":
             self.stop()
             return

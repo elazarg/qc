@@ -117,6 +117,8 @@ def switch_source(qc, position, physical_routes, physical_input, message, stream
         if source != "phrase" or device.live_position(qc) != position:
             raise
         stream_stack.close()
+        if prepare_guitar := message.get("prepare_guitar"):
+            prepare_guitar()
         iterate.set_routes(qc, physical_routes)
         if iterate.routes(device.read_preset(qc)) != physical_routes:
             raise RuntimeError("The Quad Cortex could not restore the guitar input.") from error
@@ -303,11 +305,11 @@ def run(config, stop, commands, events):
                 if device.live_position(qc) != position or device.active_scene(qc) != scene:
                     raise RuntimeError("The Quad Cortex preset or scene changed during Shape.")
 
-            def adjust_level(*, bind=False):
+            def adjust_level(*, bind=False, source=None):
                 cursor.level_probe = None
                 if bind:
                     levels.bind(base, scene, physical_routes)
-                levels.select(current, settings, level_take)
+                levels.select(current, settings, level_take, source=source or active_source or config["mode"])
                 levels.apply(qc, check_active, events)
 
             previous = live.update(qc, base, scene, settings, {}, position=position)
@@ -318,13 +320,21 @@ def run(config, stop, commands, events):
                 nonlocal observer, armed_until, active_source, active_take, phrase_take, cursor, level_take
                 new_take = message.get("take") if message["mode"] == "phrase" else None
                 if message["mode"] == "phrase" and new_take != phrase_take:
+                    levels.clear_boost(qc, check_active)
                     cursor = audio.PhraseCursor()
                     phrase_take = new_take
                 cursor.level_probe = None
                 level_take = message.get("take", level_take)
                 old_observer, observer = observer, None
+
+                def prepare_guitar():
+                    adjust_level(source="guitar")
+
+                if message["mode"] == "guitar":
+                    prepare_guitar()
                 stream, meters = switch_source(qc, position, physical_routes, physical_input,
-                                               {**message, "transport": cursor, "measure_return": levels.enabled},
+                                               {**message, "transport": cursor, "measure_return": levels.enabled,
+                                                "prepare_guitar": prepare_guitar},
                                                stream_stack, events)
                 active_source, active_take = ("phrase", new_take) if stream is not None else ("guitar", None)
                 levels.return_unavailable = active_source == "phrase" and not cursor.returns
@@ -348,6 +358,8 @@ def run(config, stop, commands, events):
                 check_active()
                 target_values = dict(pick.get("values", {}))
                 if same_working_grid(current, pick):
+                    if target_values != settings:
+                        levels.clear_boost(qc, check_active)
                     previous = live.update(qc, base, scene, target_values, previous, position=position)
                     settings, current = target_values, pick
                     adjust_level()
@@ -419,6 +431,8 @@ def run(config, stop, commands, events):
                 tone_id = current.get("tone_id")
                 if knobs := pending.get(("knobs", tone_id)) or pending.get(("knobs", None)):
                     next_settings = dict(knobs["values"])
+                    if next_settings != settings:
+                        levels.clear_boost(qc, check_active)
                     previous = live.update(qc, base, scene, next_settings, previous, position=position)
                     if next_settings != settings:
                         events({"event": "shape", "tone_id": tone_id, "has_edits": bool(previous),

@@ -6,11 +6,12 @@ import json
 import os
 from pathlib import Path
 import re
+from threading import Lock
 from uuid import uuid4
 
 import numpy as np
 
-from . import audio, capture, diagnostics, feedback, session
+from . import audio, capture, diagnostics, feedback, level_plan, session
 
 
 def same_passage(first, second):
@@ -218,6 +219,18 @@ def route(text, *, has_draft):
     """Resolve explicit session commands and pass open-ended musical language to the planner."""
     request = text.strip().rstrip(".?!")
     lowered = request.casefold()
+    volume = {
+        "louder": ("louder", "too quiet", "turn it up", "turn up the volume", "make it louder"),
+        "quieter": ("quieter", "too loud", "turn it down", "turn down the volume", "make it quieter"),
+        "slightly louder": ("a little louder", "slightly louder"),
+        "slightly quieter": ("a little quieter", "slightly quieter"),
+        "normal": ("normal volume", "reset volume"),
+        "mute": ("mute", "mute playback"),
+        "unmute": ("unmute", "unmute playback"),
+    }
+    for command, phrases in volume.items():
+        if lowered in phrases:
+            return "volume", command
     if lowered in {"stop", "stop playback", "go back to playing", "stop preview"}:
         return "stop", ""
     if lowered in {"listen", "compare", "compare sounds"}:
@@ -267,8 +280,7 @@ def playback_material(sounds):
     waves = [samples(sound) for sound in sounds]
     if len({len(wave) for wave in waves}) != 1:
         raise RuntimeError("The two recordings have different lengths. Capture them again from the same phrase.")
-    measured = [audio.describe(wave) for wave in waves]
-    if any(item["lufs"] is None or item["clipped_samples"] for item in measured):
+    if any(np.any(np.abs(wave) >= .999) for wave in waves):
         raise ValueError("The sound is silent or clipped. Choose another phrase or reference.")
     tracks = [np.array(np.broadcast_to(wave, (len(wave), 2)), dtype=np.float32) for wave in waves]
     edge = round(.006 * audio.RATE)
@@ -276,12 +288,15 @@ def playback_material(sounds):
     for track in tracks:
         track[:edge] *= ramp
         track[-edge:] *= ramp[::-1]
-    return tuple(tracks), tuple(audio.audition_gains(measured))
+    measured = tuple(level_plan.measure(track) for track in tracks)
+    if any(item["lufs"] is None for item in measured):
+        raise ValueError("The sound is silent or clipped. Choose another phrase or reference.")
+    return tuple(tracks), measured
 
 
 def prepare(sounds):
-    tracks, gains = playback_material(sounds)
-    return tuple(track * gain for track, gain in zip(tracks, gains))
+    tracks, metrics = playback_material(sounds)
+    return tuple(track * gain for track, gain in zip(tracks, audio.audition_gains(metrics)))
 
 
 class Loop:
@@ -338,10 +353,35 @@ class Player:
         self.stream = self.loop = None
         self.failures = 0
         self.device = None
-        self.gain = 1.
-        self.match = True
+        self.metrics = ()
+        self.level_feedback = {}
+        self.settings = {"match": True, "muted": False, "loudness_db": 0, "master_db": 0}
+        self.mix = (True, 1.)
+        self.level_lock = Lock()
 
-    def open(self, tracks, selected, *, gains=None):
+    def set_volume(self, settings):
+        with self.level_lock:
+            self.settings = dict(settings)
+            self.plan_volume()
+
+    def plan_volume(self):
+        settings, metrics = self.settings, self.metrics
+        match = settings["match"]
+        applied = settings["loudness_db"] if match else settings["master_db"]
+        feedback = {}
+        if metrics and match:
+            plan = audio.loudness_plan(metrics, offset_db=applied, max_boost_db=6.)
+            applied = plan["target_lufs"] - plan["reference_lufs"]
+            feedback = {"status": "matched" if len(metrics) > 1 else "measured",
+                        "limited": plan["target_lufs"] < plan["requested_lufs"] - .05}
+        elif metrics:
+            safe = -3. - max(row["true_peak_dbtp_estimate"] for row in metrics)
+            applied = min(applied, safe)
+            feedback = {"status": "manual", "limited": applied < settings["master_db"] - .05}
+        self.mix = (match, 0. if settings["muted"] else 10 ** (applied / 20))
+        self.level_feedback = feedback
+
+    def open(self, tracks, selected, *, metrics):
         self.close()
         os.environ["SD_ENABLE_ASIO"] = "1"
         import sounddevice as sd
@@ -351,14 +391,25 @@ class Player:
             raise RuntimeError("Choose a Windows playback device, then try the comparison again.")
         index = host["default_output_device"]
         self.device = sd.query_devices(index)["name"]
-        loop = Loop(tracks, selected, gains=gains)
+        loop = Loop(tracks, selected, gains=audio.audition_gains(metrics))
+        with self.level_lock:
+            self.metrics = metrics
+            self.plan_volume()
+        previous_match, amplitude = self.mix
+        ramp = GainRamp(amplitude)
         self.failures = 0
 
         def callback(out, _, timing, status):
+            nonlocal previous_match
             if status.output_underflow:
                 self.failures += 1
-            loop.process(out, match=self.match)
-            out *= self.gain
+            match, gain = self.mix
+            loop.process(out, match=match)
+            if match != previous_match:
+                # The old multiplier belongs to a different set of base gains.
+                ramp.reset(gain)
+                previous_match = match
+            ramp.apply(out, gain)
 
         stream = sd.OutputStream(device=index, channels=2, samplerate=audio.RATE, dtype="float32", latency="low",
                                  callback=callback, extra_settings=sd.WasapiSettings(auto_convert=True))
@@ -377,3 +428,30 @@ class Player:
                 stream.abort()
             finally:
                 stream.close()
+        with self.level_lock:
+            self.metrics = ()
+            self.plan_volume()
+
+
+class GainRamp:
+    """Smooth listening-level changes over 20 ms on the audio callback."""
+
+    def __init__(self, gain):
+        self.progress = np.arange(1, audio.RATE // 50 + 1, dtype=np.float32)
+        self.reset(gain)
+
+    def reset(self, gain):
+        self.current = self.target = gain
+        self.remaining = 0
+
+    def apply(self, out, gain):
+        if gain != self.target:
+            self.target = gain
+            self.step = (gain - self.current) / len(self.progress)
+            self.remaining = len(self.progress)
+        count = min(len(out), self.remaining)
+        if count:
+            out[:count] *= (self.current + self.progress[:count] * self.step)[:, None]
+            self.current += count * self.step
+            self.remaining -= count
+        out[count:] *= gain

@@ -95,11 +95,17 @@ def terminal_lanes(base, scene, physical_routes):
     return result
 
 
-def lane_targets(lanes, requested_db, muted):
+def lane_boost_headroom(lanes):
+    _, high = leveling.db_range()
+    return max(0., min((high - db for db, silent in lanes.values() if not silent), default=0.))
+
+
+def lane_targets(lanes, requested_db, muted, *, max_boost_db=0.):
     low, high = leveling.db_range()
     # Uniform gain preserves the blend of parallel physical outputs.
     floor = max((low - db for db, silent in lanes.values() if not silent), default=low)
-    applied = min(0, max(requested_db, floor))
+    ceiling = max(0., min(max_boost_db, lane_boost_headroom(lanes)))
+    applied = min(ceiling, max(requested_db, floor))
     return applied, {
         row: (leveling.norm_of(min(high, max(low, db + applied))), float(silent or muted))
         for row, (db, silent) in lanes.items()
@@ -150,24 +156,41 @@ class MeasureLoop:
 class Levels:
     def __init__(self, value, *, firmware=None):
         self.enabled = value is not None
+        self.measurements = {}
+        self.capture_identities = {}
         self.configure(value)
         self.firmware = firmware
         self.memory = load_memory() if self.enabled and firmware else {}
         self.keys = {}
         self.observed = {}
         self.take = self.side = self.identity = self.remembered = None
+        self.source = "phrase"
         self.lanes = self.applied = {}
+        self.headroom = {}
+        self.settled_trims = {}
+        self.recent_trims = {}
         self.gain = 0.
         self.last_event = None
         self.return_unavailable = False
 
     def configure(self, value):
-        self.master, self.muted, self.match, self.measurements = settings(value)
+        self.master, self.muted, self.match, measurements = settings(value)
+        for side in tuple(self.capture_identities):
+            if self.measurements.get(side) != measurements.get(side):
+                self.capture_identities.pop(side)
+        self.measurements = measurements
         self.contexts = value.get("contexts", {}) if value else {}
+        self.loudness = float((value or {}).get("loudness_db", self.master if self.match else 0.))
+        self.target = float((value or {}).get("target_lufs", -23.))
+        if not math.isfinite(self.loudness) or not -40 <= self.loudness <= 6:
+            raise ValueError("Choose an audition loudness offset between −40 and +6 dB.")
+        if not math.isfinite(self.target) or not -60 <= self.target <= 0:
+            raise ValueError("Choose a digital loudness reference between −60 and 0 LUFS.")
 
-    def select(self, tone, values, take):
+    def select(self, tone, values, take, *, source="phrase"):
         self.side = tone.get("tone_id")
         self.take = take
+        self.source = source
         self.identity = key(tone, values, take)
         self.remembered = remembered_key(tone, values, take, self.firmware)
         self.keys.setdefault(take, {})[self.side] = self.identity
@@ -177,10 +200,17 @@ class Levels:
             self.lanes = terminal_lanes(base, scene, routes)
             _, self.applied = lane_targets(self.lanes, 0., False)
 
-    def match_for_take(self):
-        if trims := matched_pair(self.measurements):
-            return trims, "capture"
-        observations, previously_measured = {}, False
+    def capture_measurement(self, side, identity):
+        reading = self.measurements.get(side)
+        if not valid(reading) or identity is None:
+            return None
+        # The same reported capture cannot follow a new sound or phrase after an edit.
+        if self.capture_identities.setdefault(side, identity) != identity:
+            return None
+        return reading
+
+    def measurements_for_take(self):
+        observations, bases = {}, set()
         for side in ("a", "b"):
             if side == self.side:
                 identity, remembered = self.identity, self.remembered
@@ -188,22 +218,65 @@ class Levels:
                 values = selected.get("values", {})
                 identity = key(selected, values, self.take)
                 remembered = remembered_key(selected, values, self.take, self.firmware)
+            elif self.contexts:
+                continue
             else:
                 identity, remembered = self.keys.get(self.take, {}).get(side), None
-            if identity in self.observed:
-                observations[side] = self.observed[identity]
-            elif remembered in self.memory:
-                observations[side] = self.memory[remembered]
-                previously_measured = True
-        return matched_pair(observations), "prior" if previously_measured else "phrase"
+            reading, basis = self.capture_measurement(side, identity), "capture"
+            if not valid(reading):
+                reading, basis = self.observed.get(identity), "phrase"
+                if not valid(reading) and remembered in self.memory:
+                    reading, basis = self.memory[remembered], "prior"
+            if valid(reading):
+                observations[side] = {**reading, "max_gain_db": self.headroom.get(identity, 6.)}
+                bases.add(basis)
+        basis = "phrase" if "phrase" in bases else "prior" if "prior" in bases else "capture"
+        return observations, basis
+
+    def match_for_take(self):
+        observations, basis = self.measurements_for_take()
+        return matched_pair(observations), basis
+
+    def smart_plan(self, observations):
+        held = self.settled_trims.get((self.take, self.side), self.recent_trims.get(self.side, 0.))
+        comparing = len(self.contexts or self.keys.get(self.take, {})) == 2
+        if self.side not in observations:
+            return None, held + min(0., self.loudness), comparing, held < -.05
+        paired = len(observations) == 2
+        waiting = comparing and not paired
+        rows = list(observations)
+        metrics = [observations[side] for side in rows]
+        reference = self.target
+        if waiting:
+            reference = min(reference, observations[self.side]["lufs"] + held)
+        base_plan = audio.loudness_plan(metrics, target_lufs=reference)
+        for side, trim in zip(rows, base_plan["trims_db"]):
+            self.settled_trims[self.take, side] = trim
+            self.recent_trims[side] = trim
+        offset = min(0., self.loudness) if waiting else self.loudness
+        # A phrase measurement cannot predict a harder pick during free playing.
+        boost = max(0., offset) if self.source == "phrase" else 0.
+        plan = audio.loudness_plan(metrics, target_lufs=reference, offset_db=offset,
+                                   max_boost_db=boost)
+        # Keep the user's requested upward change visible while a comparison is measured.
+        if waiting:
+            plan["requested_lufs"] = plan["reference_lufs"] + self.loudness
+        return plan, plan["trims_db"][rows.index(self.side)], waiting, waiting and held < -.05
 
     def apply(self, qc, check_active, events):
         if not self.enabled:
             return
-        trims, basis = self.match_for_take() if self.match else ({}, None)
-        trim = trims.get(self.side)
-        requested = self.master + (trim or 0.)
-        gain, targets = lane_targets(self.lanes, requested, self.muted)
+        self.headroom[self.identity] = lane_boost_headroom(self.lanes)
+        observations, basis = self.measurements_for_take() if self.match else ({}, None)
+        if self.match:
+            if self.side in observations:
+                observations[self.side] = {**observations[self.side], "max_gain_db": self.headroom[self.identity]}
+            plan, requested, waiting, held = self.smart_plan(observations)
+        else:
+            plan, requested, waiting, held = None, self.master, False, False
+        can_boost = plan is not None and not waiting and self.source == "phrase"
+        max_boost = max(0., self.loudness) if can_boost else 0.
+        gain, targets = lane_targets(self.lanes, requested, self.muted, max_boost_db=max_boost)
         if targets != self.applied:
             check_active()
             write(qc, targets, self.applied)
@@ -217,8 +290,8 @@ class Levels:
             reason = "This tone does not expose a plain post-chain output level."
         elif not self.match:
             status = "off"
-        elif trim is not None:
-            status = "matched"
+        elif plan is not None and not waiting:
+            status = "matched" if len(observations) == 2 else "leveled"
         elif failed:
             status = "unavailable"
             reason = "The phrase return was silent, clipped, or interrupted."
@@ -227,18 +300,42 @@ class Levels:
             reason = "The Quad Cortex USB return is unavailable for measuring this phrase."
         else:
             status = "pending"
+            if self.loudness > .05:
+                reason = "Measure this phrase before increasing its level."
+        lane_limited = bool(self.lanes and abs(self.gain - requested) > .05)
+        if lane_limited:
+            status = "limited"
+            reason = "The Quad Cortex output control reached its adjustment limit."
+        planned = {name: round(plan[name], 1) if plan is not None else None
+                   for name in ("reference_lufs", "requested_lufs", "target_lufs")}
+        measured = observations.get(self.side)
+        estimated = None
+        if measured and self.lanes and not self.muted and self.source == "phrase":
+            estimated = round(measured["lufs"] + self.gain, 1)
         event = {"event": "level", "tone_id": self.side, "master_db": self.master, "muted": self.muted,
-                 "match": self.match, "match_db": round(trim, 1) if trim is not None else None,
-                 "applied_db": round(self.gain, 1), "status": status, "basis": basis if trim is not None else None,
-                 "limited": bool(self.lanes and self.gain > requested + .05), "reason": reason}
+                 "loudness_db": self.loudness, "match": self.match,
+                 "match_db": round(requested, 1) if plan is not None else None,
+                 "applied_db": round(self.gain, 1), "status": status, "basis": basis if plan is not None else None,
+                 **planned, "estimated_lufs": estimated, "held": held, "reason": reason,
+                 "limited": (lane_limited or (self.match and plan is None and self.loudness > .05)
+                             or (plan is not None and plan["target_lufs"] < plan["requested_lufs"] - .05))}
         if event != self.last_event:
             events(event)
             self.last_event = event
 
+    def clear_boost(self, qc, check_active):
+        """Remove a verified lift before changing what the measurement describes."""
+        if self.gain > 0:
+            gain, targets = lane_targets(self.lanes, 0., self.muted)
+            check_active()
+            write(qc, targets, self.applied)
+            self.gain, self.applied = gain, targets
+
     def observe(self, cursor, meters):
         """Return true when a complete phrase may have changed the matching trim."""
         if (not self.enabled or not self.match or self.muted or not cursor.returns or not self.lanes
-                or self.identity in self.observed or self.remembered in self.memory or matched_pair(self.measurements)):
+                or self.identity in self.observed or self.remembered in self.memory
+                or self.capture_measurement(self.side, self.identity)):
             cursor.level_probe = None
             return False
         capture = cursor.level_probe
