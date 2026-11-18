@@ -14,9 +14,11 @@ from .widgets import ACCENT, FONT, INK, LINE, MUTED, PANEL, RECESS, TEXT, button
 
 
 class Knob(tk.Canvas):
-    def __init__(self, parent, name, minimum, on_change):
-        super().__init__(parent, width=112, height=92, background=RECESS, highlightthickness=1,
-                         highlightbackground=RECESS, highlightcolor=ACCENT, takefocus=True)
+    def __init__(self, parent, name, minimum, on_change, *, colors=None):
+        self.colors = colors or (RECESS, ACCENT, TEXT, MUTED, LINE, "#34433c", "#27332c")
+        surface, accent, *_ = self.colors
+        super().__init__(parent, width=112, height=92, background=surface, highlightthickness=1,
+                         highlightbackground=surface, highlightcolor=accent, takefocus=True)
         self.name, self.minimum, self.on_change = name, minimum, on_change
         self.value = 0.0
         self.bind("<Button-1>", self.begin)
@@ -45,20 +47,21 @@ class Knob(tk.Canvas):
 
     def paint(self):
         self.delete("all")
+        _, accent, text, muted, line, track, dial = self.colors
         fraction = (self.value - self.minimum) / (1 - self.minimum)
         origin = (0 - self.minimum) / (1 - self.minimum)
         ring = (23, 10, 89, 76)
-        self.create_arc(*ring, start=225, extent=-270, style="arc", outline="#34433c", width=3)
+        self.create_arc(*ring, start=225, extent=-270, style="arc", outline=track, width=3)
         if fraction != origin:
             self.create_arc(*ring, start=225 - 270 * origin, extent=-270 * (fraction - origin),
-                            style="arc", outline=ACCENT, width=3)
-        self.create_oval(32, 19, 80, 67, fill="#27332c", outline=LINE)
+                            style="arc", outline=accent, width=3)
+        self.create_oval(32, 19, 80, 67, fill=dial, outline=line)
         angle = math.radians(225 - 270 * fraction)
         self.create_line(56 + 12 * math.cos(angle), 43 - 12 * math.sin(angle),
-                         56 + 18 * math.cos(angle), 43 - 18 * math.sin(angle), fill=ACCENT, width=3)
+                         56 + 18 * math.cos(angle), 43 - 18 * math.sin(angle), fill=accent, width=3)
         percent = round(self.value * 100)
         display = f"{percent:+d}%" if percent and self.minimum < 0 else f"{percent}%"
-        self.create_text(56, 84, text=display, fill=TEXT if percent else MUTED,
+        self.create_text(56, 84, text=display, fill=text if percent else muted,
                          font=(FONT, 9, "bold"))
 
 

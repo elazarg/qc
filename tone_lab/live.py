@@ -21,7 +21,7 @@ def update(qc, base, scene, values, previous, *, position=iterate.SCRATCH):
     if changed:
         if device.live_position(qc) != position:
             raise RuntimeError("The preset was switched while Tone Lab had live control.")
-        if any(index is None for _, _, index in changed) and device.active_scene(qc) != scene:
+        if device.active_scene(qc) != scene:
             raise RuntimeError("The scene was switched while Tone Lab had live control.")
         for (row, column, index), value in changed.items():
             if index is not None:

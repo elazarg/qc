@@ -1,6 +1,7 @@
 """Audition and keep validated drafts through the connected Quad Cortex."""
 
 from contextlib import contextmanager
+import math
 from pathlib import Path
 from queue import Empty
 import time
@@ -8,13 +9,14 @@ import time
 import numpy as np
 from qc_mcp import catalog, protocol
 
-from . import audio, device, iterate, preset_design, presets, session
+from . import audio, device, iterate, preset_design, presets, qc_library, session, styles
 
 
 WORK_SLOT = {**iterate.SCRATCH, "position": 255}
 WORK_NAME = "Tone Lab Vai"
 OUTPUT_GAIN = 16005
 PREVIEW_GAIN = -12.
+ASSET_LOADERS = {29001, 14000, 14001}
 
 
 def my_presets(qc):
@@ -58,30 +60,71 @@ def compile_chain(draft, gain):
     chain = []
     for block in recipe["chain"]:
         model_id = block["model_id"]
-        controls = models[model_id]["controls"]
+        controls = models[model_id]["controls"] if model_id in models else {}
         settings = [(controls[setting["name"]][0], setting["value"]) for setting in block["settings"]]
         chain.append((model_id, settings))
     chain.append((OUTPUT_GAIN, [(0, gain)]))
     return chain
 
 
-def assert_grid(qc, chain, routing):
+def _attachments(chain, draft):
+    needed = {column for column, (model, _) in enumerate(chain) if model in ASSET_LOADERS}
+    if not needed:
+        return {}
+    recipe = preset_design.validate(draft)
+    assets = {column: asset for column, block in enumerate(recipe["chain"])
+              if (asset := preset_design.asset_attachment(block))}
+    if needed != assets.keys() or any(chain[column][0] != asset.model_id for column, asset in assets.items()):
+        raise ValueError("The draft's asset bindings no longer match its working chain.")
+    return assets
+
+
+def _confirm_assets(qc, assets):
+    if not assets:
+        return
+    library = qc_library.from_catalog(qc.list_directory())
+    available = {(item.kind, item.key): item for item in (*library.irs, *library.captures)}
+    for asset in assets.values():
+        found = available.get((asset.kind, asset.key))
+        if found is None:
+            raise RuntimeError(f"{asset.name} is missing from this Quad Cortex. Restore the asset and try again.")
+        if found.capture_version is not None and found.capture_version != asset.capture_version:
+            raise RuntimeError(f"The Quad Cortex reports a different capture version for {asset.name}.")
+
+
+def assert_grid(qc, chain, routing, draft=None, *, edits=None, scene=0):
+    assets = _attachments(chain, draft)
     grid = device.read_preset(qc)
     expected = [[model_id for model_id, _ in chain], [], [], []]
     actual = [[model.hash for model in row.models if model.hash] for row in grid.chains]
     if actual != expected or iterate.routes(grid) != routing:
         raise RuntimeError("The Quad Cortex did not confirm the draft blocks and routing.")
+    edits = edits or {}
     for column, (model_id, settings) in enumerate(chain):
-        params = grid.chains[0].models[column].params
-        for index, display in settings:
+        block = grid.chains[0].models[column]
+        if column in assets and not qc_library.asset_matches(block, assets[column]):
+            raise RuntimeError(f"The Quad Cortex did not confirm the asset binding for {assets[column].name}.")
+        expected_values = dict(settings)
+        expected_values.update({index: edit["to"] for (row, col, index), edit in edits.items()
+                                if row == 0 and col == column and index is not None})
+        for index, display in expected_values.items():
             raw = catalog.to_norm(model_id, index, display)
-            values = params[index].param_values
-            if not values or abs(values[0].float_value - raw) > .006:
+            parameter = block.params[index]
+            selected = scene if parameter.scene_mode else 0
+            values = parameter.param_values
+            if selected >= len(values) or abs(values[selected].float_value - raw) > .006:
                 raise RuntimeError(f"The Quad Cortex did not confirm a setting on {catalog.lookup(model_id)['name']}.")
+        if (change := edits.get((0, column, None))) is not None:
+            bypass = grid.bypass[0].colBypass[column]
+            selected = scene if bypass.sceneMode else 0
+            if selected >= len(bypass.sceneBypass) or bypass.sceneBypass[selected].bypass != change["to"]:
+                raise RuntimeError("The Quad Cortex did not confirm the draft's bypass change.")
     return grid
 
 
-def build_grid(qc, scratch, chain):
+def build_grid(qc, scratch, chain, draft=None):
+    assets = _attachments(chain, draft)
+    _confirm_assets(qc, assets)
     if device.live_position(qc) != WORK_SLOT:
         raise RuntimeError("The Quad Cortex changed before the draft could be built.")
     iterate.set_routes(qc, iterate.USB_ROUTES)
@@ -100,13 +143,16 @@ def build_grid(qc, scratch, chain):
     for column, (model_id, settings) in enumerate(chain):
         if device.live_position(qc) != WORK_SLOT:
             raise RuntimeError("The selected preset changed while the draft was being built.")
-        qc.add_block(model_id, row=0, column=column)
+        if column in assets:
+            qc_library.add_asset(qc, assets[column], 0, column)
+        else:
+            qc.add_block(model_id, row=0, column=column)
         time.sleep(.10)
         for index, value in settings:
             qc.set_param(0, column, index, catalog.to_norm(model_id, index, value))
             time.sleep(.07)
     time.sleep(.40)
-    assert_grid(qc, chain, iterate.USB_ROUTES)
+    return assert_grid(qc, chain, iterate.USB_ROUTES, draft)
 
 
 def guitar_routes(physical_input):
@@ -115,7 +161,7 @@ def guitar_routes(physical_input):
     return [(physical_input, 19), (0, 0), (0, 0), (0, 0)]
 
 
-def route_to_guitar(qc, chain, physical_input):
+def route_to_guitar(qc, chain, physical_input, draft=None):
     if device.live_position(qc) != WORK_SLOT:
         raise RuntimeError("The working draft is no longer selected.")
     routing = guitar_routes(physical_input)
@@ -124,22 +170,22 @@ def route_to_guitar(qc, chain, physical_input):
     time.sleep(.15)
     qc.set_routing(0, *routing[0])
     time.sleep(.25)
-    return assert_grid(qc, chain, routing)
+    return assert_grid(qc, chain, routing, draft)
 
 
 def try_guitar(draft, physical_input, gain, stop, commands, report):
     """Monitor the draft on the hardware until Stop live is pressed."""
-    from . import live, styles
+    from . import live
 
     if stop.is_set():
         return
     chain = compile_chain(draft, min(PREVIEW_GAIN if gain is None else gain, -6.0))
     with device.connect(write=True) as qc:
         with working_grid(qc) as scratch:
-            build_grid(qc, scratch, chain)
+            build_grid(qc, scratch, chain, draft)
             if stop.is_set():
                 return
-            base = route_to_guitar(qc, chain, physical_input)
+            base = route_to_guitar(qc, chain, physical_input, draft)
             scene = device.active_scene(qc)
             report({"event": "controls", "available": styles.available_knobs(base, scene)})
             report(f"Playing draft · {draft['name']}")
@@ -164,8 +210,30 @@ def try_guitar(draft, physical_input, gain, stop, commands, report):
                     checked = now
 
 
-def hear(draft, take):
+def clean_values(values):
+    clean = {}
+    for name, value in (values or {}).items():
+        if (name not in styles.KNOBS or type(value) not in (int, float) or not math.isfinite(value)
+                or not styles.KNOBS[name][1] <= value <= 1):
+            raise ValueError(f"Invalid tone direction setting for {name}.")
+        if value:
+            clean[name] = float(value)
+    return clean
+
+
+def _shape(qc, base, values, scene=None):
+    from . import live
+
+    current = device.active_scene(qc)
+    scene = current if scene is None else scene
+    if scene != current:
+        device.select_scene(qc, scene)
+    return live.update(qc, base, scene, values, {}, position=WORK_SLOT) if values else {}, scene
+
+
+def hear(draft, take, *, values=None):
     take = Path(take)
+    values = clean_values(values)
     info, selection, dry, wet = iterate.take_audio(take)
     target_level = audio.describe(wet)["lufs"]
     if target_level is None:
@@ -175,7 +243,10 @@ def hear(draft, take):
     with device.connect(write=True) as qc:
         offset = iterate.calibration_offset(qc)
         with working_grid(qc) as scratch:
-            build_grid(qc, scratch, chain)
+            base = build_grid(qc, scratch, chain, draft)
+            edits, scene = _shape(qc, base, values)
+            if edits:
+                assert_grid(qc, chain, iterate.USB_ROUTES, draft, edits=edits, scene=scene)
             samples = audio.reamp(dry)[offset:offset + len(dry)].copy()
             if samples.shape != wet.shape:
                 raise RuntimeError("The Quad Cortex return did not match the performance length.")
@@ -191,7 +262,7 @@ def hear(draft, take):
                 control = catalog.to_norm(OUTPUT_GAIN, 0, gain)
                 qc.set_param(0, len(chain) - 1, 0, control)
                 time.sleep(.25)
-                assert_grid(qc, compile_chain(draft, gain), iterate.USB_ROUTES)
+                assert_grid(qc, compile_chain(draft, gain), iterate.USB_ROUTES, draft, edits=edits, scene=scene)
                 scaled = audio.reamp(dry)[offset:offset + len(dry)].copy()
             metrics = audio.describe(scaled)
             if scaled.shape != wet.shape or metrics["lufs"] is None or metrics["clipped_samples"]:
@@ -201,7 +272,7 @@ def hear(draft, take):
     manifest.update(draft_id=draft["id"], source_clip=take.name, selection_seconds=list(selection),
                     save_input=info.get("physical_input", 1), output_gain_db=gain,
                     original_preset=info.get("wet_preset"),
-                    original_scene=info.get("wet_scene"))
+                    original_scene=info.get("wet_scene"), draft_scene=device.SCENES[scene], knob_values=values)
     fade = np.linspace(0, 1, 480)[:, None]
     for track in (wet, scaled):
         track[:480] *= fade
@@ -228,29 +299,45 @@ def new_slot(files, name):
     raise RuntimeError("Choose a different name for this preset.")
 
 
-def save(draft, proof=None, *, physical_input=1):
+def save(draft, proof=None, *, physical_input=1, allow_my_presets=False, values=None):
     gain = PREVIEW_GAIN
+    proof_values = {}
+    proof_scene = None
     if proof is not None:
         manifest = session.load_session(proof)
         if manifest.get("draft_id") != draft["id"] or manifest.get("state") != "ready":
             raise ValueError("This audition belongs to a different preset draft.")
-        gain, physical_input = manifest["output_gain_db"], manifest["save_input"]
+        proof_values = clean_values(manifest.get("knob_values"))
+        if values is None or clean_values(values) == proof_values:
+            gain, physical_input = manifest["output_gain_db"], manifest["save_input"]
+            recorded_scene = manifest.get("draft_scene")
+            if isinstance(recorded_scene, str) and len(recorded_scene) == 1 and recorded_scene in device.SCENES:
+                proof_scene = device.SCENES.index(recorded_scene)
+    values = proof_values if values is None else clean_values(values)
     if (type(gain) not in (int, float) or not -30 <= gain <= 0 or physical_input not in (1, 2)):
         raise ValueError("The draft audition is missing verified routing and gain.")
     chain = compile_chain(draft, gain)
     with device.connect(write=True) as qc:
         visited = []
+        name = preset_design.preset_name(draft["name"])
+        qc_library.destination(qc, name, allow_my_presets=allow_my_presets)
         with working_grid(qc, visited) as scratch:
-            build_grid(qc, scratch, chain)
-            index, name = new_slot(my_presets(qc), preset_design.preset_name(draft["name"]))
-            route_to_guitar(qc, chain, physical_input)
-            address = {**WORK_SLOT, "position": index}
-            qc.write_preset_file(address["folder_key"], index, name)
+            build_grid(qc, scratch, chain, draft)
+            base = route_to_guitar(qc, chain, physical_input, draft)
+            edits, scene = _shape(qc, base, values, proof_scene)
+            if edits:
+                assert_grid(qc, chain, guitar_routes(physical_input), draft, edits=edits, scene=scene)
+            saved = qc_library.destination(qc, name, allow_my_presets=allow_my_presets)
+            address = saved.position
+            if device.live_position(qc) != WORK_SLOT:
+                raise RuntimeError("The working draft is no longer selected. No preset was saved.")
+            qc.write_preset_file(address["folder_key"], address["position"], saved.name)
             time.sleep(.65)
             visited.append(address)
-            iterate.recall(qc, address, name)
-            verified = assert_grid(qc, chain, guitar_routes(physical_input))
+            iterate.recall(qc, address, saved.name)
+            if device.active_scene(qc) != scene:
+                device.select_scene(qc, scene)
+            verified = assert_grid(qc, chain, guitar_routes(physical_input), draft, edits=edits, scene=scene)
             presets.archive(verified, address, qc.firmware, reason="Kept AI draft in a new Quad Cortex slot")
-    label = f"{name} · My Presets {index // 8 + 1}{'ABCDEFGH'[index % 8]}"
-    session.write_json(session.SESSIONS / "drafts" / f"{draft['id']}.kept.json", {"label": label})
-    return label
+    return qc_library.store_receipt(draft["id"], saved, qc_library.preset_fingerprint(verified),
+                                    scene=device.SCENES[scene], values=values)

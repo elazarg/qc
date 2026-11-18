@@ -9,19 +9,23 @@ import tkinter as tk
 from tkinter import filedialog
 import webbrowser
 
-from . import advisor, capture, desktop, device, diagnostics, draft_render, iterate, listening, preset_design, preset_library, session, styles
+from . import advisor, capture, desktop, device, diagnostics, draft_render, listening, live_client, monitor, preset_design, preset_library, qc_library, session, styles
+from .knob_panel import KnobPanel
+from .tone_identity import Tone
+from .tone_space_ui import ToneSpacePanel
 
 
-PAPER = "#f1efea"
-WHITE = "#ffffff"
-INK = "#22232a"
-SUBTLE = "#5a5b67"
-RULE = "#dedbd5"
-DARK = "#24262f"
-TILE = "#353743"
-LIGHT = "#f8f7f4"
+PAPER = "#14151a"
+WHITE = "#252834"
+INK = "#f0ede9"
+SUBTLE = "#a5a6b5"
+RULE = "#383c4a"
+DARK = "#1e2028"
+TILE = "#2c303c"
+LIGHT = "#f5f1ee"
 SOFT = "#bcbcc9"
-ACCENT = "#ffc18f"
+ACCENT = "#f7b889"
+ACCENT_INK = "#1a1718"
 FONT = "Segoe UI"
 
 
@@ -34,8 +38,9 @@ def control(parent, title, action, *, primary=False, dark=False):
     return tk.Button(parent, text=title, command=action, relief="flat", borderwidth=0, takefocus=True,
                      padx=13, pady=6, cursor="hand2", font=(FONT, 10, "bold"),
                      bg=ACCENT if primary else TILE if dark else WHITE,
-                     fg=LIGHT if dark and not primary else INK,
-                     activebackground="#ffd7b7" if primary else "#dcd7d0", activeforeground=INK,
+                     fg=ACCENT_INK if primary else INK,
+                     activebackground="#ffd7b7" if primary else RULE,
+                     activeforeground=ACCENT_INK if primary else INK,
                      disabledforeground="#92909a", highlightthickness=1, highlightbackground=parent["bg"],
                      highlightcolor="#b2541d")
 
@@ -44,7 +49,8 @@ def menu(parent, title, *, dark=False, refresh=None):
     button = tk.Menubutton(parent, text=title, indicatoron=True, cursor="hand2", takefocus=True,
                           font=(FONT, 10, "bold"), bg=TILE if dark else WHITE,
                           fg=LIGHT if dark else INK, padx=13, pady=7)
-    entries = tk.Menu(button, tearoff=False, postcommand=refresh)
+    entries = tk.Menu(button, tearoff=False, postcommand=refresh, bg=WHITE, fg=LIGHT,
+                      activebackground=RULE, activeforeground=LIGHT)
     button.configure(menu=entries)
     return button, entries
 
@@ -63,17 +69,23 @@ class Desk:
         self.control_mail = Queue()
         self.live_messages = Queue()
         self.values = {}
+        self.audition_values = {}
+        self.available = None
+        self.active_source = None
+        self.requested_source = None
+        self.base_bypassed = False
         self.takes = listening.takes()
         self.drafts = {draft["id"]: draft for draft in preset_design.history()}
         self.presets = None
         self.reference = self.reference_choice = None
-        self.adjustment = {}
         self.take = self.baseline = self.alternative = self.draft = None
+        self.tone_a, self.tone_b = Tone.original(), None
         self.last_heard = self.kept = self.playing = self.play_group = None
         self.kept_note = ""
         self.qc_name = None
         self.state_file = session.SESSIONS / "desk.json"
         self.state = self.read_state(self.state_file)
+        self.values = {key: val for key, val in self.state.get("shape", {}).items() if key in styles.KNOBS}
         guitar = self.state.get("guitar") or self.read_state(session.SESSIONS / "player.json").get("guitar")
         self.guitar = tk.StringVar(value=guitar if guitar in session.GUITARS else session.GUITARS[0])
         self.request = tk.StringVar()
@@ -84,6 +96,7 @@ class Desk:
         self.hardware = tk.StringVar(value="Quad Cortex · checking connection")
         self.step = tk.StringVar()
         self.a_name, self.b_name = tk.StringVar(), tk.StringVar()
+        self.a_context, self.b_context = tk.StringVar(), tk.StringVar()
         self.build()
         selected = next((take for take in self.takes if take.folder.name == self.state.get("take")), None)
         self.select_take(selected or (self.takes[0] if self.takes else None), remember=False)
@@ -105,115 +118,145 @@ class Desk:
         root = self.root
         root.title("Tone Lab")
         root.configure(bg=PAPER)
-        root.minsize(850, 545)
-        root.geometry(f"{min(1060, max(850, root.winfo_screenwidth() - 70))}x"
-                      f"{min(575, max(545, root.winfo_screenheight() - 110))}")
+        root.minsize(940, 700)
+        root.geometry(f"{min(1180, max(940, root.winfo_screenwidth() - 80))}x"
+                      f"{min(800, max(700, root.winfo_screenheight() - 85))}")
         root.protocol("WM_DELETE_WINDOW", lambda: self.close(None))
         root.bind("<Escape>", lambda _: self.stop())
         root.bind("<Control-k>", lambda _: self.command.focus_set())
-        root.bind("<Control-1>", lambda _: self.listen("a"))
-        root.bind("<Control-2>", lambda _: self.listen_or_render())
+        root.bind("<Control-1>", lambda _: self.listen_or_render("a"))
+        root.bind("<Control-2>", lambda _: self.listen_or_render("b"))
+        root.bind("<Control-g>", lambda _: self.start_source("guitar"))
+        root.bind("<Control-l>", lambda _: self.start_source("phrase"))
+        root.bind("<Control-0>", lambda _: self.toggle_base())
 
-        page = tk.Frame(root, bg=PAPER, padx=25, pady=15)
+        page = tk.Frame(root, bg=PAPER, padx=22, pady=12)
         page.pack(fill="both", expand=True)
         header = tk.Frame(page, bg=PAPER)
-        header.pack(fill="x", pady=(0, 12))
-        text(header, "Tone Lab", size=19, bold=True).pack(side="left")
-        self.tools, tools = menu(header, "Tools")
+        header.pack(fill="x", pady=(0, 9))
+        text(header, "Tone Lab", size=19, bold=True).pack(side="left", padx=(0, 15))
+        self.tabs = {}
+        for name in ("Shape", "Sounds", "Lab", "Setup"):
+            tab = control(header, name, lambda chosen=name: self.show_tab(chosen))
+            tab.pack(side="left", padx=(0, 3))
+            self.tabs[name] = tab
+        self.tools, tools = menu(header, "QC")
         tools.add_command(label="Open Cortex Control", command=self.open_editor)
-        tools.add_command(label="Check Quad Cortex", command=self.check_qc)
-        tools.add_command(label="Open workbench · calibration, levels and tone controls",
-                          command=lambda: self.close("workbench"))
+        tools.add_command(label="Check current preset", command=self.check_qc)
         self.tools.pack(side="right")
         guitar, guitars = menu(header, "")
         guitar.configure(textvariable=self.guitar)
         for name in session.GUITARS:
             guitars.add_command(label=name, command=lambda value=name: self.select_guitar(value))
-        guitar.pack(side="right", padx=(6, 9))
-        text(header, variable=self.hardware, size=10, color=SUBTLE).pack(side="right")
+        guitar.pack(side="right", padx=5)
+        text(header, variable=self.hardware, size=9, color=SUBTLE).pack(side="right", padx=(6, 0))
 
-        ask = tk.Frame(page, bg=WHITE, padx=16, pady=12)
-        ask.pack(fill="x")
-        caption = tk.Frame(ask, bg=WHITE)
-        caption.pack(fill="x")
-        text(caption, "What should it sound like?", size=22, bold=True).pack(side="left")
-        text(caption, "Win+H to dictate", size=9, color=SUBTLE).pack(side="right")
-        entry = tk.Frame(ask, bg=WHITE)
-        entry.pack(fill="x", pady=(9, 5))
-        self.command = tk.Entry(entry, textvariable=self.request, font=(FONT, 13), bg=PAPER, fg=INK,
+        ask = tk.Frame(page, bg=PAPER)
+        ask.pack(fill="x", pady=(0, 6))
+        self.command = tk.Entry(ask, textvariable=self.request, font=(FONT, 12), bg=DARK, fg=INK,
                                 relief="flat", highlightthickness=1, highlightbackground=RULE,
-                                highlightcolor="#b2541d", insertbackground=INK)
-        self.command.pack(side="left", fill="x", expand=True, ipady=8, padx=(0, 7))
+                                highlightcolor=ACCENT, insertbackground=LIGHT)
+        self.command.pack(side="left", fill="x", expand=True, ipady=7, padx=(0, 5))
         self.command.bind("<Return>", lambda _: self.ask())
-        self.ask_button = control(entry, "Ask Tone Lab", self.ask, primary=True)
-        self.ask_button.pack(side="right")
-        self.guidance = text(ask, variable=self.status, color=SUBTLE, size=10, wrap=790)
-        self.guidance.pack(fill="x", pady=(2, 0))
-        ask.bind("<Configure>", lambda event: self.guidance.configure(wraplength=max(200, event.width - 36)))
+        self.ask_button = control(ask, "Ask", self.ask, primary=True)
+        self.ask_button.pack(side="left")
+        text(ask, "Win+H", size=9, color=SUBTLE).pack(side="left", padx=7)
+        status = text(page, variable=self.status, color=SUBTLE, size=10, wrap=1000)
+        status.pack(fill="x", pady=(0, 6))
+        page.bind("<Configure>", lambda event: status.configure(wraplength=max(300, event.width - 44)))
 
-        sources = tk.Frame(page, bg=PAPER, pady=9)
-        sources.pack(fill="x")
-        phrase = tk.Frame(sources, bg=PAPER)
-        phrase.pack(side="left", fill="x", expand=True)
-        text(phrase, "YOUR PHRASE", bold=True, color=SUBTLE, size=9).pack(anchor="w")
-        self.phrase_line = text(phrase, variable=self.phrase, bold=True, size=10)
-        self.phrase_line.pack(anchor="w")
-        self.take_menu, self.take_options = menu(phrase, "Choose", refresh=self.list_phrases)
-        self.take_menu.pack(side="left", pady=(4, 0))
-        self.record = control(phrase, "Record phrase", self.recording)
-        self.record.pack(side="left", padx=(5, 0), pady=(4, 0))
-        ref = tk.Frame(sources, bg=PAPER)
-        ref.pack(side="left", fill="x", expand=True, padx=(12, 0))
-        text(ref, "REFERENCE", bold=True, color=SUBTLE, size=9).pack(anchor="w")
-        text(ref, variable=self.target, bold=True, size=10, wrap=350).pack(anchor="w")
-        self.ref_menu, refs = menu(ref, "Choose")
+        deck = tk.Frame(page, bg=DARK, padx=13, pady=10)
+        deck.pack(fill="x", pady=(0, 10))
+        line = tk.Frame(deck, bg=DARK)
+        line.pack(fill="x")
+        self.live_button = control(line, "Guitar", lambda: self.start_source("guitar"), dark=True)
+        self.live_button.pack(side="left", padx=(0, 4))
+        self.loop_button = control(line, "▶  Phrase", lambda: self.start_source("phrase"), dark=True)
+        self.loop_button.pack(side="left", padx=(0, 4))
+        self.pause = control(line, "■", self.stop, dark=True)
+        self.pause.pack(side="left")
+        text(line, variable=self.output, size=10, color=SOFT).pack(side="left", padx=9)
+        self.save_button = control(line, "Save to QC", self.save, primary=True)
+        self.save_button.pack(side="right")
+        self.detail_menu, self.details = menu(line, "Details", dark=True, refresh=self.list_details)
+        self.detail_menu.pack(side="right", padx=5)
+
+        context = tk.Frame(deck, bg=DARK)
+        context.pack(fill="x", pady=(8, 0))
+        context.columnconfigure(0, weight=1, uniform="pair")
+        context.columnconfigure(1, weight=1, uniform="pair")
+        phrase = tk.Frame(context, bg=DARK)
+        phrase.grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        text(phrase, variable=self.phrase, size=10, color=SOFT).pack(side="left", fill="x", expand=True)
+        self.take_menu, self.take_options = menu(phrase, "Takes", dark=True, refresh=self.list_phrases)
+        self.take_menu.pack(side="right")
+        self.record = control(phrase, "● Rec", self.recording, dark=True)
+        self.record.pack(side="right", padx=(0, 4))
+        ref = tk.Frame(context, bg=DARK)
+        ref.grid(row=0, column=1, sticky="ew", padx=(6, 0))
+        text(ref, variable=self.target, size=10, color=SOFT).pack(side="left", fill="x", expand=True)
+        self.ref_menu, refs = menu(ref, "Reference", dark=True)
         refs.add_command(label="A saved Quad Cortex preset", command=lambda: self.find_presets(""))
         refs.add_command(label="An audio excerpt", command=self.choose_wave)
         self.reference_history = tk.Menu(refs, tearoff=False, postcommand=self.list_references)
         refs.add_cascade(label="Previously captured presets", menu=self.reference_history)
         refs.add_command(label="Clear reference", command=self.clear_reference)
-        self.ref_menu.pack(side="left", pady=(4, 0))
-        self.hear_reference = control(ref, "Play reference", lambda: self.listen("reference"))
-        self.hear_reference.pack(side="left", padx=(5, 0), pady=(4, 0))
-        self.match_button = control(ref, "Find a match", self.match)
-        self.match_button.pack(side="left", padx=(5, 0), pady=(4, 0))
+        self.ref_menu.pack(side="right")
+        self.hear_reference = control(ref, "▶", lambda: self.listen("reference"), dark=True)
+        self.hear_reference.pack(side="right", padx=(0, 4))
+        self.match_button = control(ref, "Match", self.match, dark=True)
+        self.match_button.pack(side="right", padx=(0, 4))
 
-        deck = tk.Frame(page, bg=DARK, padx=16, pady=13)
-        deck.pack(fill="both", expand=True)
-        line = tk.Frame(deck, bg=DARK)
-        line.pack(fill="x")
-        text(line, "Listen", size=15, color=LIGHT, bold=True).pack(side="left")
-        text(line, variable=self.output, size=9, color=SOFT).pack(side="right")
         pair = tk.Frame(deck, bg=DARK)
-        pair.pack(fill="x", pady=(8, 7))
-        self.a_tile = self.tile(pair, "A  ·  STARTING SOUND", self.a_name, lambda: self.listen("a"))
-        self.a_tile.pack(side="left", fill="both", expand=True, padx=(0, 4))
-        self.b_tile = self.tile(pair, "B  ·  ALTERNATIVE", self.b_name, self.listen_or_render)
-        self.b_tile.pack(side="left", fill="both", expand=True, padx=(4, 0))
-        self.playhead = tk.Canvas(deck, background=TILE, height=4, highlightthickness=0)
+        pair.pack(fill="x", pady=(7, 4))
+        pair.columnconfigure((0, 1), weight=1, uniform="pair")
+        self.a_tile = self.tile(pair, "A", self.a_name, self.a_context, lambda: self.listen_or_render("a"), 0)
+        self.b_tile = self.tile(pair, "B", self.b_name, self.b_context, lambda: self.listen_or_render("b"), 1)
+        self.playhead = tk.Canvas(deck, background=TILE, height=3, highlightthickness=0)
         self.playhead.pack(fill="x")
-        self.position = self.playhead.create_rectangle(0, 0, 0, 4, fill=ACCENT, width=0)
-        transport = tk.Frame(deck, bg=DARK)
-        transport.pack(fill="x", pady=(7, 0))
-        self.pause = control(transport, "Stop", self.stop, dark=True)
-        self.pause.pack(side="left")
-        self.keep_button = control(transport, "Keep this sound", self.keep, primary=True)
+        self.position = self.playhead.create_rectangle(0, 0, 0, 3, fill=ACCENT, width=0)
+        status_row = tk.Frame(deck, bg=DARK)
+        status_row.pack(fill="x", pady=(3, 0))
+        text(status_row, variable=self.step, size=9, color=SOFT).pack(side="left")
+        self.keep_button = control(status_row, "Keep choice", self.keep, dark=True)
         self.keep_button.pack(side="right")
-        self.try_button = control(transport, "Try with guitar", self.try_guitar, dark=True)
-        self.try_button.pack(side="right", padx=(0, 5))
-        self.detail_menu, self.details = menu(transport, "Details", dark=True, refresh=self.list_details)
-        self.detail_menu.pack(side="right", padx=(0, 5))
-        text(transport, variable=self.step, color=SOFT, size=9, wrap=330).pack(side="left", padx=9)
+
+        viewport = tk.Frame(page, bg=PAPER)
+        viewport.pack(fill="both", expand=True)
+        self.knobs = KnobPanel(viewport, self)
+        self.space = ToneSpacePanel(viewport, read_values=lambda: self.values, apply_values=self.set_shape,
+                                    audition=lambda: self.listen_or_render("b"),
+                                    read_sounds=lambda: (self.baseline, self.alternative))
+        from .qc_browser import Browser
+        from .setup_ui import SetupPanel
+
+        self.browser = Browser(viewport, self)
+        self.setup = SetupPanel(viewport, self, live_observer=True)
+        self.pages = {"Shape": self.knobs, "Sounds": self.browser, "Lab": self.space, "Setup": self.setup}
+        self.show_tab("Shape")
 
     @staticmethod
-    def tile(parent, heading, caption, action):
-        tile = tk.Button(parent, relief="flat", anchor="w", justify="left", width=25, height=2, padx=12, pady=5,
-                         takefocus=True, cursor="hand2", bg=TILE, fg=LIGHT, disabledforeground=SOFT,
-                         activebackground="#ffd7b7", activeforeground=INK, font=(FONT, 12, "bold"),
-                         highlightthickness=1, highlightbackground=TILE, highlightcolor=ACCENT, command=action)
-        tile.heading = heading
-        caption.trace_add("write", lambda *_: tile.configure(text=f"{tile.heading}\n{caption.get()}"))
-        return tile
+    def tile(parent, side, title, hint, action, column):
+        frame = tk.Frame(parent, bg=TILE, padx=5, pady=3)
+        frame.grid(row=0, column=column, sticky="ew", padx=(0, 5) if column == 0 else (5, 0))
+        button = control(frame, "▶", action, dark=True)
+        button.pack(side="left", padx=(0, 7))
+        info = tk.Frame(frame, bg=TILE)
+        info.pack(side="left", fill="x", expand=True)
+        label = text(info, "", bold=True, size=11)
+        label.pack(anchor="w")
+        label.configure(width=39)
+        title.trace_add("write", lambda *_: label.configure(text=f"{side}  ·  {title.get()}"))
+        text(info, variable=hint, color=SUBTLE, size=9).pack(anchor="w")
+        return button
+
+    def show_tab(self, name):
+        for page in self.pages.values():
+            page.pack_forget()
+        self.pages[name].pack(fill="both", expand=True)
+        for title, button in self.tabs.items():
+            button.configure(bg=ACCENT if title == name else WHITE, fg=ACCENT_INK if title == name else INK)
+        self.tab = name
 
     def set_status(self, value):
         self.status.set(value)
@@ -225,23 +268,26 @@ class Desk:
         self.reference = listening.Sound.from_record(self.state.get("reference"))
         if self.state.get("draft") in self.drafts:
             self.draft = self.drafts[self.state["draft"]]
-        if self.take and self.state.get("take") == self.take.folder.name:
-            stored_a = listening.Sound.from_record(self.state.get("baseline"))
-            stored_b = listening.Sound.from_record(self.state.get("alternative"))
-            if stored_a and stored_a.paired_with(self.take.original):
-                self.baseline = stored_a
-                self.alternative = stored_b if stored_b and stored_b.paired_with(stored_a) else None
+        self.tone_a = (Tone.from_record(self.state.get("tone_a"))
+                       or Tone.from_sound(listening.Sound.from_record(self.state.get("baseline"))) or Tone.original())
+        self.tone_b = (Tone.from_record(self.state.get("tone_b"))
+                       or Tone.from_sound(listening.Sound.from_record(self.state.get("alternative"))) or self.tone_b)
+        if not self.tone_b and self.draft:
+            self.tone_b = Tone.from_draft(self.draft)
+        self.resolve_audio()
         if self.state.get("kept"):
             self.kept = Path(self.state["kept"])
             self.kept_note = self.state.get("kept_note", "")
-        if self.draft:
-            self.set_status(self.draft["target"])
+        if self.tone_b and self.tone_b.preset:
+            self.set_status(f"{self.tone_b.name} is on the Quad Cortex.")
         self.update()
 
     def remember(self):
         data = {"guitar": self.guitar.get(), "take": self.take.folder.name if self.take else None,
                 "kept": str(self.kept) if self.kept else None, "kept_note": self.kept_note,
                 "draft": self.draft["id"] if self.draft else None,
+                "shape": self.values, "tone_a": self.tone_a.to_record(),
+                "tone_b": self.tone_b.to_record() if self.tone_b else None,
                 "reference": self.reference.to_record() if self.reference else None,
                 "baseline": self.baseline.to_record() if self.baseline else None,
                 "alternative": self.alternative.to_record() if self.alternative else None}
@@ -265,23 +311,82 @@ class Desk:
             self.take_options.add_command(label="No paired phrases yet", state="disabled")
 
     def select_take(self, take, *, remember=True):
-        if self.job is not None:
+        live_monitor = self.task_if_active("monitor")
+        if self.job is not None and not live_monitor:
             return
         self.stop_audio()
         self.last_heard = None
         self.take = take
-        if self.draft and take:
-            self.baseline, self.alternative = take.original, None
-        else:
-            self.baseline, self.alternative = listening.latest_comparison(take) if take else (None, None)
-        if self.alternative and self.alternative.draft_id:
-            self.draft = self.drafts.get(self.alternative.draft_id)
-        self.adjustment = {}
-        self.set_status("Try “Make me a Lenny Kravitz preset” or describe a change to your sound." if not self.draft
-                        else f"{self.draft['target']}")
+        if not remember and take:
+            _, recent = listening.latest_comparison(take)
+            self.tone_b = Tone.from_sound(recent)
+        self.resolve_audio()
+        if live_monitor and self.requested_source == "phrase":
+            self.start_source("phrase")
         if remember:
             self.remember()
         self.update()
+
+    def resolve_audio(self):
+        self.baseline = self.tone_a.asset(self.take)
+        self.alternative = self.alternative_asset()
+        self.audition_values = self.rendered_values(self.alternative)
+        if (self.tone_b and self.tone_b.preset and self.alternative and self.alternative.draft_id
+                and self.audition_values == dict(self.tone_b.values)):
+            self.audition_values = {}
+
+    def alternative_asset(self):
+        tone = self.tone_b
+        if tone and tone.kind == "draft":
+            tone = tone.with_values(self.values)
+        return tone.asset(self.take) if tone else None
+
+    @staticmethod
+    def rendered_values(sound):
+        if sound and sound.folder:
+            values = Desk.read_state(sound.folder / "session.json").get("knob_values", {})
+            return {key: value for key, value in values.items() if value}
+        return {}
+
+    def shape_tone(self):
+        return self.tone_b if self.tone_b and self.tone_b.kind in ("draft", "preset") else None
+
+    def shape_dirty(self):
+        return self.values != self.audition_values
+
+    def set_shape(self, values):
+        value_map = {}
+        for key, value in values.items():
+            if key in styles.KNOBS:
+                floor = styles.KNOBS[key][1]
+                value = round(max(floor, min(1., float(value))), 2)
+                if value:
+                    value_map[key] = value
+        self.values = value_map
+        if self.task_if_active("monitor"):
+            self.base_bypassed = False
+            self.control_mail.put({"event": "knobs", "values": self.values})
+            self.show_monitor_output()
+        if getattr(self, "shape_writer", None) is not None:
+            self.root.after_cancel(self.shape_writer)
+        self.shape_writer = self.root.after(350, self.write_shape)
+        self.update()
+
+    def write_shape(self):
+        self.shape_writer = None
+        self.remember()
+
+    def toggle_base(self):
+        if self.task_if_active("monitor") and self.active_source and self.values and not self.stop_signal.is_set():
+            self.base_bypassed = not self.base_bypassed
+            self.control_mail.put({"event": "knobs", "values": {} if self.base_bypassed else self.values})
+            self.show_monitor_output()
+            self.update()
+
+    def show_monitor_output(self):
+        if self.active_source:
+            shape = " · base" if self.base_bypassed else ""
+            self.output.set(f"{self.active_source.title()} → {self.active_monitor_name}{shape} · Quad Cortex")
 
     def update(self):
         take = self.take
@@ -290,50 +395,75 @@ class Desk:
             self.phrase.set(f"{take.name}  ·  {take.info.get('guitar') or 'Guitar unlabelled'}  ·  {length:.1f}s")
         else:
             self.phrase.set("Record a phrase or build a sound first")
-        self.target.set(self.reference.name if self.reference else "No reference selected")
-        self.a_tile.heading = "A  ·  REFERENCE" if self.baseline and self.baseline == self.reference else "A  ·  STARTING SOUND"
-        self.b_tile.heading = "B  ·  REFERENCE" if self.alternative and self.alternative == self.reference else "B  ·  ALTERNATIVE"
-        self.a_name.set(self.baseline.name if self.baseline else "Record a phrase")
-        if self.alternative:
-            self.b_name.set(self.alternative.name)
-        elif self.draft or self.adjustment:
-            self.b_name.set("Render the change" if self.take else "Needs a phrase")
-        else:
-            self.b_name.set("Ask for a change")
-        renderable = (self.draft or self.adjustment) and self.take
+        self.target.set(f"Reference · {self.reference.name}" if self.reference else "Choose a reference")
+        self.a_name.set(self.baseline.name if self.baseline else self.tone_a.name)
+        self.b_name.set(self.tone_b.name if self.tone_b else "Current Quad Cortex")
+        self.a_context.set(self.tone_caption(self.tone_a, self.baseline))
+        self.b_context.set(self.tone_caption(self.tone_b, self.alternative, shaped=self.shape_dirty()))
+        renderable = (self.shape_tone() or self.values) and self.take
         idle = self.job is None
+        live_monitor = self.task_if_active("monitor") and not self.stop_signal.is_set()
         for button, enabled in (
-                (self.a_tile, idle and self.baseline), (self.b_tile, idle and (self.alternative or renderable)),
+                (self.a_tile, idle and (self.baseline or self.take and self.tone_a.kind in ("preset", "draft"))),
+                (self.b_tile, idle and (self.alternative or renderable)),
                 (self.ask_button, self.thinking is None and self.leaving is None),
-                (self.take_menu, idle and self.takes), (self.ref_menu, idle),
+                (self.take_menu, (idle or live_monitor) and self.takes), (self.ref_menu, idle),
                 (self.hear_reference, idle and self.reference), (self.match_button, idle and self.take and self.reference),
                 (self.keep_button, idle and self.selected_sound()),
-                (self.try_button, idle and self.draft), (self.record, idle or self.task == "record"),
+                (self.save_button, idle and (self.shape_tone() or self.values)),
+                (self.live_button, idle or live_monitor), (self.loop_button, (idle or live_monitor) and self.take),
+                (self.record, idle or self.task == "record"),
                 (self.pause, not idle and self.stop_signal or self.playing or self.play_job)):
             button.configure(state="normal" if enabled else "disabled")
         for tile, sound in ((self.a_tile, self.baseline), (self.b_tile, self.alternative)):
             heard = sound and self.playing == sound
-            tile.configure(bg=ACCENT if heard else TILE, fg=INK if heard else LIGHT)
-        self.try_button.configure(text=f"Try {self.draft['name']} live" if self.draft else "Try with guitar")
+            tile.configure(bg=ACCENT if heard else TILE, fg=ACCENT_INK if heard else LIGHT)
+        for name, button in (("guitar", self.live_button), ("phrase", self.loop_button)):
+            is_selected = self.active_source == name
+            button.configure(bg=ACCENT if is_selected else TILE, fg=ACCENT_INK if is_selected else LIGHT)
         sound = self.selected_sound()
         if sound and sound.path == self.kept:
             self.keep_button.configure(text="Kept", state="disabled")
         else:
             self.keep_button.configure(text="Keep this sound")
-        if self.baseline and self.alternative:
+        if live_monitor:
+            self.step.set("Change input to keep shaping the same sound")
+        elif self.baseline and self.alternative and not self.shape_dirty():
             self.step.set("Same phrase · level-matched" if self.baseline.paired_with(self.alternative)
                           else "Separate recordings")
-        elif self.draft:
-            self.step.set("Try it live or compare on a saved phrase")
+        elif renderable:
+            self.step.set("▶ B renders the selected tone and current shape on this phrase")
         else:
             self.step.set("")
+        self.knobs.sync(self.shape_tone().name if self.shape_tone() else "Current Quad Cortex", self.values, self.available)
+        if self.tab == "Lab":
+            self.space.sync(self.values, self.available)
+        self.browser.sync()
+        self.setup.sync()
+
+    @staticmethod
+    def tone_caption(tone, wave, *, shaped=False):
+        if tone is None:
+            return "Use a saved tone or shape the current preset"
+        if tone.preset:
+            scene = f" · scene {device.SCENES[tone.scene]}" if tone.scene is not None else ""
+            storage = f"QC · {tone.preset.setlist} {tone.preset.slot}{scene}"
+        else:
+            storage = {"original": "Recorded processing", "draft": "Draft", "capture": "Captured audio"}[tone.kind]
+        if shaped:
+            return storage + " · shape changed"
+        if wave is None:
+            return storage + " · no audio for this phrase"
+        return storage
 
     def stop_audio(self):
+        self.setup.stop_preview()
         self.play_cancel.set()
         if self.playing or self.play_job or self.player.stream:
             self.worker.submit(self.player.close)
         self.play_group = self.playing = None
-        self.output.set("Playback paused")
+        if not self.task_if_active("monitor"):
+            self.output.set("Stopped")
 
     def stop(self):
         self.stop_audio()
@@ -375,55 +505,127 @@ class Desk:
         self.output.set(f"Playing {side} · Windows audio")
         self.update()
 
-    def listen_or_render(self):
-        if self.alternative:
-            self.listen("b")
-        elif self.draft or self.adjustment:
+    def listen_or_render(self, side="b"):
+        if self.job is not None:
+            return
+        wave = self.baseline if side == "a" else self.alternative
+        tone = self.tone_a if side == "a" else self.tone_b
+        shaped = side == "b" and self.shape_dirty() and (not tone or tone.kind in ("draft", "preset"))
+        if wave and not shaped:
+            self.listen(side)
+        elif side == "a" and tone.preset and self.take:
+            self.render_preset(tone, side)
+        elif side == "a" and tone.kind == "draft" and self.take:
+            self.submit("render", f"Replaying the phrase through {tone.name}…",
+                        draft_render.hear, self.drafts[tone.draft_id], self.take.folder,
+                        values=dict(tone.values), done=lambda folder: self.rendered_anchor(tone, folder))
+        elif side == "b":
             self.compare()
 
     def compare(self):
-        if self.alternative:
+        if self.alternative and not self.shape_dirty():
             self.listen("b")
             return
         if not self.take:
-            self.set_status("Record or choose a phrase to compare these sounds. You can try a draft live now.")
+            self.set_status("Choose or record a phrase for this comparison. Guitar is available for live playing.")
             return
-        if self.draft:
-            self.submit("render", f"Rendering {self.draft['name']} with your saved phrase…",
-                        draft_render.hear, self.draft, self.take.folder, done=self.show_render)
-        elif self.adjustment:
-            self.submit("render", "Preparing the change on your saved phrase…",
-                        iterate.render_knobs, self.take.folder, self.adjustment, done=self.show_render)
+        tone = self.shape_tone()
+        values = dict(self.values)
+        if tone and tone.preset and not values:
+            self.render_preset(tone, "b")
+        elif tone and tone.kind == "draft":
+            draft = self.drafts[tone.draft_id]
+            self.submit("render", f"Rendering {draft['name']} on this phrase…",
+                        draft_render.hear, draft, self.take.folder, values=values,
+                        done=lambda folder: self.show_render(folder, values))
+        elif tone or values and not self.tone_b:
+            config = self.monitor_config("phrase")
+            self.submit("render", "Rendering the current shape on this phrase…",
+                        monitor.render_variant, self.take.folder, config,
+                        done=lambda folder: self.show_render(folder, values))
         else:
             self.set_status("Ask Tone Lab for a change or choose a preset to compare.")
 
-    def restore_draft_comparison(self):
-        if not self.draft or not self.take or self.job is not None:
-            self.set_status("Choose a phrase and prepare a draft first.")
-            return
-        self.stop_audio()
-        self.last_heard = None
-        saved = listening.draft_comparison(self.take, self.draft["id"])
-        self.baseline, self.alternative = saved or (self.take.original, None)
-        self.remember()
-        self.update()
-        if saved:
-            self.set_status(f"{self.draft['name']} is ready as B.")
-        else:
-            self.compare()
+    def render_preset(self, tone, side):
+        self.submit("render", f"Replaying the phrase through {tone.name}…", preset_library.render_reference,
+                    tone.preset, self.take.folder, scene=tone.scene,
+                    done=lambda result: self.rendered_preset(tone, side, result))
 
-    def show_render(self, folder):
+    def rendered_preset(self, tone, side, captured):
+        sound = listening.captured_sound(captured, self.take)
+        if side == "a":
+            self.tone_a, self.baseline = tone.with_capture(sound), sound
+        else:
+            self.tone_b, self.alternative = tone.with_capture(sound), sound
+            self.audition_values = {}
+        self.last_heard = None
+        self.remember()
+        self.set_status(f"{sound.name} is ready on {side.upper()}.")
+
+    def rendered_anchor(self, tone, folder):
+        pair = listening.comparison(folder, self.take)
+        if pair:
+            self.tone_a, self.baseline = tone.with_capture(pair[1]), pair[1]
+            self.remember()
+            self.set_status(f"{self.baseline.name} is ready on A.")
+
+    def restore_draft_comparison(self):
+        if not self.draft or self.job is not None:
+            self.set_status("Prepare a draft first.")
+            return
+        self.set_tone(Tone.from_draft(self.draft))
+        self.set_status(f"{self.draft['name']} is selected as B.")
+
+    def show_render(self, folder, values):
         pair = listening.comparison(folder, self.take)
         if not pair:
             self.set_status("The check did not produce two aligned sounds. Try the draft live or choose another phrase.")
             return
         baseline, alternative = pair
         if not self.baseline or not self.baseline.paired_with(alternative):
-            self.baseline = baseline
+            if self.tone_a.kind == "original":
+                self.baseline = baseline
         self.alternative = alternative
+        self.audition_values = values
+        if self.tone_b:
+            self.tone_b = self.tone_b.with_capture(alternative)
         self.last_heard = None
         self.remember()
-        self.set_status("Ready to compare. Use A and B to change the sound without restarting the phrase.")
+        self.set_status("B is ready to hear.")
+
+    def set_tone(self, tone):
+        self.stop_audio()
+        self.last_heard = None
+        self.tone_b = tone
+        self.values = {}
+        self.available = None
+        if tone and tone.draft_id in self.drafts:
+            self.draft = self.drafts[tone.draft_id]
+        self.resolve_audio()
+        self.remember()
+        self.update()
+
+    def use_as_tone(self, preset, scene=None):
+        self.set_tone(Tone.from_preset(preset, scene))
+        self.set_status(f"{preset.name} is selected as B. Play it live with Guitar or replay this phrase with ▶ B.")
+        self.show_tab("Shape")
+
+    def use_asset(self, asset, *, capture_has_cab=None, capture_version=None):
+        base = (self.drafts[self.tone_b.draft_id] if self.tone_b and self.tone_b.draft_id in self.drafts else None)
+        if base is None:
+            base = {"id": None, "name": "Clean platform", "target": "An audition of your Quad Cortex asset",
+                    "guitar": self.guitar.get(), "explanation": "A clean amp with minimal processing.",
+                    "chain": [{"model_id": 1084, "settings": []}, {"model_id": 12022, "settings": []}], "sources": []}
+        try:
+            draft = preset_design.variant_with_asset(base, asset, capture_has_cab=capture_has_cab,
+                                                     capture_version=capture_version)
+        except (ValueError, RuntimeError, OSError) as error:
+            self.set_status(str(error))
+            return
+        self.drafts[draft["id"]] = draft
+        self.set_tone(Tone.from_draft(draft))
+        self.set_status(f"{asset.name} is in the new B tone.")
+        self.show_tab("Shape")
 
     def choose_wave(self):
         path = filedialog.askopenfilename(parent=self.root, title="Choose a guitar reference excerpt",
@@ -438,10 +640,6 @@ class Desk:
     def clear_reference(self):
         if self.playing == self.reference:
             self.stop_audio()
-        if self.alternative and self.alternative == self.reference:
-            self.alternative = None
-        if self.baseline and self.baseline == self.reference:
-            self.baseline = self.take.original if self.take else None
         self.last_heard = None
         self.reference = self.reference_choice = None
         self.remember()
@@ -455,14 +653,16 @@ class Desk:
                     listening.closest, self.reference, self.take, done=self.matched)
 
     def matched(self, candidate):
-        self.baseline = (self.reference if self.reference.paired_with(candidate) else self.take.original)
-        self.alternative = candidate
-        self.last_heard = None
-        self.remember()
+        self.tone_a = Tone.from_sound(self.reference) if self.reference.paired_with(candidate) else Tone.original()
+        self.set_tone(Tone.from_sound(candidate))
         self.set_status("Closest saved sound is B. Listen to decide whether it fits.")
 
     def find_presets(self, query):
         self.preset_query = query
+        if self.presets is None and self.browser.library:
+            self.presets = self.browser.library.presets
+        if query and self.qc_name is None and self.use_available_reference(query):
+            return
         if self.presets is not None:
             self.choose_preset(query)
         else:
@@ -498,13 +698,7 @@ class Desk:
     def use_captured(self, sound):
         self.reference = sound
         self.reference_choice = None
-        if self.baseline and self.baseline.paired_with(sound):
-            self.stop_audio()
-            self.alternative = sound
-            self.last_heard = None
-            self.set_status("Previously captured reference ready as B.")
-        else:
-            self.set_status("Previously captured reference ready to play separately.")
+        self.set_status(f"{sound.name} is ready on the reference player.")
         self.remember()
         self.update()
 
@@ -577,10 +771,9 @@ class Desk:
 
     def captured_reference(self, reference):
         self.reference = listening.captured_sound(reference, self.take)
-        self.alternative = self.reference
         self.last_heard = None
         self.remember()
-        self.set_status("Reference ready as B. Your playing preset and scene were restored.")
+        self.set_status("Reference ready. Your playing preset and scene were restored.")
 
     def recording(self):
         if self.task_if_active("record"):
@@ -594,7 +787,7 @@ class Desk:
         self.submit("record", "Connecting… wait for Recording before playing.",
                     capture.record_take, self.input_channel, self.guitar.get(), self.stop_signal, self.ready,
                     done=self.recorded)
-        self.record.configure(text="Stop recording")
+        self.record.configure(text="■ Rec")
 
     def task_if_active(self, name):
         return self.job is not None and self.task == name
@@ -613,7 +806,10 @@ class Desk:
         query = self.request.get().strip()
         if not query or self.thinking is not None:
             return
-        action, value = listening.route(query, has_draft=bool(self.draft))
+        has_recipe = self.tone_b is not None and self.tone_b.draft_id in self.drafts
+        action, value = listening.route(query, has_draft=has_recipe)
+        if styles.intent(query):
+            action = "adjust-live"
         if action in ("reference", "compare", "draft", "match") and self.job is not None:
             self.set_status("Finish or stop the current hardware action, then try that request again.")
             return
@@ -643,7 +839,7 @@ class Desk:
         self.sent = query
         self.intent = action
         if action in ("create", "refine"):
-            prior = self.draft if action == "refine" else None
+            prior = (self.drafts.get(self.tone_b.draft_id) if self.tone_b else None) if action == "refine" else None
             prompt_context = f"Selected listening reference: {self.reference.name}" if self.reference else ""
             if self.kept_note and self.alternative and self.alternative.path == self.kept:
                 prompt_context += f"\nPlayer's listening note on this version: {self.kept_note}"
@@ -664,35 +860,26 @@ class Desk:
 
     def answered(self, result):
         if self.intent in ("create", "refine"):
-            old_alternative = self.alternative
-            self.stop_audio()
-            self.last_heard = None
             self.draft = result
             self.drafts[result["id"]] = result
-            if old_alternative and old_alternative.draft_id and old_alternative.draft_id == result.get("parent"):
-                self.baseline = old_alternative
-            elif self.take:
-                self.baseline = self.take.original
-            self.alternative = None
-            self.adjustment = {}
+            if not self.task_if_active("monitor"):
+                self.set_tone(Tone.from_draft(result))
+            else:
+                self.set_status(f"{result['name']} is ready. Stop the current audition and choose it from Details.")
+                return
             self.set_status(f"{result['target']} · {result['name']} is ready to try.")
         else:
             reply, knobs = result
-            if knobs and self.task_if_active("live"):
-                self.values.update(knobs)
-                self.control_mail.put(dict(self.values))
-            elif knobs:
-                self.stop_audio()
-                self.last_heard = None
-                self.adjustment = knobs
-                self.draft = self.alternative = None
-                if self.take:
-                    self.baseline = self.take.original
+            if knobs:
+                self.set_shape({**self.values, **knobs})
             self.set_status(reply)
         self.remember()
 
     def list_details(self):
         self.details.delete(0, tk.END)
+        if self.tone_b:
+            self.details.add_command(label=f"Pin {self.tone_b.name} as A", command=self.pin_baseline)
+            self.details.add_command(label="Restore the phrase's original tone on A", command=self.original_on_a)
         if self.draft:
             recipe = self.draft
             self.details.add_command(label=f"Compare {recipe['name']}", command=self.restore_draft_comparison)
@@ -705,13 +892,43 @@ class Desk:
             if saved:
                 self.details.add_command(label=f"Saved on QC · {saved}", state="disabled")
             else:
-                self.details.add_command(label="Save a copy to My Presets", command=self.save)
+                self.details.add_command(label="Save selected tone to QC", command=self.save)
+        if self.reference:
+            self.details.add_command(label="Put reference on A", command=self.reference_on_a)
         if self.reference_choice and self.take:
             for scene_index, scene in enumerate(device.SCENES):
                 self.details.add_command(label=f"Capture reference scene {scene}",
                                          command=lambda index=scene_index: self.use_preset(self.reference_choice, index))
         if not self.draft and not self.reference_choice:
             self.details.add_command(label="Choose a sound to see its details", state="disabled")
+
+    def reference_on_a(self):
+        if self.job is not None or not self.reference:
+            return
+        self.stop_audio()
+        self.tone_a = Tone.from_sound(self.reference)
+        self.resolve_audio()
+        self.remember()
+        self.update()
+
+    def pin_baseline(self):
+        if self.job is not None or not self.tone_b:
+            return
+        self.stop_audio()
+        self.tone_a = (self.tone_b.with_values(self.values) if self.tone_b.kind == "draft"
+                       else Tone.from_sound(self.alternative) if self.values and self.alternative
+                       else self.tone_b)
+        self.baseline = self.tone_a.asset(self.take)
+        self.remember()
+        self.update()
+
+    def original_on_a(self):
+        if self.job is None:
+            self.stop_audio()
+            self.tone_a = Tone.original()
+            self.baseline = self.tone_a.asset(self.take)
+            self.remember()
+            self.update()
 
     def keep(self, *, note=""):
         sound = self.selected_sound()
@@ -730,30 +947,75 @@ class Desk:
         self.update()
 
     def save(self):
-        draft = self.draft
-        proof = self.alternative.folder if self.alternative and self.alternative.draft_id == draft["id"] else None
-        self.submit("save", "Saving a copy in an empty Quad Cortex slot…", draft_render.save, draft, proof,
-                    physical_input=self.input_channel, done=self.saved)
+        tone = self.shape_tone()
+        if tone and tone.kind == "draft":
+            draft = self.drafts[tone.draft_id]
+            proof = self.alternative.folder if (self.alternative and self.alternative.draft_id == draft["id"]
+                                                  and not self.shape_dirty()) else None
+            self.submit("save", "Saving the tone in the Tone Lab setlist…", draft_render.save, draft, proof,
+                        physical_input=self.input_channel, values=dict(self.values),
+                        done=lambda location: self.saved(location, draft))
+        elif self.values:
+            self.submit("save", "Saving this shape in the Tone Lab setlist…", monitor.save_variant,
+                        self.monitor_config("guitar"), done=self.saved_variant)
+        elif tone and tone.preset:
+            self.set_status(f"Saved on the Quad Cortex · {tone.preset.setlist} {tone.preset.slot} · {tone.name}")
 
-    def saved(self, location):
+    def saved(self, location, draft):
+        tone = Tone.from_draft(draft)
+        if tone.preset:
+            proof = self.alternative
+            self.set_tone(tone.with_capture(proof))
+        self.browser.changed()
         self.presets = None
         self.set_status(f"Saved · {location}")
 
-    def try_guitar(self):
-        if not self.draft or self.job is not None:
+    def saved_variant(self, result):
+        preset, scene, fingerprint = result
+        tone = Tone.from_preset(preset, scene, fingerprint=fingerprint)
+        self.set_tone(tone.with_capture(self.alternative))
+        self.browser.changed()
+        self.set_status(f"Saved · {preset.setlist} {preset.slot} · {preset.name}")
+
+    def monitor_config(self, source):
+        tone = self.shape_tone()
+        config = {"take": str(self.take.folder) if self.take else None, "mode": source,
+                  "physical_input": self.input_channel, "values": dict(self.values),
+                  "name": tone.name if tone else self.qc_name or "Current Quad Cortex"}
+        if tone and tone.preset:
+            config["preset"] = {"position": tone.preset.position, "name": tone.preset.name}
+            config["scene"] = tone.scene
+        elif tone and tone.kind == "draft":
+            config["draft"] = self.drafts[tone.draft_id]
+            if self.alternative and self.alternative.folder:
+                config["gain"] = self.read_state(self.alternative.folder / "session.json").get("output_gain_db")
+        return config
+
+    def start_source(self, source):
+        if source == "phrase" and not self.take:
+            self.set_status("Choose or record a phrase first.")
+            return
+        if self.task_if_active("monitor") and not self.stop_signal.is_set():
+            self.requested_source = source
+            self.control_mail.put({"event": "source", "mode": source,
+                                   "take": str(self.take.folder) if self.take else None})
+            self.output.set("Switching input…")
+            return
+        if self.job is not None:
             return
         self.stop_signal = Event()
         self.control_mail = Queue()
-        self.values = {}
-        self.live_draft = self.draft
-        proof = self.alternative.folder if self.alternative and self.alternative.draft_id == self.draft["id"] else None
-        gain = self.read_state(proof / "session.json").get("output_gain_db") if proof else None
-        self.submit("live", f"Loading {self.draft['name']} temporarily…", draft_render.try_guitar,
-                    self.draft, self.input_channel, gain, self.stop_signal, self.control_mail, self.live_messages.put,
+        self.live_messages = Queue()
+        self.requested_source = source
+        config = self.monitor_config(source)
+        config["guitar_config"] = self.setup.live_config()
+        self.active_monitor_name = config["name"]
+        self.submit("monitor", f"Preparing {config['name']} on the Quad Cortex…", live_client.run_monitor,
+                    config, self.stop_signal, self.control_mail, self.live_messages.put,
                     done=self.restored)
 
     def restored(self, _):
-        self.set_status("Your previous Quad Cortex preset and scene are restored.")
+        self.set_status("Quad Cortex returned to the playing preset.")
         self.check_qc()
 
     @staticmethod
@@ -775,7 +1037,7 @@ class Desk:
     def open_editor(self):
         if self.job is not None or self.check is not None:
             self.editor_after = True
-            if self.task_if_active("live"):
+            if self.task_if_active("monitor"):
                 self.stop()
             self.set_status("Opening Cortex Control when the Quad Cortex handoff is complete…")
             return
@@ -798,7 +1060,7 @@ class Desk:
         if self.check is not None and self.check.done():
             try:
                 self.qc_name, scene = self.check.result()
-                if not self.task_if_active("live"):
+                if not self.task_if_active("monitor"):
                     self.hardware.set(f"QC last seen · {self.qc_name} · {scene}")
             except device.EditorActive:
                 self.qc_name = None
@@ -824,7 +1086,12 @@ class Desk:
             past, self.job = self.job, None
             task = self.task
             self.stop_signal = None
-            self.record.configure(text="Record phrase")
+            self.record.configure(text="● Rec")
+            if task == "monitor":
+                self.available = self.active_source = self.requested_source = None
+                self.base_bypassed = False
+                self.setup.live_event({"event": "guitar-stopped"})
+                self.output.set("Stopped")
             try:
                 self.outcome(past.result())
             except device.EditorActive as error:
@@ -835,7 +1102,7 @@ class Desk:
             except Exception as error:
                 diagnostics.LOG.exception("Listening desk operation failed")
                 self.set_status(str(error))
-                if task in ("live", "render", "reference", "save", "load"):
+                if task in ("monitor", "render", "reference", "save", "load"):
                     self.hardware.set("Quad Cortex · checking current sound")
                     self.check_qc()
             self.update()
@@ -848,9 +1115,29 @@ class Desk:
         try:
             while True:
                 message = self.live_messages.get_nowait()
-                if isinstance(message, str) and self.task_if_active("live") and not self.stop_signal.is_set():
-                    self.hardware.set(f"Quad Cortex · previewing {self.live_draft['name']}")
-                    self.set_status("Play your guitar through the draft. Press Esc to restore the previous sound.")
+                if not self.task_if_active("monitor") or self.stop_signal.is_set():
+                    continue
+                if isinstance(message, str):
+                    self.set_status(message)
+                elif message["event"] == "controls":
+                    self.available = set(message["available"])
+                    self.update()
+                elif message["event"] == "source":
+                    self.active_source = self.requested_source = message["mode"]
+                    self.show_monitor_output()
+                    self.set_status(message.get("reason", ""))
+                    self.update()
+                elif message["event"].startswith("guitar-"):
+                    self.setup.live_event(message)
+                    if message["event"] == "guitar-gesture" and message.get("applied"):
+                        was_bypassed = self.base_bypassed
+                        self.base_bypassed = False
+                        self.values[message["control"]] = message["value"]
+                        if was_bypassed:
+                            self.control_mail.put({"event": "knobs", "values": self.values})
+                        self.write_shape()
+                        self.show_monitor_output()
+                        self.update()
         except Empty:
             pass
         if self.thinking is not None and self.thinking.done():
@@ -883,6 +1170,11 @@ class Desk:
             self.finish_close(self.leaving)
 
     def finish_close(self, destination):
+        if getattr(self, "shape_writer", None) is not None:
+            self.root.after_cancel(self.shape_writer)
+            self.shape_writer = None
+        self.remember()
+        self.setup.shutdown()
         self.worker.shutdown(wait=True)
         self.advisor.shutdown(wait=False, cancel_futures=True)
         self.leave(destination)

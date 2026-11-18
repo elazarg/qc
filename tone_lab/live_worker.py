@@ -23,7 +23,7 @@ def recover():
         return
     target = json.loads(RECOVERY.read_text(encoding="utf-8"))
     with device.connect(write=True) as qc:
-        if qc.get_setlist_position() == iterate.SCRATCH:
+        if qc.get_setlist_position() == target.get("fixture", iterate.SCRATCH):
             iterate.recall(qc, target["position"], target["name"])
             if device.active_scene(qc) != target["scene"]:
                 device.select_scene(qc, target["scene"])
@@ -31,7 +31,7 @@ def recover():
     RECOVERY.unlink(missing_ok=True)
 
 
-def read_commands(stop, commands):
+def read_commands(stop, commands, monitor=False):
     pending = b""
     try:
         # A raw pipe read avoids holding Python's buffered-stdin lock at shutdown.
@@ -41,8 +41,11 @@ def read_commands(stop, commands):
                 event = json.loads(line)
                 if event.get("event") == "stop":
                     return
-                if event.get("event") == "knobs":
-                    commands.put(event["values"])
+                if event.get("event") in ("knobs", "source"):
+                    if monitor:
+                        commands.put(event)
+                    elif event["event"] == "knobs":
+                        commands.put(event["values"])
     except (OSError, ValueError):
         diagnostics.LOG.warning("Live worker command pipe ended", exc_info=True)
     finally:
@@ -53,6 +56,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--take", type=Path)
     parser.add_argument("--mode", choices=("guitar", "reamp"))
+    parser.add_argument("--monitor", type=Path)
     parser.add_argument("--muted", action="store_true")
     parser.add_argument("--capture-return", action="store_true")
     parser.add_argument("--guitar-config", type=json.loads)
@@ -65,11 +69,11 @@ def main():
             if args.recover:
                 recover()
                 return 0
-            if args.mode is None or (args.mode == "reamp" and args.take is None):
+            if args.monitor is None and (args.mode is None or (args.mode == "reamp" and args.take is None)):
                 raise ValueError("Choose a live mode and supply a dry take for reamping.")
             diagnostics.LOG.info("Live worker started mode=%s muted=%s", args.mode, args.muted)
             stop, commands = Event(), Queue()
-            Thread(target=read_commands, args=(stop, commands), daemon=True).start()
+            Thread(target=read_commands, args=(stop, commands, args.monitor is not None), daemon=True).start()
 
             def events(event):
                 if event["event"] == "restore":
@@ -78,9 +82,15 @@ def main():
                     faulthandler.dump_traceback_later(4.5, file=crash_log)
                 emit(event)
 
-            result = live.run(args.take, args.mode, stop, commands, lambda text: emit({"event": "status", "text": text}),
-                              audible=not args.muted, capture_return=args.capture_return,
-                              guitar_config=args.guitar_config, events=events)
+            if args.monitor:
+                from . import monitor
+
+                config = json.loads(args.monitor.read_text(encoding="utf-8"))
+                result = monitor.run(config, stop, commands, events)
+            else:
+                result = live.run(args.take, args.mode, stop, commands, lambda text: emit({"event": "status", "text": text}),
+                                  audible=not args.muted, capture_return=args.capture_return,
+                                  guitar_config=args.guitar_config, events=events)
             RECOVERY.unlink(missing_ok=True)
             diagnostics.LOG.info("Live worker stopped %s", result)
             emit({"event": "done", "audio": result})

@@ -39,7 +39,7 @@ def example_counts(examples):
 
 
 class GuitarInputPanel:
-    def __init__(self, review, parent, worker):
+    def __init__(self, review, parent, worker, *, live_observer=True):
         self.review, self.root, self.worker = review, review.root, worker
         self.future = None
         self.live_running = False
@@ -139,10 +139,13 @@ class GuitarInputPanel:
 
         live = card(body)
         live.pack(fill="x", pady=(0, 10))
-        gestures = self.disclosure(live, "Live observation and gesture mapping")
+        gestures = self.disclosure(live, "Live observation and gesture mapping" if live_observer else "Gesture mapping")
         self.observe_box = self.check(gestures, "Observe during Live guitar", self.observe, self.change_observe)
-        label(gestures, variable=self.live_text, color=MUTED, wrap=550).pack(anchor="w", pady=(4, 0))
-        label(gestures, variable=self.live_action, color=ACCENT, wrap=550).pack(anchor="w")
+        if live_observer:
+            label(gestures, variable=self.live_text, color=MUTED, wrap=550).pack(anchor="w", pady=(4, 0))
+            label(gestures, variable=self.live_action, color=ACCENT, wrap=550).pack(anchor="w")
+        else:
+            self.observe_box.pack_forget()
         label(gestures, "Map a return gesture", strong=True).pack(anchor="w", pady=(8, 0))
         label(gestures, "Pick a starting state and an excursion. A deliberate move away and back can nudge one tone control.",
               color=MUTED, wrap=550).pack(anchor="w", pady=(4, 8))
@@ -154,8 +157,13 @@ class GuitarInputPanel:
         self.map_save = button(gestures, "Save mapping", self.save_mapping, compact=True)
         self.map_save.pack(anchor="w", pady=(8, 4))
         self.arm_box = self.check(gestures, "Arm mapped control for the next run", self.arm)
-        label(gestures, "The control is armed for about 20 seconds at the start of the run.",
-              color=MUTED, size=9, wrap=520).pack(anchor="w", pady=(1, 5))
+        if live_observer:
+            label(gestures, "The control is armed for about 20 seconds at the start of the run.",
+                  color=MUTED, size=9, wrap=520).pack(anchor="w", pady=(1, 5))
+        else:
+            self.arm_box.pack_forget()
+            label(gestures, "Check a recorded take to rehearse the mapped gesture.",
+                  color=MUTED, size=9, wrap=520).pack(anchor="w", pady=(1, 5))
         self.scroller.bind("<MouseWheel>", self.scroll)
         for panel in (header, training, example_tools, live, gestures, analysis):
             for item in panel.winfo_children():

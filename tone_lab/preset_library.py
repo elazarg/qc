@@ -1,6 +1,7 @@
 """Browse saved Quad Cortex setlists and capture comparable reference audio."""
 
 from dataclasses import dataclass
+from hashlib import sha256
 from pathlib import Path
 import re
 
@@ -111,6 +112,7 @@ def render_reference(choice, take, *, scene=None):
         current = _current_saved(qc)
         try:
             source = iterate.recall(qc, choice.position, choice.name)
+            fingerprint = sha256(source.SerializeToString(deterministic=True)).hexdigest()
             reference_scene = source.default_scene if scene is None else scene
             if not 0 <= reference_scene < len(device.SCENES):
                 raise RuntimeError("The preset did not report a valid default scene. Choose A to H explicitly.")
@@ -137,7 +139,7 @@ def render_reference(choice, take, *, scene=None):
     audio.write_wave(path, samples)
     manifest.update(state="ready", source_clip=take.name, selection_seconds=list(selection), firmware=firmware,
                     qc_reference={"name": choice.name, "scene": scene_name, "setlist": choice.setlist,
-                                  "slot": choice.slot, "position": choice.position},
+                                  "slot": choice.slot, "position": choice.position, "fingerprint": fingerprint},
                     candidates=[{"name": f"{choice.name} · Scene {scene_name}", "file": path.name,
                                  "scene": scene_name, "metrics": metrics}])
     session.write_json(folder / "session.json", manifest)

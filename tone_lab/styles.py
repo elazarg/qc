@@ -17,12 +17,18 @@ STYLES = {
                ("Guitar Amplifier", "PRESENCE", -2), ("Neural Capture", "TREBLE", -3)],
 }
 
+CABS = ("Cabsim Guitar (M)", "Cabsim Guitar (ST)")
+LOW_CUT = [("Equalizer", "HPF", 70), ("Equalizer", "HPF FREQ", 70), ("IRLoaders", "HI PASS", 70),
+           *((category, "HPF", 70) for category in CABS)]
+HIGH_CUT = [("Equalizer", "LPF", -3500), ("Equalizer", "LPF FREQ", -3500), ("IRLoaders", "LOW PASS", -3500),
+            *((category, "LPF", -3500) for category in CABS)]
+
 KNOBS = {
     "jazz": ("Jazz", 0, STYLES["more jazz"]),
     "drive": ("Drive", -1, []),  # The negative side moves toward the available gain floor.
     "warmth": ("Warmth", -1, STYLES["darker"]),
     "space": ("Space", -1, [("Delay", "MIX", 18.0), ("Delay", "FEEDBACK", 12.0),
-                            ("Reverb", "MIX", 12.0)]),
+                            ("Reverb", "MIX", 12.0), ("IRLoaders", "ROOM MIX", 10.0)]),
     "tightness": ("Tightness", -1, [("Guitar Amplifier", "BASS", -2.0),
                                       ("Neural Capture", "BASS", -3.0),
                                       ("Guitar Overdrive", "BASS", -1.8)]),
@@ -46,13 +52,31 @@ KNOBS = {
                                          ("Modulation", "DEPTH", 20.0)]),
     "width": ("Width", -1, [("Modulation", "WIDTH", 30.0), ("Delay", "WIDTH", 25.0),
                               ("Delay", "STEREO WIDTH", 25.0), ("Reverb", "WIDTH", 25.0)]),
+    "compression": ("Evenness", -1, [("Compressor", "THRESHOLD", -9.0), ("Compressor", "MIX", 19.0),
+                                      ("Compressor", "RATIO", 1.4)]),
+    "punch": ("Pick bite", -1, [("Guitar Amplifier", "PRESENCE", 1.8),
+                                 ("Guitar Amplifier", "TREBLE", .9), ("Neural Capture", "MID", .8),
+                                 ("Neural Capture", "TREBLE", 1.3), ("Equalizer", "2kHz", 1.8)]),
+    "low_cut": ("Low cut", -1, LOW_CUT),
+    "soft_top": ("Soft top", -1, HIGH_CUT),
+    "tail": ("Tail length", -1, [("Reverb", "DECAY", .75), ("Delay", "FEEDBACK", 20.0)]),
+    "motion": ("Motion rate", -1, [("Modulation", "RATE", 1.2), ("Modulation", "CHR RATE", .6),
+                                    ("Modulation", "VIB RATE", 1.7)]),
+    "bloom": ("Bloom", 0, [("Compressor", "THRESHOLD", -5.0), ("Compressor", "MIX", 12.0),
+                          ("Compressor", "ATTACK", -5.0), ("Delay", "FEEDBACK", 8.0),
+                          ("Reverb", "MIX", 9.0), ("Guitar Amplifier", "GAIN", .7)]),
+    "band_fit": ("Band fit", 0, [("Guitar Amplifier", "BASS", -1.6), ("Guitar Amplifier", "MID", 1.2),
+                                ("Neural Capture", "BASS", -1.8), ("Neural Capture", "MID", 1.4),
+                                ("Delay", "MIX", -6.0), ("Reverb", "MIX", -7.0),
+                                ("Equalizer", "125Hz", -1.6), ("Equalizer", "1kHz", 1.4)]),
 }
 
-PRIMARY_KNOBS = ("drive", "warmth", "space", "jazz")
+PRIMARY_KNOBS = ("drive", "warmth", "punch", "space", "jazz")
 KNOB_GROUPS = {
-    "Response": ("tightness", "attack", "sustain", "gate"),
-    "EQ": ("body", "mids", "presence"),
-    "Effects": ("delay", "repeats", "delay_time", "reverb", "modulation", "width"),
+    "Response": ("tightness", "attack", "sustain", "compression", "gate"),
+    "EQ": ("body", "mids", "presence", "low_cut", "soft_top"),
+    "Effects": ("delay", "repeats", "delay_time", "reverb", "tail", "modulation", "motion", "width"),
+    "Character": ("jazz", "bloom", "band_fit"),
 }
 KNOB_HINTS = {
     "drive": "Changes pedal and amp input drive. Full left bypasses active drive pedals.",
@@ -72,6 +96,14 @@ KNOB_HINTS = {
     "reverb": "Changes the level of the existing reverb.",
     "modulation": "Changes the amount of the existing modulation effect.",
     "width": "Changes stereo width on effects with a width control.",
+    "compression": "Evens out the difference between soft notes and hard picking through an existing compressor.",
+    "punch": "Emphasizes the bite of the pick through upper mids and amp or capture brightness.",
+    "low_cut": "Moves an available cab or EQ high-pass filter to make space for bass.",
+    "soft_top": "Lowers an existing cab or EQ low-pass filter to soften the high end.",
+    "tail": "Lengthens the ambience and repeats while keeping the basic wet mix.",
+    "motion": "Changes the speed of an active unsynced modulation effect.",
+    "bloom": "Softens and lengthens the sound with available compression, gain and ambience.",
+    "band_fit": "Looks for midrange definition, less low-end overlap and shorter or quieter effects.",
 }
 
 DRIVE_CATEGORIES = {"Guitar Overdrive", "Bass Overdrive", "Guitar Amplifier", "Bass Amplifier", "Neural Capture"}
@@ -105,7 +137,7 @@ def knobs(preset, scene, values):
         for category, parameter, delta in edits:
             key = (category, parameter)
             rules[key] = rules.get(key, 0.0) + value * delta
-    return apply_rules(preset, scene, rules, allow_neutral=True, drive=values.get("drive", 0.0))[1]
+    return apply_rules(preset, scene, rules, allow_neutral=True, drive=values.get("drive", 0.0), active_only=True)[1]
 
 
 def available_knobs(preset, scene):
@@ -134,7 +166,7 @@ def _sync_enabled(model, parameters, scene):
     return False
 
 
-def apply_rules(preset, scene, rules, *, allow_neutral=False, drive=0.0):
+def apply_rules(preset, scene, rules, *, allow_neutral=False, drive=0.0, active_only=False):
     result = type(preset)()
     result.CopyFrom(preset)
     changes = []
@@ -164,14 +196,15 @@ def apply_rules(preset, scene, rules, *, allow_neutral=False, drive=0.0):
                     delta += rules.get((category, "GAIN"), 0.0)
                 if (category == "Utility" and name == "THRESHOLD" and model.hash != 16003):
                     continue
+                index_in_scene = scene if setting.scene_mode else 0
                 if (param["type"] != "float" or setting.expression
-                        or setting.scene_mode or not setting.param_values):
+                        or setting.scene_mode and not active_only or index_in_scene >= len(setting.param_values)):
                     continue
                 if not delta and not (drive and category in DRIVE_CATEGORIES):
                     continue
                 if category == "Delay" and name == "DELAY TIME" and _sync_enabled(model, info["params"], scene):
                     continue
-                value = setting.param_values[0]
+                value = setting.param_values[index_in_scene]
                 if value.WhichOneof("value") != "float_value":
                     continue
                 try:
@@ -180,6 +213,8 @@ def apply_rules(preset, scene, rules, *, allow_neutral=False, drive=0.0):
                     continue
                 if category == "Compressor" and name == "ATTACK" and param["units"] != "ms":
                     delta *= (high - low) * .2 / 18
+                if category == "Reverb" and name == "DECAY" and param["units"] != "s":
+                    delta *= (high - low) * .22 / .75
                 before = catalog.to_display(model.hash, index, value.float_value)
                 floor = min(before, low + .15 * (high - low)) if amp_volume else low
                 delta += _drive_delta(category, name, drive, before, floor, high, param["units"], amp_volume=amp_volume)
@@ -187,7 +222,8 @@ def apply_rules(preset, scene, rules, *, allow_neutral=False, drive=0.0):
                 if math.isclose(before, after, abs_tol=0.001):
                     continue
                 raw = catalog.to_norm(model.hash, index, after)
-                for entry in setting.param_values:
+                targets = (value,) if setting.scene_mode else setting.param_values
+                for entry in targets:
                     if entry.WhichOneof("value") == "float_value":
                         entry.float_value = raw
                 changes.append({"row": row + 1, "column": column + 1, "model": info["name"],

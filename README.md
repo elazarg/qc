@@ -1,16 +1,16 @@
 # Tone Lab for Quad Cortex
 
-Open **Tone Lab.lnk** to go to the listening desk. Pick the guitar you’re playing and describe a sound in **Ask Tone Lab**. Press **Ctrl+K** to jump to the request box or use **Win+H** to dictate.
+Open **Tone Lab.lnk**. The dark workspace keeps tone shaping, live input, recorded phrases, and A/B in one window. Press **Ctrl+K** for the request field or use **Win+H** to dictate.
 
-- Click **A** or **B** to play or change the sound. When both come from the same phrase, the loop stays at the same place and levels are matched. **Esc** stops playback. **Keep this sound** stores a local listening decision.
-- Ask “Make me a Lenny Kravitz preset.” **B** renders the draft on your current phrase. **Try with guitar** auditions it temporarily on the Quad Cortex. **Details** shows the reasoning and sources and can **Save a copy to My Presets**.
-- Choose an audio excerpt, a previously captured reference, or a saved Quad Cortex preset. Capturing a fresh preset reference replays your phrase through it and restores the starting device preset and scene. **Find a match** brings a saved alternative for the current phrase into the listening comparison.
-- Use **Tools → Open Cortex Control** for detailed hardware editing. The Lab leaves device control to Cortex Control while it is open. Your session, drafts, saved references and playback remain available. Capturing or saving with direct hardware control requires a handoff. Audio-only recording can retain four raw channels while the editor is open; the preset identity is provisional.
-- **Tools → Open workbench** opens the earlier controls for live macros, calibration, levels and detailed tone search. **Back to listening** returns to the same session.
+- **Guitar** and **▶ Phrase** feed the same working Quad Cortex tone. Turn the knobs during playback, switch between the two inputs, and press **■** or **Esc** to release the unit. Turn your normal monitor volume down before starting the live loop.
+- **▶ A** and **▶ B** audition recorded audio. The loop uses one cursor and matches loudness when both sounds use the same passage. **Takes** changes the performance while the selected tones and knobs stay put. A sound that has no audio for the new phrase asks for one reamp.
+- **Sounds** browses the actual Quad Cortex inventory. Select a preset and scene, replace the cabinet in a draft with one of your IRs, or try a capture with the appropriate cabinet setup. **Save to QC** creates a native preset in the dedicated **Tone Lab** setlist. Subsequent auditions recall that saved sound.
+- **Lab** offers two-dimensional controls, marked positions and sweeps. Use recorded A/B measurements to see the differences in spectrum, dynamics, stereo energy and note tails. **Setup** contains guitar calibration, gestures and soundcheck.
+- **QC → Open Cortex Control** handles detailed hardware editing. Tone Lab preserves drafts, takes and cached playback while the editor is open. Direct hardware renders and saving require a handoff. Audio-only recording can retain the raw channels during editing.
 
-The Live controls and preset references use **My Presets → 32G** as a working copy. Draft auditions temporarily use **32H**. Tone Lab checks the working slot, archives the starting preset locally, and restores the original saved preset and scene when the audition ends. **Save on QC** is the action that keeps a draft in a regular My Presets slot.
+Temporary work still uses the two previously provisioned scratch slots in **My Presets**. The application verifies the working slot and restores the original preset and scene when finished. Permanent saves use a fresh empty slot in **Tone Lab**.
 
-Rig sources appear under **Details** when the advisor finds them. A named artist gives the draft a musical target. The recorded take provides the performance for auditioning. To plan the next iterations, see [Tone Lab product direction](INTENT_AND_LANDSCAPE.md).
+Rig sources appear under **Details** when available. See [the hardware capabilities and inventory](QC_CAPABILITIES.md) and [the interaction research](INTENT_AND_LANDSCAPE.md).
 
 ## Guitar input experiment
 

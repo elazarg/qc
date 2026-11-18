@@ -12,7 +12,7 @@ CONTEXTS = {"Full-range / PA": "frfr", "Guitar cabinet": "cab", "Backing mix": "
 
 
 class SoundCheck:
-    def __init__(self, review, parent, worker):
+    def __init__(self, review, parent, worker, *, anchors=("Quietest", "A", "B", "C")):
         self.review, self.worker = review, worker
         self.pending = self.preview_file = None
         self.take_text = tk.StringVar(value="Check the dry DI and processed signal from the current take.")
@@ -44,7 +44,7 @@ class SoundCheck:
               color=MUTED, wrap=550).pack(anchor="w", pady=(7, 0))
 
         trim, row = self.section(body, "Relative preset levels", self.trim_text)
-        ttk.Combobox(row, textvariable=self.anchor, values=("Quietest", "A", "B", "C"), state="readonly", width=9,
+        ttk.Combobox(row, textvariable=self.anchor, values=anchors, state="readonly", width=9,
                      style="ToneLab.SoundCheck.TCombobox").pack(side="left", padx=(0, 7))
         self.trims = button(row, "Plan trims for this comparison", self.check_trims, compact=True)
         self.trims.pack(side="left")

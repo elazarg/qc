@@ -5,6 +5,7 @@ from pathlib import Path
 from queue import Empty, SimpleQueue
 import subprocess
 import sys
+from tempfile import TemporaryDirectory
 from threading import Thread
 import time
 
@@ -30,6 +31,17 @@ def run(take, mode, stop, commands, report, *, audible=True, guitar_config=None)
         argv.append("--muted")
     if mode == "guitar" and guitar_config:
         argv += ["--guitar-config", json.dumps(guitar_config, ensure_ascii=True)]
+    return supervise(argv, stop, commands, report)
+
+
+def run_monitor(config, stop, commands, report):
+    with TemporaryDirectory(prefix="tone-monitor-") as folder:
+        path = Path(folder) / "session.json"
+        path.write_text(json.dumps(config, ensure_ascii=True), encoding="utf-8")
+        return supervise(worker_command() + ["--monitor", str(path)], stop, commands, report, monitor=True)
+
+
+def supervise(argv, stop, commands, report, *, monitor=False):
     process = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                                text=True, encoding="utf-8", bufsize=1, creationflags=subprocess.CREATE_NO_WINDOW)
     incoming, outgoing = SimpleQueue(), SimpleQueue()
@@ -62,14 +74,16 @@ def run(take, mode, stop, commands, report, *, audible=True, guitar_config=None)
                 outgoing.put({"event": "stop"})
                 stop_deadline = time.monotonic() + STOP_TIMEOUT
             if stop_deadline is None:
-                values = None
+                updates = {}
                 while True:
                     try:
-                        values = commands.get_nowait()
+                        item = commands.get_nowait()
                     except Empty:
                         break
-                if values is not None:
-                    outgoing.put({"event": "knobs", "values": values})
+                    event = item if monitor else {"event": "knobs", "values": item}
+                    updates[event["event"]] = event
+                for event in updates.values():
+                    outgoing.put(event)
             try:
                 event = incoming.get(timeout=.05)
             except Empty:
@@ -78,11 +92,11 @@ def run(take, mode, stop, commands, report, *, audible=True, guitar_config=None)
                 continue
             if event is None:
                 raise RuntimeError("The live audio worker exited unexpectedly.")
-            if event["event"] in ("status", "heartbeat"):
+            if event["event"] in ("status", "heartbeat", "source"):
                 deadline = time.monotonic() + HEARTBEAT_TIMEOUT
             if event["event"] == "status":
                 report(event["text"])
-            elif event["event"] in ("controls", "guitar-state", "guitar-gesture", "guitar-status"):
+            elif event["event"] in ("controls", "source", "guitar-state", "guitar-gesture", "guitar-status", "guitar-stopped"):
                 report(event)
             elif event["event"] == "error":
                 raise RuntimeError(event["text"])
