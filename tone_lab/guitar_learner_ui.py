@@ -1,6 +1,7 @@
 """A dedicated recording and evaluation desk for guitar configuration learning."""
 
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from threading import Event
 import tkinter as tk
 from tkinter import filedialog
@@ -27,7 +28,7 @@ def prediction_value(key, value, layout):
     if value is None:
         return "Uncertain"
     if key == "pickup":
-        return data.LAYOUTS[layout]["pickups"][value - 1]
+        return f"{value} · {data.LAYOUTS[layout]['pickups'][value - 1]}"
     if key == "wiring":
         return value
     low, high = setting(value["low"]), setting(value["high"])
@@ -75,24 +76,55 @@ def evaluate(layout):
     return examples, tests, profile, checks, ""
 
 
-def report_score(checks, layout):
+def setup_key(configuration):
+    return configuration["pickup"], configuration.get("wiring")
+
+
+def training_coverage(examples):
+    if not examples:
+        return ""
+    settings = [row["configuration"] for row in examples]
+    positions = ", ".join(map(str, sorted({row["pickup"] for row in settings})))
+    knobs = []
+    for key in ("tone", "volume"):
+        values = sorted({row[key] for row in settings})
+        knobs.append(f"{key.title()} {setting(values[0])}" if len(values) == 1 else
+                     f"{key.title()} {setting(values[0])}–{setting(values[-1])}")
+    return f"Taught blade positions {positions}  ·  {'  ·  '.join(knobs)}"
+
+
+def report_score(checks, layout, examples):
     if not checks:
         return ""
-    count = len(checks)
-    parts = [f"{count} blind check{'s' if count != 1 else ''}"]
+    taught_setups = {setup_key(row["configuration"]) for row in examples}
+    supported = [(row, guess) for row, guess in checks if setup_key(row["configuration"]) in taught_setups]
+    count = len(supported)
+    outside = len(checks) - count
+    parts = []
+    if count:
+        parts.append(f"{count} check{'s' if count != 1 else ''} on taught setups")
     controls = ("pickup", "wiring") if "wiring" in data.LAYOUTS[layout] else ("pickup",)
     for control in controls:
-        correct = sum(guess.get(control) == row["configuration"][control] for row, guess in checks)
-        parts.append(f"{control.title()} {correct}/{count}")
+        called = [(row, guess) for row, guess in supported if guess.get(control) is not None]
+        if called:
+            correct = sum(guess[control] == row["configuration"][control] for row, guess in called)
+            detail = f"{correct}/{len(called)} correct"
+            if len(called) != count:
+                detail += f", {count - len(called)} uncertain"
+            parts.append(f"{control.title()} {detail}")
+        elif count:
+            parts.append(f"{control.title()} uncertain")
     for control in ("volume", "tone"):
         estimates = [(abs(guess[control]["value"] - row["configuration"][control]),
                       guess[control]["low"] <= row["configuration"][control] <= guess[control]["high"])
-                     for row, guess in checks if guess.get(control) is not None]
+                     for row, guess in supported if guess.get(control) is not None]
         if estimates:
             covered = sum(inside for _, inside in estimates)
             error = float(np.mean([difference for difference, _ in estimates]))
             parts.append(f"{control.title()} error {error:.1f} · in range {covered}/{count}")
-    return "  |  ".join(parts)
+    if outside:
+        parts.append(f"{outside} outside taught setups")
+    return "  ·  ".join(parts)
 
 
 class GuitarLearner:
@@ -199,7 +231,8 @@ class GuitarLearner:
         self.action = button(panel, "Add example", self.perform, primary=True)
         self.action.pack(fill="x", pady=(7, 5))
         self.status = tk.StringVar(master=self.window)
-        word(panel, variable=self.status, color=ALERT, wrap=318, size=9).pack(fill="x")
+        self.status_line = word(panel, variable=self.status, color=ALERT, wrap=318, size=9)
+        self.status_line.pack(fill="x")
 
         self.report = tk.Frame(panel, background=PANEL)
         self.headline = tk.StringVar(master=self.window)
@@ -216,8 +249,12 @@ class GuitarLearner:
         lower.pack(side="bottom", fill="x", pady=(7, 0))
         self.labels_button, self.labels = self.menu(lower, "Recordings", self.list_labels)
         self.labels_button.pack(side="right")
+        self.past_button, self.past = self.menu(lower, "Past checks", self.list_checks)
+        self.past_button.pack(side="right", padx=(0, 5))
         self.score = tk.StringVar(master=self.window)
         word(panel, variable=self.score, color=MUTED, size=9, wrap=319).pack(side="bottom", fill="x", pady=(3, 0))
+        self.coverage = tk.StringVar(master=self.window)
+        word(panel, variable=self.coverage, color=ACCENT, size=9, wrap=319).pack(side="bottom", fill="x", pady=(5, 0))
         self.bindings = (self.takes_button, self.wav_button, self.labels_button)
 
     def menu(self, parent, title, refresh):
@@ -242,6 +279,12 @@ class GuitarLearner:
         self.examples, self.tests, self.checks = [], [], []
         self.profile = self.guess = None
         self.used_source = None
+        if self.source is not None and self.source.kind == "saved-check":
+            self.source = self.excerpt = self.full_excerpt = None
+            self.wave_peaks = ()
+            self.source_title.set("No recording selected")
+            self.source_detail.set("Dry input")
+            self.draw_wave()
         self.board.show(layout)
         self.work("Reading labeled recordings…", evaluate, lambda result: self.loaded(result, use_last=True), layout)
 
@@ -266,6 +309,7 @@ class GuitarLearner:
             widget.configure(state="normal" if idle else "disabled")
         for widget in self.bindings:
             widget.configure(state="normal" if idle else "disabled")
+        self.past_button.configure(state="normal" if idle and self.tests else "disabled")
         if self.stop:
             label = "Saving…" if self.stop.is_set() else "■  Stop"
             self.record_button.configure(text=label, state="disabled" if self.stop.is_set() else "normal")
@@ -275,17 +319,24 @@ class GuitarLearner:
         if teaching:
             instruction = teaching_hint(self.layout, self.examples, self.board.values)
         else:
-            instruction = ("Use a fresh clip at a setting between your examples."
+            instruction = ("Use a fresh clip on a taught setup. Repeat a few notes you played in the examples."
                            if self.profile else "Teach at least two recordings of the same notes to unlock a check.")
         self.guidance.set(instruction)
         available = self.excerpt is not None and not self.excerpt.clipped and idle
-        available = available and (self.used_source is None and not self.excerpt.quiet if teaching else self.profile)
+        available = available and self.used_source is None
+        available = available and (not self.excerpt.quiet if teaching else self.profile)
+        reviewing = not teaching and self.used_source and self.used_source["role"] == "test"
+        if reviewing:
+            self.action.pack_forget()
+        elif not self.action.winfo_manager():
+            self.action.pack(before=self.status_line, fill="x", pady=(7, 5))
         self.action.configure(text="Add example" if teaching else "Estimate settings",
                               state="normal" if available else "disabled")
         count = len(self.examples)
         settings = len({tuple(sorted(row["configuration"].items())) for row in self.examples})
         self.count.set(f"{count} example{'s' if count != 1 else ''}  ·  {settings} setup{'s' if settings != 1 else ''}")
-        self.score.set(report_score(self.checks, self.layout) if self.layout else "")
+        self.score.set(report_score(self.checks, self.layout, self.examples) if self.layout else "")
+        self.coverage.set(training_coverage(self.examples))
         if not teaching and self.guess:
             self.show_guess(idle)
         else:
@@ -296,8 +347,10 @@ class GuitarLearner:
         sources = data.take_sources(GUITAR)
         if not sources:
             self.takes.add_command(label="No verified Charvel dry takes", state="disabled")
+        labeled = {Path(row["source"]) for row in (*self.examples, *self.tests)}
         for source in sources[:18]:
-            self.takes.add_command(label=source.label, command=lambda picked=source: self.select_source(picked))
+            title = source.label if source.path in labeled else f"{source.label} · unlabelled"
+            self.takes.add_command(label=title, command=lambda picked=source: self.select_source(picked))
 
     def list_labels(self):
         self.labels.delete(0, tk.END)
@@ -318,9 +371,29 @@ class GuitarLearner:
                                  self.load_board(saved))
                 item.add_command(label="Remove label", command=lambda saved=row: self.remove(saved))
 
+    def list_checks(self):
+        self.past.delete(0, tk.END)
+        for row in self.tests:
+            label = summarize(self.layout, row["configuration"])
+            self.past.add_command(label=label, command=lambda saved=row: self.review_check(saved))
+
     def load_board(self, row):
         self.board.show(self.layout, row["configuration"])
         self.sync()
+
+    def review_check(self, row):
+        source = data.DrySource(Path(row["wav"]), row["source_label"], guitar=GUITAR, kind="saved-check")
+        prediction = next((guess for saved, guess in self.checks if saved["id"] == row["id"]), None)
+        self.change_mode("Blind check")
+
+        def reviewed(excerpt):
+            self.source_ready(source, excerpt)
+            self.used_source, self.guess = row, prediction
+            self.source_detail.set(f"{row['seconds']:.1f}s  ·  Saved blind check")
+            self.status.set("" if prediction else "Teach more examples to estimate this saved check.")
+            self.sync()
+
+        self.work("Reading the saved check…", data.inspect, reviewed, source)
 
     def remove(self, row):
         self.guess = None
@@ -366,7 +439,7 @@ class GuitarLearner:
         elif excerpt.quiet:
             self.status.set("Very quiet dry signal.")
         else:
-            self.status.set("")
+            self.status.set("Match the board to the recording and add the example." if self.mode == "Teach" else "")
         self.draw_wave()
         self.sync()
 
@@ -393,7 +466,8 @@ class GuitarLearner:
                                   fill=ACCENT if left <= x <= right else "#686e75", width=2)
 
     def start_span(self, event):
-        if self.full_excerpt is not None and self.job is None and self.stop is None:
+        if (self.full_excerpt is not None and self.job is None and self.stop is None
+                and not (self.used_source and self.used_source["role"] == "test")):
             self.drag_span = event.x, event.x
 
     def move_span(self, event):
@@ -421,7 +495,8 @@ class GuitarLearner:
         self.work("Selecting the passage…", lambda: data.inspect(self.source, start=start, end=end), self.use_excerpt)
 
     def reset_span(self, _):
-        if self.full_excerpt is not None and self.job is None and self.stop is None:
+        if (self.full_excerpt is not None and self.job is None and self.stop is None
+                and not (self.used_source and self.used_source["role"] == "test")):
             self.drag_span = None
             self.use_excerpt(self.full_excerpt)
 
@@ -505,15 +580,50 @@ class GuitarLearner:
 
     def show_guess(self, idle):
         guess = self.guess
-        self.headline.set(f"{guess['confidence'].title()} estimate" if guess["confidence"] != "uncertain" else "Uncertain")
         keys = ["pickup", "volume", "tone"]
         if "wiring" in data.LAYOUTS[self.layout]:
             keys.insert(1, "wiring")
-        present = [f"{key.title()}  {prediction_value(key, guess.get(key), self.layout)}" for key in keys]
+        predicted = [key for key in keys if guess.get(key) is not None]
+        control_names = {"pickup": "Pickup", "wiring": "Mini-toggle", "tone": "Tone", "volume": "Volume"}
+        held = {key for key in ("volume", "tone") if len({row["configuration"][key] for row in self.examples}) <= 1}
+        present = [f"{control_names[key]}  {prediction_value(key, guess[key], self.layout)}" for key in predicted]
+        unresolved = [control_names[key] for key in keys if key not in predicted and key not in held]
+        if present and unresolved:
+            present.append(f"{' and '.join(unresolved)} uncertain")
+        confidence = guess["confidence"].title()
+        if len(predicted) == 1:
+            headline = f"{confidence} {control_names[predicted[0]].lower()} estimate"
+        elif predicted:
+            headline = f"{confidence} estimate"
+        else:
+            headline = "Insufficient evidence"
+        self.headline.set(headline)
         self.details.set("  ·  ".join(present))
-        self.note.set(guess["reason"] if self.used_source is None else
-                      f"Actual  {summarize(self.layout, self.used_source['configuration'])}")
-        self.actual.configure(state="normal" if idle and self.used_source is None else "disabled")
+        notes = [guess["reason"]]
+        if len(predicted) == 1 and (evidence := guess.get("evidence", {}).get(predicted[0])):
+            count = len(evidence["notes_used"])
+            notes.append(f"{count} comparable pitch{'es' if count != 1 else ''} supported this estimate.")
+        if guess.get("nearest") and not predicted:
+            nearest = guess["nearest"]
+            reference = prediction_value("pickup", nearest["pickup"], self.layout)
+            if nearest.get("wiring"):
+                reference += f" · {nearest['wiring']}"
+            notes.append(f"Closest taught setup · {reference}")
+        if held:
+            notes.append(f"{' and '.join(control_names[key] for key in keys if key in held)} need examples at different settings.")
+        if self.used_source is not None:
+            actual = self.used_source["configuration"]
+            caption = f"Actual · {summarize(self.layout, actual)}"
+            if setup_key(actual) not in {setup_key(row["configuration"]) for row in self.examples}:
+                caption += " · outside taught setups"
+            notes.insert(0, caption)
+        self.note.set("\n".join(notes))
+        if self.used_source is not None:
+            self.actual.pack_forget()
+        else:
+            self.actual.configure(state="normal" if idle else "disabled")
+            if not self.actual.winfo_manager():
+                self.actual.pack(anchor="w", pady=(3, 0))
         if not self.report.winfo_manager():
             self.report.pack(fill="x", pady=(6, 0))
 

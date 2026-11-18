@@ -1,7 +1,7 @@
 """Infer a pickup and approximate knob positions from mixed DI examples."""
 
 from collections import defaultdict
-from itertools import product
+from itertools import combinations, product
 import json
 import math
 from pathlib import Path
@@ -19,6 +19,7 @@ METADATA_KEYS = {"wav", "start", "end", "source_id", "role", "id"}
 LEVEL_WEIGHT = .4
 MAX_DISTANCE = 2.1
 NEAR_BEST = .66
+MIN_NOTE_COVERAGE = .35
 
 
 def _configuration(example):
@@ -52,7 +53,7 @@ def _signatures(dry, start=None, end=None):
             values = np.asarray(frames)
             center = np.median(values, axis=0)
             spread = 1.4826 * np.median(np.abs(values - center), axis=0)
-            signatures[note] = center, spread
+            signatures[note] = center, spread, len(frames)
     return signatures
 
 
@@ -94,7 +95,7 @@ def calibrate(guitar, examples):
         if not notes:
             raise ValueError(f"Example {count + 1} has no sustained single notes. Record a few clear notes again.")
         group = knots[pickup, wiring]
-        for note, (center, spread) in notes.items():
+        for note, (center, spread, _) in notes.items():
             group[note][position].append(center)
             noise[note].append(spread)
         if source_id := example.get("source_id"):
@@ -186,12 +187,17 @@ def _interpolate(anchors, queries):
     return answer
 
 
-def _ranked(setup, observations, scales):
+def _positions(setup, observations):
     anchors = [setup["notes"][note] for note in observations]
-    points = np.unique(np.concatenate([record["positions"] for record in anchors]), axis=0)
-    queries = _grid(points)
+    return np.unique(np.concatenate([record["positions"] for record in anchors]), axis=0)
+
+
+def _ranked(setup, observations, scales, queries=None):
+    points = _positions(setup, observations)
+    if queries is None:
+        queries = _grid(points)
     distance = np.zeros(len(queries))
-    for note, (center, _) in observations.items():
+    for note, (center, _, _) in observations.items():
         # A noisy check cannot manufacture a close match by inflating its own radius.
         scale = np.asarray(scales[note])
         differences = (_interpolate(setup["notes"][note], queries) - center) / scale
@@ -207,15 +213,12 @@ def _squared_distance(differences):
     return np.mean(differences[..., :-1] ** 2, axis=-1) + LEVEL_WEIGHT * differences[..., -1] ** 2
 
 
-def _categorical(plausible, setups, key):
+def _categorical(plausible, comparable, key):
     plausible_setups = [setup for setup, *_ in plausible]
     selected = {setup[key] for setup in plausible_setups}
     if len(selected) != 1:
         return None
-    other = "wiring" if key == "pickup" else "pickup"
-    # A pickup and a wiring switch that always moved together cannot validate one another.
-    if not all(any(reference[other] == setup[other] and reference[key] != setup[key] for reference in setups)
-               for setup in plausible_setups):
+    if not all((setup["pickup"], setup["wiring"]) in comparable[key] for setup in plausible_setups):
         return None
     return next(iter(selected))
 
@@ -236,39 +239,132 @@ def _ranges(knobs, plausible, best_setup, best_point):
     return ranges
 
 
+def _coverage(notes, total_frames):
+    return sum(frames for _, _, frames in notes.values()) / total_frames
+
+
+def _overlap(observations, *setups):
+    return {note: signature for note, signature in observations.items() if all(note in setup["notes"] for setup in setups)}
+
+
+def _evidence(notes, total_frames):
+    return {"notes_used": sorted(map(int, notes)), "coverage": round(_coverage(notes, total_frames), 3)}
+
+
+def _nearest(setups, observations, scales, total_frames, min_notes):
+    nearest, best = None, MAX_DISTANCE
+    for setup in setups:
+        notes = _overlap(observations, setup)
+        if len(notes) < min_notes or _coverage(notes, total_frames) < .5:
+            continue
+        points, scores, _ = _ranked(setup, notes, scales)
+        if not np.isfinite(scores).any():
+            continue
+        index = int(np.nanargmin(scores))
+        distance = scores[index]
+        if distance < best:
+            best = distance
+            nearest = {key: setup[key] for key in CATEGORY_KEYS}
+            nearest["settings"] = {key: round(float(value), 1) for key, value in zip(setup["knobs"], points[index])}
+            nearest.update(_evidence(notes, total_frames))
+    return nearest
+
+
+def _paired_categories(setups, observations, scales, total_frames, min_notes):
+    """Compare each factor using notes shared by setups with the other factor held fixed."""
+    excluded = {key: set() for key in CATEGORY_KEYS}
+    matches = {key: [] for key in CATEGORY_KEYS}
+    comparable = {key: set() for key in CATEGORY_KEYS}
+    for (first, a), (second, b) in combinations(enumerate(setups), 2):
+        changed = [key for key in CATEGORY_KEYS if a[key] != b[key]]
+        if len(changed) != 1:
+            continue
+        notes = _overlap(observations, a, b)
+        if len(notes) < min_notes or _coverage(notes, total_frames) < MIN_NOTE_COVERAGE:
+            continue
+        same_knobs = a["knobs"] == b["knobs"]
+        queries = _grid(np.vstack([_positions(a, notes), _positions(b, notes)])) if same_knobs else None
+        first_scores = _ranked(a, notes, scales, queries)[1]
+        second_scores = _ranked(b, notes, scales, queries)[1]
+        if same_knobs:
+            # Compare pickup/wiring where both settings were taught over a common knob range.
+            available = np.isfinite(first_scores) & np.isfinite(second_scores)
+            first_scores, second_scores = first_scores[available], second_scores[available]
+        options = ((first, first_scores), (second, second_scores))
+        if not all(np.isfinite(scores).any() for _, scores in options):
+            continue
+        key = changed[0]
+        comparable[key].update({(a["pickup"], a["wiring"]), (b["pickup"], b["wiring"])})
+        minima = [(index, float(np.nanmin(scores))) for index, scores in options]
+        (winner, closest), (loser, runner_up) = sorted(minima, key=lambda option: option[1])
+        if closest > MAX_DISTANCE or runner_up - closest <= NEAR_BEST:
+            continue
+        excluded[key].add(loser)
+        matches[key].append((winner, notes))
+
+    outcome = {}
+    for key in CATEGORY_KEYS:
+        remaining = {index for index in range(len(setups)) if index not in excluded[key]}
+        choices = {setups[index][key] for index in remaining}
+        if len(choices) == 1:
+            wins = [notes for index, notes in matches[key] if index in remaining]
+            if wins:
+                strongest = max(wins, key=lambda notes: _coverage(notes, total_frames))
+                outcome[key] = next(iter(choices)), _evidence(strongest, total_frames)
+    return outcome, comparable
+
+
 def estimate(profile, dry, *, start=None, end=None, source_id=None):
     """Return plausible settings in the taught ranges, or abstain when cues overlap."""
     if source_id and source_id in profile.get("source_ids", ()):
         raise ValueError("Choose a fresh performance. This recording was used for calibration.")
     knobs, setups = profile["knobs"], profile["setups"]
     result = {"pickup": None, "wiring": None, "tone": None, "volume": None, **dict.fromkeys(knobs),
-              "notes_used": [], "confidence": "uncertain"}
+              "notes_used": [], "confidence": "uncertain", "evidence": {}, "nearest": None}
     observed = _signatures(dry, start, end)
     if not observed:
         return {**result, "reason": "No sustained single notes detected."}
-    common = {note: features for note, features in observed.items() if all(note in row["notes"] for row in setups)}
-    if len(common) * 2 < len(observed):
-        return {**result, "reason": "Play the same notes you taught across the pickup settings."}
-    result["notes_used"] = sorted(map(int, common))
     scales = profile["scales"]
-    if any(_squared_distance(spread / scales[note]) > 1.9 ** 2 for note, (_, spread) in common.items()):
+    total_frames = sum(frames for _, _, frames in observed.values())
+    taught = {note: signature for note, signature in observed.items() if note in scales}
+    stable = {note: signature for note, signature in taught.items()
+              if _squared_distance(signature[1] / scales[note]) <= 1.9 ** 2}
+    if _coverage(stable, total_frames) < .5 * _coverage(taught, total_frames):
         return {**result, "reason": "The notes changed too much within the clip. Hold one configuration and pick steadily."}
-    ranked = [(row, *_ranked(row, common, scales)) for row in setups]
+    min_notes = min(len(observed), 2)
+    result["nearest"] = _nearest(setups, stable, scales, total_frames, min_notes)
+    paired, comparable = _paired_categories(setups, stable, scales, total_frames, min_notes)
+    common = _overlap(stable, *setups)
+    combined = _coverage(common, total_frames) >= .5 and len(common) >= min_notes
+    ranked = [(row, *_ranked(row, common, scales)) for row in setups] if combined else []
     ranked = [(row, points, scores, independent) for row, points, scores, independent in ranked if np.isfinite(scores).any()]
-    if len(ranked) < len(setups):
-        return {**result, "reason": "The calibration has no shared knob settings for these notes."}
-    best_setup, points, scores, _ = min(ranked, key=lambda row: np.nanmin(row[2]))
-    best_index = int(np.nanargmin(scores))
-    best = float(scores[best_index])
-    if best > MAX_DISTANCE:
-        return {**result, "reason": "The dry signal falls outside the learned examples."}
-    plausible = [(row, candidates[distances <= best + NEAR_BEST], independent)
-                 for row, candidates, distances, independent in ranked if np.any(distances <= best + NEAR_BEST)]
-    result.update({key: _categorical(plausible, setups, key) for key in CATEGORY_KEYS})
-    ranges = _ranges(knobs, plausible, best_setup, points[best_index])
-    result.update(ranges)
-    if result["pickup"] is None and result["wiring"] is None and not any(ranges.values()):
-        return {**result, "reason": "Several settings explain this clip. Teach each control at more distinct combinations."}
-    complete = all(ranges.values()) and result["pickup"] is not None
-    confidence = "strong" if best < .55 and complete else "good" if best < 1.25 else "tentative"
-    return {**result, "confidence": confidence, "reason": "Estimate from the taught range. Picking and input gain affect the result."}
+    best = float("inf")
+    if len(ranked) == len(setups):
+        best_setup, points, scores, _ = min(ranked, key=lambda row: np.nanmin(row[2]))
+        best_index = int(np.nanargmin(scores))
+        best = float(scores[best_index])
+        if best <= MAX_DISTANCE:
+            plausible = [(row, candidates[distances <= best + NEAR_BEST], independent)
+                         for row, candidates, distances, independent in ranked if np.any(distances <= best + NEAR_BEST)]
+            result.update({key: _categorical(plausible, comparable, key) for key in CATEGORY_KEYS})
+            result.update(_ranges(knobs, plausible, best_setup, points[best_index]))
+            result["evidence"] = {key: _evidence(common, total_frames) for key in (*CATEGORY_KEYS, *knobs)
+                                  if result[key] is not None}
+
+    for key, (value, evidence) in paired.items():
+        if result[key] is None:
+            result[key], result["evidence"][key] = value, evidence
+        elif result[key] != value:
+            result[key] = None
+            result["evidence"].pop(key, None)
+
+    if result["evidence"]:
+        result["notes_used"] = sorted({note for row in result["evidence"].values() for note in row["notes_used"]})
+        complete = all(result[key] is not None for key in knobs) and result["pickup"] is not None
+        confidence = "strong" if best < .55 and complete else "good" if best < 1.25 else "tentative"
+        return {**result, "confidence": confidence, "reason": "Estimate from comparable notes. Picking and input gain affect the result."}
+    if result["nearest"]:
+        return {**result, "reason": "The nearest example is inconclusive. Teach the same notes at more distinct settings."}
+    if _coverage(stable, total_frames) < .5:
+        return {**result, "reason": "Too few notes match the examples. Play the same notes you taught."}
+    return {**result, "reason": "The dry signal falls outside the learned examples."}

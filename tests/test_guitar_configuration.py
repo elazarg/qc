@@ -70,6 +70,33 @@ class GuitarConfigurationTest(unittest.TestCase):
         self.assertIsNone(result["pickup"], result)
         self.assertIsNone(result["wiring"], result)
 
+    def test_does_not_confuse_different_tone_settings_for_pickup_evidence(self):
+        profile = configuration.calibrate("Charvel", [
+            {"pickup": pickup, "tone": tone, "volume": 6, "wav": clip(1, tone, 6)}
+            for pickup, tone in ((1, 2), (5, 10))])
+        result = configuration.estimate(profile, clip(1, 10, 6))
+        self.assertIsNone(result["pickup"], result)
+        self.assertEqual(result["nearest"]["pickup"], 5, result)
+
+    def test_supported_pickup_uses_notes_shared_with_its_relevant_alternative(self):
+        def phrase(pickup, wiring, frequencies):
+            notes = [np.r_[clip(pickup, 6, 6, wiring=wiring, frequency=hz), np.zeros(audio.RATE // 10)]
+                     for hz in frequencies]
+            return np.concatenate(notes)
+
+        frequencies = (110, 146.83, 164.81, 196)
+        profile = configuration.calibrate("Charvel", [
+            {"pickup": pickup, "tone": 6, "volume": 6, "wiring": wiring,
+             "wav": phrase(pickup, wiring, notes)}
+            for pickup, wiring, notes in ((1, "Parallel", frequencies), (5, "Parallel", frequencies),
+                                          (5, "Series", frequencies[-1:]))])
+        result = configuration.estimate(profile, phrase(5, "Parallel", frequencies))
+        self.assertEqual(result["pickup"], 5, result)
+        self.assertGreaterEqual(len(result["evidence"]["pickup"]["notes_used"]), 3)
+        self.assertIsNone(result["wiring"], result)
+        self.assertIsNone(result["tone"], result)
+        self.assertEqual(result["nearest"]["wiring"], "Parallel", result)
+
     def test_abstains_when_settings_change_during_the_check(self):
         profile = configuration.calibrate("Charvel", [
             {"pickup": pickup, "tone": 6, "volume": 6, "wav": clip(pickup, 6, 6)} for pickup in (1, 5)])
