@@ -82,6 +82,8 @@ def assert_grid(qc, chain, routing):
 
 
 def build_grid(qc, scratch, chain):
+    if device.live_position(qc) != WORK_SLOT:
+        raise RuntimeError("The Quad Cortex changed before the draft could be built.")
     iterate.set_routes(qc, iterate.USB_ROUTES)
     for row, lane in enumerate(scratch.chains):
         for column, model in enumerate(lane.models):
@@ -96,6 +98,8 @@ def build_grid(qc, scratch, chain):
     if any(model.hash for row in cleared.chains for model in row.models):
         raise RuntimeError("The temporary Quad Cortex grid did not clear.")
     for column, (model_id, settings) in enumerate(chain):
+        if device.live_position(qc) != WORK_SLOT:
+            raise RuntimeError("The selected preset changed while the draft was being built.")
         qc.add_block(model_id, row=0, column=column)
         time.sleep(.10)
         for index, value in settings:

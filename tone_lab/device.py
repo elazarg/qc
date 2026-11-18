@@ -3,9 +3,13 @@
 from contextlib import contextmanager
 import logging
 import math
+import os
+from pathlib import Path
+import subprocess
+import sys
 import time
 
-from qc_mcp import catalog
+from qc_mcp import catalog, protocol
 from qc_mcp.autolevel import IN_PORT_USB_5_6, OUT_PORT_USB_5_6
 from qc_mcp.transport import QuadCortex
 
@@ -13,11 +17,38 @@ SCENES = "ABCDEFGH"
 LAB_PREFIX = "Tone Lab"
 
 
+def editor_running():
+    if sys.platform != "win32":
+        return False
+    tasklist = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "tasklist.exe"
+    try:
+        result = subprocess.run([str(tasklist), "/FI", "IMAGENAME eq Cortex Control.exe", "/FO", "CSV", "/NH"],
+                                capture_output=True, timeout=2.0, creationflags=subprocess.CREATE_NO_WINDOW)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return b'"cortex control.exe"' in result.stdout.lower()
+
+
+class EditorActive(RuntimeError):
+    """Cortex Control owns the hardware. Tone Lab can still use local audio."""
+
+
 @contextmanager
 def connect(*, write=False):
+    """Give the stock editor priority on Windows, including while it starts."""
+    handoff = "Cortex Control is using the Quad Cortex. Close it to use this device action. Your listening session stays open."
+    if editor_running():
+        raise EditorActive(handoff)
     qc = QuadCortex(share=not write)
     try:
-        qc.open()
+        try:
+            if editor_running():
+                raise EditorActive(handoff)
+            qc.open()
+        except (OSError, RuntimeError) as error:
+            if ("exclusively" in str(error).casefold() or "sharing violation" in str(error).casefold()) and editor_running():
+                raise EditorActive(handoff) from error
+            raise
         if not qc.protocol_version_verified:
             raise RuntimeError("The Quad Cortex firmware could not be verified.")
         yield qc
@@ -37,6 +68,14 @@ def active_scene(qc):
     if scene is None or not 0 <= scene.selected_scene < len(SCENES):
         raise RuntimeError("The Quad Cortex did not report the active scene.")
     return scene.selected_scene
+
+
+def require_clean(qc):
+    dirty = qc.read_state("PresetDirty", timeout_ms=2200)
+    if dirty is None or dirty.action != protocol.ACTION["UPDATE"]:
+        raise RuntimeError("Couldn't verify the current preset's edits. Check the Quad Cortex and try again.")
+    if dirty.is_dirty:
+        raise RuntimeError("The current Quad Cortex sound has unsaved edits. Save them in Cortex Control or on the unit first.")
 
 
 def live_position(qc):

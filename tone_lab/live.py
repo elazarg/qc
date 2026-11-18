@@ -53,6 +53,7 @@ def run(take, mode, stop, commands, report, *, audible=True, capture_return=Fals
     if stop.is_set():
         return {}
     with device.connect(write=True) as qc:
+        device.require_clean(qc)
         original_address = qc.get_setlist_position()
         original = device.read_preset(qc)
         scene = device.active_scene(qc)

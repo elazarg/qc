@@ -1,15 +1,12 @@
 # Tone Lab for Quad Cortex
 
-Open **Tone Lab.lnk** to go straight to **Live**. Pick the guitar you’re playing and use **Ask Tone Lab**. Type, press **Ctrl+K** to jump to the request box, or use **Win+H** to dictate. Keep Cortex Control closed while Tone Lab uses the Quad Cortex over USB.
+Open **Tone Lab.lnk** to go to the listening desk. Pick the guitar you’re playing and describe a sound in **Ask Tone Lab**. Press **Ctrl+K** to jump to the request box or use **Win+H** to dictate.
 
-| Intent | What to use |
-| --- | --- |
-| Change how the guitar feels under your fingers | **Live guitar** puts the working copy on the Quad Cortex hardware path. Start with Drive, Warmth, Space and Jazz. **More controls** exposes Response, EQ and Effects separately. |
-| Compare changes on the exact same performance | **Record clip** captures synchronized dry DI and wet audio. **Loop take** reamps that DI through the currently loaded preset's working copy. **Save A/B** records the current settings against the wet take and adds the render to the library. |
-| Make a tone from scratch | Ask “Make me a Lenny Kravitz preset.” Tone Lab chooses a specific sound to aim for and builds a draft from stock Quad Cortex blocks. **Try live** puts the draft under your fingers. **Render A/B** lets you hear the same saved performance through both versions. **Save on QC** uses an empty slot in My Presets. |
-| Use a preset you already own | Open **Choose a preset**, search your user setlists, and use **Load on QC** or **Use as reference**. Choose the scene of interest. A reference captures the selected preset with the current take’s dry guitar, then restores the preset and scene you were using. |
-| Get closer to a reference | In **Tone Match**, choose a WAV, the take’s wet audio, or a saved Quad Cortex preset. **Find closest tones** ranks existing audio by tone, dynamics, and ambience. **Compare** plays a candidate and the reference at a common loudness. |
-| Say what worked | Play a version and use **Add listening note** to attach your observation to that version. Follow up in **Ask Tone Lab** to refine a draft. |
+- Click **A** or **B** to play or change the sound. When both come from the same phrase, the loop stays at the same place and levels are matched. **Esc** stops playback. **Keep this sound** stores a local listening decision.
+- Ask “Make me a Lenny Kravitz preset.” **B** renders the draft on your current phrase. **Try with guitar** auditions it temporarily on the Quad Cortex. **Details** shows the reasoning and sources and can **Save a copy to My Presets**.
+- Choose an audio excerpt, a previously captured reference, or a saved Quad Cortex preset. Capturing a fresh preset reference replays your phrase through it and restores the starting device preset and scene. **Find a match** brings a saved alternative for the current phrase into the listening comparison.
+- Use **Tools → Open Cortex Control** for detailed hardware editing. The Lab leaves device control to Cortex Control while it is open. Your session, drafts, saved references and playback remain available. Capturing or saving with direct hardware control requires a handoff. Audio-only recording can retain four raw channels while the editor is open; the preset identity is provisional.
+- **Tools → Open workbench** opens the earlier controls for live macros, calibration, levels and detailed tone search. **Back to listening** returns to the same session.
 
 The Live controls and preset references use **My Presets → 32G** as a working copy. Draft auditions temporarily use **32H**. Tone Lab checks the working slot, archives the starting preset locally, and restores the original saved preset and scene when the audition ends. **Save on QC** is the action that keeps a draft in a regular My Presets slot.
 

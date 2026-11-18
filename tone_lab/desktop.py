@@ -2,6 +2,7 @@
 
 import ctypes
 from ctypes import wintypes
+import os
 from pathlib import Path
 import sys
 
@@ -35,6 +36,22 @@ def show_in_taskbar(root):
     set_style(hwnd, index, flags)
     root.withdraw()
     root.after_idle(root.deiconify)
+
+
+def open_cortex_control():
+    user32 = ctypes.windll.user32
+    find = user32.FindWindowW
+    find.argtypes = (wintypes.LPCWSTR, wintypes.LPCWSTR)
+    find.restype = wintypes.HWND
+    hwnd = find(None, "Cortex Control")
+    if hwnd:
+        user32.ShowWindow(hwnd, 9)
+        user32.SetForegroundWindow(hwnd)
+        return
+    app = Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Neural DSP/Cortex Control/Cortex Control.exe"
+    if not app.is_file():
+        raise RuntimeError("Windows couldn't find Cortex Control in its standard installation folder.")
+    os.startfile(app)
 
 
 def shortcut():

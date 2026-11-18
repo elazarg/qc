@@ -11,8 +11,9 @@ from . import audio, device, session, sources
 def parser():
     command = argparse.ArgumentParser(prog="tone_lab", description=__doc__)
     sub = command.add_subparsers(dest="action", required=True)
-    clip = sub.add_parser("clip", help="Open the one-button clip recorder")
+    clip = sub.add_parser("clip", help="Open the listening desk")
     clip.add_argument("--input", type=int, choices=(1, 2), default=1)
+    clip.add_argument("--workbench", action="store_true", help="Open the detailed controls")
     latest = sub.add_parser("latest-clip", help="Find the latest recorded clip")
     latest.add_argument("--pair", action="store_true", help="Include both dry and wet audio paths")
     sub.add_parser("ui", help="Open the optional workbench")
@@ -95,7 +96,7 @@ def run(args):
 
             if args.action == "latest-clip":
                 return capture.latest_clip(pair=args.pair)
-            capture.launch(args.input)
+            capture.launch(args.input, workbench=args.workbench)
         case "ui":
             from .ui import launch
 

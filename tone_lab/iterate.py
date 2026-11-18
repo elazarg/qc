@@ -141,6 +141,7 @@ def render_knobs(take, values):
     take = Path(take)
     info, selection, dry, wet = take_audio(take)
     with device.connect(write=True) as qc:
+        device.require_clean(qc)
         offset = calibration_offset(qc)
         position = qc.get_setlist_position()
         source = device.read_preset(qc)
@@ -192,6 +193,7 @@ def render(note, *, take=None, arm=False, progress=lambda message: None):
     take = Path(take)
     info, (start, end), dry, wet = take_audio(take)
     with device.connect(write=True) as qc:
+        device.require_clean(qc)
         offset = calibration_offset(qc)
         position = qc.get_setlist_position()
         source = device.read_preset(qc)
