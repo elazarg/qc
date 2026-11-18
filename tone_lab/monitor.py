@@ -60,6 +60,8 @@ def drain(commands):
     try:
         message = commands.get(timeout=.075)
         while True:
+            if message["event"] == "tone":
+                messages.pop(("knobs", message["config"].get("tone_id")), None)
             key = ("knobs", message.get("tone_id")) if message["event"] == "knobs" else message["event"]
             messages[key] = message
             message = commands.get_nowait()
@@ -186,7 +188,8 @@ def resident_grids(qc, events):
         if side in prepared and prepared[side][0] == identity:
             _, stored, physical, inlet, default_scene = prepared[side]
             base = iterate.recall(qc, position, name)
-            if iterate.sound_state(base) != iterate.sound_state(stored):
+            if (iterate.sound_state(base) != iterate.sound_state(stored) or iterate.routes(base) != iterate.routes(stored)
+                    or (base.tempo, base.volume, base.pan) != (stored.tempo, stored.volume, stored.pan)):
                 raise RuntimeError("A Tone Lab working preset changed on the Quad Cortex.")
         else:
             staging = (position, source_address)

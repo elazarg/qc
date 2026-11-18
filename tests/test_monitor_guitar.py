@@ -11,6 +11,15 @@ from tone_lab import audio, guitar_gestures, monitor
 
 
 class ShapeGuitarTest(unittest.TestCase):
+    def test_replacing_a_side_discards_queued_knobs_from_its_old_tone(self):
+        queue = Queue()
+        queue.put({"event": "knobs", "tone_id": "b", "values": {"drive": 1.}})
+        queue.put({"event": "tone", "config": {"tone_id": "b", "values": {}}})
+        queue.put({"event": "knobs", "tone_id": "a", "values": {"body": -.3}})
+        pending = monitor.drain(queue)
+        self.assertNotIn(("knobs", "b"), pending)
+        self.assertIn(("knobs", "a"), pending)
+
     def test_switching_tones_keeps_the_phrase_stream_and_ignores_old_knobs(self):
         stop = Event()
         preset_a = {"position": {"position": 10}, "name": "Clean"}
@@ -102,7 +111,8 @@ class ShapeGuitarTest(unittest.TestCase):
 
         def prepare(qc, pick, base, inlet, *, position, monitor_mode):
             prepared.append((pick, position, monitor_mode))
-            fixture = SimpleNamespace(name=iterate.fixture_identity(position)[0], signature=base.signature)
+            fixture = SimpleNamespace(name=iterate.fixture_identity(position)[0], signature=base.signature,
+                                      tempo=120, volume=0, pan=0)
             source[position["position"]] = fixture
             state["position"] = position
             return fixture

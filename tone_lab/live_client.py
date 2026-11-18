@@ -83,7 +83,10 @@ def supervise(argv, stop, commands, report, *, monitor=False):
                     except Empty:
                         break
                     event = item if monitor else {"event": "knobs", "values": item}
+                    if event["event"] == "tone":
+                        updates.pop(("knobs", event["config"].get("tone_id")), None)
                     key = (event["event"], event.get("tone_id")) if event["event"] == "knobs" else event["event"]
+                    updates.pop(key, None)
                     updates[key] = event
                 for event in updates.values():
                     outgoing.put(event)
