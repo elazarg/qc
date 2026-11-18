@@ -119,6 +119,13 @@ def latest_comparison(take):
     return take.original, None
 
 
+def draft_comparison(take, draft_id):
+    for folder, record in feedback.comparisons(take.folder.name):
+        if record.get("draft_id") == draft_id and (pair := comparison(folder, take)):
+            return pair
+    return None
+
+
 def captured_sound(reference, take):
     return Sound(f"{reference.name} · {reference.scene}", Path(reference.path), take.folder.name, take.section,
                  folder=Path(reference.path).parent)
@@ -178,8 +185,10 @@ def route(text, *, has_draft):
     lowered = request.casefold()
     if lowered in {"stop", "stop playback", "go back to playing", "stop preview"}:
         return "stop", ""
-    if lowered in {"listen", "compare", "compare sounds", "hear the draft"}:
+    if lowered in {"listen", "compare", "compare sounds"}:
         return "compare", ""
+    if lowered in {"hear the draft", "hear draft", "compare the draft"}:
+        return "draft", ""
     if lowered in {"keep this", "keep this sound", "keep this version"}:
         return "keep", ""
     note = re.match(r"(?i)^keep this(?: sound| version)?[,:]\s*(\S.*)$", request)

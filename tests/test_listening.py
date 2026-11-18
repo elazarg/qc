@@ -15,6 +15,7 @@ class ListeningSessionTest(unittest.TestCase):
         self.assertEqual(listening.route("Less bite, keep the attack.", has_draft=True)[0], "refine")
         self.assertEqual(listening.route("Less bite on my current QC sound.", has_draft=True)[0], "adjust-live")
         self.assertEqual(listening.route("Match the reference.", has_draft=True)[0], "match")
+        self.assertEqual(listening.route("Hear the draft.", has_draft=True)[0], "draft")
         self.assertEqual(listening.route("Keep this, the attack feels right.", has_draft=True),
                          ("keep", "the attack feels right"))
 

@@ -314,6 +314,7 @@ class Desk:
         for tile, sound in ((self.a_tile, self.baseline), (self.b_tile, self.alternative)):
             heard = sound and self.playing == sound
             tile.configure(bg=ACCENT if heard else TILE, fg=INK if heard else LIGHT)
+        self.try_button.configure(text=f"Try {self.draft['name']} live" if self.draft else "Try with guitar")
         sound = self.selected_sound()
         if sound and sound.path == self.kept:
             self.keep_button.configure(text="Kept", state="disabled")
@@ -395,6 +396,21 @@ class Desk:
                         iterate.render_knobs, self.take.folder, self.adjustment, done=self.show_render)
         else:
             self.set_status("Ask Tone Lab for a change or choose a preset to compare.")
+
+    def restore_draft_comparison(self):
+        if not self.draft or not self.take or self.job is not None:
+            self.set_status("Choose a phrase and prepare a draft first.")
+            return
+        self.stop_audio()
+        self.last_heard = None
+        saved = listening.draft_comparison(self.take, self.draft["id"])
+        self.baseline, self.alternative = saved or (self.take.original, None)
+        self.remember()
+        self.update()
+        if saved:
+            self.set_status(f"{self.draft['name']} is ready as B.")
+        else:
+            self.compare()
 
     def show_render(self, folder):
         pair = listening.comparison(folder, self.take)
@@ -598,7 +614,7 @@ class Desk:
         if not query or self.thinking is not None:
             return
         action, value = listening.route(query, has_draft=bool(self.draft))
-        if action in ("reference", "compare", "match") and self.job is not None:
+        if action in ("reference", "compare", "draft", "match") and self.job is not None:
             self.set_status("Finish or stop the current hardware action, then try that request again.")
             return
         self.request.set("")
@@ -613,6 +629,9 @@ class Desk:
             return
         if action == "compare":
             self.compare()
+            return
+        if action == "draft":
+            self.restore_draft_comparison()
             return
         if action == "match":
             self.match()
@@ -676,6 +695,7 @@ class Desk:
         self.details.delete(0, tk.END)
         if self.draft:
             recipe = self.draft
+            self.details.add_command(label=f"Compare {recipe['name']}", command=self.restore_draft_comparison)
             self.details.add_command(label="Why this sound?", command=lambda: self.set_status(recipe["explanation"]))
             self.details.add_command(label="Show signal chain", command=lambda: self.set_status(preset_design.chain_text(recipe)))
             for source in recipe["sources"]:
