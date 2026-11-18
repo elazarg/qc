@@ -90,6 +90,8 @@ def _observations(dry, control):
             if energy.sum() < 1e-10:
                 continue
             values = 10 * np.log10(np.clip(energy / energy.sum(), 1e-4, None))
+            if control == "configuration":
+                values = np.r_[values, 20 * math.log10(rms)]
         observations.append((note, values))
     return observations
 

@@ -86,6 +86,7 @@ class Desk:
         self.worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix="tone-audio")
         self.advisor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="tone-advice")
         self.player = listening.Player()
+        self.guitar_learner = None
         self.job = self.thinking = self.stop_signal = self.play_job = None
         self.outcome = self.leaving = self.check = None
         self.editor_after = False
@@ -189,8 +190,10 @@ class Desk:
         for name in session.GUITARS:
             guitars.add_command(label=name, command=lambda value=name: self.select_guitar(value))
         guitars.add_separator()
-        guitars.add_command(label="Learn guitar controls", command=self.show_guitar_calibration)
+        guitars.add_command(label="Charvel Guitar Learner", command=self.show_guitar_learner)
+        guitars.add_command(label="Guitar calibration and gestures", command=self.show_guitar_calibration)
         guitar.pack(side="right", padx=5)
+        control(header, "Guitar Learner", self.show_guitar_learner).pack(side="right", padx=(0, 5))
         text(header, variable=self.hardware, size=9, color=SUBTLE).pack(side="right", padx=(6, 0))
 
         ask = tk.Frame(page, bg=PAPER)
@@ -300,6 +303,13 @@ class Desk:
     def show_guitar_calibration(self):
         self.show_tab("Setup")
         self.setup.show_calibration()
+
+    def show_guitar_learner(self):
+        from .guitar_learner_ui import GuitarLearner
+
+        if self.guitar_learner is None:
+            self.guitar_learner = GuitarLearner(self)
+        self.guitar_learner.show()
 
     def set_status(self, value):
         self.status.set(value)
@@ -1455,6 +1465,8 @@ class Desk:
             self.root.after_cancel(self.shape_writer)
             self.shape_writer = None
         self.remember()
+        if self.guitar_learner is not None:
+            self.guitar_learner.shutdown()
         self.setup.shutdown()
         self.worker.shutdown(wait=True)
         self.advisor.shutdown(wait=False, cancel_futures=True)
