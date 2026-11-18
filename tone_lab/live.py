@@ -11,7 +11,7 @@ from qc_mcp import catalog
 from . import audio, device, iterate, styles
 
 
-def update(qc, base, scene, values, previous):
+def update(qc, base, scene, values, previous, *, position=iterate.SCRATCH):
     edits = styles.knobs(base, scene, values)
     next_values = {(x["row"] - 1, x["column"] - 1, x.get("index")): x for x in edits}
     changed = {key: value["from"] for key, value in previous.items() if key not in next_values}
@@ -19,7 +19,7 @@ def update(qc, base, scene, values, previous):
         if key not in previous or abs(previous[key]["to"] - value["to"]) > .001:
             changed[key] = value["to"]
     if changed:
-        if device.live_position(qc) != iterate.SCRATCH:
+        if device.live_position(qc) != position:
             raise RuntimeError("The preset was switched while Tone Lab had live control.")
         if any(index is None for _, _, index in changed) and device.active_scene(qc) != scene:
             raise RuntimeError("The scene was switched while Tone Lab had live control.")

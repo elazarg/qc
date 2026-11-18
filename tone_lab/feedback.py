@@ -24,7 +24,7 @@ def notes(folder):
             for path in sorted((folder / "feedback").glob("*.json"))]
 
 
-def save(folder, text):
+def save(folder, text, *, audition=None, audition_name=None):
     folder = Path(folder)
     description = session.load_session(folder)
     text = text.strip()
@@ -34,7 +34,9 @@ def save(folder, text):
     directory = folder / "feedback"
     directory.mkdir(exist_ok=True)
     path = directory / f"{now:%Y%m%d-%H%M%S}-{uuid4().hex[:6]}.json"
+    heard = description["auditions"].get(audition, {})
     session.write_json(path, {"created_utc": now.isoformat(), "comparison": folder.name,
                              "source_clip": description.get("source_clip"), "text": text,
+                             "audition": audition, "audition_name": audition_name, "heard_render": heard.get("render"),
                              "auditions": {label: row["render"] for label, row in description["auditions"].items()}})
     return path

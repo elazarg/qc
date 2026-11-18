@@ -77,6 +77,9 @@ KNOB_HINTS = {
 DRIVE_CATEGORIES = {"Guitar Overdrive", "Bass Overdrive", "Guitar Amplifier", "Bass Amplifier", "Neural Capture"}
 PEDAL_CATEGORIES = {"Guitar Overdrive", "Bass Overdrive"}
 GAIN_NAMES = {"GAIN", "DRIVE", "DISTORTION", "FUZZ", "PREAMP", "PREAMP GAIN"}
+AMP_GAIN_NAMES = {"GAIN 1", "GAIN 2", "VOLUME BRIGHT", "VOLUME NORMAL"}
+AMP_VOLUME_AS_DRIVE = {1009, 1011, 1083, 1084, 1094, 1095, 1096, 1097, 1120, 1127, 1128,
+                       1154, 1155, 1156, 1166, 1167}
 PEDAL_LEVEL_NAMES = {"LEVEL", "VOLUME", "OUTPUT"}
 DRIVE_BYPASS = -0.98
 
@@ -110,8 +113,9 @@ def available_knobs(preset, scene):
             if knobs(preset, scene, {key: 1}) or (lower < 0 and knobs(preset, scene, {key: lower}))]
 
 
-def _drive_delta(category, name, drive, before, low, high, units):
-    if category in DRIVE_CATEGORIES and name in GAIN_NAMES:
+def _drive_delta(category, name, drive, before, low, high, units, *, amp_volume):
+    gain_control = name in GAIN_NAMES or amp_volume or (category == "Guitar Amplifier" and name in AMP_GAIN_NAMES)
+    if category in DRIVE_CATEGORIES and gain_control:
         if drive < 0:
             return (before - low) * drive
         return (high - low) * .15 * drive
@@ -153,7 +157,11 @@ def apply_rules(preset, scene, rules, *, allow_neutral=False, drive=0.0):
                                         "model": info["name"], "from": False, "to": True})
             for index, (setting, param) in enumerate(zip(model.params, info["params"])):
                 name = param["name"]
+                amp_volume = category == "Guitar Amplifier" and (
+                    name in {"VOLUME BRIGHT", "VOLUME NORMAL"} or name == "VOLUME" and model.hash in AMP_VOLUME_AS_DRIVE)
                 delta = rules.get((category, name), 0.0)
+                if amp_volume or (category == "Guitar Amplifier" and name in {"GAIN 1", "GAIN 2"}):
+                    delta += rules.get((category, "GAIN"), 0.0)
                 if (category == "Utility" and name == "THRESHOLD" and model.hash != 16003):
                     continue
                 if (param["type"] != "float" or setting.expression
@@ -173,8 +181,9 @@ def apply_rules(preset, scene, rules, *, allow_neutral=False, drive=0.0):
                 if category == "Compressor" and name == "ATTACK" and param["units"] != "ms":
                     delta *= (high - low) * .2 / 18
                 before = catalog.to_display(model.hash, index, value.float_value)
-                delta += _drive_delta(category, name, drive, before, low, high, param["units"])
-                after = min(high, max(low, before + delta))
+                floor = min(before, low + .15 * (high - low)) if amp_volume else low
+                delta += _drive_delta(category, name, drive, before, floor, high, param["units"], amp_volume=amp_volume)
+                after = min(high, max(floor, before + delta))
                 if math.isclose(before, after, abs_tol=0.001):
                     continue
                 raw = catalog.to_norm(model.hash, index, after)

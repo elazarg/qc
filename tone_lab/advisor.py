@@ -85,12 +85,20 @@ def research(text, take):
               "If the exact gear is undocumented, say what is inferred. You have no audio. Do not access local files.\n"
               + json.dumps({"request": text, "take": context}, ensure_ascii=False))
     result = request(prompt, schema, web=True)
+    return result["reply"].strip(), source_links(result["sources"])
+
+
+def source_links(items):
     links = []
-    for item in result["sources"][:6]:
-        url = urlsplit(item["url"])
-        if url.scheme == "https" and url.hostname and not url.username and item["title"].strip():
-            links.append({"title": item["title"].strip(), "url": url.geturl()})
-    return result["reply"].strip(), links
+    for item in items[:6]:
+        try:
+            url = urlsplit(item["url"])
+            title = item["title"].strip()
+        except (KeyError, TypeError, AttributeError, ValueError):
+            continue
+        if url.scheme == "https" and url.hostname and not url.username and title:
+            links.append({"title": title, "url": url.geturl()})
+    return links
 
 
 def request(prompt, schema, *, web):

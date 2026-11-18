@@ -7,7 +7,7 @@ from tkinter import filedialog
 from urllib.parse import urlsplit
 import webbrowser
 
-from . import advisor, diagnostics
+from . import advisor, diagnostics, session
 from .widgets import FONT, LINE, MUTED, PANEL, RECESS, TEXT, add_scrollbar, button, card, entry, label, slider
 
 
@@ -17,10 +17,12 @@ class LibraryPanel:
         self.matching = matching
         self.future = None
         self.reference = None
+        self.reference_take = None
+        self.reference_selection = None
         self.status = tk.StringVar()
         self.query = tk.StringVar()
         self.same_take = tk.BooleanVar()
-        self.what = tk.StringVar(value="Choose a WAV or use the wet recording for this take.")
+        self.what = tk.StringVar(value="Choose a reference for the sound you want to match.")
 
         controls = card(parent)
         controls.pack(fill="x", pady=(0, 11))
@@ -71,16 +73,28 @@ class LibraryPanel:
         self.secondary_actions = [self.research_button]
 
     def build_match(self, panel):
-        label(panel, variable=self.what, color=MUTED, wrap=520).pack(anchor="w", pady=(4, 7))
+        reference = tk.Frame(panel, bg=PANEL)
+        reference.pack(fill="x", pady=(4, 7))
+        self.reference_play = button(reference, "Play reference", self.play_reference, compact=True)
+        self.reference_play.configure(state="disabled")
+        self.reference_play.pack(side="right")
+        options = tk.Menubutton(reference, text="Saved", indicatoron=True, takefocus=True,
+                                font=(FONT, 10), background=PANEL, foreground=TEXT, padx=5)
+        self.saved_references = tk.Menu(options, tearoff=False, postcommand=self.list_references)
+        options.configure(menu=self.saved_references)
+        options.pack(side="right", padx=(0, 5))
+        label(reference, variable=self.what, color=MUTED, wrap=335).pack(side="left", fill="x", expand=True)
         row = tk.Frame(panel, bg=PANEL)
         row.pack(fill="x")
         choose = button(row, "Choose WAV", self.choose, compact=True)
         choose.pack(side="left", padx=(0, 5))
         use_take = button(row, "Use take's wet audio", self.use_take, compact=True)
         use_take.pack(side="left", padx=(0, 5))
+        use_qc = button(row, "Use QC preset", lambda: self.review.show_view("presets"), compact=True)
+        use_qc.pack(side="left", padx=(0, 5))
         self.action = button(row, "Find closest tones", self.find, accent=True, compact=True)
         self.action.pack(side="left")
-        self.secondary_actions = [choose, use_take]
+        self.secondary_actions = [choose, use_take, use_qc, self.reference_play, options]
         priorities = tk.Frame(panel, background=PANEL)
         priorities.pack(fill="x", pady=(5, 0))
         self.weights = {}
@@ -100,16 +114,56 @@ class LibraryPanel:
         choice = filedialog.askopenfilename(parent=self.review.root, title="Choose a guitar reference",
                                             filetypes=(("WAV audio", "*.wav"),))
         if choice:
-            self.reference = Path(choice)
-            self.what.set(self.reference.name)
+            self.set_reference(choice, Path(choice).name)
 
     def use_take(self):
         source = self.review.take_info.get("wet")
         if not source:
             self.status.set("This take does not have a wet recording.")
             return
-        self.reference = Path(source)
-        self.what.set("Wet recording from this take")
+        self.set_reference(source, "Wet recording from this take",
+                           take_id=self.review.take.name if self.review.take else None,
+                           selection=self.review.take_info.get("selected_passage_seconds"))
+
+    def set_reference(self, path, name, *, take_id=None, selection=None):
+        self.reference = Path(path)
+        self.reference_take = take_id
+        self.reference_selection = selection
+        self.what.set(name)
+        if self.future is None:
+            self.reference_play.configure(state="normal")
+        self.review.update_buttons()
+
+    def play_reference(self):
+        if self.reference:
+            self.preview({"file": self.reference, "selection": self.reference_selection})
+
+    def use_preset_reference(self, path, name):
+        take_id = session.load_session(Path(path).parent).get("source_clip")
+        self.set_reference(path, name, take_id=take_id)
+        self.status.set("Reference captured from the dry take over USB.")
+
+    def list_references(self):
+        self.saved_references.delete(0, tk.END)
+        count = 0
+        for file in sorted(session.SESSIONS.glob("*-preset-reference-*/session.json"), reverse=True):
+            try:
+                info = session.load_session(file.parent)
+                identity = info["qc_reference"]
+                path = file.with_name("reference.wav")
+                if info.get("state") != "ready" or not path.is_file():
+                    continue
+                title = f"{identity['name']} · {identity['scene']}"
+            except (OSError, ValueError, KeyError):
+                continue
+            self.saved_references.add_command(label=f"{title} · {identity['setlist']} {identity['slot']}",
+                command=lambda wav=path, name=title, take=info.get("source_clip"):
+                    self.set_reference(wav, name, take_id=take))
+            count += 1
+            if count == 12:
+                break
+        if not count:
+            self.saved_references.add_command(label="No saved preset references yet", state="disabled")
 
     def clear(self, message=None):
         for child in self.body.winfo_children():
@@ -128,7 +182,7 @@ class LibraryPanel:
         from . import tone_search
 
         if self.matching and self.reference is None:
-            self.status.set("Choose a reference WAV first.")
+            self.status.set("Choose a WAV, recorded take, or QC preset first.")
             return
         if self.same_take.get() and not self.review.take:
             self.status.set("There is no current take to search.")
@@ -169,6 +223,8 @@ class LibraryPanel:
         self.action.configure(state="normal")
         for control in self.secondary_actions:
             control.configure(state="normal")
+        if self.matching and self.reference is None:
+            self.reference_play.configure(state="disabled")
         try:
             result = future.result()
         except Exception as error:
@@ -203,7 +259,10 @@ class LibraryPanel:
             row.pack(fill="x", pady=(0, 5))
             action = button(row, "Play", lambda selected=result: self.preview(selected), compact=True)
             action.pack(side="right")
-            if result.get("session") and result.get("same_take"):
+            if self.matching and self.reference and self.review.take:
+                button(row, "Compare", lambda selected=result: self.compare_match(selected),
+                       compact=True).pack(side="right", padx=(0, 5))
+            elif result.get("session") and result.get("same_take"):
                 button(row, "Compare", lambda selected=result: self.review.select_comparison(selected["session"]),
                        compact=True).pack(side="right", padx=(0, 5))
             left = tk.Frame(row, bg=RECESS)
@@ -219,6 +278,22 @@ class LibraryPanel:
             if bits:
                 label(left, " · ".join(bits), color=MUTED, wrap=350, size=9).pack(fill="x", pady=(2, 0))
         self.bind_wheel(self.body)
+
+    def compare_match(self, result):
+        from . import tone_search
+
+        if self.review.busy() or not self.review.take or not self.reference:
+            self.status.set("Finish the current audio task before comparing.")
+            return
+        take_id = self.review.take.name
+        self.run("Level-matching the reference and candidate…", self.compared,
+                 tone_search.compare_to_reference, result, self.reference, self.what.get(), take_id,
+                 reference_take=self.reference_take, selection=self.reference_selection)
+
+    def compared(self, folder):
+        self.review.read_state()
+        self.review.select_comparison(folder)
+        self.status.set("Play the reference and candidate in Compare versions.")
 
     def preview(self, result):
         from . import tone_search

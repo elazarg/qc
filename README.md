@@ -1,18 +1,23 @@
 # Tone Lab for Quad Cortex
 
-Open **Tone Lab.lnk** to go straight to **Live**. Keep Cortex Control closed while using the direct USB controls. Tone Lab uses the loaded saved preset as a starting point and a verified working copy in **My Presets → 32G**. It supports a single physical guitar input feeding Multi Out, including parallel lanes. It archives the original and previous working copies locally before changing the scratch slot.
+Open **Tone Lab.lnk** to go straight to **Live**. Pick the guitar you’re playing and use **Ask Tone Lab**. Type, press **Ctrl+K** to jump to the request box, or use **Win+H** to dictate. Keep Cortex Control closed while Tone Lab uses the Quad Cortex over USB.
 
 | Intent | What to use |
 | --- | --- |
 | Change how the guitar feels under your fingers | **Live guitar** puts the working copy on the Quad Cortex hardware path. Start with Drive, Warmth, Space and Jazz. **More controls** exposes Response, EQ and Effects separately. |
 | Compare changes on the exact same performance | **Record clip** captures synchronized dry DI and wet audio. **Loop take** reamps that DI through the currently loaded preset's working copy. **Save A/B** records the current settings against the wet take and adds the render to the library. |
-| Describe a sound or research a song | **Ask AI** turns a request into suggested knobs. **Tone Search** finds saved takes and renders by name, notes and audio traits. **Research rig** runs a separate live web search and returns sources. |
-| Get closer to a reference | In **Tone Match**, choose a WAV or use the take's wet audio. Set the relative importance of tone, dynamics and ambience, and audition the closest saved results at matched loudness. The scores describe similarity within the library. Build or render more candidates when the library has no close match. |
-| Say what worked | Write a note in **Feedback**. The note stays attached to its comparison and letter mapping. |
+| Make a tone from scratch | Ask “Make me a Lenny Kravitz preset.” Tone Lab chooses a specific sound to aim for and builds a draft from stock Quad Cortex blocks. **Try live** puts the draft under your fingers. **Render A/B** lets you hear the same saved performance through both versions. **Save on QC** uses an empty slot in My Presets. |
+| Use a preset you already own | Open **Choose a preset**, search your user setlists, and use **Load on QC** or **Use as reference**. Choose the scene of interest. A reference captures the selected preset with the current take’s dry guitar, then restores the preset and scene you were using. |
+| Get closer to a reference | In **Tone Match**, choose a WAV, the take’s wet audio, or a saved Quad Cortex preset. **Find closest tones** ranks existing audio by tone, dynamics, and ambience. **Compare** plays a candidate and the reference at a common loudness. |
+| Say what worked | Play a version and use **Add listening note** to attach your observation to that version. Follow up in **Ask Tone Lab** to refine a draft. |
+
+The Live controls and preset references use **My Presets → 32G** as a working copy. Draft auditions temporarily use **32H**. Tone Lab checks the working slot, archives the starting preset locally, and restores the original saved preset and scene when the audition ends. **Save on QC** is the action that keeps a draft in a regular My Presets slot.
+
+Rig sources appear under **Details** when the advisor finds them. A named artist gives the draft a musical target. The recorded take provides the performance for auditioning. To plan the next iterations, see [Tone Lab product direction](INTENT_AND_LANDSCAPE.md).
 
 ## Guitar input experiment
 
-**Guitar input** is separate from the default Live view. Train one profile per instrument and control, using at least two labeled examples. For a first pickup profile, record the same single-note phrase at neck and bridge with the guitar volume, tone, picking point, and input gain held steady. **Inspect** shows the state estimates and uncertainty on a fresh DI. Start with a take containing ordinary playing and a second take containing an intentional gesture. Pickup location and picking point both change the harmonics. Volume inference also depends on how hard you play. [Pickup and plucking-point estimation study](https://qmro.qmul.ac.uk/xmlui/bitstream/handle/123456789/31405/Dixon%20Pickup%20position%20and%20plucking%202017%20Published.pdf?isAllowed=y&sequence=1)
+Open **Guitar input**, choose the guitar, and start with **Pickup selector**. Use **Record example**, play a short repeating phrase on one pickup, stop, and label it. Repeat the same phrase on a second pickup with volume, tone, picking point, and input gain held steady. The view shows the collected settings and suggests the next one. Train the profile, then check it with a fresh dry clip. Pickup location and picking point both change harmonics, and volume inference also depends on how hard you play. [Pickup and plucking-point estimation study](https://qmro.qmul.ac.uk/xmlui/bitstream/handle/123456789/31405/Dixon%20Pickup%20position%20and%20plucking%202017%20Published.pdf?isAllowed=y&sequence=1)
 
 To use the guitar as a controller, choose a starting state, an excursion, and a tone control. Rehearse A → B → A with a sustained note or repeated notes at each position. A silent switch gives the estimator no note to compare. **Observe during Live guitar** monitors dry USB input in memory. **Arm mapped control for the next run** permits bounded changes for the first 20 seconds. A return gesture changes one virtual control. **Stop live** ends the experiment. The same pattern can be tested on calibrated tone-knob positions. Observation and arming are off on app launch.
 
@@ -30,17 +35,17 @@ The workbench is available via `python -m tone_lab ui` in the local environment.
 
 ## Compare and give feedback
 
-The main window shows the latest take separately from its reamps. Use **Older** and **Newer** to move between comparisons of that take. Use the one text box for notes such as “A is closer. B is too dry.” Each note keeps its comparison and A/B/C mapping. The saved take, its renders, and the notes remain separate files.
+Use **Change** in Current take to revisit a recording. **Dry** and **Original wet** play the recorded inputs. **Compare versions** labels every audition and offers an optional **Blind** view. Use **Older** and **Newer** to move among comparisons. A listening note remembers the version you just played.
 
-Three short requests also act like style controls. **More jazz** reduces drive, softens the top end and backs off ambience. **Less delay** lowers mix and feedback. **Darker** softens supported tone, treble and presence controls. With the take's recorded preset and scene loaded, these requests produce two variations against the original wet track. Open-ended feedback is saved for the next conversation.
+When adjusting the live tone, **More jazz**, **Less delay**, and **Darker** work directly from the request box. They move the relevant knob while live control is running. With a saved take available and live control stopped, **Compare on this take** renders the proposed change against the recorded wet sound.
 
 ### Live controls and the tone advisor
 
 Drag, scroll, or use arrow keys to turn a knob. The controls combine their changes against the fixed preset baseline. **Reset** returns to that baseline. Drive at its minimum backs off gain and bypasses compatible active drive pedals. A modeled capture can retain the distortion of its source. Choose a clean model or capture when you want a genuinely clean starting point.
 
-- **Loop recorded take** feeds the same dry passage into the Quad Cortex and monitors through its normal outputs. Start with the Quad Cortex volume low. A separate audio process handles the driver and the Lab can stop it and restore the original preset if the driver stops responding.
+- **Loop take** feeds the same dry passage into the Quad Cortex and monitors through its normal outputs. Start with the Quad Cortex volume low. A separate audio process handles the driver and the Lab can stop it and restore the original preset if the driver stops responding.
 - **Live guitar** routes the temporary copy to the guitar input and monitor outputs. The guitar stays on the Quad Cortex signal path while the knobs adjust its settings over USB. **Stop live** recalls the original saved preset and scene.
-- In **Tone advisor**, dictate into the text box with Windows **Win+H** or type. **Ask AI** uses the authenticated Codex client and sends the request, knob positions and short take labels. **Speak reply** uses the Windows voice. **Use suggested knobs** applies proposed settings, including during a live loop. The Lab sends text to Codex and keeps guitar WAVs local. [Windows voice typing](https://support.microsoft.com/en-us/accessibility/windows/use-voice-typing-to-talk-instead-of-type-on-your-pc)
+- **Ask Tone Lab** uses the authenticated Codex client for open-ended requests and searches the web for a new rig when appropriate. It sends text context including guitar choice and short take labels. Guitar audio is processed locally. [Windows voice typing](https://support.microsoft.com/en-us/accessibility/windows/use-voice-typing-to-talk-instead-of-type-on-your-pc)
 
 ## First hardware session
 

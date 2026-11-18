@@ -13,24 +13,32 @@ from uuid import uuid4
 from . import audio, device, diagnostics, session
 
 
-def latest_clip(*, pair=False):
+def clip_paths():
     folder = session.SESSIONS / "recordings"
     clips = [*folder.glob("clip-*.wav"), *folder.glob("clip-*/dry.wav"),
              *folder.glob("clip-*/inputs.wav")]
-    newest = max(clips, key=lambda clip: clip.stat().st_mtime_ns, default=None)
-    if newest is None:
+    return sorted(clips, key=lambda clip: clip.stat().st_mtime_ns, reverse=True)
+
+
+def latest_clip(*, pair=False):
+    paths = clip_paths()
+    if not paths:
         raise ValueError("There is no clip yet. Open Start Tone Lab and record a riff.")
-    if newest.name == "inputs.wav":
+    return clip_info(paths[0], pair=pair)
+
+
+def clip_info(path, *, pair=True):
+    if path.name == "inputs.wav":
         if not pair:
             raise RuntimeError("The last take was saved as raw USB inputs. Its dry and wet mapping needs to be verified.")
-        info = json.loads((newest.parent / "clip.json").read_text(encoding="utf-8"))
-        return {**info, "raw": str(newest), "dry": None, "wet": None}
+        info = json.loads((path.parent / "clip.json").read_text(encoding="utf-8"))
+        return {**info, "raw": str(path), "dry": None, "wet": None}
     if pair:
-        if newest.name != "dry.wav":
-            return {"dry": str(newest), "wet": None}
-        info = json.loads((newest.parent / "clip.json").read_text(encoding="utf-8"))
-        return {**info, "dry": str(newest), "wet": str(newest.with_name("wet.wav"))}
-    return newest
+        if path.name != "dry.wav":
+            return {"dry": str(path), "wet": None}
+        info = json.loads((path.parent / "clip.json").read_text(encoding="utf-8"))
+        return {**info, "dry": str(path), "wet": str(path.with_name("wet.wav"))}
+    return path
 
 
 class ClipRecorder:
@@ -57,7 +65,7 @@ class ClipRecorder:
 
         self.review = Review(root, self, latest_clip)
 
-    def press(self):
+    def press(self, *, guitar=None):
         if self.stop is not None:
             self.stop.set()
             self.button.configure(state="disabled")
@@ -72,10 +80,10 @@ class ClipRecorder:
         self.ready.clear()
         self.button.configure(text="Stop and save")
         self.status.set("Connecting to Quad Cortex…")
-        self.worker.submit(self.record, self.stop)
+        self.worker.submit(self.record, self.stop, guitar or self.review.guitar.get())
         self.root.after(100, self.poll)
 
-    def record(self, stop):
+    def record(self, stop, guitar):
         take_id = uuid4().hex[:6]
         try:
             diagnostics.LOG.info("Capture %s requested on physical input %d", take_id, self.input_channel)
@@ -101,7 +109,8 @@ class ClipRecorder:
                     staging = Path(directory)
                     audio.write_wave(staging / "inputs.wav", samples)
                     session.write_json(staging / "clip.json", {"duration_seconds": duration, "sample_rate": audio.RATE,
-                                       "physical_input": self.input_channel, "routing_unresolved": True})
+                                       "guitar": guitar, "physical_input": self.input_channel,
+                                       "routing_unresolved": True})
                     staging.rename(destination)
                 diagnostics.LOG.info("Capture %s saved all four raw inputs", take_id)
                 self.results.put(f"Clip saved · {duration:.1f}s · routing needs checking")
@@ -117,7 +126,7 @@ class ClipRecorder:
                 audio.write_wave(staging / "dry.wav", dry)
                 audio.write_wave(staging / "wet.wav", wet)
                 session.write_json(staging / "clip.json", {**context, "duration_seconds": duration, "sample_rate": audio.RATE,
-                                   "physical_input": self.input_channel,
+                                   "guitar": guitar, "physical_input": self.input_channel,
                                    "dry_channel": channels[0], "wet_channels": channels[1:],
                                    "dry_peak_dbfs": dry_metrics["peak_dbfs"], "wet_peak_dbfs": wet_metrics["peak_dbfs"]})
                 staging.rename(destination)
@@ -148,6 +157,8 @@ class ClipRecorder:
             self.close()
             return
         self.button.configure(text="Record clip", state="normal")
+        if result.startswith("Clip saved"):
+            self.review.pinned_take = None
         self.status.set(result)
         if not self.review.text.get().strip():
             self.review.read_state()

@@ -149,7 +149,7 @@ def _library():
                "target": info.get("song") or info.get("passage", ""), "tags": tags}
     for path in sorted(session.SESSIONS.glob("*/session.json"), reverse=True):
         info = _read_json(path)
-        if info.get("state") != "ready" or info.get("kind") == "demo":
+        if info.get("state") != "ready" or info.get("kind") in ("demo", "match-audition"):
             continue
         take = info.get("source_clip") if isinstance(info.get("source_clip"), str) else None
         candidates = info.get("candidates")
@@ -322,3 +322,20 @@ def audition(result):
     audio.write_wave(pending, samples * 10 ** (gain / 20), pcm16=True)
     pending.replace(target)
     return target
+
+
+def compare_to_reference(result, reference, reference_title, take_id, *, reference_take=None, selection=None):
+    """Build an audition using a common playback loudness for a reference and a result."""
+    reference = Path(reference)
+    original = _samples(reference, selection)
+    candidate = _samples(result["file"], result.get("selection"))
+    # The player sees whether these are the same performance in the comparison title.
+    folder, manifest = session.new_session("match-audition", result.get("guitar", ""), "",
+                                           result.get("target", ""))
+    is_same = reference_take and reference_take == result.get("take_id")
+    manifest.update(source_clip=take_id, style="Reference comparison", same_candidate_take=bool(is_same),
+                    match_source=str(Path(result["file"]).resolve()))
+    return session.make_shortlist(folder, manifest, [
+        ({"name": f"Reference · {reference_title}", "audition_role": "reference"}, original),
+        ({"name": result["title"], "audition_role": "candidate"}, candidate),
+    ], original)
