@@ -1,6 +1,7 @@
 """48 kHz audio I/O and file analysis."""
 
 from contextlib import contextmanager
+from dataclasses import dataclass
 import math
 import os
 from pathlib import Path
@@ -194,9 +195,17 @@ def reamp(dry):
     return result[padding - RATE // 20:]
 
 
+@dataclass
+class PhraseCursor:
+    """Keep the next DI sample across input changes and brief preset reloads."""
+
+    frame: int = 0
+    muted: bool = False
+
+
 @contextmanager
-def loop_feed(dry, *, monitor_return=False):
-    """Send guitar to Grid USB 5. Optionally measure a USB-only test return."""
+def loop_feed(dry, *, monitor_return=False, transport=None):
+    """Send guitar to Grid USB 5 with an optional shared phrase cursor."""
     if (dry.ndim != 2 or dry.shape[1] != 1 or not np.isfinite(dry).all()
             or not 0.001 <= np.max(np.abs(dry)) < .999):
         raise ValueError("Use a mono, unclipped DI for the loop.")
@@ -205,8 +214,10 @@ def loop_feed(dry, *, monitor_return=False):
     fade = np.linspace(0, 1, RATE // 100, dtype=np.float32)
     riff[:len(fade)] *= fade
     riff[len(dry) - len(fade):len(dry)] *= fade[::-1]
-    cursor = 0
-    meters = {"frames": 0, "peak": 0.0, "dropouts": 0, "longest_callback_gap_ms": 0.0}
+    transport = PhraseCursor() if transport is None else transport
+    cursor = transport.frame % len(riff)
+    meters = {"frames": 0, "peak": 0.0, "dropouts": 0, "longest_callback_gap_ms": 0.0,
+              "cursor": cursor, "loop_frames": len(riff)}
     last_callback = None
 
     def feed(outdata, frames, status):
@@ -219,12 +230,17 @@ def loop_feed(dry, *, monitor_return=False):
         if meters["frames"] and status:
             meters["dropouts"] += 1
         outdata.fill(0)
-        written = 0
-        while written < frames:
-            count = min(frames - written, len(riff) - cursor)
-            outdata[written:written + count, 0] = riff[cursor:cursor + count]
-            cursor = (cursor + count) % len(riff)
-            written += count
+        if transport.muted:
+            cursor = (cursor + frames) % len(riff)
+        else:
+            written = 0
+            while written < frames:
+                count = min(frames - written, len(riff) - cursor)
+                outdata[written:written + count, 0] = riff[cursor:cursor + count]
+                cursor = (cursor + count) % len(riff)
+                written += count
+        transport.frame = cursor
+        meters["cursor"] = cursor
         meters["frames"] += frames
 
     settings = sd.AsioSettings([4, 5])

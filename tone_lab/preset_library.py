@@ -49,6 +49,8 @@ def saved_presets(catalog):
                 continue
             if key == iterate.SCRATCH["folder_key"] and index >= 254 and name.startswith("Tone Lab "):
                 continue
+            if key == iterate.LIVE_B["folder_key"] and index == iterate.LIVE_B["position"] and name == iterate.LIVE_B_NAME:
+                continue
             rows.append(SavedPreset(name, folder["name"] or key, key, index))
     return sorted(rows, key=lambda row: (row.name.casefold(), row.setlist.casefold(), row.index))
 

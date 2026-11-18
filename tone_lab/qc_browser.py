@@ -45,6 +45,7 @@ class Browser(tk.Frame):
         self.buttons.pack(fill="x", pady=(6, 0))
         self.use = control(self.buttons, "Use as B", self.apply, primary=True)
         self.use.pack(side="left", padx=(0, 4))
+        self.use_a = control(self.buttons, "Use as A", lambda: self.apply("a"))
         self.reference = control(self.buttons, "Use as reference", self.use_reference)
         self.scene_menu, scene_menu = menu(self.buttons, "Default scene")
         self.scene_menu.configure(textvariable=self.scene)
@@ -77,9 +78,10 @@ class Browser(tk.Frame):
 
     def change(self, kind):
         self.kind.set(kind)
-        for button in (self.reference, self.scene_menu, self.version_menu, self.cab_menu):
+        for button in (self.use_a, self.reference, self.scene_menu, self.version_menu, self.cab_menu):
             button.pack_forget()
         if kind == "Presets":
+            self.use_a.pack(side="left", padx=(0, 4))
             self.reference.pack(side="left", padx=(0, 4))
             self.scene_menu.pack(side="left")
         elif kind == "Captures":
@@ -128,6 +130,7 @@ class Browser(tk.Frame):
             choice = (self.cab.get() != "Cabinet in capture?"
                       and (row.capture_version is not None or self.version.get() != "Capture version"))
         self.use.configure(state="normal" if choice and ready else "disabled")
+        self.use_a.configure(state="normal" if row and ready else "disabled")
         self.reference.configure(state="normal" if row and ready else "disabled")
         self.refresh.configure(state="normal" if ready else "disabled")
         if kind == "Captures" and row is not None:
@@ -146,12 +149,12 @@ class Browser(tk.Frame):
         if row := self.item():
             self.desk.use_preset(row, self.scene_index())
 
-    def apply(self):
+    def apply(self, side="b"):
         if self.use.cget("state") != "normal":
             return
         row = self.item()
         if self.kind.get() == "Presets":
-            self.desk.use_as_tone(row, self.scene_index())
+            self.desk.use_as_tone(row, self.scene_index(), side=side)
         else:
             version = None if self.version.get() == "Capture version" else int(self.version.get()[-1])
             self.desk.use_asset(row, capture_has_cab=self.cab.get() == "Amp + cabinet", capture_version=version)

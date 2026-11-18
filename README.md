@@ -2,13 +2,13 @@
 
 Open **Tone Lab.lnk**. The dark workspace keeps tone shaping, live input, recorded phrases, and A/B in one window. Press **Ctrl+K** for the request field or use **Win+H** to dictate.
 
-- **Guitar** and **▶ Phrase** feed the same working Quad Cortex tone. Turn the knobs during playback, switch between the two inputs, and press **■** or **Esc** to release the unit. Turn your normal monitor volume down before starting the live loop.
-- **▶ A** and **▶ B** audition recorded audio. The loop uses one cursor and matches loudness when both sounds use the same passage. **Takes** changes the performance while the selected tones and knobs stay put. A sound that has no audio for the new phrase asks for one reamp.
-- **Sounds** browses the actual Quad Cortex inventory. Select a preset and scene, replace the cabinet in a draft with one of your IRs, or try a capture with the appropriate cabinet setup. **Save to QC** creates a native preset in the dedicated **Tone Lab** setlist. Subsequent auditions recall that saved sound.
+- **A** and **B** select the Quad Cortex tone. Each has its own knob settings. Choose **Guitar** or **▶ Phrase** to feed it live guitar or the dry recording. Changing A/B during Phrase keeps the recording at its current position. Loading a different hardware chain can briefly interrupt the output. Switching back from Guitar resumes the phrase where it paused. **■** or **Esc** releases the unit.
+- **Takes** changes the performance. **Details** plays captured wet audio through Windows and can capture a new version for comparison. Captured clips on the same passage share a cursor and are loudness matched.
+- **Sounds** browses the actual Quad Cortex inventory. Choose a preset and scene for A or B, replace the cabinet in a draft with one of your IRs, or try a capture with the appropriate cabinet setup. **Save to QC** creates a native preset in the dedicated **Tone Lab** setlist. Subsequent auditions recall that saved sound.
 - **Lab** offers two-dimensional controls, marked positions and sweeps. Use recorded A/B measurements to see the differences in spectrum, dynamics, stereo energy and note tails. **Setup** contains guitar calibration, gestures and soundcheck.
 - **QC → Open Cortex Control** handles detailed hardware editing. Tone Lab preserves drafts, takes and cached playback while the editor is open. Direct hardware renders and saving require a handoff. Audio-only recording can retain the raw channels during editing.
 
-Temporary work still uses the two previously provisioned scratch slots in **My Presets**. The application verifies the working slot and restores the original preset and scene when finished. Permanent saves use a fresh empty slot in **Tone Lab**.
+Temporary work uses the two existing scratch slots in **My Presets**. During live A/B, Tone Lab can also use **Tone Lab 32H** to keep a second working copy. It uses that slot when it is empty or already contains its own working copy. Tone Lab restores the original preset and scene when finished. Permanent saves use a fresh empty slot in **Tone Lab**.
 
 Rig sources appear under **Details** when available. See [the hardware capabilities and inventory](QC_CAPABILITIES.md) and [the interaction research](INTENT_AND_LANDSCAPE.md).
 

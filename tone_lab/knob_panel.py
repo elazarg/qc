@@ -87,8 +87,9 @@ class KnobPanel(tk.Frame):
 
     def sync(self, name, values, available):
         self.current.set(f"Shape  ·  {name}")
+        can_compare = values and self.desk.active_source and self.desk.active_side == self.desk.side
         self.compare.configure(text="Hear shape" if self.desk.base_bypassed else "Hear base",
-                               state="normal" if values and self.desk.active_source else "disabled")
+                               state="normal" if can_compare else "disabled")
         self.available = available
         for key, knob in self.knobs.items():
             colors = COLORS if available is None or key in available else UNAVAILABLE

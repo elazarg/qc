@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from tone_lab import preset_library, qc_library, session
+from tone_lab import iterate, preset_library, qc_library, session
 
 
 V1 = "a" * 64
@@ -59,6 +59,16 @@ class QuadCortexLibraryTest(unittest.TestCase):
         self.assertEqual(plan.name, "First 2")
         self.assertEqual(plan.slot, "1E")
         self.assertEqual(plan.position, {"folder_key": rows[0]["key"], "position": 4, "is_factory": False})
+
+    def test_browser_hides_owned_live_fixture_only_at_its_address(self):
+        key = iterate.LIVE_B["folder_key"]
+        index = iterate.LIVE_B["position"]
+        name = iterate.LIVE_B_NAME
+        catalog = {"presets": [directory_folder("Tone Lab", key,
+                                                slots((0, name, "user"), (index, name, "fixture")))]}
+        self.assertEqual([(preset.name, preset.index) for preset in preset_library.saved_presets(catalog)], [(name, 0)])
+        catalog["presets"][0]["files"][index] = item("User preset", "user-preset", index)
+        self.assertEqual([preset.index for preset in preset_library.saved_presets(catalog)], [0, index])
 
     def test_save_requires_complete_user_slots_and_preserves_my_presets_fixtures(self):
         incomplete = [directory_folder("Tone Lab", "/media/p4/Presets/Tone Lab", slots()[:-1])]

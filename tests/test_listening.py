@@ -52,6 +52,55 @@ class ListeningSessionTest(unittest.TestCase):
                 verdict = listening.keep(b, None, "Reference", a)
                 self.assertTrue(verdict.is_file())
 
+    def test_failed_reamp_reports_quiet_alternative_and_leaves_previous_pair_available(self):
+        with TemporaryDirectory() as folder, patch.object(session, "SESSIONS", Path(folder)):
+            root = Path(folder)
+            take = listening.Performance(root / "phrase", {"wet": str(root / "wet.wav"), "duration_seconds": 1})
+            time = np.arange(audio.RATE, dtype=np.float32) / audio.RATE
+            wet = (.1 * np.sin(2 * np.pi * 220 * time))[:, None]
+            original = ({"name": "Recorded baseline", "audition_role": "original"}, wet)
+            for name, new_wet in (("audible", wet * .8), ("quiet", wet * 1e-4)):
+                render = root / name
+                render.mkdir()
+                manifest = {"kind": "knobs", "source_clip": take.folder.name,
+                            "selection_seconds": take.section, "candidates": []}
+                session.make_shortlist(render, manifest, [original, ({"name": name}, new_wet)], None)
+
+            with self.assertRaisesRegex(ValueError, "silent or too quiet"):
+                listening.comparison(root / "quiet", take, required=True)
+            self.assertIsNone(listening.comparison(root / "quiet", take))
+            original, alternative = listening.latest_comparison(take)
+            self.assertEqual(alternative.name, "audible")
+            self.assertTrue(original.paired_with(alternative))
+
+    def test_comparison_uses_sample_boundaries_and_requires_a_distinct_alternative(self):
+        with TemporaryDirectory() as folder:
+            root = Path(folder)
+            take = listening.Performance(root / "phrase", {"wet": str(root / "wet.wav"), "duration_seconds": 1})
+            for filename in ("original.wav", "alternative.wav"):
+                (root / filename).touch()
+            manifest = {"source_clip": take.folder.name, "selection_seconds": [0, 1 + .1 / audio.RATE],
+                        "candidates": [{"file": "original.wav", "audition_role": "original"},
+                                       {"file": "original.wav", "name": "Duplicate entry"}],
+                        "auditions": {"B": {"render": "original.wav"}}}
+            session.write_json(root / "session.json", manifest)
+            with self.assertRaisesRegex(ValueError, "playable alternative"):
+                listening.comparison(root, take, required=True)
+
+            manifest["candidates"].append({"file": "alternative.wav"})
+            manifest["auditions"]["A"] = {"render": "alternative.wav"}
+            session.write_json(root / "session.json", manifest)
+            original, alternative = listening.comparison(root, take, required=True)
+            self.assertEqual(original.path.name, "original.wav")
+            self.assertEqual(alternative.path.name, "alternative.wav")
+            previous = listening.Sound("Cached", alternative.path, take.folder.name, tuple(manifest["selection_seconds"]))
+            self.assertTrue(alternative.paired_with(previous))
+
+            manifest["selection_seconds"][1] += 1 / audio.RATE
+            session.write_json(root / "session.json", manifest)
+            with self.assertRaisesRegex(ValueError, "different part"):
+                listening.comparison(root, take, required=True)
+
     def test_editor_active_does_not_open_hid(self):
         with patch.object(device, "editor_running", return_value=True), patch.object(device, "QuadCortex") as qc:
             for write in (False, True):

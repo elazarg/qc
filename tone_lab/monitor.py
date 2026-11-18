@@ -58,11 +58,11 @@ def grid(qc, config, events, visited=()):
 def drain(commands):
     messages = {}
     try:
-        first = commands.get(timeout=.075)
-        messages[first["event"]] = first
+        message = commands.get(timeout=.075)
         while True:
+            key = ("knobs", message.get("tone_id")) if message["event"] == "knobs" else message["event"]
+            messages[key] = message
             message = commands.get_nowait()
-            messages[message["event"]] = message
     except Empty:
         return messages
 
@@ -73,6 +73,14 @@ def input_routes(physical_routes, physical_input, source):
     if source != "phrase":
         raise ValueError("Choose Guitar or Phrase as the input.")
     return [(12 if inlet == physical_input else inlet, outlet) for inlet, outlet in physical_routes]
+
+
+def set_input_routes(qc, position, routes):
+    if device.live_position(qc) != position:
+        raise RuntimeError("The selected preset changed on the Quad Cortex.")
+    iterate.set_routes(qc, routes)
+    if device.live_position(qc) != position or iterate.routes(device.read_preset(qc)) != routes:
+        raise RuntimeError("The Quad Cortex could not verify the input switch.")
 
 
 def switch_source(qc, position, physical_routes, physical_input, message, stream_stack, events):
@@ -86,13 +94,11 @@ def switch_source(qc, position, physical_routes, physical_input, message, stream
             if not message.get("take"):
                 raise ValueError("Choose or record a dry phrase first.")
             _, _, dry, _ = iterate.take_audio(Path(message["take"]))
-            iterate.set_routes(qc, routes)
-            stream, meters = stream_stack.enter_context(audio.loop_feed(dry))
+            set_input_routes(qc, position, routes)
+            stream, meters = stream_stack.enter_context(audio.loop_feed(dry, transport=message.get("transport")))
         else:
-            iterate.set_routes(qc, routes)
+            set_input_routes(qc, position, routes)
             stream, meters = None, {}
-        if device.live_position(qc) != position or iterate.routes(device.read_preset(qc)) != routes:
-            raise RuntimeError("The Quad Cortex could not verify the input switch.")
     except Exception as error:
         if source != "phrase" or device.live_position(qc) != position:
             raise
@@ -142,27 +148,151 @@ def observe_guitar(observer, now, available, settings, armed_until, events):
     return proposed, outcome
 
 
+def same_working_grid(before, after):
+    if before.get("draft") or after.get("draft"):
+        keys = ("draft", "gain", "physical_input")
+    else:
+        keys = ("preset", "scene")
+    return all(before.get(key) == after.get(key) for key in keys)
+
+
+@contextmanager
+def resident_grids(qc, events):
+    """Keep independent Quad Cortex working copies of the saved A and B chains."""
+    address = device.live_position(qc)
+    reserved = (iterate.SCRATCH, iterate.LIVE_B)
+    if not address or address in (*reserved, draft_render.WORK_SLOT):
+        raise RuntimeError("Select a saved sound on the Quad Cortex before starting Shape.")
+    device.require_clean(qc)
+    original = device.read_preset(qc)
+    original_scene = device.active_scene(qc)
+    events({"event": "restore", "position": address, "scene": original_scene, "name": original.name,
+            "fixtures": list(reserved)})
+    staging = ()
+    prepared = {}
+
+    def select(config, mode):
+        nonlocal staging
+        side = config["tone_id"]
+        position, name = ((iterate.SCRATCH, iterate.SCRATCH_NAME) if side == "a"
+                          else (iterate.LIVE_B, iterate.LIVE_B_NAME))
+        pick = config.get("preset")
+        source_address = pick["position"] if pick else address
+        source_name = pick["name"] if pick else original.name
+        if source_address in (*reserved, draft_render.WORK_SLOT):
+            raise ValueError("Choose a saved tone outside Tone Lab's working slots.")
+        staging = (position,)
+        identity = (source_address, source_name)
+        if side in prepared and prepared[side][0] == identity:
+            _, stored, physical, inlet, default_scene = prepared[side]
+            base = iterate.recall(qc, position, name)
+            if iterate.sound_state(base) != iterate.sound_state(stored):
+                raise RuntimeError("A Tone Lab working preset changed on the Quad Cortex.")
+        else:
+            staging = (position, source_address)
+            if source_address == address:
+                source = original if device.live_position(qc) == address else iterate.recall(qc, address, source_name)
+            else:
+                source = iterate.recall(qc, source_address, source_name)
+            if source.name != source_name:
+                raise RuntimeError("The preset in this Quad Cortex slot changed. Refresh Sounds and choose it again.")
+            physical = iterate.routes(source)
+            inputs = {port for port, _ in physical if port}
+            inlet = next(iter(inputs)) if len(inputs) == 1 else 0
+            default_scene = original_scene if source_address == address else source.default_scene
+            base = iterate.prepare_fixture(qc, source_address, source, inlet, position=position, monitor_mode=mode)
+            prepared[side] = (identity, base, physical, inlet, default_scene)
+        scene = config.get("scene")
+        scene = default_scene if scene is None else scene
+        if device.active_scene(qc) != scene:
+            device.select_scene(qc, scene)
+        staging = ()
+        return base, scene, position, physical, inlet
+
+    try:
+        yield select
+    finally:
+        owned = ((iterate.SCRATCH,) if "a" in prepared else ()) + ((iterate.LIVE_B,) if "b" in prepared else ())
+        if device.live_position(qc) in (address, *owned, *staging):
+            restored = iterate.recall(qc, address, original.name)
+            if device.active_scene(qc) != original_scene:
+                device.select_scene(qc, original_scene)
+            if iterate.sound_state(restored) != iterate.sound_state(original) or iterate.routes(restored) != iterate.routes(original):
+                raise RuntimeError("The Quad Cortex restored the saved sound. Check its last edits on the device.")
+
+
 def run(config, stop, commands, events):
     guitar_config = config.get("guitar_config")
     try:
         if stop.is_set():
             return {}
-        with device.connect(write=True) as qc, grid(qc, config, events) as selected, ExitStack() as stream_stack:
-            base, scene, position, physical_routes, physical_input = selected
-            available = styles.available_knobs(base, scene)
-            events({"event": "controls", "available": available})
+        with device.connect(write=True) as qc, ExitStack() as tone_stack, ExitStack() as stream_stack:
+            current = config
+            anchor = observer = armed_until = resident = None
+            warm_available = True
+            active_source = active_take = phrase_take = None
+            cursor = audio.PhraseCursor()
+
+            def report(event):
+                nonlocal anchor
+                if event["event"] == "restore":
+                    before = (event["position"], event["scene"])
+                    if anchor is not None and before != anchor:
+                        raise RuntimeError("The Quad Cortex changed while restoring the previous working preset.")
+                    anchor = before
+                events(event)
+
+            def announce(reason=None):
+                tone_id = current.get("tone_id")
+                events({"event": "controls", "available": available, "tone_id": tone_id})
+                events({"event": "tone", "tone_id": tone_id, "name": current.get("name"), "reason": reason})
+
+            def close_tone():
+                nonlocal resident
+                resident = None
+                tone_stack.close()
+                if anchor is not None and (device.live_position(qc), device.active_scene(qc)) != anchor:
+                    raise RuntimeError("The Quad Cortex changed while restoring the previous working preset.")
+
+            def open_tone(pick, mode):
+                nonlocal resident, warm_available
+                events({"event": "loading-tone", "tone_id": pick.get("tone_id"), "name": pick.get("name")})
+                use_resident = warm_available and pick.get("tone_id") in ("a", "b") and not pick.get("draft")
+                if resident is None or not use_resident:
+                    close_tone()
+                if use_resident:
+                    if resident is None:
+                        resident = tone_stack.enter_context(resident_grids(qc, report))
+                    try:
+                        new_grid = resident(pick, mode)
+                    except iterate.FixtureUnavailable as error:
+                        diagnostics.LOG.info("A second named Quad Cortex working slot is unavailable: %s", error)
+                        close_tone()
+                        warm_available = False
+                if resident is None:
+                    new_grid = tone_stack.enter_context(grid(qc, pick, report))
+                new_base, new_scene, _, _, _ = new_grid
+                return new_grid, styles.available_knobs(new_base, new_scene)
+
+            (base, scene, position, physical_routes, physical_input), available = open_tone(current, config["mode"])
             if stop.is_set():
                 return {}
-            settings = dict(config.get("values", {}))
+            settings = dict(current.get("values", {}))
             previous = live.update(qc, base, scene, settings, {}, position=position)
-            observer = armed_until = None
+            announce()
 
             def change_input(message):
-                nonlocal observer, armed_until
+                nonlocal observer, armed_until, active_source, active_take, phrase_take, cursor
+                new_take = message.get("take") if message["mode"] == "phrase" else None
+                if message["mode"] == "phrase" and new_take != phrase_take:
+                    cursor = audio.PhraseCursor()
+                    phrase_take = new_take
                 old_observer, observer = observer, None
-                stream, meters = switch_source(qc, position, physical_routes, physical_input, message, stream_stack, events)
+                stream, meters = switch_source(qc, position, physical_routes, physical_input,
+                                               {**message, "transport": cursor}, stream_stack, events)
+                active_source, active_take = ("phrase", new_take) if stream is not None else ("guitar", None)
                 diagnostics.LOG.info("Shape using %s on scene %s of %s",
-                                     "Phrase" if stream is not None else "Guitar", device.SCENES[scene], base.name)
+                                     active_source.title(), device.SCENES[scene], base.name)
                 if guitar_config and not stop.is_set():
                     if stream is None:
                         observer, armed_until = attach_observer(qc, physical_input, guitar_config,
@@ -174,18 +304,85 @@ def run(config, stop, commands, events):
                         events({"event": "guitar-status", "text": "Dry guitar observation pauses in Phrase mode."})
                 return stream, meters
 
+            def check_active():
+                if device.live_position(qc) != position or device.active_scene(qc) != scene:
+                    raise RuntimeError("The Quad Cortex preset or scene changed during Shape.")
+
+            def retune(pick):
+                nonlocal current, base, scene, position, physical_routes, physical_input, available
+                nonlocal settings, previous, observer, armed_until
+                check_active()
+                target_values = dict(pick.get("values", {}))
+                if same_working_grid(current, pick):
+                    previous = live.update(qc, base, scene, target_values, previous, position=position)
+                    settings, current = target_values, pick
+                    announce()
+                    return
+
+                old_input = physical_input
+                # Keep ASIO running and advance through the same performance while the
+                # unit recalls another chain. Silence the transient recall/routing gap.
+                cursor.muted = True
+                reason = None
+
+                def load(candidate, values):
+                    loaded, controls = open_tone(candidate, active_source)
+                    selected, selected_scene, selected_position, physical, inlet = loaded
+                    if stop.is_set():
+                        return loaded, controls, {}
+                    changed = live.update(qc, selected, selected_scene, values, {}, position=selected_position)
+                    routes = input_routes(physical, inlet, active_source)
+                    if resident is None or iterate.routes(selected) != routes:
+                        set_input_routes(qc, selected_position, routes)
+                    return loaded, controls, changed
+
+                try:
+                    selected, controls, changed = load(pick, target_values)
+                except (RuntimeError, ValueError, OSError) as error:
+                    close_tone()
+                    if anchor is None:
+                        raise
+                    reason = f"Could not load {pick.get('name') or 'the selected tone'}. {error}"
+                    pick, target_values = current, settings
+                    selected, controls, changed = load(pick, target_values)
+                if stop.is_set():
+                    return
+                base, scene, position, physical_routes, physical_input = selected
+                available, previous = controls, changed
+                if active_source == "guitar" and guitar_config and old_input != physical_input:
+                    stream_stack.close()
+                    observer, armed_until = attach_observer(qc, physical_input, guitar_config,
+                                                           stream_stack, events, armed_until)
+                settings, current = target_values, pick
+                cursor.muted = False
+                announce(reason)
+
             stream, meters = change_input(config)
             checked, frames = time.monotonic(), -1
             while not stop.is_set():
                 pending = drain(commands)
                 if stop.is_set():
                     break
+                if pending_tone := pending.get("tone"):
+                    retune(pending_tone["config"])
+                    if stop.is_set():
+                        break
                 if source := pending.get("source"):
-                    stream, meters = change_input(source)
-                    frames = -1
-                if knobs := pending.get("knobs"):
-                    settings = dict(knobs["values"])
-                    previous = live.update(qc, base, scene, settings, previous, position=position)
+                    take = source.get("take") if source["mode"] == "phrase" else None
+                    if (source["mode"], take) != (active_source, active_take):
+                        stream, meters = change_input(source)
+                        frames = -1
+                    else:
+                        events({"event": "source", "mode": active_source})
+                tone_id = current.get("tone_id")
+                if knobs := pending.get(("knobs", tone_id)) or pending.get(("knobs", None)):
+                    next_settings = dict(knobs["values"])
+                    previous = live.update(qc, base, scene, next_settings, previous, position=position)
+                    if next_settings != settings:
+                        events({"event": "shape", "tone_id": tone_id, "has_edits": bool(previous),
+                                "reason": "This tone has no writable controls for those settings."
+                                if any(next_settings.values()) and not previous else None})
+                    settings = next_settings
                 now = time.monotonic()
                 if observer is not None:
                     if observer.allow_changes and armed_until is not None and now >= armed_until:
@@ -196,10 +393,10 @@ def run(config, stop, commands, events):
                         previous = live.update(qc, base, scene, proposed, previous, position=position)
                         settings = proposed
                     if outcome is not None:
+                        outcome["tone_id"] = tone_id
                         events(outcome)
                 if now - checked >= .8:
-                    if device.live_position(qc) != position or device.active_scene(qc) != scene:
-                        raise RuntimeError("The Quad Cortex preset or scene changed during Shape.")
+                    check_active()
                     if stream is not None and (not stream.active or frames == meters["frames"]):
                         raise RuntimeError("The Quad Cortex loop stopped responding.")
                     frames = meters.get("frames", -1)

@@ -11,7 +11,13 @@ from . import audio, capture, device, presets, session, styles
 
 SCRATCH_NAME = "Tone Lab Style"
 SCRATCH = {"folder_key": "/media/p4/Presets/My Presets", "position": 254, "is_factory": False}
+LIVE_B_NAME = "Tone Lab Live B"
+LIVE_B = {"folder_key": "/media/p4/Presets/Tone Lab", "position": 255, "is_factory": False}
 USB_ROUTES = [(12, 14), (0, 0), (0, 0), (0, 0)]
+
+
+class FixtureUnavailable(RuntimeError):
+    """The Lab could not confirm an unused or app-owned working slot."""
 
 
 def routes(preset):
@@ -47,9 +53,18 @@ def recall(qc, position, name):
     raise RuntimeError(f"Could not confirm preset {name} at the expected slot.")
 
 
-def verify_fixture(qc, source, expected_routes=USB_ROUTES):
+def fixture_identity(position):
+    if position == SCRATCH:
+        return SCRATCH_NAME, "My Presets 32G"
+    if position == LIVE_B:
+        return LIVE_B_NAME, "Tone Lab 32H"
+    raise ValueError("Choose one of Tone Lab's verified working slots.")
+
+
+def verify_fixture(qc, source, expected_routes=USB_ROUTES, *, position=SCRATCH):
+    name, _ = fixture_identity(position)
     readback = device.read_preset(qc)
-    if qc.get_setlist_position() != SCRATCH or readback.name != SCRATCH_NAME or routes(readback) != expected_routes:
+    if qc.get_setlist_position() != position or readback.name != name or routes(readback) != expected_routes:
         raise RuntimeError("Tone Lab could not verify the routing on its test preset.")
     for a, b in zip(readback.chains, source.chains):
         if ([m.hash for m in a.models] != [m.hash for m in b.models]
@@ -67,35 +82,66 @@ def set_routes(qc, expected):
     time.sleep(.35)
 
 
-def prepare_fixture(qc, source_position, source, physical_input):
-    """Reuse or refresh the single Tone Lab-owned slot, keeping both presets locally."""
-    expected = reamp_routes(source, physical_input)
-    if source_position == SCRATCH or qc.get_setlist_position() != source_position:
+def _confirm_empty_live_b(qc):
+    # Recalling a genuinely vacant slot and a preset named "Unsaved" with no
+    # blocks can return the same grid. Only a fresh directory can distinguish them.
+    matches = [row for row in qc.list_directory().get("presets", [])
+               if row.get("key") == LIVE_B["folder_key"] and not row.get("is_factory")]
+    files = matches[0].get("files", []) if len(matches) == 1 else []
+    if tuple(row.get("index") for row in files) != tuple(range(256)):
+        raise FixtureUnavailable("The Quad Cortex did not confirm the Tone Lab setlist's working slot.")
+    entry = files[LIVE_B["position"]]
+    if entry.get("name") or entry.get("key") or entry.get("is_readonly"):
+        raise FixtureUnavailable("Tone Lab 32H contains another preset. Tone Lab left it untouched.")
+
+
+def _fixture_sound(preset):
+    return sound_state(preset), preset.tempo, preset.volume, preset.pan
+
+
+def prepare_fixture(qc, source_position, source, physical_input, *, position=SCRATCH, monitor_mode=None):
+    """Stage a protected copy for offline reamp, guitar, or an audible USB phrase."""
+    name, slot = fixture_identity(position)
+    if monitor_mode not in (None, "guitar", "phrase"):
+        raise ValueError("Choose Guitar or Phrase as the input.")
+    expected = reamp_routes(source, physical_input, monitor=monitor_mode == "phrase")
+    if monitor_mode == "guitar":
+        expected = routes(source)
+    if source_position in (SCRATCH, LIVE_B) or qc.get_setlist_position() != source_position:
         raise RuntimeError("The original preset is no longer selected.")
     presets.archive(source, source_position, qc.firmware, reason="Before Tone Lab reamp")
-    fixture = recall(qc, SCRATCH, None)
+    try:
+        fixture = recall(qc, position, None)
+    except RuntimeError as error:
+        if position == LIVE_B:
+            raise FixtureUnavailable("The Quad Cortex could not recall the Tone Lab 32H working slot.") from error
+        raise
     blank = (fixture.name.strip().lower() in ("", "unsaved")
              and not any(model.hash for chain in fixture.chains for model in chain.models))
-    if not blank and fixture.name != SCRATCH_NAME:
-        raise RuntimeError("My Presets 32G is occupied by another preset. Tone Lab left it untouched.")
-    if not blank and sound_state(fixture) == sound_state(source) and routes(fixture) == expected:
+    if not blank and fixture.name != name:
+        raise FixtureUnavailable(f"{slot} contains another preset. Tone Lab left it untouched.")
+    if blank and position == LIVE_B:
+        _confirm_empty_live_b(qc)
+    if not blank and _fixture_sound(fixture) == _fixture_sound(source) and routes(fixture) == expected:
         return fixture
     if not blank:
-        presets.archive(fixture, SCRATCH, qc.firmware, reason="Previous Tone Lab working copy")
+        presets.archive(fixture, position, qc.firmware, reason="Previous Tone Lab working copy")
     saved = recall(qc, source_position, source.name)
-    if sound_state(saved) != sound_state(source):
+    if _fixture_sound(saved) != _fixture_sound(source) or qc.get_setlist_position() != source_position:
         raise RuntimeError("The recalled preset differs from the working version. Tone Lab kept a local snapshot and skipped the copy.")
-    qc.write_preset_file(SCRATCH["folder_key"], SCRATCH["position"], SCRATCH_NAME)
+    qc.write_preset_file(position["folder_key"], position["position"], name)
     time.sleep(.55)
-    copy = recall(qc, SCRATCH, SCRATCH_NAME)
-    if sound_state(copy) != sound_state(source):
+    copy = recall(qc, position, name)
+    if _fixture_sound(copy) != _fixture_sound(source):
         raise RuntimeError("The new test copy did not match the saved preset.")
+    if routes(copy) == expected:
+        return copy
     set_routes(qc, expected)
-    verify_fixture(qc, source, expected)
-    qc.write_preset_file(SCRATCH["folder_key"], SCRATCH["position"], SCRATCH_NAME)
+    verify_fixture(qc, source, expected, position=position)
+    qc.write_preset_file(position["folder_key"], position["position"], name)
     time.sleep(.55)
-    recall(qc, SCRATCH, SCRATCH_NAME)
-    return verify_fixture(qc, source, expected)
+    recall(qc, position, name)
+    return verify_fixture(qc, source, expected, position=position)
 
 
 def apply_changes(qc, source, changes, expected_routes=USB_ROUTES):

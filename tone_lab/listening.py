@@ -13,6 +13,18 @@ import numpy as np
 from . import audio, capture, diagnostics, feedback, session
 
 
+def same_passage(first, second):
+    """Compare the sample boundaries used by the recording and reamp."""
+    if first is None or second is None:
+        return first is second
+    try:
+        start, end = (round(seconds * audio.RATE) for seconds in first)
+        compare_start, compare_end = (round(seconds * audio.RATE) for seconds in second)
+    except (TypeError, ValueError, OverflowError):
+        return False
+    return start == compare_start and end == compare_end
+
+
 @dataclass(frozen=True)
 class Sound:
     name: str
@@ -24,7 +36,7 @@ class Sound:
     draft_id: str | None = None
 
     def paired_with(self, other):
-        return bool(self.take_id and self.take_id == other.take_id and self.passage == other.passage)
+        return bool(self.take_id and self.take_id == other.take_id and same_passage(self.passage, other.passage))
 
     def to_record(self):
         return {"name": self.name, "path": str(self.path), "take": self.take_id, "passage": self.passage,
@@ -90,26 +102,49 @@ def takes():
     return result
 
 
-def comparison(folder, take):
+def comparison(folder, take, *, required=False):
+    """Read a fixed-performance pair, explaining rejected fresh renders on request."""
+    def unavailable(message):
+        if required:
+            raise ValueError(message)
+        return None
+
+    folder = Path(folder)
     saved = session.load_session(folder)
-    if saved.get("source_clip") != take.folder.name or not saved.get("auditions"):
-        return None
-    passage = tuple(saved.get("selection_seconds", []))
-    eligible = [row for row in saved.get("candidates", []) if row.get("file") and not row.get("excluded")]
-    included = {item["render"] for item in saved["auditions"].values()}
-    eligible = [row for row in eligible if row["file"] in included and (folder / row["file"]).is_file()]
-    if len(eligible) < 2 or passage != take.section:
-        return None
-    original = next((row for row in eligible if row.get("audition_role") == "original"
-                     or "baseline" in row.get("name", "").casefold()), eligible[0])
-    change = next((row for row in eligible if row is not original), None)
+    if saved.get("source_clip") != take.folder.name:
+        return unavailable("This render used a different recording.")
+    if not same_passage(saved.get("selection_seconds", ()), take.section):
+        return unavailable("This render used a different part of the recording.")
+
+    rows = [row for row in saved.get("candidates", []) if row.get("file")]
+    included = {item["render"] for item in saved.get("auditions", {}).values()}
+    original = next((row for row in rows if row.get("audition_role") == "original"), None)
+    if original is None:
+        original = next((row for row in rows if "baseline" in (row.get("name") or "").casefold()), None)
+    if original is None:
+        original = next((row for row in rows if row["file"] in included and not row.get("excluded")), None)
+    if original is None:
+        return unavailable("The render returned no comparison audio.")
+    if reason := original.get("excluded"):
+        return unavailable(f"The original recording was excluded because it was {reason.lower()}.")
+    if not (folder / original["file"]).is_file():
+        return unavailable("The original comparison audio is missing.")
+
+    alternatives = [row for row in rows if row["file"] != original["file"]]
+    change = next((row for row in alternatives if row["file"] in included and not row.get("excluded")
+                   and (folder / row["file"]).is_file()), None)
     if not change:
-        return None
+        reasons = {row.get("excluded") for row in alternatives}
+        if "Silent or too quiet" in reasons:
+            return unavailable("The new tone came back silent or too quiet to play.")
+        if "Clipped" in reasons:
+            return unavailable("The new tone clipped. Lower its output and try again.")
+        return unavailable("The render did not return a playable alternative.")
     original_name = take.original.name if original.get("audition_role") == "original" else original.get("name")
-    return (Sound(original_name or take.original.name, folder / original["file"], take.folder.name, passage,
+    return (Sound(original_name or take.original.name, folder / original["file"], take.folder.name, take.section,
                   folder=folder),
             Sound(change.get("name") or change.get("source") or "Processed version", folder / change["file"],
-                  take.folder.name, passage, folder=folder, draft_id=saved.get("draft_id")))
+                  take.folder.name, take.section, folder=folder, draft_id=saved.get("draft_id")))
 
 
 def latest_comparison(take):
@@ -157,9 +192,9 @@ def closest(reference, take):
         selection = row.get("selection")
         if folder:
             info = session.load_session(folder)
-            if tuple(info.get("selection_seconds", [])) != take.section:
+            if not same_passage(info.get("selection_seconds", ()), take.section):
                 continue
-        elif selection and tuple(selection) != take.section:
+        elif selection and not same_passage(selection, take.section):
             continue
         return Sound(row["title"], path, take.folder.name, take.section,
                      tuple(selection) if selection else None, folder=folder)

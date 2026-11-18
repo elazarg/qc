@@ -109,7 +109,8 @@ KNOB_HINTS = {
 DRIVE_CATEGORIES = {"Guitar Overdrive", "Bass Overdrive", "Guitar Amplifier", "Bass Amplifier", "Neural Capture"}
 PEDAL_CATEGORIES = {"Guitar Overdrive", "Bass Overdrive"}
 GAIN_NAMES = {"GAIN", "DRIVE", "DISTORTION", "FUZZ", "PREAMP", "PREAMP GAIN"}
-AMP_GAIN_NAMES = {"GAIN 1", "GAIN 2", "VOLUME BRIGHT", "VOLUME NORMAL"}
+AMP_INPUT_GAIN_NAMES = {"GAIN", "GAIN 1", "GAIN 2"}
+AMP_CATEGORIES = {"Guitar Amplifier", "Bass Amplifier"}
 AMP_VOLUME_AS_DRIVE = {1009, 1011, 1083, 1084, 1094, 1095, 1096, 1097, 1120, 1127, 1128,
                        1154, 1155, 1156, 1166, 1167}
 PEDAL_LEVEL_NAMES = {"LEVEL", "VOLUME", "OUTPUT"}
@@ -146,7 +147,7 @@ def available_knobs(preset, scene):
 
 
 def _drive_delta(category, name, drive, before, low, high, units, *, amp_volume):
-    gain_control = name in GAIN_NAMES or amp_volume or (category == "Guitar Amplifier" and name in AMP_GAIN_NAMES)
+    gain_control = name in GAIN_NAMES or amp_volume or (category in AMP_CATEGORIES and name in AMP_INPUT_GAIN_NAMES)
     if category in DRIVE_CATEGORIES and gain_control:
         if drive < 0:
             return (before - low) * drive
@@ -216,7 +217,10 @@ def apply_rules(preset, scene, rules, *, allow_neutral=False, drive=0.0, active_
                 if category == "Reverb" and name == "DECAY" and param["units"] != "s":
                     delta *= (high - low) * .22 / .75
                 before = catalog.to_display(model.hash, index, value.float_value)
-                floor = min(before, low + .15 * (high - low)) if amp_volume else low
+                # The bottom of a conventional 0–10 preamp input knob can mute the
+                # amp. Keep low-drive macros audible even when their offsets stack.
+                amp_input_gain = category in AMP_CATEGORIES and name in AMP_INPUT_GAIN_NAMES and (low, high) == (0, 10)
+                floor = min(before, low + .15 * (high - low)) if amp_volume or amp_input_gain else low
                 delta += _drive_delta(category, name, drive, before, floor, high, param["units"], amp_volume=amp_volume)
                 after = min(high, max(floor, before + delta))
                 if math.isclose(before, after, abs_tol=0.001):

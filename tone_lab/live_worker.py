@@ -22,8 +22,9 @@ def recover():
     if not RECOVERY.is_file():
         return
     target = json.loads(RECOVERY.read_text(encoding="utf-8"))
+    fixtures = target.get("fixtures", [target.get("fixture", iterate.SCRATCH)])
     with device.connect(write=True) as qc:
-        if qc.get_setlist_position() == target.get("fixture", iterate.SCRATCH):
+        if qc.get_setlist_position() in fixtures:
             iterate.recall(qc, target["position"], target["name"])
             if device.active_scene(qc) != target["scene"]:
                 device.select_scene(qc, target["scene"])
@@ -41,7 +42,7 @@ def read_commands(stop, commands, monitor=False):
                 event = json.loads(line)
                 if event.get("event") == "stop":
                     return
-                if event.get("event") in ("knobs", "source"):
+                if event.get("event") in ("knobs", "source", "tone"):
                     if monitor:
                         commands.put(event)
                     elif event["event"] == "knobs":
@@ -74,12 +75,19 @@ def main():
             diagnostics.LOG.info("Live worker started mode=%s muted=%s", args.mode, args.muted)
             stop, commands = Event(), Queue()
             Thread(target=read_commands, args=(stop, commands, args.monitor is not None), daemon=True).start()
+            loading_tone = False
 
             def events(event):
-                if event["event"] == "restore":
+                nonlocal loading_tone
+                kind = event["event"]
+                if kind == "restore":
                     session.write_json(RECOVERY, event)
-                if event["event"] in ("restore", "heartbeat"):
-                    faulthandler.dump_traceback_later(4.5, file=crash_log)
+                if kind == "loading-tone":
+                    loading_tone = True
+                elif kind in ("tone", "source"):
+                    loading_tone = False
+                if kind in ("restore", "heartbeat", "loading-tone", "tone", "source"):
+                    faulthandler.dump_traceback_later(30 if loading_tone else 4.5, file=crash_log)
                 emit(event)
 
             if args.monitor:
