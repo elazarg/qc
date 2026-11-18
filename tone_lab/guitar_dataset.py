@@ -47,6 +47,8 @@ class DrySource:
     kind: str = "wav"
     mapping: str | None = None
     duration: float | None = None
+    # Original recording hash, start in that recording, and saved excerpt hash.
+    origin: tuple[str, float, str] | None = None
 
 
 @dataclass(frozen=True)
@@ -176,54 +178,129 @@ def source_from_wav(path):
     path = Path(path).resolve()
     if path.suffix.casefold() != ".wav" or not path.is_file():
         raise ValueError("Choose an available mono dry WAV.")
-    if path.parent.parent == (session.SESSIONS / "recordings").resolve() and (path.parent / "clip.json").is_file():
+    managed = (session.SESSIONS / "recordings", live_recordings())
+    if any(path.parent.parent == root.resolve() for root in managed) and (path.parent / "clip.json").is_file():
         if path.name.casefold() != "dry.wav":
             raise ValueError("Choose the take's verified dry WAV rather than the processed or raw USB recording.")
         return _take_source(path.parent)
     return DrySource(path, path.name)
 
 
-def take_sources(instrument):
-    recordings = session.SESSIONS / "recordings"
+def take_sources(instrument, *, include_unknown=False):
+    recordings = [*(session.SESSIONS / "recordings").glob("clip-*"), *live_recordings().glob("clip-*")]
     sources = []
-    for folder in sorted(recordings.glob("clip-*"), reverse=True):
+    for folder in sorted(recordings, key=lambda path: path.name, reverse=True):
         if not folder.is_dir():
             continue
         try:
             source = source_from_take(instrument, folder)
         except (OSError, ValueError):
             continue
-        if source.guitar:
+        if source.guitar or include_unknown:
             sources.append(source)
     return sources
 
 
-def records(instrument, layout, *, role=None):
-    """Return active rows, with the private excerpt path where the model expects it."""
-    if role is not None:
-        _role(role)
+def live_recordings():
+    return session.SESSIONS / "guitar_learner" / "live_recordings"
+
+
+def label_history(instrument, layout):
+    """Read active and retired labels, including their configuration edits."""
     folder = dataset_folder(instrument, layout)
     result = []
-    for path in folder.glob("*/record.json"):
+    paths = (*folder.glob("*/record.json"), *folder.glob(".removed/*/record.json"))
+    for path in paths:
         if not re.fullmatch("[0-9a-f]{32}", path.parent.name):
             continue
         try:
             row = json.loads(path.read_text(encoding="utf-8"))
             wave = path.with_name("dry.wav")
             if (row["schema"] != SCHEMA or row["id"] != path.parent.name or row["layout"] != layout
-                    or _instrument(row["instrument"])[1] != _instrument(instrument)[1] or not wave.is_file()
-                    or not isinstance(row["created_at"], str)):
+                    or _instrument(row["instrument"])[1] != _instrument(instrument)[1]
+                    or not isinstance(row["created_at"], str) or not isinstance(row.get("history", []), list)
+                    or not isinstance(row.get("active", True), bool) or not isinstance(row.get("source"), str)):
                 continue
             _role(row["role"])
             configuration(layout, row["configuration"])
             if (not all(re.fullmatch("[0-9a-f]{64}", row[key]) for key in ("source_id", "excerpt_id"))
-                    or not all(math.isfinite(row[key]) for key in ("source_start", "source_end"))):
+                    or not all(math.isfinite(row[key]) for key in ("source_start", "source_end"))
+                    or not math.isfinite(row.get("source_offset", 0.))):
                 continue
         except (AttributeError, OSError, KeyError, TypeError, ValueError):
             continue
-        if role is None or row["role"] == role:
-            result.append({**row, "wav": str(wave.resolve())})
+        result.append({**row, "active": path.parent.parent == folder and row.get("active", True) and wave.is_file(),
+                       "wav": str(wave.resolve())})
     return sorted(result, key=lambda row: row["created_at"], reverse=True)
+
+
+def _exposure(rows):
+    examples = [row for row in rows if row["role"] == "example"
+                or any(item.get("role") == "example" for item in row.get("history", []) if isinstance(item, dict))]
+    return {row["source_id"] for row in examples}, {row["excerpt_id"] for row in examples}
+
+
+def records(instrument, layout, *, role=None):
+    """Return active labels. A test query returns only score-eligible checks."""
+    if role is not None:
+        _role(role)
+    return _active_records(label_history(instrument, layout), role)
+
+
+def _active_records(rows, role):
+    sources, excerpts = _exposure(rows)
+    result = []
+    for row in rows:
+        if not row["active"] or (role is not None and row["role"] != role):
+            continue
+        row = {key: value for key, value in row.items() if key != "active"}
+        exposed = row["source_id"] in sources or row["excerpt_id"] in excerpts
+        if row["role"] == "test" and exposed:
+            if role == "test":
+                continue
+            row["score_eligible"] = False
+        result.append(row)
+    return result
+
+
+def dataset_sources(instrument, layout, *, include_unknown=False):
+    """List (dry source, active labels) for takes and previously labeled imports."""
+    groups = {source.path: (source, []) for source in take_sources(instrument, include_unknown=include_unknown)}
+    history = label_history(instrument, layout)
+    labeled = {row["id"]: row for row in _active_records(history, None)}
+    saved = {Path(row["wav"]): row for row in history}
+    for row in history:
+        original = Path(row["source"])
+        if original in groups:
+            key = original
+        elif original in saved and original.is_file():
+            key = original
+            groups[key] = (_saved_source(instrument, saved[key]), [])
+        else:
+            try:
+                source = source_from_wav(original)
+                _check_instrument(instrument, source)
+                key = original
+            except (OSError, ValueError):
+                key = Path(row["wav"])
+                if not key.is_file():
+                    continue
+                source = _saved_source(instrument, row)
+            groups.setdefault(key, (source, []))
+        if row["id"] in labeled:
+            groups[key][1].append(labeled[row["id"]])
+    return [(source, tuple(labels)) for source, labels in groups.values()]
+
+
+def _saved_source(instrument, row):
+    origin = row["source_id"], row["source_start"] + row.get("source_offset", 0.), row["excerpt_id"]
+    return DrySource(Path(row["wav"]), row["source_label"], guitar=instrument, kind="saved-excerpt",
+                     mapping=row.get("mapping"), duration=row["seconds"], origin=origin)
+
+
+def find_label(instrument, layout, excerpt):
+    """Return the active label for an exact selection, including an identical export."""
+    return next((row for row in records(instrument, layout) if row["excerpt_id"] == excerpt.excerpt_id), None)
 
 
 def _bounds(source, frames, start, end):
@@ -251,7 +328,8 @@ def _check_reuse(existing, source_id, excerpt_id, start, end, role):
             continue
         if row["role"] != role:
             raise ValueError("This recording is already used for the other role. Use a fresh take for an independent test.")
-        if row["excerpt_id"] == excerpt_id or max(start, row["source_start"]) < min(end, row["source_end"]):
+        offset = row.get("source_offset", 0.)
+        if row["excerpt_id"] == excerpt_id or max(start, row["source_start"] + offset) < min(end, row["source_end"] + offset):
             raise ValueError("This part of the dry recording already has a configuration label.")
 
 
@@ -265,14 +343,25 @@ def inspect(source, *, start=None, end=None):
     first, last = _bounds(source, len(raw), start, end)
     excerpt = raw[first:last]
     peak = float(np.max(np.abs(excerpt)))
-    return DryExcerpt(excerpt, _digest(raw), _digest(excerpt), first / audio.RATE, last / audio.RATE,
+    source_id = _digest(raw)
+    if source.origin:
+        origin_id, _, saved_excerpt_id = source.origin
+        if source_id != saved_excerpt_id:
+            raise ValueError("The saved dry excerpt no longer matches its recording label.")
+        source_id = origin_id
+    return DryExcerpt(excerpt, source_id, _digest(excerpt), first / audio.RATE, last / audio.RATE,
                       len(raw) / audio.RATE, audio.db(peak), peak < .001, peak >= .999)
 
 
+def is_independent(instrument, layout, excerpt):
+    """Check whether this performance has ever been used to teach this dataset."""
+    sources, excerpts = _exposure(label_history(instrument, layout))
+    return excerpt.source_id not in sources and excerpt.excerpt_id not in excerpts
+
+
 def check_test(instrument, layout, excerpt):
-    """Refuse an independent check on audio already labeled as an example."""
-    if any(row["source_id"] == excerpt.source_id or row["excerpt_id"] == excerpt.excerpt_id
-           for row in records(instrument, layout, role="example")):
+    """Refuse an independent check on audio previously used to teach."""
+    if not is_independent(instrument, layout, excerpt):
         raise ValueError("This recording helped train the learner. Choose a new performance for an independent test.")
 
 
@@ -295,9 +384,14 @@ def add(instrument, layout, source, values, *, role="example", start=None, end=N
            "source": str(source.path), "source_label": source.label, "source_kind": source.kind, "mapping": source.mapping,
            "source_start": excerpt.source_start, "source_end": excerpt.source_end, "seconds": len(excerpt.samples) / audio.RATE,
            "peak_dbfs": excerpt.peak_dbfs, "quiet": excerpt.quiet, "created_at": datetime.now(timezone.utc).isoformat()}
+    offset = source.origin[1] if source.origin else 0.
+    if source.origin:
+        row["source_offset"] = offset
     with _WRITE:
         _check_reuse(records(name, layout), excerpt.source_id, excerpt.excerpt_id,
-                     excerpt.source_start, excerpt.source_end, role)
+                     offset + excerpt.source_start, offset + excerpt.source_end, role)
+        if role == "test":
+            check_test(name, layout, excerpt)
         folder.mkdir(parents=True, exist_ok=True)
         with TemporaryDirectory(prefix=".label-", dir=folder) as directory:
             stage = Path(directory)
@@ -307,14 +401,52 @@ def add(instrument, layout, source, values, *, role="example", start=None, end=N
     return {**row, "wav": str((folder / identity / "dry.wav").resolve())}
 
 
-def remove(instrument, layout, identity):
-    """Remove a label from this dataset while preserving the excerpt locally."""
+def _active_label(instrument, layout, identity):
     if not isinstance(identity, str) or not re.fullmatch("[0-9a-f]{32}", identity):
         raise ValueError("Choose an existing labeled recording.")
-    folder = dataset_folder(instrument, layout)
+    row = next((row for row in label_history(instrument, layout) if row["id"] == identity and row["active"]), None)
+    if row is None:
+        raise ValueError("That labeled recording is unavailable.")
+    return row
+
+
+def _update_label(row, action, **updates):
+    before = {"action": action, "at": datetime.now(timezone.utc).isoformat(),
+              "role": row["role"], "configuration": row["configuration"]}
+    updated = {**row, **updates, "history": [*row.get("history", []), before]}
+    manifest = Path(row["wav"]).with_name("record.json")
+    session.write_json(manifest, {key: value for key, value in updated.items() if key != "wav"})
+    return updated
+
+
+def retag(instrument, layout, identity, values, *, role=None, promote=False):
+    """Correct a configuration, or explicitly promote a saved check to an example."""
+    selected = configuration(layout, values)
     with _WRITE:
-        if not (folder / identity / "record.json").is_file():
-            raise ValueError("That labeled recording is unavailable.")
-        removed = folder / ".removed"
-        removed.mkdir(exist_ok=True)
-        (folder / identity).rename(removed / identity)
+        row = _active_label(instrument, layout, identity)
+        target = row["role"] if role is None else _role(role)
+        if target != row["role"]:
+            if target == "test":
+                raise ValueError("This recording helped train the learner. Choose a new performance for an independent test.")
+            if not promote:
+                raise ValueError("Use this saved check to teach explicitly. It will leave the independent score.")
+            if row.get("quiet"):
+                raise ValueError("The excerpt is too quiet to teach a configuration. Play an audible dry example.")
+            offset = row.get("source_offset", 0.)
+            _check_reuse(records(instrument, layout, role="example"), row["source_id"], row["excerpt_id"],
+                         offset + row["source_start"], offset + row["source_end"], "example")
+        if selected != row["configuration"] or target != row["role"]:
+            action = "promote" if target != row["role"] else "retag"
+            row = _update_label(row, action, role=target, configuration=selected)
+        row.pop("active")
+        return row
+
+
+def unlabel(instrument, layout, identity):
+    """Retire a label while retaining the source, excerpt and earlier settings."""
+    with _WRITE:
+        _update_label(_active_label(instrument, layout, identity), "unlabel", active=False)
+
+
+def remove(instrument, layout, identity):
+    unlabel(instrument, layout, identity)

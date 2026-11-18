@@ -32,7 +32,7 @@ def recover():
     RECOVERY.unlink(missing_ok=True)
 
 
-def read_commands(stop, commands, monitor=False):
+def read_commands(stop, commands, monitor=False, learner=False):
     pending = b""
     try:
         # A raw pipe read avoids holding Python's buffered-stdin lock at shutdown.
@@ -40,9 +40,13 @@ def read_commands(stop, commands, monitor=False):
             *lines, pending = (pending + data).split(b"\n")
             for line in lines:
                 event = json.loads(line)
-                if event.get("event") == "stop":
+                kind = event.get("event")
+                if kind == "stop":
                     return
-                if event.get("event") in ("knobs", "source", "tone", "level"):
+                if learner:
+                    if kind in ("learner-profile", "learner-snapshot"):
+                        commands.put(event)
+                elif kind in ("knobs", "source", "tone", "level"):
                     if monitor:
                         commands.put(event)
                     elif event["event"] == "knobs":
@@ -58,6 +62,7 @@ def main():
     parser.add_argument("--take", type=Path)
     parser.add_argument("--mode", choices=("guitar", "reamp"))
     parser.add_argument("--monitor", type=Path)
+    parser.add_argument("--learner", type=Path)
     parser.add_argument("--muted", action="store_true")
     parser.add_argument("--capture-return", action="store_true")
     parser.add_argument("--guitar-config", type=json.loads)
@@ -70,11 +75,13 @@ def main():
             if args.recover:
                 recover()
                 return 0
-            if args.monitor is None and (args.mode is None or (args.mode == "reamp" and args.take is None)):
+            if args.monitor is None and args.learner is None and (
+                    args.mode is None or (args.mode == "reamp" and args.take is None)):
                 raise ValueError("Choose a live mode and supply a dry take for reamping.")
-            diagnostics.LOG.info("Live worker started mode=%s muted=%s", args.mode, args.muted)
+            diagnostics.LOG.info("Live worker started mode=%s muted=%s", "learner" if args.learner else args.mode, args.muted)
             stop, commands = Event(), Queue()
-            Thread(target=read_commands, args=(stop, commands, args.monitor is not None), daemon=True).start()
+            Thread(target=read_commands, args=(stop, commands, args.monitor is not None, args.learner is not None),
+                   daemon=True).start()
             loading_tone = False
 
             def events(event):
@@ -86,11 +93,16 @@ def main():
                     loading_tone = True
                 elif kind in ("tone", "source"):
                     loading_tone = False
-                if kind in ("restore", "heartbeat", "loading-tone", "tone", "source"):
+                if kind in ("restore", "heartbeat", "loading-tone", "tone", "source", "learner-ready"):
                     faulthandler.dump_traceback_later(30 if loading_tone else 4.5, file=crash_log)
                 emit(event)
 
-            if args.monitor:
+            if args.learner:
+                from . import guitar_live
+
+                config = json.loads(args.learner.read_text(encoding="utf-8"))
+                result = guitar_live.run(config, stop, commands, events)
+            elif args.monitor:
                 from . import monitor
 
                 config = json.loads(args.monitor.read_text(encoding="utf-8"))
@@ -99,7 +111,8 @@ def main():
                 result = live.run(args.take, args.mode, stop, commands, lambda text: emit({"event": "status", "text": text}),
                                   audible=not args.muted, capture_return=args.capture_return,
                                   guitar_config=args.guitar_config, events=events)
-            RECOVERY.unlink(missing_ok=True)
+            if not args.learner:
+                RECOVERY.unlink(missing_ok=True)
             diagnostics.LOG.info("Live worker stopped %s", result)
             emit({"event": "done", "audio": result})
             return 0

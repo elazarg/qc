@@ -19,6 +19,7 @@ class DryWindow:
     def __init__(self, size):
         self.samples = np.empty(size, dtype=np.float32)
         self.cursor = self.filled = self.generation = 0
+        self.discontinuities = 0
         self.time = 0.0
         self.lock = Lock()
 
@@ -26,6 +27,7 @@ class DryWindow:
         with self.lock:
             if gap:
                 self.filled = self.cursor = 0
+                self.discontinuities += 1
             values = chunk[-len(self.samples):]
             first = min(len(values), len(self.samples) - self.cursor)
             self.samples[self.cursor:self.cursor + first] = values[:first]
@@ -36,11 +38,21 @@ class DryWindow:
             self.generation += 1
 
     def latest(self, generation):
+        snapshot = self.recent(generation=generation, minimum=len(self.samples))
+        return snapshot[:3] if snapshot else None
+
+    def recent(self, size=None, *, generation=None, minimum=1):
+        """Copy the newest contiguous samples, in time order, outside the callback."""
         with self.lock:
-            if self.filled != len(self.samples) or generation == self.generation:
+            if self.filled < minimum or generation == self.generation:
                 return None
-            values = np.concatenate((self.samples[self.cursor:], self.samples[:self.cursor]))
-            return self.generation, self.time, values
+            count = min(self.filled, size) if size is not None else self.filled
+            start = (self.cursor - count) % len(self.samples)
+            if start + count <= len(self.samples):
+                values = self.samples[start:start + count].copy()
+            else:
+                values = np.concatenate((self.samples[start:], self.samples[:self.cursor]))
+            return self.generation, self.time, values, self.discontinuities, self.filled
 
 
 class Observer:

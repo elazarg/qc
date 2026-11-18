@@ -650,7 +650,8 @@ class Desk:
         self.stop_audio()
         if self.stop_signal is not None:
             self.stop_signal.set()
-            self.set_status("Saving the phrase…" if self.task == "record" else "Restoring your Quad Cortex sound…")
+            messages = {"record": "Saving the phrase…", "learner-listen": "Closing the dry input…"}
+            self.set_status(messages.get(self.task, "Restoring your Quad Cortex sound…"))
         self.update()
         return "break"
 

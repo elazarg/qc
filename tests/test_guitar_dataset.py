@@ -117,6 +117,69 @@ class GuitarDatasetTest(unittest.TestCase):
         known_quiet = data.add("Charvel", self.layout, silent, self.config, role="test")
         self.assertTrue(known_quiet["quiet"])
 
+    def test_edit_promote_and_unlabel_keep_score_partition_and_audio_bytes(self):
+        original = self.wave(self.root / "original.wav")
+        first = data.add("Charvel", self.layout, original, self.config, role="test", start=0, end=.8)
+        second = data.add("Charvel", self.layout, original, self.config, role="test", start=1, end=1.8)
+        source_bytes = original.read_bytes()
+        excerpt_bytes = Path(first["wav"]).read_bytes()
+        corrected = {**self.config, "tone": 6}
+        edited = data.retag("Charvel", self.layout, first["id"], corrected)
+        self.assertEqual(edited["history"][0]["configuration"], first["configuration"])
+        self.assertEqual(edited["configuration"]["tone"], 6.)
+        self.assertEqual(len(data.records("Charvel", self.layout, role="test")), 2)
+
+        with self.assertRaisesRegex(ValueError, "explicitly"):
+            data.retag("Charvel", self.layout, first["id"], corrected, role="example")
+        promoted = data.retag("Charvel", self.layout, first["id"], corrected, role="example", promote=True)
+        self.assertEqual(promoted["id"], first["id"])
+        self.assertEqual(promoted["history"][-1]["action"], "promote")
+        self.assertEqual(data.records("Charvel", self.layout, role="example"), [promoted])
+        self.assertEqual(data.records("Charvel", self.layout, role="test"), [])
+        earlier_check = data.find_label("Charvel", self.layout, data.inspect(original, start=1, end=1.8))
+        self.assertEqual(earlier_check["id"], second["id"])
+        self.assertFalse(earlier_check["score_eligible"])
+        with self.assertRaisesRegex(ValueError, "new performance"):
+            data.retag("Charvel", self.layout, first["id"], corrected, role="test")
+
+        data.unlabel("Charvel", self.layout, first["id"])
+        self.assertFalse(data.find_label("Charvel", self.layout, data.inspect(original, start=0, end=.8)))
+        self.assertFalse(data.is_independent("Charvel", self.layout, data.inspect(original)))
+        history = next(row for row in data.label_history("Charvel", self.layout) if row["id"] == first["id"])
+        self.assertFalse(history["active"])
+        self.assertEqual(history["history"][-1]["action"], "unlabel")
+        self.assertEqual(original.read_bytes(), source_bytes)
+        self.assertEqual(Path(first["wav"]).read_bytes(), excerpt_bytes)
+
+    def test_dataset_shows_unlabeled_takes_and_retired_imports(self):
+        take = self.take("012300")
+        unknown = self.take("012400", guitar="")
+        original = self.wave(self.root / "original.wav", frequency=340)
+        label = data.add("Charvel", self.layout, original, self.config)
+        library = dict((source.path, labels) for source, labels in data.dataset_sources("Charvel", self.layout,
+                                                                                      include_unknown=True))
+        self.assertEqual(library[take / "dry.wav"], ())
+        self.assertEqual(library[unknown / "dry.wav"], ())
+        self.assertEqual(library[original], (label,))
+        data.unlabel("Charvel", self.layout, label["id"])
+        self.assertEqual(dict((source.path, labels) for source, labels in data.dataset_sources("Charvel", self.layout))[original], ())
+
+    def test_saved_excerpt_fallback_retains_origin_for_score_and_label_reuse(self):
+        original = self.wave(self.root / "original.wav")
+        example = data.add("Charvel", self.layout, original, self.config, start=0, end=.8)
+        probe = data.add("Charvel", self.layout, original, self.config, start=1, end=1.8)
+        data.unlabel("Charvel", self.layout, probe["id"])
+        original.unlink()
+        source, active = next((source, labels) for source, labels in data.dataset_sources("Charvel", self.layout)
+                              if source.path == Path(probe["wav"]))
+        self.assertFalse(active)
+        self.assertEqual(data.inspect(source).source_id, example["source_id"])
+        self.assertFalse(data.is_independent("Charvel", self.layout, data.inspect(source)))
+        added = data.add("Charvel", self.layout, source, self.config)
+        self.assertEqual(added["source_offset"], 1.)
+        library = {source.path: labels for source, labels in data.dataset_sources("Charvel", self.layout)}
+        self.assertEqual(library[Path(probe["wav"])], (added,))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -42,7 +42,14 @@ def run_monitor(config, stop, commands, report):
         return supervise(worker_command() + ["--monitor", str(path)], stop, commands, report, monitor=True)
 
 
-def supervise(argv, stop, commands, report, *, monitor=False):
+def run_learner(config, stop, commands, report):
+    with TemporaryDirectory(prefix="tone-learner-") as folder:
+        path = Path(folder) / "session.json"
+        path.write_text(json.dumps(config, ensure_ascii=True), encoding="utf-8")
+        return supervise(worker_command() + ["--learner", str(path)], stop, commands, report, learner=True)
+
+
+def supervise(argv, stop, commands, report, *, monitor=False, learner=False):
     process = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                                text=True, encoding="utf-8", bufsize=1, creationflags=subprocess.CREATE_NO_WINDOW)
     incoming, outgoing = SimpleQueue(), SimpleQueue()
@@ -82,10 +89,15 @@ def supervise(argv, stop, commands, report, *, monitor=False):
                         item = commands.get_nowait()
                     except Empty:
                         break
-                    event = item if monitor else {"event": "knobs", "values": item}
+                    event = item if monitor or learner else {"event": "knobs", "values": item}
                     if event["event"] == "tone":
                         updates.pop(("knobs", event["config"].get("tone_id")), None)
-                    key = (event["event"], event.get("tone_id")) if event["event"] == "knobs" else event["event"]
+                    if event["event"] == "knobs":
+                        key = (event["event"], event.get("tone_id"))
+                    elif event["event"] == "learner-snapshot":
+                        key = (event["event"], event.get("request_id"))
+                    else:
+                        key = event["event"]
                     updates.pop(key, None)
                     updates[key] = event
                 for event in updates.values():
@@ -103,7 +115,7 @@ def supervise(argv, stop, commands, report, *, monitor=False):
                 deadline = time.monotonic() + TONE_LOAD_TIMEOUT
                 if stop_deadline is not None:
                     stop_deadline = deadline
-            elif event["event"] in ("status", "heartbeat", "source", "tone"):
+            elif event["event"] in ("status", "heartbeat", "source", "tone", "learner-ready"):
                 if event["event"] in ("source", "tone"):
                     loading_tone = False
                 deadline = time.monotonic() + HEARTBEAT_TIMEOUT
@@ -111,6 +123,8 @@ def supervise(argv, stop, commands, report, *, monitor=False):
                 report(event["text"])
             elif event["event"] in ("controls", "source", "tone", "loading-tone", "shape", "level",
                                      "guitar-state", "guitar-gesture", "guitar-status", "guitar-stopped"):
+                report(event)
+            elif learner and event["event"].startswith("learner-"):
                 report(event)
             elif monitor and event["event"] == "heartbeat":
                 report(event)
@@ -124,6 +138,8 @@ def supervise(argv, stop, commands, report, *, monitor=False):
         if process.poll() is None:
             process.kill()
         process.wait(timeout=3)
+        if learner:
+            raise
         try:
             recovery = subprocess.run(worker_command() + ["--recover"], capture_output=True, encoding="utf-8",
                                       timeout=12, creationflags=subprocess.CREATE_NO_WINDOW)

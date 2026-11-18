@@ -44,8 +44,13 @@ def _configuration(example):
 
 
 def _signatures(dry, start=None, end=None):
+    observations = guitar_state._observations(guitar_state._samples(dry, start, end), "configuration")
+    return _summarize(observations)
+
+
+def _summarize(observations):
     grouped = defaultdict(list)
-    for note, features in guitar_state._observations(guitar_state._samples(dry, start, end), "configuration"):
+    for note, features in observations:
         grouped[str(note)].append(features)
     signatures = {}
     for note, frames in grouped.items():
@@ -318,10 +323,13 @@ def estimate(profile, dry, *, start=None, end=None, source_id=None):
     """Return plausible settings in the taught ranges, or abstain when cues overlap."""
     if source_id and source_id in profile.get("source_ids", ()):
         raise ValueError("Choose a fresh performance. This recording was used for calibration.")
+    return _estimate_from_signatures(profile, _signatures(dry, start, end))
+
+
+def _estimate_from_signatures(profile, observed):
     knobs, setups = profile["knobs"], profile["setups"]
     result = {"pickup": None, "wiring": None, "tone": None, "volume": None, **dict.fromkeys(knobs),
               "notes_used": [], "confidence": "uncertain", "evidence": {}, "nearest": None}
-    observed = _signatures(dry, start, end)
     if not observed:
         return {**result, "reason": "No sustained single notes detected."}
     scales = profile["scales"]

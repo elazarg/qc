@@ -63,7 +63,7 @@ def _pitch(frame):
     return PITCH_RATE / (lag + np.clip(offset, -.5, .5))
 
 
-def _observations(dry, control):
+def _observations(dry, control, *, include_position=False):
     if len(dry) < FRAME:
         return []
     reduced = signal.resample_poly(dry, 1, 4)
@@ -92,7 +92,7 @@ def _observations(dry, control):
             values = 10 * np.log10(np.clip(energy / energy.sum(), 1e-4, None))
             if control == "configuration":
                 values = np.r_[values, 20 * math.log10(rms)]
-        observations.append((note, values))
+        observations.append((start, note, values) if include_position else (note, values))
     return observations
 
 
