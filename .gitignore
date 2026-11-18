@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+tone_sessions/
+*.lnk
+.pytest_cache/
+
