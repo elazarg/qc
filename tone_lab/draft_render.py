@@ -9,11 +9,12 @@ import time
 import numpy as np
 from qc_mcp import catalog, protocol
 
-from . import audio, device, iterate, preset_design, presets, qc_library, session, styles
+from . import audio, device, diagnostics, iterate, preset_design, presets, qc_library, session, styles
 
 
 WORK_SLOT = {**iterate.SCRATCH, "position": 255}
-WORK_NAME = "Tone Lab Vai"
+WORK_NAME = "Tone Lab Preview"
+LEGACY_WORK_NAME = "Tone Lab Vai"
 OUTPUT_GAIN = 16005
 PREVIEW_GAIN = -12.
 ASSET_LOADERS = {29001, 14000, 14001}
@@ -25,6 +26,33 @@ def my_presets(qc):
     if folder is None or folder["is_factory"] or len(folder["files"]) != 256:
         raise RuntimeError("The Quad Cortex did not return the full My Presets setlist.")
     return folder["files"]
+
+
+def name_preview_slot(qc, scratch):
+    """Replace the early app-owned fixture name once, with its grid intact."""
+    if scratch.name != LEGACY_WORK_NAME:
+        return scratch
+    if device.live_position(qc) != WORK_SLOT:
+        raise RuntimeError("The Quad Cortex changed before naming the preview slot.")
+    directory_slot = my_presets(qc)[WORK_SLOT["position"]]
+    if directory_slot.get("name") != LEGACY_WORK_NAME or directory_slot.get("is_readonly"):
+        raise RuntimeError("Couldn't verify the old Tone Lab preview slot in My Presets 32H.")
+    presets.archive(scratch, WORK_SLOT, qc.firmware, reason="Before naming the Tone Lab preview slot")
+    qc.write_preset_file(WORK_SLOT["folder_key"], WORK_SLOT["position"], WORK_NAME)
+    time.sleep(.55)
+    renamed = iterate.recall(qc, WORK_SLOT, WORK_NAME)
+    if iterate.sound_state(scratch) != iterate.sound_state(renamed) or iterate.routes(scratch) != iterate.routes(renamed):
+        raise RuntimeError("The Quad Cortex could not verify the renamed preview slot.")
+    return renamed
+
+
+def label_preview(qc, scene, draft):
+    """Put the logical draft name on the active temporary scene."""
+    if device.live_position(qc) == WORK_SLOT:
+        try:
+            qc.set_scene_label(scene, preset_design.preset_name(draft["name"]))
+        except (OSError, RuntimeError):
+            diagnostics.LOG.warning("The Quad Cortex could not label the preview scene", exc_info=True)
 
 
 @contextmanager
@@ -41,9 +69,9 @@ def working_grid(qc, visited=()):
         scratch = iterate.recall(qc, WORK_SLOT, None)
         blank = (scratch.name.strip().casefold() in ("", "unsaved")
                  and not any(model.hash for row in scratch.chains for model in row.models))
-        if scratch.name != WORK_NAME and not blank:
+        if scratch.name not in (WORK_NAME, LEGACY_WORK_NAME) and not blank:
             raise RuntimeError("My Presets 32H is in use. The draft needs the Tone Lab working slot.")
-        yield scratch
+        yield name_preview_slot(qc, scratch)
     finally:
         if device.live_position(qc) not in (position, WORK_SLOT, *visited):
             raise RuntimeError("The selected preset changed on the Quad Cortex. Tone Lab released live control.")

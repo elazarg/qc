@@ -29,11 +29,12 @@ class GuitarCalibrationFlowTest(unittest.TestCase):
         panel.examples, panel.counts, panel.examples_changed = [], {}, False
         panel.latest_dry, panel.example_source = None, None
         panel.recording_before = guitar_ui.NO_RECORDING
+        panel.recording_kind = panel.recording_setting = None
         panel.instrument = tk.StringVar(interpreter, "Charvel")
         panel.control = tk.StringVar(interpreter, "Pickup selector")
         panel.loaded_selection = panel.selection()[2], "pickup"
-        for name in ("status", "latest_text", "source_text", "progress_text", "next_step", "example_label",
-                     "start_seconds", "end_seconds"):
+        for name in ("status", "latest_text", "source_text", "progress_text", "next_step", "example_label", "control_hint",
+                     "start_seconds", "end_seconds", "estimate_text"):
             setattr(panel, name, tk.StringVar(interpreter))
         for name in ("set_buttons", "label_box", "instrument_box", "example_list"):
             setattr(panel, name, Mock())
@@ -55,8 +56,9 @@ class GuitarCalibrationFlowTest(unittest.TestCase):
         self.recorder.stop = None
         self.panel.capture_changed()
 
-    def test_record_example_uses_shared_transport_and_waits_for_new_dry_audio(self):
+    def test_record_example_uses_shared_transport_and_saves_chosen_setting(self):
         self.take("Older take")
+        self.panel.example_label.set("Neck")
         self.panel.record_example()
         self.assertIsNone(self.panel.example_source)
         self.assertIn("Wait for Recording", self.panel.source_text.get())
@@ -68,21 +70,51 @@ class GuitarCalibrationFlowTest(unittest.TestCase):
         self.assertEqual(self.recorder.press.call_count, 2)
         new_take = self.take("Neck take")
         self.finish_recording()
-        self.assertEqual(self.panel.example_source, new_take)
-
-        self.panel.example_label.set("Neck")
-        self.panel.add_example()
+        self.assertIsNone(self.panel.example_source)
         data = json.loads((self.panel.loaded_selection[0] / "pickup-examples.json").read_text(encoding="utf-8"))
         self.assertEqual(data, [{"label": "Neck", "wav": str(new_take)}])
         self.assertEqual(self.panel.progress_text.get(), "Neck ×1")
         self.assertIn("Bridge", self.panel.next_step.get())
+        self.assertEqual(self.panel.example_label.get(), "Bridge")
 
     def test_failed_recording_does_not_attach_the_previous_take(self):
         self.take("Older take")
+        self.panel.example_label.set("Neck")
         self.panel.record_example()
         self.finish_recording()
         self.assertIsNone(self.panel.example_source)
-        self.assertIn("No new dry example", self.panel.source_text.get())
+        self.assertIn("No new dry recording", self.panel.source_text.get())
+
+    def test_guided_capture_uses_the_returned_clip_even_if_another_take_is_newer(self):
+        self.take("Older take")
+        self.panel.example_label.set("Neck")
+        self.panel.record_example()
+        owned_capture = self.take("Guided take")
+        self.panel.review.completed_example = Mock(return_value=self.info)
+        self.take("Concurrent take")
+        self.finish_recording()
+        self.assertEqual(self.panel.examples[0]["wav"], str(owned_capture))
+
+    def test_fresh_check_inspects_exact_clip_without_adding_a_training_example(self):
+        self.take("Older take")
+        self.panel.profile = {"labels": ["Neck", "Bridge"]}
+        self.panel.inspect_path = Mock()
+        self.panel.record_check()
+        self.panel.record_example()
+        self.assertFalse(self.recorder.stop.is_set())
+        self.panel.record_check()
+        self.assertTrue(self.recorder.stop.is_set())
+        fresh = self.take("Fresh check")
+        self.finish_recording()
+        self.panel.inspect_path.assert_called_once_with(fresh)
+        self.assertEqual(self.panel.examples, [])
+
+    def test_latest_take_from_another_guitar_is_explained(self):
+        self.take("Unrelated take")
+        self.info["guitar"] = "Les Paul"
+        self.panel.select_latest()
+        self.assertIsNone(self.panel.example_source)
+        self.assertIn("Les Paul", self.panel.status.get())
 
     def test_labeled_source_stays_fixed_when_a_newer_take_appears(self):
         captured = self.take("Chosen take")

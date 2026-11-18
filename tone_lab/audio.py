@@ -201,10 +201,12 @@ class PhraseCursor:
 
     frame: int = 0
     muted: bool = False
+    returns: bool = False
+    level_probe: object = None
 
 
 @contextmanager
-def loop_feed(dry, *, monitor_return=False, transport=None):
+def loop_feed(dry, *, monitor_return=False, return_channels=None, transport=None):
     """Send guitar to Grid USB 5 with an optional shared phrase cursor."""
     if (dry.ndim != 2 or dry.shape[1] != 1 or not np.isfinite(dry).all()
             or not 0.001 <= np.max(np.abs(dry)) < .999):
@@ -249,12 +251,20 @@ def loop_feed(dry, *, monitor_return=False, transport=None):
         def duplex(indata, outdata, frames, timing, status):
             feed(outdata, frames, status)
             meters["peak"] = max(meters["peak"], abs(float(indata.min())), abs(float(indata.max())))
+            probe = transport.level_probe
+            if probe is not None and not transport.muted:
+                probe.write(indata, interrupted=bool(status))
 
-        stream = sd.Stream(**options, channels=(2, 2), extra_settings=(settings, settings), callback=duplex)
+        inputs = sd.AsioSettings([channel - 1 for channel in return_channels]) if return_channels else settings
+        stream = sd.Stream(**options, channels=(2, 2), extra_settings=(inputs, settings), callback=duplex)
     else:
         def output(outdata, frames, timing, status):
             feed(outdata, frames, status)
 
         stream = sd.OutputStream(**options, channels=2, extra_settings=settings, callback=output)
     with stream:
-        yield stream, meters
+        transport.returns = monitor_return
+        try:
+            yield stream, meters
+        finally:
+            transport.returns = False

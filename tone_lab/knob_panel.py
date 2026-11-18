@@ -54,6 +54,8 @@ class KnobPanel(tk.Frame):
                                  disabledforeground=muted, activebackground=line, relief="flat",
                                  borderwidth=0, padx=8, pady=3)
         self.compare.pack(side="right", padx=4)
+        self.expand = tk.Button(footer, text="Add shaping controls", command=desk.expand_tone, bg=surface, fg=accent,
+                                activebackground=line, relief="flat", borderwidth=0, padx=8, pady=3)
         self.show(self.active)
 
     def describe(self, key):
@@ -85,11 +87,15 @@ class KnobPanel(tk.Frame):
         for name, button in self.tabs.items():
             button.configure(bg=accent if name == group else COLORS[0], fg="#16151a" if name == group else light)
 
-    def sync(self, name, values, available):
+    def sync(self, name, values, available, *, expandable=False):
         self.current.set(f"Shape  ·  {name}")
         can_compare = values and self.desk.active_source and self.desk.active_side == self.desk.side
         self.compare.configure(text="Hear shape" if self.desk.base_bypassed else "Hear base",
                                state="normal" if can_compare else "disabled")
+        if expandable and not self.expand.winfo_manager():
+            self.expand.pack(side="right", padx=4)
+        elif not expandable and self.expand.winfo_manager():
+            self.expand.pack_forget()
         self.available = available
         for key, knob in self.knobs.items():
             colors = COLORS if available is None or key in available else UNAVAILABLE

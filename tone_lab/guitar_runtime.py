@@ -70,19 +70,20 @@ class Observer:
                 result = guitar_state.estimate(self.profile, dry)
             except Exception:
                 diagnostics.LOG.exception("Guitar input analysis failed; no gesture sent")
-                self.results.append((when, None, 0.0))
+                self.results.append((when, None, 0.0, "Dry input analysis stopped."))
                 return
-            self.results.append((when, result.get("label"), float(result.get("confidence", 0))))
+            self.results.append((when, result.get("label"), float(result.get("confidence", 0)), result.get("reason")))
 
     def poll(self, now):
         """Return the newest state and a gesture proposal, if any."""
         try:
-            when, label, confidence = self.results.popleft()
+            when, label, confidence, reason = self.results.popleft()
         except IndexError:
             return None, None
         if now - when > STALE_SECONDS:
-            label, confidence = None, 0.0
-        event = {"event": "guitar-state", "control": self.control, "label": label, "confidence": confidence}
+            label, confidence, reason = None, 0.0, "Waiting for a new dry note."
+        event = {"event": "guitar-state", "control": self.control, "label": label, "confidence": confidence,
+                 "reason": reason}
         gesture = self.detector.observe(when, label, confidence) if self.detector else None
         return event, gesture
 

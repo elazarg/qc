@@ -115,6 +115,7 @@ class DeskReview:
 
     def __init__(self, desk, play):
         self.desk, self.root = desk, desk.root
+        self.guitar = desk.guitar
         self.recorder = ExampleRecorder(desk)
         self.play_file = play
 
@@ -131,8 +132,11 @@ class DeskReview:
         return self.desk.baseline, self.desk.alternative
 
     def latest(self, *, pair=False):
+        return capture.latest_clip(pair=pair)
+
+    def completed_example(self):
         path = self.recorder.recorded_path
-        return capture.clip_info(path, pair=pair) if path else capture.latest_clip(pair=pair)
+        return capture.clip_info(path, pair=True) if path else {}
 
     def busy(self):
         return self.desk.job is not None or self.desk.leaving is not None
@@ -142,6 +146,8 @@ class DeskReview:
 
 
 class SetupPanel(tk.Frame):
+    CALIBRATION = "Guitar calibration"
+
     def __init__(self, parent, desk, *, live_observer=False):
         super().__init__(parent, background=BG)
         self.desk = desk
@@ -155,7 +161,7 @@ class SetupPanel(tk.Frame):
         header = tk.Frame(self, background=BG)
         header.pack(fill="x", pady=(0, 8))
         self.tabs, self.views = {}, {}
-        for name in ("Sound check", "Guitar input"):
+        for name in (self.CALIBRATION, "Sound check"):
             self.tabs[name] = button(header, name, lambda target=name: self.show(target), compact=True)
             self.tabs[name].pack(side="left", padx=(0, 6))
             self.views[name] = tk.Frame(self, background=BG)
@@ -163,12 +169,20 @@ class SetupPanel(tk.Frame):
         self.stop_button.pack(side="right")
         label(header, variable=self.status, color=MUTED, size=9).pack(side="right", padx=(6, 8))
         self.soundcheck = DeskSoundCheck(self.review, self.views["Sound check"], self.worker)
-        self.guitar_input = GuitarInputPanel(self.review, self.views["Guitar input"], self.worker,
+        self.guitar_input = GuitarInputPanel(self.review, self.views[self.CALIBRATION], self.worker,
                                             live_observer=live_observer)
-        self.show("Sound check")
+        self.show_calibration()
+        self.bind("<Map>", lambda event: self.guitar_input.follow_desk_guitar() if event.widget is self else None)
         self.bind("<Unmap>", self.unmapped)
 
+    def show_calibration(self, control=None):
+        self.show(self.CALIBRATION)
+        if control:
+            self.guitar_input.choose_control(control)
+
     def show(self, name):
+        if name == self.CALIBRATION:
+            self.guitar_input.follow_desk_guitar()
         if self.active == name:
             return
         if self.active:
@@ -187,6 +201,7 @@ class SetupPanel(tk.Frame):
         self.stop_button.configure(state="normal" if self.preview is not None else "disabled")
 
     def live_config(self):
+        self.guitar_input.follow_desk_guitar()
         return self.guitar_input.live_config()
 
     def live_event(self, event):

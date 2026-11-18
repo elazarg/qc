@@ -48,6 +48,28 @@ class ToneDirectionsTest(unittest.TestCase):
         edits = styles.knobs(source, 0, {"soft_top": .5})
         self.assertTrue(any(edit["index"] == index and edit["to"] < edit["from"] for edit in edits))
 
+    def test_secondary_delay_knob_auditions_a_dry_delay_and_respects_an_explicit_cut(self):
+        model = 6011
+        settings = {index: catalog.to_norm(model, index, float(param["default"]))
+                    for index, param in enumerate(catalog.lookup(model)["params"])}
+        settings[0] = 0.
+        source = preset.PresetBuilder("Parked stereo delay").add_block(0, 0, model, params=settings).build()
+        self.assertEqual(styles.knobs(source, 0, {"repeats": 0}), [])
+        edits = {edit["name"]: edit["to"] for edit in styles.knobs(source, 0, {"repeats": .5})}
+        self.assertAlmostEqual(edits["MIX"], 8.)
+        self.assertAlmostEqual(edits["FEEDBACK"], 37.5)
+        cut = styles.knobs(source, 0, {"repeats": .5, "delay": -1.})
+        self.assertEqual([edit["name"] for edit in cut], ["FEEDBACK"])
+        self.assertEqual(source.chains[0].models[0].params[0].param_values[0].float_value, 0.)
+
+    def test_stock_graphic_eq_faders_are_available_to_mix_and_attack_controls(self):
+        model = 4005
+        settings = {index: catalog.to_norm(model, index, float(param["default"]))
+                    for index, param in enumerate(catalog.lookup(model)["params"])}
+        source = preset.PresetBuilder("Flat Graphic-9").add_block(0, 0, model, params=settings).build()
+        edits = {edit["name"]: edit["to"] for edit in styles.knobs(source, 0, {"band_fit": 1., "punch": .5})}
+        self.assertEqual(edits, {"125Hz": -1.6, "1kHz": 1.4, "2kHz": .9})
+
 
 if __name__ == "__main__":
     unittest.main()

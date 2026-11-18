@@ -241,9 +241,12 @@ def route(text, *, has_draft):
 
     if preset_design.is_request(request):
         return "create", text
-    if has_draft and not re.match(r"(?i)^(?:why|what|how|which|can i)\b", request):
-        return "refine", text
-    if re.match(r"(?i)^(?:make|give me|build|create|design|i want|i need)\b", request):
+    if preset_design.is_revision(request):
+        return ("refine" if has_draft else "adjust-live"), text
+    if re.match(r"(?i)^(?:why|what|how|which|can i|does|is)\b", request):
+        return "adjust-live", text
+    if (has_draft or re.match(r"(?i)^(?:make|give me|build|create|design|i want|i need)\b", request)
+            or re.search(r"(?i)\b(?:style|inspired|in the vein of)\b", request)):
         return "create", text
     return "adjust-live", text
 
@@ -258,7 +261,7 @@ def samples(sound):
     return wave
 
 
-def prepare(sounds):
+def playback_material(sounds):
     if len(sounds) == 2 and not sounds[0].paired_with(sounds[1]):
         raise ValueError("These recordings are from different performances. Play them individually.")
     waves = [samples(sound) for sound in sounds]
@@ -267,20 +270,24 @@ def prepare(sounds):
     measured = [audio.describe(wave) for wave in waves]
     if any(item["lufs"] is None or item["clipped_samples"] for item in measured):
         raise ValueError("The sound is silent or clipped. Choose another phrase or reference.")
-    tracks = [np.array(np.broadcast_to(wave, (len(wave), 2)) * gain, dtype=np.float32)
-              for wave, gain in zip(waves, audio.audition_gains(measured))]
+    tracks = [np.array(np.broadcast_to(wave, (len(wave), 2)), dtype=np.float32) for wave in waves]
     edge = round(.006 * audio.RATE)
     ramp = np.linspace(0, 1, edge, dtype=np.float32)[:, None]
     for track in tracks:
         track[:edge] *= ramp
         track[-edge:] *= ramp[::-1]
-    return tuple(tracks)
+    return tuple(tracks), tuple(audio.audition_gains(measured))
+
+
+def prepare(sounds):
+    tracks, gains = playback_material(sounds)
+    return tuple(track * gain for track, gain in zip(tracks, gains))
 
 
 class Loop:
     """Render all versions from the same sample cursor on the audio thread."""
 
-    def __init__(self, tracks, selected=0, crossfade=480):
+    def __init__(self, tracks, selected=0, crossfade=480, *, gains=None):
         self.tracks = tracks
         self.selected = selected
         self.current = selected
@@ -288,8 +295,9 @@ class Loop:
         self.crossfade = crossfade
         self.weight = float(selected)
         self.progress = np.arange(1, crossfade + 1, dtype=np.float32)
+        self.gains = gains or (1.,) * len(tracks)
 
-    def process(self, output):
+    def process(self, output, *, match=True):
         cursor = self.cursor
         total = len(self.tracks[0])
         while len(output):
@@ -297,20 +305,24 @@ class Loop:
             chunk = output[:frames]
             a = self.tracks[0][cursor:cursor + frames]
             selected = self.selected
+            gain_a = self.gains[0] if match else 1.
             if len(self.tracks) == 1:
-                chunk[:] = a
+                np.multiply(a, gain_a, out=chunk)
             else:
                 b = self.tracks[1][cursor:cursor + frames]
+                gain_b = self.gains[1] if match else 1.
                 if self.weight == selected:
-                    chunk[:] = b if selected else a
+                    np.multiply(b if selected else a, gain_b if selected else gain_a, out=chunk)
                     self.current = selected
                 else:
                     start = self.weight
                     delta = (1 if selected else -1) / self.crossfade
                     split = min(frames, len(self.progress))
                     levels = np.clip(start + self.progress[:split] * delta, 0, 1)[:, None]
-                    chunk[:split] = a[:split] + (b[:split] - a[:split]) * levels
-                    chunk[split:] = b[split:] if selected else a[split:]
+                    start_track = a[:split] * gain_a
+                    chunk[:split] = start_track + (b[:split] * gain_b - start_track) * levels
+                    np.multiply(b[split:] if selected else a[split:], gain_b if selected else gain_a,
+                                out=chunk[split:])
                     self.weight = float(levels[-1, 0])
                     if self.weight == selected:
                         self.current = selected
@@ -326,8 +338,10 @@ class Player:
         self.stream = self.loop = None
         self.failures = 0
         self.device = None
+        self.gain = 1.
+        self.match = True
 
-    def open(self, tracks, selected):
+    def open(self, tracks, selected, *, gains=None):
         self.close()
         os.environ["SD_ENABLE_ASIO"] = "1"
         import sounddevice as sd
@@ -337,13 +351,14 @@ class Player:
             raise RuntimeError("Choose a Windows playback device, then try the comparison again.")
         index = host["default_output_device"]
         self.device = sd.query_devices(index)["name"]
-        loop = Loop(tracks, selected)
+        loop = Loop(tracks, selected, gains=gains)
         self.failures = 0
 
         def callback(out, _, timing, status):
             if status.output_underflow:
                 self.failures += 1
-            loop.process(out)
+            loop.process(out, match=self.match)
+            out *= self.gain
 
         stream = sd.OutputStream(device=index, channels=2, samplerate=audio.RATE, dtype="float32", latency="low",
                                  callback=callback, extra_settings=sd.WasapiSettings(auto_convert=True))

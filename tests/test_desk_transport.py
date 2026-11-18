@@ -18,10 +18,16 @@ class DeskTransportTest(unittest.TestCase):
         desk.stop_signal = Event()
         desk.side = "b"
         desk.active_side = "b" if running else None
+        desk.active_revision = None
+        desk.tone_revisions = {"a": 0, "b": 1}
+        desk.tone_revision = 1
+        desk.confirmed_tones = {}
+        desk.tone_requests = {}
         desk.shapes = {"a": {"warmth": .2}, "b": {"drive": .5}}
         default = SavedPreset("Clean", "My Presets", "/media/p4/Presets/My Presets", 5)
         desk.tone_a = Tone.from_preset(default, "A")
         desk.tone_b = None
+        desk.baseline = desk.alternative = None
         desk.take = SimpleNamespace(folder=Path("a-take"))
         desk.qc_name = "Clean"
         desk.input_channel = 1
@@ -30,12 +36,16 @@ class DeskTransportTest(unittest.TestCase):
         desk.base_bypassed = False
         desk.control_mail = Queue()
         desk.monitor_controls = {}
+        desk.level_feedback = {}
         desk.root = Mock()
         desk.output = Mock()
         desk.update = Mock()
         desk.submit = Mock()
         desk.remember = Mock()
         desk.set_status = Mock()
+        desk.send_levels = Mock()
+        desk.stop_audio = Mock()
+        desk.resolve_audio = Mock()
         return desk
 
     def test_selecting_a_tone_without_playback_does_not_start_input(self):
@@ -75,6 +85,35 @@ class DeskTransportTest(unittest.TestCase):
         desk.monitor_event({"event": "tone", "tone_id": "a", "name": "Clean"})
         self.assertEqual(desk.available, {"warmth"})
         desk.output.set.assert_called_with("Phrase → A · Clean · Quad Cortex")
+
+    def test_new_chat_draft_enters_b_without_restarting_the_phrase(self):
+        desk = self.desk()
+        desk.side = "a"
+        draft = {"id": "new-recipe", "name": "Bright Lead", "target": "Lead"}
+        desk.intent = "refine"
+        desk.drafts = {}
+        a = desk.tone_a
+        desk.answered(draft)
+        update = desk.control_mail.get_nowait()
+        self.assertEqual(update["event"], "tone")
+        self.assertEqual(update["config"]["take"], str(desk.take.folder))
+        self.assertEqual(update["config"]["draft"], draft)
+        self.assertEqual(desk.tone_a, a)
+        self.assertEqual(desk.shapes["a"], {"warmth": .2})
+        self.assertTrue(desk.control_mail.empty())
+
+    def test_rejected_new_b_restores_the_previous_b_title_and_shape(self):
+        desk = self.desk()
+        old_tone = Tone.from_preset(SavedPreset("Old", "My Presets", "/media/p4/Presets/My Presets", 7))
+        desk.tone_b = old_tone
+        desk.confirmed_tones = {"b": desk.tone_snapshot("b")}
+        new_tone = Tone.from_preset(SavedPreset("New", "My Presets", "/media/p4/Presets/My Presets", 8))
+        desk.set_tone(new_tone)
+        desk.monitor_event({"event": "tone", "tone_id": "b", "tone_revision": 1,
+                            "requested_revision": 2, "name": "Old", "reason": "Could not load New."})
+        self.assertEqual(desk.tone_b, old_tone)
+        self.assertEqual(desk.shapes["b"], {"drive": .5})
+        desk.set_status.assert_called_with("Could not load New.")
 
 
 if __name__ == "__main__":

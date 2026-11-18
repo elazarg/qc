@@ -5,7 +5,8 @@ from pathlib import Path
 from queue import Empty
 import time
 
-from . import audio, device, diagnostics, draft_render, guitar_runtime, iterate, live, preset_design, presets, qc_library, session, styles
+from . import (audio, device, diagnostics, draft_render, guitar_runtime, iterate, live, live_levels,
+               preset_design, presets, qc_library, session, styles)
 
 
 @contextmanager
@@ -26,6 +27,7 @@ def grid(qc, config, events, visited=()):
         with draft_render.working_grid(qc) as scratch:
             draft_render.build_grid(qc, scratch, chain, draft=draft)
             scene = device.active_scene(qc)
+            draft_render.label_preview(qc, scene, draft)
             yield device.read_preset(qc), scene, fixture, draft_render.guitar_routes(physical_input), physical_input
         return
 
@@ -97,7 +99,17 @@ def switch_source(qc, position, physical_routes, physical_input, message, stream
                 raise ValueError("Choose or record a dry phrase first.")
             _, _, dry, _ = iterate.take_audio(Path(message["take"]))
             set_input_routes(qc, position, routes)
-            stream, meters = stream_stack.enter_context(audio.loop_feed(dry, transport=message.get("transport")))
+            transport = message.get("transport")
+            audition = None
+            if message.get("measure_return"):
+                try:
+                    channels = device.recording_channels_from(qc, physical_input)[1:]
+                    audition = stream_stack.enter_context(audio.loop_feed(
+                        dry, monitor_return=True, return_channels=channels, transport=transport))
+                except Exception as error:
+                    diagnostics.LOG.info("The Phrase return could not be monitored for loudness: %s", error)
+            stream, meters = (audition if audition is not None else
+                              stream_stack.enter_context(audio.loop_feed(dry, transport=transport)))
         else:
             set_input_routes(qc, position, routes)
             stream, meters = None, {}
@@ -234,7 +246,10 @@ def run(config, stop, commands, events):
             anchor = observer = armed_until = resident = None
             warm_available = True
             active_source = active_take = phrase_take = None
+            level_config = config.get("level")
+            level_take = (level_config or {}).get("take", current.get("take"))
             cursor = audio.PhraseCursor()
+            levels = live_levels.Levels(level_config, firmware=getattr(qc, "firmware", None))
 
             def report(event):
                 nonlocal anchor
@@ -245,10 +260,12 @@ def run(config, stop, commands, events):
                     anchor = before
                 events(event)
 
-            def announce(reason=None):
+            def announce(reason=None, requested_revision=None):
                 tone_id = current.get("tone_id")
-                events({"event": "controls", "available": available, "tone_id": tone_id})
-                events({"event": "tone", "tone_id": tone_id, "name": current.get("name"), "reason": reason})
+                revision = current.get("tone_revision")
+                events({"event": "controls", "available": available, "tone_id": tone_id, "tone_revision": revision})
+                events({"event": "tone", "tone_id": tone_id, "name": current.get("name"), "reason": reason,
+                        "tone_revision": revision, "requested_revision": requested_revision})
 
             def close_tone():
                 nonlocal resident
@@ -281,21 +298,39 @@ def run(config, stop, commands, events):
             if stop.is_set():
                 return {}
             settings = dict(current.get("values", {}))
+
+            def check_active():
+                if device.live_position(qc) != position or device.active_scene(qc) != scene:
+                    raise RuntimeError("The Quad Cortex preset or scene changed during Shape.")
+
+            def adjust_level(*, bind=False):
+                cursor.level_probe = None
+                if bind:
+                    levels.bind(base, scene, physical_routes)
+                levels.select(current, settings, level_take)
+                levels.apply(qc, check_active, events)
+
             previous = live.update(qc, base, scene, settings, {}, position=position)
+            adjust_level(bind=True)
             announce()
 
             def change_input(message):
-                nonlocal observer, armed_until, active_source, active_take, phrase_take, cursor
+                nonlocal observer, armed_until, active_source, active_take, phrase_take, cursor, level_take
                 new_take = message.get("take") if message["mode"] == "phrase" else None
                 if message["mode"] == "phrase" and new_take != phrase_take:
                     cursor = audio.PhraseCursor()
                     phrase_take = new_take
+                cursor.level_probe = None
+                level_take = message.get("take", level_take)
                 old_observer, observer = observer, None
                 stream, meters = switch_source(qc, position, physical_routes, physical_input,
-                                               {**message, "transport": cursor}, stream_stack, events)
+                                               {**message, "transport": cursor, "measure_return": levels.enabled},
+                                               stream_stack, events)
                 active_source, active_take = ("phrase", new_take) if stream is not None else ("guitar", None)
+                levels.return_unavailable = active_source == "phrase" and not cursor.returns
+                adjust_level()
                 diagnostics.LOG.info("Shape using %s on scene %s of %s",
-                                     active_source.title(), device.SCENES[scene], base.name)
+                                     active_source.title(), device.SCENES[scene], current.get("name") or base.name)
                 if guitar_config and not stop.is_set():
                     if stream is None:
                         observer, armed_until = attach_observer(qc, physical_input, guitar_config,
@@ -307,10 +342,6 @@ def run(config, stop, commands, events):
                         events({"event": "guitar-status", "text": "Dry guitar observation pauses in Phrase mode."})
                 return stream, meters
 
-            def check_active():
-                if device.live_position(qc) != position or device.active_scene(qc) != scene:
-                    raise RuntimeError("The Quad Cortex preset or scene changed during Shape.")
-
             def retune(pick):
                 nonlocal current, base, scene, position, physical_routes, physical_input, available
                 nonlocal settings, previous, observer, armed_until
@@ -319,14 +350,17 @@ def run(config, stop, commands, events):
                 if same_working_grid(current, pick):
                     previous = live.update(qc, base, scene, target_values, previous, position=position)
                     settings, current = target_values, pick
+                    adjust_level()
                     announce()
                     return
 
                 old_input = physical_input
                 # Keep ASIO running and advance through the same performance while the
                 # unit recalls another chain. Silence the transient recall/routing gap.
+                cursor.level_probe = None
                 cursor.muted = True
                 reason = None
+                requested_revision = pick.get("tone_revision")
 
                 def load(candidate, values):
                     loaded, controls = open_tone(candidate, active_source)
@@ -357,8 +391,9 @@ def run(config, stop, commands, events):
                     observer, armed_until = attach_observer(qc, physical_input, guitar_config,
                                                            stream_stack, events, armed_until)
                 settings, current = target_values, pick
+                adjust_level(bind=True)
                 cursor.muted = False
-                announce(reason)
+                announce(reason, requested_revision if reason else None)
 
             stream, meters = change_input(config)
             checked, frames = time.monotonic(), -1
@@ -366,6 +401,10 @@ def run(config, stop, commands, events):
                 pending = drain(commands)
                 if stop.is_set():
                     break
+                if volume := pending.get("level"):
+                    levels.configure(volume)
+                    if active_source == "guitar":
+                        level_take = volume.get("take", level_take)
                 if pending_tone := pending.get("tone"):
                     retune(pending_tone["config"])
                     if stop.is_set():
@@ -386,6 +425,9 @@ def run(config, stop, commands, events):
                                 "reason": "This tone has no writable controls for those settings."
                                 if any(next_settings.values()) and not previous else None})
                     settings = next_settings
+                    adjust_level()
+                elif volume:
+                    adjust_level()
                 now = time.monotonic()
                 if observer is not None:
                     if observer.allow_changes and armed_until is not None and now >= armed_until:
@@ -395,6 +437,7 @@ def run(config, stop, commands, events):
                     if proposed != settings:
                         previous = live.update(qc, base, scene, proposed, previous, position=position)
                         settings = proposed
+                        adjust_level()
                     if outcome is not None:
                         outcome["tone_id"] = tone_id
                         events(outcome)
@@ -403,6 +446,8 @@ def run(config, stop, commands, events):
                     if stream is not None and (not stream.active or frames == meters["frames"]):
                         raise RuntimeError("The Quad Cortex loop stopped responding.")
                     frames = meters.get("frames", -1)
+                    if active_source == "phrase" and levels.observe(cursor, meters):
+                        levels.apply(qc, check_active, events)
                     events({"event": "heartbeat", "audio": dict(meters)})
                     checked = now
             return dict(meters)

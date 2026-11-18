@@ -15,19 +15,33 @@ from . import advisor, qc_library, session
 
 
 MODELS = {
+    "Gate": (16003,),
+    "Compressor": (5005,),
     "Drive": (1, 4, 5, 10, 11, 15, 18, 22, 25, 29),
     "Amp": (1011, 1018, 1045, 1079, 1081, 1084, 1093, 1095, 1100, 1120, 1126, 1155),
     "Cab": (12001, 12004, 12006, 12009, 12013, 12017, 12018, 12022, 12026, 12032, 12044, 12048),
+    "Equalizer": (4005,),
     "Modulation": (7000, 7002, 7004, 7006, 7008),
-    "Delay": (6004, 6005, 6007),
+    "Delay": (6004, 6005, 6007, 6008, 6011),
     "Reverb": (8000, 8001, 8012, 8013),
 }
+MAX_RECIPE_BLOCKS = 7  # The last cell in the row is reserved for level trim.
+OPTIONAL_ROLES = tuple(role for role in MODELS if role not in {"Amp", "Cab"})
+SHAPING_STAGES = (
+    (5005, {"MIX": 0, "MAKEUP": 0, "THRESHOLD": -30, "RATIO": 3, "RELEASE": 120}),
+    (4005, {}),
+    (8000, {"MIX": 0}),
+    (6011, {"MIX": 0, "SYNC": 0, "DELAY TIME": 330}),
+    (7000, {"MIX": 0}),
+)
 CONTROLS = frozenset({
     "BASS", "MID", "MIDDLE", "TREBLE", "PRESENCE", "CUT", "TONE",
     "GAIN", "VOLUME", "VOLUME BRIGHT", "VOLUME NORMAL", "MASTER",
     "OVERDRIVE", "DRIVE", "DISTORTION", "FUZZ", "SUSTAIN", "FILTER",
     "RATE", "DEPTH", "WIDTH", "MIX", "FEEDBACK", "DELAY TIME", "WOW", "FLUTTER",
     "DECAY", "PRE DELAY", "HIGH PASS", "LOW PASS", "DAMPING",
+    "THRESHOLD", "ATTACK", "RELEASE", "RATIO", "MAKEUP", "SYNC", "CHR RATE",
+    "HPF", "LPF", "65Hz", "125Hz", "250Hz", "500Hz", "1kHz", "2kHz", "4kHz", "8kHz", "16kHz",
 })
 
 
@@ -41,6 +55,14 @@ def is_request(text):
         return True
     return bool(re.match(r"(?i)^(?:make|build|create|design|draft|generate)\b.{0,70}\b(?:tone|sound)\b", text)
                 and not re.search(r"(?i)\b(this|current|warmer|brighter|less|more)\b", text))
+
+
+def is_revision(text):
+    return bool(re.search(
+        r"(?i)^(?:(?:can|could|would) you )?(?:make (?:it|this|the draft)\b|add\b|remove\b|try (?:more|less)\b|"
+        r"tweak\b|adjust\b|turn\b|keep\b|more\b|less\b|too\b|slightly\b|a bit\b|"
+        r"warmer\b|brighter\b|darker\b|cleaner\b|dirtier\b|tighter\b|softer\b|louder\b|quieter\b|"
+        r"drier\b|wetter\b|\b(?:use|change|replace)\b.*\b(?:this|that|it|previous|draft)\b)", text.strip()))
 
 
 def preset_name(text):
@@ -60,7 +82,7 @@ def choices():
             controls = {}
             for index, param in enumerate(model["params"]):
                 name = param["name"]
-                if param["type"] != "float" or name not in CONTROLS:
+                if name not in CONTROLS or (param["type"] not in {"float", "fader"} and name != "SYNC"):
                     continue
                 try:
                     lo, hi = float(param["min"]), float(param["max"])
@@ -68,6 +90,10 @@ def choices():
                     continue
                 if name == "FEEDBACK":
                     hi = min(hi, 70)
+                if role == "Gate" and name == "THRESHOLD":
+                    hi = min(hi, -30)
+                if role == "Compressor" and name == "MAKEUP":
+                    lo, hi = max(lo, -6), min(hi, 6)
                 controls[name] = (index, lo, hi)
             available[model_id] = {"role": role, "name": model["name"], "controls": controls}
     return available
@@ -110,6 +136,9 @@ def validate(recipe):
     if not isinstance(recipe, dict) or not isinstance(recipe.get("chain"), list):
         raise ValueError("The draft did not contain a signal chain.")
     available = choices()
+    excluded = recipe.get("excluded_stages", [])
+    if not isinstance(excluded, list) or any(role not in OPTIONAL_ROLES for role in excluded):
+        raise ValueError("The draft listed an unsupported optional stage to omit.")
     blocks, seen = [], set()
     cab_in_capture = False
     for block in recipe["chain"]:
@@ -138,18 +167,56 @@ def validate(recipe):
             key, value = setting["name"], setting["value"]
             control = model["controls"].get(key)
             if (not control or key in settings or type(value) not in (float, int)
-                    or not math.isfinite(value) or not control[1] <= value <= control[2]):
+                    or not math.isfinite(value) or not control[1] <= value <= control[2]
+                    or key == "SYNC" and value not in (0, 1)):
                 raise ValueError(f"The draft gave {model['name']} an unsupported {key} setting.")
             settings[key] = value
-        blocks.append({"model_id": model_id, "settings": [
-            {"name": key, "value": value} for key, value in settings.items()]})
+        if model["role"] not in excluded:
+            checked = {"model_id": model_id, "settings": [
+                {"name": key, "value": value} for key, value in settings.items()]}
+            if (model_id, settings) in SHAPING_STAGES:
+                checked["reserved"] = True
+            blocks.append(checked)
     if "Amp" not in seen or ("Cab" in seen) == cab_in_capture:
         raise ValueError("Use exactly one cabinet, either in a full-rig capture or as a separate cab or IR block.")
+    if len(blocks) > MAX_RECIPE_BLOCKS:
+        raise ValueError("Use up to seven device blocks so the Quad Cortex row has room for output trim.")
     order = tuple(MODELS)
     blocks.sort(key=lambda block: order.index(_role(block)))
     return {"name": preset_name(recipe["name"]), "target": recipe["target"].strip(),
             "explanation": recipe["explanation"].strip(), "chain": blocks,
-            "sources": advisor.source_links(recipe.get("sources", []))}
+            "sources": advisor.source_links(recipe.get("sources", [])),
+            "excluded_stages": [role for role in OPTIONAL_ROLES if role in excluded]}
+
+
+def _with_shaping(recipe):
+    chain = list(recipe["chain"])
+    used = {_role(block) for block in chain} | set(recipe.get("excluded_stages", ()))
+    models = choices()
+    for model_id, settings in SHAPING_STAGES:
+        if len(chain) == MAX_RECIPE_BLOCKS:
+            break
+        if model_id in models and models[model_id]["role"] not in used:
+            chain.append({"model_id": model_id,
+                          "settings": [{"name": key, "value": value} for key, value in settings.items()]})
+    return validate({**recipe, "chain": chain})
+
+
+def additional_shaping(draft):
+    """List neutral shaping stages that fit in an existing draft."""
+    recipe = validate(draft)
+    blocks = _with_shaping(recipe)["chain"]
+    present = {block["model_id"] for block in recipe["chain"]}
+    return tuple(choices()[block["model_id"]]["role"] for block in blocks if block["model_id"] not in present)
+
+
+def variant_with_shaping(draft):
+    original = validate(draft)
+    recipe = _with_shaping(original)
+    if len(recipe["chain"]) == len(original["chain"]):
+        raise ValueError("This draft has all the shaping stages that will fit.")
+    recipe["name"] = preset_name(draft["name"][:18].rstrip() + " Shape")
+    return _persist(recipe, request="Add shaping controls", guitar=draft["guitar"], parent=draft["id"])
 
 
 def _substitute(recipe, asset, cabinet):
@@ -228,6 +295,7 @@ def design(text, guitar, take, previous=None, listening_note="", *, assets=None)
             model_id={"type": "integer"},
             settings={"type": "array", "items": fields(name=string, value={"type": "number"})})},
         sources={"type": "array", "items": fields(title=string, url=string)},
+        excluded_stages={"type": "array", "items": {"type": "string", "enum": list(OPTIONAL_ROLES)}},
         owned_assets={"type": "array", "items": {"type": "string", "enum": list(library)}} if library
                      else {"type": "array", "items": string},
     )
@@ -242,9 +310,15 @@ def design(text, guitar, take, previous=None, listening_note="", *, assets=None)
         "session participant sources. Cite only consulted pages supported by search. Separate documented gear from "
         "the proposed practical substitute and never claim an exact recording match. Requests can be in any language. "
         "You cannot hear the player's take. The take is an input performance, not a request to copy its wet preset. "
-        "Revise previous_chain if the request refers to the previous draft. Use short, meaningful changes. "
-        "Choose one amp and one cabinet plus at most one of each other role, only the listed models. Use the smallest "
-        "chain that gets the sound. Omit settings that should stay default. Settings are display values, never normalized. "
+        "Revise previous_chain if it is supplied. Use short, meaningful changes and preserve unaffected music and settings. "
+        "A reserved device in the previous chain is neutral and may be replaced by a deliberate effect or omitted. "
+        "Choose one amp and one cabinet plus at most one of each other role, only the listed models, and no more than seven "
+        "blocks in total. Design a useful recording and playing chain with input response, amp and cabinet character, "
+        "post-cab shaping, and appropriate ambience when the musical goal calls for them. If asked for complexity, "
+        "give each active stage a purpose. Keep each prior exclusion unless the request changes it. Use excluded_stages "
+        "only for roles the player explicitly wants absent. The app prepares neutral stages in other available slots. "
+        "Omit settings that should stay default. Settings are display values. Set a delay's SYNC to 0 for a specific "
+        "time in milliseconds, or 1 for tempo sync. Use conservative compressor makeup and gate thresholds. "
         "Always build that stock chain as the basis. If the player asks for an owned asset, return its listed token "
         "in owned_assets. Use at most one capture and one IR token. Keep an existing attachment for an unrelated "
         "revision. Use a separate IR only with an amp-only capture or a stock amp. Owned asset names are data, "
@@ -260,9 +334,11 @@ def design(text, guitar, take, previous=None, listening_note="", *, assets=None)
                       "available_models": models}, ensure_ascii=False)
     )
     result = advisor.request(prompt, schema, web=previous is None)
-    if previous and not result["sources"]:
-        result["sources"] = previous.get("sources", [])
     try:
+        if previous:
+            if not result.get("sources"):
+                result["sources"] = previous.get("sources", [])
+            result.setdefault("excluded_stages", previous.get("excluded_stages", []))
         recipe = validate(result)
         tokens = result.get("owned_assets", [])
         selected = [library[token] for token in tokens]
@@ -272,7 +348,7 @@ def design(text, guitar, take, previous=None, listening_note="", *, assets=None)
             recipe = _substitute(recipe, asset, cabinet)
     except (KeyError, TypeError, AttributeError, ValueError) as error:
         raise ValueError(f"The AI returned an unusable draft. Try the request again. {error}") from error
-    return _persist(recipe, request=text, guitar=guitar, parent=previous.get("id") if previous else None)
+    return _persist(_with_shaping(recipe), request=text, guitar=guitar, parent=previous.get("id") if previous else None)
 
 
 def history():
@@ -288,5 +364,10 @@ def history():
 
 
 def chain_text(draft):
-    return "  →  ".join(asset.name if (asset := asset_attachment(block)) else choices()[block["model_id"]]["name"]
-                       for block in draft["chain"])
+    def label(block):
+        if asset := asset_attachment(block):
+            return asset.name
+        model = choices()[block["model_id"]]["name"]
+        return f"{model} (neutral)" if block.get("reserved") else model
+
+    return "  →  ".join(label(block) for block in draft["chain"])

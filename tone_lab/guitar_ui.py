@@ -10,14 +10,19 @@ import tkinter as tk
 from tkinter import filedialog, ttk
 
 from . import audio, diagnostics, session, styles
-from .widgets import ACCENT, BG, FONT, LINE, MUTED, PANEL, RECESS, TEXT, add_scrollbar, button, card, entry, label
+from .widgets import ACCENT, BG, FONT, INK, LINE, MUTED, PANEL, RECESS, TEXT, add_scrollbar, button, card, entry, label
 
 
-CONTROLS = {"Pickup selector": "pickup", "Tone knob": "tone", "Volume knob": "volume"}
+CONTROLS = {"Pickup selector": "pickup", "Volume knob": "volume", "Tone knob": "tone"}
 SETTINGS = {
     "pickup": ("Neck", "Bridge", "Middle"),
     "tone": ("Tone 10", "Tone 0", "Tone 5"),
     "volume": ("Volume 10", "Volume 5", "Volume 2"),
+}
+CALIBRATION_HINTS = {
+    "pickup": "Move the selector. Keep both knobs and your picking position fixed.",
+    "volume": "Turn the volume knob. Keep pickup, tone, Quad Cortex input gain and picking strength fixed.",
+    "tone": "Turn the tone knob. Keep pickup, volume and your picking position fixed.",
 }
 NO_RECORDING = object()
 
@@ -38,6 +43,13 @@ def example_counts(examples):
     return counts
 
 
+def estimate_label(state, score):
+    if not state:
+        return "Uncertain"
+    match = "strong match" if score >= .8 else "good match" if score >= .55 else "tentative match"
+    return f"{state} · {match}"
+
+
 class GuitarInputPanel:
     def __init__(self, review, parent, worker, *, live_observer=True):
         self.review, self.root, self.worker = review, review.root, worker
@@ -50,20 +62,25 @@ class GuitarInputPanel:
         self.latest_dry = None
         self.example_source = None
         self.recording_before = NO_RECORDING
+        self.recording_kind = None
+        self.recording_setting = None
         self.examples_changed = False
         self.result_audio = None
         self.result_intervals = []
         self.loaded_selection = None
-        self.instrument = tk.StringVar(value=session.GUITARS[0])
+        self.desk_guitar = getattr(review, "guitar", None)
+        self.last_desk_guitar = self.desk_guitar.get() if self.desk_guitar else session.GUITARS[0]
+        self.instrument = tk.StringVar(value=self.last_desk_guitar)
         self.control = tk.StringVar(value=next(iter(CONTROLS)))
         self.example_label = tk.StringVar()
         self.start_seconds, self.end_seconds = tk.StringVar(), tk.StringVar()
         self.profile_text = tk.StringVar()
         self.latest_text, self.source_text = tk.StringVar(), tk.StringVar()
         self.progress_text, self.next_step = tk.StringVar(), tk.StringVar()
+        self.control_hint = tk.StringVar()
         self.status = tk.StringVar()
         self.estimate_text = tk.StringVar()
-        self.live_text = tk.StringVar(value="Live input is off.")
+        self.live_text = tk.StringVar(value="Live estimate is off.")
         self.live_action = tk.StringVar()
         self.observe, self.arm = tk.BooleanVar(), tk.BooleanVar()
         self.home, self.excursion, self.knob = tk.StringVar(), tk.StringVar(), tk.StringVar()
@@ -79,43 +96,46 @@ class GuitarInputPanel:
         body.bind("<Configure>", lambda _: self.scroller.configure(scrollregion=self.scroller.bbox("all")))
         self.scroller.bind("<Configure>", lambda event: self.scroller.itemconfigure(frame, width=event.width))
 
-        header = card(body)
-        header.pack(fill="x", pady=(0, 10))
-        label(header, "Guitar input · experimental", size=16, strong=True).pack(anchor="w")
-        label(header, "Teach Tone Lab how this guitar sounds at different settings.", color=MUTED,
-              wrap=550).pack(anchor="w", pady=(4, 9))
+        header = card(body, padding=12)
+        header.pack(fill="x", pady=(0, 8))
         choice = self.row(header)
         self.instrument_box = self.combo(choice, "Instrument", self.instrument, self.instruments(), width=18, editable=True)
-        self.control_box = self.combo(choice, "Control to teach", self.control, tuple(CONTROLS), width=16)
+        controls = self.field_cell(choice, "Control to learn")
+        self.control_buttons = {}
+        for title, key in CONTROLS.items():
+            self.control_buttons[title] = button(controls, title, lambda value=key: self.choose_control(value), compact=True)
+            self.control_buttons[title].pack(side="left", padx=(0, 4))
         self.instrument_box.bind("<<ComboboxSelected>>", lambda _: self.load_selection())
         self.instrument_box.bind("<Return>", lambda _: self.load_selection())
         self.instrument_box.bind("<FocusOut>", lambda _: self.load_selection())
-        self.control_box.bind("<<ComboboxSelected>>", lambda _: self.load_selection())
 
-        training = self.section(body, "Teach one setting at a time")
-        label(training, "Set the guitar, then play three sustained single notes. Use the same strings, frets, and picking "
-              "for every example and keep the other guitar controls fixed.", color=MUTED, wrap=530).pack(anchor="w", pady=(4, 8))
-        actions = self.row(training)
+        workspace = tk.Frame(body, background=BG)
+        workspace.pack(fill="x")
+        workspace.columnconfigure((0, 1), weight=1, uniform="guitar-calibration")
+        training = self.section(workspace, "Teach two settings")
+        training.grid(row=0, column=0, sticky="nsew", padx=(0, 4), pady=(0, 8))
+        label(training, variable=self.control_hint, color=MUTED, wrap=375).pack(anchor="w", pady=(4, 0))
+        label(training, "Repeat the same three sustained single notes at each setting.", color=MUTED,
+              wrap=375).pack(anchor="w", pady=(2, 0))
+        actions = self.row(training, 8)
+        self.label_box = self.combo(actions, "Setting on guitar", self.example_label, (), width=18, editable=True)
         self.record = button(actions, "Record example", self.record_example, accent=True, compact=True)
-        self.use_latest = button(actions, "Use latest take", self.select_latest, compact=True)
-        for widget in (self.record, self.use_latest):
-            widget.pack(side="left", padx=(0, 6))
-        label(training, variable=self.latest_text, color=MUTED, size=9, wrap=530).pack(anchor="w", pady=(4, 0))
-        label(training, variable=self.source_text, color=ACCENT, wrap=530).pack(anchor="w", pady=(9, 0))
-        fields = self.row(training, 4)
-        self.label_box = self.combo(fields, "Setting played", self.example_label, (), width=19, editable=True)
-        self.label_box.bind("<Return>", lambda _: self.add_example())
-        self.add_take = button(fields, "Save example", self.add_example, compact=True)
-        self.add_take.pack(side="left", anchor="s", pady=1)
-        label(training, variable=self.progress_text, strong=True, wrap=530).pack(anchor="w", pady=(12, 0))
-        label(training, variable=self.next_step, color=MUTED, wrap=530).pack(anchor="w", pady=(3, 0))
-        self.train = button(training, "Train profile", self.train_profile, accent=True, compact=True)
-        self.train.pack(anchor="w", pady=(6, 0))
-        label(training, variable=self.profile_text, color=ACCENT, wrap=530).pack(anchor="w", pady=(5, 0))
+        self.record.pack(side="left", anchor="s", padx=(0, 6))
+        self.train = button(actions, "Learn settings", self.train_profile, compact=True)
+        self.train.pack(side="left", anchor="s")
+        label(training, variable=self.progress_text, strong=True, wrap=375).pack(anchor="w", pady=(9, 0))
+        label(training, variable=self.next_step, color=MUTED, wrap=375).pack(anchor="w", pady=(3, 0))
+        label(training, variable=self.source_text, color=ACCENT, wrap=375).pack(anchor="w", pady=(3, 0))
+        label(training, variable=self.profile_text, color=ACCENT, wrap=375).pack(anchor="w", pady=(5, 0))
 
         example_tools = self.disclosure(training, "Example library and clip ranges")
-        self.add_wav = button(example_tools, "Choose a dry WAV…", self.select_wav, compact=True)
-        self.add_wav.pack(anchor="w", pady=(5, 2))
+        actions = self.row(example_tools, 4)
+        self.use_latest = button(actions, "Use latest take", self.select_latest, compact=True)
+        self.add_wav = button(actions, "Choose a dry WAV…", self.select_wav, compact=True)
+        self.add_take = button(actions, "Save labeled example", self.add_example, compact=True)
+        for widget in (self.use_latest, self.add_wav, self.add_take):
+            widget.pack(side="left", padx=(0, 6))
+        label(example_tools, variable=self.latest_text, color=MUTED, size=9, wrap=375).pack(anchor="w", pady=(4, 0))
         fields = self.row(example_tools, 4)
         self.field(fields, "Start (s, optional)", self.start_seconds, width=10)
         self.field(fields, "End (s, optional)", self.end_seconds, width=10)
@@ -126,26 +146,34 @@ class GuitarInputPanel:
         self.remove = button(example_tools, "Remove selected example", self.remove_example, compact=True)
         self.remove.pack(anchor="e")
 
-        analysis = self.section(body, "Check a fresh take")
+        analysis = self.section(workspace, "Check what Tone Lab hears")
+        analysis.grid(row=0, column=1, sticky="nsew", padx=(4, 0), pady=(0, 8))
         actions = self.row(analysis, 8)
+        self.record_test = button(actions, "Record a fresh check", self.record_check, accent=True, compact=True)
         self.inspect_take = button(actions, "Check latest dry take", lambda: self.inspect(current=True), compact=True)
-        self.inspect_wav = button(actions, "Choose a dry WAV…", self.inspect, compact=True)
-        self.audition = button(actions, "Hear selection", self.listen, compact=True)
-        for widget in (self.inspect_take, self.inspect_wav, self.audition):
+        for widget in (self.record_test, self.inspect_take):
             widget.pack(side="left", padx=(0, 5))
-        label(analysis, variable=self.estimate_text, color=MUTED, wrap=550).pack(anchor="w", pady=(8, 4))
-        self.timeline = self.listbox(analysis, height=5)
+        label(analysis, variable=self.estimate_text, color=MUTED, wrap=375).pack(anchor="w", pady=(8, 4))
+        label(analysis, "Estimates apply to the settings and notes you taught.", color=MUTED, size=9,
+              wrap=375).pack(anchor="w", pady=(0, 4))
+        self.observe_box = self.check(analysis, "Show estimate while playing guitar", self.observe, self.change_observe)
+        if live_observer:
+            label(analysis, variable=self.live_text, color=MUTED, wrap=375).pack(anchor="w", pady=(4, 0))
+            label(analysis, variable=self.live_action, color=ACCENT, wrap=375).pack(anchor="w")
+        else:
+            self.observe_box.pack_forget()
+        details = self.disclosure(analysis, "Dry audio and estimate timeline")
+        actions = self.row(details, 5)
+        self.inspect_wav = button(actions, "Check a dry WAV…", self.inspect, compact=True)
+        self.audition = button(actions, "Hear selection", self.listen, compact=True)
+        for widget in (self.inspect_wav, self.audition):
+            widget.pack(side="left", padx=(0, 5))
+        self.timeline = self.listbox(details, height=5)
         self.timeline.pack(fill="x")
 
         live = card(body)
         live.pack(fill="x", pady=(0, 10))
-        gestures = self.disclosure(live, "Live observation and gesture mapping" if live_observer else "Gesture mapping")
-        self.observe_box = self.check(gestures, "Observe during Live guitar", self.observe, self.change_observe)
-        if live_observer:
-            label(gestures, variable=self.live_text, color=MUTED, wrap=550).pack(anchor="w", pady=(4, 0))
-            label(gestures, variable=self.live_action, color=ACCENT, wrap=550).pack(anchor="w")
-        else:
-            self.observe_box.pack_forget()
+        gestures = self.disclosure(live, "Gesture mapping")
         label(gestures, "Map a return gesture", strong=True).pack(anchor="w", pady=(8, 0))
         label(gestures, "Pick a starting state and an excursion. A deliberate move away and back can nudge one tone control.",
               color=MUTED, wrap=550).pack(anchor="w", pady=(4, 8))
@@ -165,7 +193,7 @@ class GuitarInputPanel:
             label(gestures, "Check a recorded take to rehearse the mapped gesture.",
                   color=MUTED, size=9, wrap=520).pack(anchor="w", pady=(1, 5))
         self.scroller.bind("<MouseWheel>", self.scroll)
-        for panel in (header, training, example_tools, live, gestures, analysis):
+        for panel in (header, training, example_tools, live, gestures, analysis, details):
             for item in panel.winfo_children():
                 if isinstance(item, (tk.Frame, tk.Label)):
                     item.bind("<MouseWheel>", self.scroll)
@@ -190,8 +218,7 @@ class GuitarInputPanel:
         return names
 
     def section(self, body, title):
-        panel = card(body)
-        panel.pack(fill="x", pady=(0, 10))
+        panel = card(body, padding=12)
         label(panel, title, size=13, strong=True).pack(anchor="w")
         return panel
 
@@ -258,6 +285,25 @@ class GuitarInputPanel:
             raise ValueError("Enter a name for this guitar.")
         return instrument, control, profile_folder(instrument)
 
+    def follow_desk_guitar(self):
+        if not self.desk_guitar or self.live_running or self.future is not None or self.review.recorder.stop is not None:
+            return
+        selected = self.desk_guitar.get()
+        if not selected or selected == self.last_desk_guitar:
+            return
+        self.last_desk_guitar = selected
+        self.instrument.set(selected)
+        self.load_selection()
+
+    def choose_control(self, control):
+        if self.live_running or self.future is not None or self.review.recorder.stop is not None:
+            return
+        for title, key in CONTROLS.items():
+            if control in (key, title):
+                self.control.set(title)
+                self.load_selection()
+                return
+
     def load_selection(self):
         if self.live_running:
             return
@@ -272,7 +318,7 @@ class GuitarInputPanel:
         self.loaded_selection = selected
         self.observe.set(False)
         self.arm.set(False)
-        self.live_text.set("Live input is off.")
+        self.live_text.set("Live estimate is off.")
         self.live_action.set("")
         self.status.set("")
         self.examples, self.mapping, self.profile = [], None, None
@@ -300,6 +346,8 @@ class GuitarInputPanel:
         except (OSError, ValueError, KeyError, TypeError) as error:
             self.status.set(str(error))
         self.refresh_profile()
+        self.update_latest()
+        self.set_buttons()
 
     @staticmethod
     def valid_example(item):
@@ -313,7 +361,7 @@ class GuitarInputPanel:
         states = list(self.profile["labels"]) if self.profile is not None else []
         if self.mapping and (self.mapping.home not in states or self.mapping.excursion not in states):
             self.mapping = None
-        self.profile_text.set("Trained settings  ·  " + " / ".join(states) if states else "")
+        self.profile_text.set("Learned  ·  " + " / ".join(states) if states else "")
         self.home_box.configure(values=states)
         self.excursion_box.configure(values=states)
         self.home.set(self.mapping.home if self.mapping else states[0] if states else "")
@@ -327,7 +375,8 @@ class GuitarInputPanel:
         self.counts = example_counts(self.examples)
         known = [label for label, _ in self.counts.values()]
         suggestions = [label for label in SETTINGS[control] if label.casefold() not in self.counts]
-        self.label_box.configure(values=(*known, *suggestions))
+        self.label_box.configure(values=(*suggestions, *known))
+        self.control_hint.set(CALIBRATION_HINTS[control])
         self.example_list.delete(0, "end")
         for example in self.examples:
             source = Path(example["wav"])
@@ -344,11 +393,17 @@ class GuitarInputPanel:
         elif len(self.counts) == 1:
             next_step = f"Record a different setting, such as {suggestions[0]}. Repeat the same notes."
         elif self.profile is None or self.examples_changed:
-            next_step = "Train the profile now, or add more examples to teach additional settings."
+            next_step = "Choose Learn settings, or record more examples first."
         else:
             next_step = "Record a fresh take and check which setting Tone Lab hears."
         self.next_step.set(next_step)
+        if not self.example_label.get().strip():
+            self.example_label.set(self.suggested_setting())
         self.set_buttons()
+
+    def suggested_setting(self):
+        settings = SETTINGS[CONTROLS[self.control.get()]]
+        return next((setting for setting in settings if setting.casefold() not in self.counts), settings[0])
 
     def set_buttons(self):
         waiting = self.future is not None
@@ -357,15 +412,26 @@ class GuitarInputPanel:
         recording = recorder.stop is not None
         guided = self.recording_before is not NO_RECORDING and recording
         editable = not (self.live_running or recording or waiting)
-        self.record.configure(text="Stop and save example" if guided else "Record example",
-                              state="normal" if ((guided and not recorder.stop.is_set())
-                                                 or (editable and not self.review.busy())) else "disabled")
+        start_allowed = editable and not self.review.busy()
+        stop_allowed = guided and not recorder.stop.is_set()
+        setting = self.example_label.get().strip()
+        caption = setting if len(setting) <= 18 else setting[:17] + "…"
+        recording_example = guided and self.recording_kind == "example"
+        recording_check = guided and self.recording_kind == "check"
+        self.record.configure(text="Stop and save example" if recording_example else f"Record {caption}" if caption else "Record example",
+                              state="normal" if (recording_example and stop_allowed or start_allowed and setting) else "disabled")
+        self.record_test.configure(text="Stop and check" if recording_check else "Record a fresh check",
+                                   state="normal" if (recording_check and stop_allowed or start_allowed and valid_profile) else "disabled")
         self.instrument_box.configure(state="normal" if editable else "disabled")
-        self.control_box.configure(state="readonly" if editable else "disabled")
+        for title, choice in self.control_buttons.items():
+            selected = title == self.control.get()
+            choice.configure(state="normal" if editable else "disabled", bg=ACCENT if selected else "#28332d",
+                             fg=INK if selected else TEXT)
         self.label_box.configure(state="normal" if editable else "disabled")
         for widget, ready in ((self.use_latest, editable and self.latest_dry is not None),
                               (self.add_take, editable and self.example_source is not None and self.example_label.get().strip()),
-                              (self.add_wav, editable), (self.train, editable and len(self.counts) >= 2),
+                              (self.add_wav, editable),
+                              (self.train, editable and len(self.counts) >= 2),
                               (self.map_save, editable and valid_profile),
                               (self.inspect_wav, editable and valid_profile),
                               (self.inspect_take, editable and valid_profile and self.latest_dry is not None),
@@ -375,11 +441,15 @@ class GuitarInputPanel:
         self.observe_box.configure(state="normal" if editable and valid_profile else "disabled")
         self.arm_box.configure(state="normal" if editable and self.observe.get() and self.mapping else "disabled")
 
-    def current_take(self):
-        info = self.review.latest(pair=True)
+    def current_take(self, info=None):
+        if info is None:
+            info = self.review.latest(pair=True)
         filename = info.get("dry")
         if not filename:
             raise ValueError("The latest take has no verified dry recording.")
+        guitar = info.get("guitar")
+        if guitar and guitar.casefold() != self.instrument.get().strip().casefold():
+            raise ValueError(f"The latest dry take used {guitar}. Record an example on this guitar.")
         path = Path(filename).resolve()
         recorded_at = datetime.fromtimestamp(path.stat().st_mtime)
         details = [info.get("song") or info.get("passage") or f"Take at {recorded_at:%H:%M:%S}"]
@@ -390,9 +460,11 @@ class GuitarInputPanel:
     def update_latest(self):
         try:
             self.latest_dry = self.current_take()
-        except (OSError, RuntimeError, ValueError):
+        except (OSError, RuntimeError, ValueError) as error:
             self.latest_dry = None
-        self.latest_text.set(f"Latest dry take · {self.latest_dry[1]}" if self.latest_dry else "No dry take ready to use")
+            self.latest_text.set(str(error))
+        else:
+            self.latest_text.set(f"Latest dry take · {self.latest_dry[1]}")
 
     def capture_changed(self):
         recorder = self.review.recorder
@@ -400,37 +472,66 @@ class GuitarInputPanel:
             self.update_latest()
             if self.recording_before is not NO_RECORDING:
                 before, self.recording_before = self.recording_before, NO_RECORDING
-                if self.latest_dry and self.latest_dry[0] != before:
-                    self.set_source(*self.latest_dry)
+                kind, self.recording_kind = self.recording_kind, None
+                setting, self.recording_setting = self.recording_setting, None
+                completed_example = getattr(self.review, "completed_example", None)
+                try:
+                    captured = self.current_take(completed_example()) if completed_example else self.latest_dry
+                except (OSError, RuntimeError, ValueError):
+                    captured = None
+                if captured and captured[0] != before:
+                    if kind == "check":
+                        self.estimate_text.set("Checking the dry recording…")
+                        self.inspect_path(captured[0])
+                    else:
+                        self.set_source(*captured)
+                        self.example_label.set(setting)
+                        self.add_example()
                 else:
-                    self.source_text.set("No new dry example was saved. Check the recording status above.")
+                    status = self.estimate_text if kind == "check" else self.source_text
+                    status.set("No new dry recording was saved. Check the recording status above.")
         elif self.recording_before is not NO_RECORDING:
+            status = self.estimate_text if self.recording_kind == "check" else self.source_text
             if recorder.stop.is_set():
-                self.source_text.set("Saving the example…")
+                status.set("Saving the dry recording…")
             elif recorder.ready.is_set():
-                self.source_text.set("Recording. Play your notes, then stop and save the example.")
+                status.set("Recording. Play your notes, then press Stop.")
             else:
-                self.source_text.set("Connecting to Quad Cortex. Wait for Recording before playing.")
+                status.set("Connecting to Quad Cortex. Wait for Recording before playing.")
         self.set_buttons()
 
     def record_example(self):
+        self.record_dry("example")
+
+    def record_check(self):
+        self.record_dry("check")
+
+    def record_dry(self, kind):
         recorder = self.review.recorder
         if recorder.stop is not None:
-            if self.recording_before is not NO_RECORDING and not recorder.stop.is_set():
+            if self.recording_kind == kind and not recorder.stop.is_set():
                 recorder.press()
             return
         if self.review.busy() or self.future is not None:
-            self.status.set("Finish the current audio task before recording an example.")
+            self.status.set("Finish the current audio task before recording a dry sample.")
             return
         self.load_selection()
         try:
             self.selection()
+            setting = self.example_label.get().strip()
+            if kind == "example" and not setting:
+                raise ValueError("Enter the setting you are about to play.")
+            if kind == "check" and self.profile is None:
+                raise ValueError("Learn two settings before recording a check.")
         except ValueError as error:
             self.status.set(str(error))
             return
         self.update_latest()
         self.recording_before = self.latest_dry[0] if self.latest_dry else None
-        self.set_source(None)
+        self.recording_kind = kind
+        self.recording_setting = setting
+        if kind == "example":
+            self.set_source(None)
         self.status.set("")
         recorder.press(guitar=self.instrument.get())
 
@@ -438,7 +539,7 @@ class GuitarInputPanel:
         self.example_source = path
         self.start_seconds.set("")
         self.end_seconds.set("")
-        self.source_text.set(f"Ready to label · {description}" if path else "Record an example or choose a dry take.")
+        self.source_text.set(f"Ready to label · {description}" if path else "")
         self.set_buttons()
 
     def select_latest(self):
@@ -449,7 +550,7 @@ class GuitarInputPanel:
             self.label_box.focus_set()
             self.status.set("")
         else:
-            self.status.set("The latest take has no verified dry recording.")
+            self.status.set(self.latest_text.get())
             self.set_buttons()
 
     def select_wav(self):
@@ -504,7 +605,7 @@ class GuitarInputPanel:
         except (OSError, RuntimeError, ValueError) as error:
             self.status.set(str(error))
         else:
-            self.example_label.set("")
+            self.example_label.set(self.suggested_setting())
             self.set_source(None)
             self.status.set(f"Saved {text} as a calibration example.")
 
@@ -550,9 +651,9 @@ class GuitarInputPanel:
                 self.profile = profile
                 self.examples_changed = False
                 self.refresh_profile()
-                self.status.set("Profile saved. Try a new take with the same settings.")
+                self.status.set("Settings learned. Record a fresh check at one of the settings you taught.")
 
-        self.run("Training this profile…", train, finish)
+        self.run("Learning these settings…", train, finish)
 
     def save_mapping(self):
         from . import guitar_gestures
@@ -578,7 +679,8 @@ class GuitarInputPanel:
     def change_observe(self):
         if not self.observe.get():
             self.arm.set(False)
-        self.live_text.set("Live input will observe this profile on the next run." if self.observe.get() else "Live input is off.")
+        self.live_text.set(f"Start a new Guitar run to watch the {self.control.get().lower()}." if self.observe.get()
+                           else "Live estimate is off.")
         self.live_action.set("")
         self.set_buttons()
 
@@ -590,7 +692,7 @@ class GuitarInputPanel:
         armed = bool(self.mapping and self.arm.get())
         self.live_running = True
         self.arm.set(False)
-        self.live_text.set("Waiting for dry input. Use Stop live to end.")
+        self.live_text.set(f"Listening for {control} on {self.instrument.get()}. Play a note you taught.")
         self.live_action.set("Waiting for a mapped return gesture." if armed else "Observing only")
         self.set_buttons()
         return {"profile": str((folder / f"{control}.json").resolve()),
@@ -600,7 +702,8 @@ class GuitarInputPanel:
         kind = event.get("event")
         if kind == "guitar-state":
             state = event.get("label")
-            text = f"{event['control'].capitalize()}  ·  {state} ({event['confidence']:.0%})" if state else "No reliable state yet"
+            result = estimate_label(state, event.get("confidence", 0))
+            text = f"{result}  ·  {event['reason']}" if not state and event.get("reason") else result
             if text != self.live_text.get():
                 self.live_text.set(text)
         elif kind == "guitar-gesture":
@@ -617,20 +720,27 @@ class GuitarInputPanel:
         self.result_audio = None
         self.result_intervals = []
         if self.profile is None:
-            self.estimate_text.set("Train a profile above to check a dry take.")
+            self.estimate_text.set("Learn two settings to enable a check.")
         else:
-            self.estimate_text.set("Record a new take at a setting you taught, then check it here.")
+            self.estimate_text.set("Play the same notes at a setting you taught for a fresh check.")
         self.timeline.delete(0, "end")
 
     def inspect(self, *, current=False):
-        from . import guitar_gestures, guitar_state
-
         try:
             source = self.source(current)
         except (OSError, RuntimeError, ValueError) as error:
             self.status.set(str(error))
             return
-        if source is None or self.profile is None:
+        if source is not None:
+            self.inspect_path(source)
+
+    def inspect_path(self, source):
+        from . import guitar_gestures, guitar_state
+
+        if self.profile is None or self.future is not None:
+            return
+        if any(Path(example["wav"]).resolve() == source for example in self.examples):
+            self.status.set("This dry take was used for calibration. Record a fresh check, or choose another dry take.")
             return
         profile, mapping = self.profile, self.mapping
 
@@ -644,15 +754,16 @@ class GuitarInputPanel:
         def finish(result):
             if self.profile is profile:
                 self.show_analysis(source, *result)
-                self.status.set("Inspection finished. No hardware controls were moved.")
+                self.status.set("Dry check complete.")
 
         self.run("Analyzing the dry signal…", estimate, finish)
 
     def show_analysis(self, source, samples, estimate, observations, events):
         self.result_audio = samples
         state = estimate.get("label")
-        result = f"{state} · score {estimate.get('confidence', 0):.0%}" if state else "No reliable overall state"
-        self.estimate_text.set(f"{source.name}  ·  {result}  ·  {len(events)} return gestures")
+        result = estimate_label(state, estimate.get("confidence", 0))
+        reason = f"  ·  {estimate['reason']}" if not state and estimate.get("reason") else ""
+        self.estimate_text.set(result + reason)
         self.timeline.delete(0, "end")
         self.result_intervals = []
         points = []
@@ -665,7 +776,7 @@ class GuitarInputPanel:
             if current != last:
                 when = observation["time"]
                 score = observation.get("confidence", 0)
-                text = f"{current}  ·  score {score:.0%}" if current else "Uncertain or quiet"
+                text = estimate_label(current, score)
                 points.append((when, text, .35))
                 last = current
         for when, text, before in sorted(points):

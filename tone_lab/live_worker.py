@@ -42,7 +42,7 @@ def read_commands(stop, commands, monitor=False):
                 event = json.loads(line)
                 if event.get("event") == "stop":
                     return
-                if event.get("event") in ("knobs", "source", "tone"):
+                if event.get("event") in ("knobs", "source", "tone", "level"):
                     if monitor:
                         commands.put(event)
                     elif event["event"] == "knobs":

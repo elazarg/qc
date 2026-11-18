@@ -140,7 +140,7 @@ def calibrate(guitar, control, examples):
         notes[str(note)] = {"centers": centers.tolist(), "scale": scale.tolist(), "radii": radii}
 
     if not notes:
-        raise ValueError("No common, distinguishable notes. Play the same sustained single notes at each setting.")
+        raise ValueError("No common, distinguishable notes. Repeat the same sustained single notes at settings farther apart.")
     return {"schema": SCHEMA, "guitar": guitar, "control": control, "labels": state_labels, "notes": notes}
 
 

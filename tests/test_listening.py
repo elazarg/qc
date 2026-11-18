@@ -12,6 +12,9 @@ class ListeningSessionTest(unittest.TestCase):
     def test_routes_reference_and_revision_without_exposing_tools(self):
         self.assertEqual(listening.route("Use my Plini preset as a reference.", has_draft=True), ("reference", "Plini"))
         self.assertEqual(listening.route("Make me a Lenny Kravitz preset.", has_draft=True)[0], "create")
+        self.assertEqual(listening.route("Heavy metal, Pantera style", has_draft=True)[0], "create")
+        self.assertEqual(listening.route("Andy Timmons, but not naive. A real complex signal chain", has_draft=True)[0], "create")
+        self.assertEqual(listening.route("More Andy Timmons than Andy Timmons", has_draft=True)[0], "refine")
         self.assertEqual(listening.route("Less bite, keep the attack.", has_draft=True)[0], "refine")
         self.assertEqual(listening.route("Less bite on my current QC sound.", has_draft=True)[0], "adjust-live")
         self.assertEqual(listening.route("Match the reference.", has_draft=True)[0], "match")
@@ -32,6 +35,16 @@ class ListeningSessionTest(unittest.TestCase):
         self.assertEqual(next_chunk[:, 0].tolist(), [30, 56, 82, 108, 109, 110, 111, 100, 101])
         self.assertEqual(loop.cursor, 2)
         self.assertEqual(loop.current, 1)
+
+    def test_captured_matching_can_toggle_without_restarting_the_loop(self):
+        track = np.tile(np.arange(1, 7, dtype=np.float32)[:, None], (1, 2))
+        loop = listening.Loop((track,), gains=(.5,))
+        chunk = np.empty((2, 2), dtype=np.float32)
+        loop.process(chunk)
+        self.assertEqual(chunk[:, 0].tolist(), [.5, 1])
+        loop.process(chunk, match=False)
+        self.assertEqual(chunk[:, 0].tolist(), [3, 4])
+        self.assertEqual(loop.cursor, 4)
 
     def test_common_level_and_disagreement_between_performances(self):
         with TemporaryDirectory() as folder:

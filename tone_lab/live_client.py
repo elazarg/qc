@@ -109,7 +109,7 @@ def supervise(argv, stop, commands, report, *, monitor=False):
                 deadline = time.monotonic() + HEARTBEAT_TIMEOUT
             if event["event"] == "status":
                 report(event["text"])
-            elif event["event"] in ("controls", "source", "tone", "loading-tone", "shape",
+            elif event["event"] in ("controls", "source", "tone", "loading-tone", "shape", "level",
                                      "guitar-state", "guitar-gesture", "guitar-status", "guitar-stopped"):
                 report(event)
             elif monitor and event["event"] == "heartbeat":

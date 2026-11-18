@@ -84,15 +84,15 @@ KNOB_HINTS = {
     "space": "Changes how much ambience and how many repeats you hear.",
     "jazz": "A rounded direction with less gain and ambience and more midrange.",
     "tightness": "Leans out the bass in the drive and amp path.",
-    "attack": "Lets more of the transient through active compressors.",
+    "attack": "Changes pick response through a compressor, bringing it into the mix if parked dry.",
     "sustain": "Adds compression or drive where the preset supports it.",
     "gate": "Raises the threshold of the Simple Gate block.",
     "body": "Adds low end in the amp or capture.",
     "mids": "Changes midrange emphasis in the amp or capture.",
     "presence": "Changes upper-end bite and definition.",
     "delay": "Changes the level of the delay without changing its repeat count.",
-    "repeats": "Changes how quickly the delay fades away.",
-    "delay_time": "Lengthens or shortens unsynced delay times.",
+    "repeats": "Changes how quickly the delay fades away and brings a dry delay into the mix.",
+    "delay_time": "Lengthens or shortens unsynced delay times and brings a dry delay into the mix.",
     "reverb": "Changes the level of the existing reverb.",
     "modulation": "Changes the amount of the existing modulation effect.",
     "width": "Changes stereo width on effects with a width control.",
@@ -115,6 +115,9 @@ AMP_VOLUME_AS_DRIVE = {1009, 1011, 1083, 1084, 1094, 1095, 1096, 1097, 1120, 112
                        1154, 1155, 1156, 1166, 1167}
 PEDAL_LEVEL_NAMES = {"LEVEL", "VOLUME", "OUTPUT"}
 DRIVE_BYPASS = -0.98
+DRY_EFFECT_MIX = {"Compressor": ("compression", 25), "Delay": ("delay", 16),
+                  "Reverb": ("reverb", 16), "Modulation": ("modulation", 16)}
+DRY_EFFECT_DIRECTIONS = {"attack", "delay_time", "repeats", "tail", "motion", "width"}
 
 
 def intent(text):
@@ -131,6 +134,7 @@ def apply(preset, scene, style, amount):
 
 def knobs(preset, scene, values):
     rules = {}
+    previews = {}
     for name, value in values.items():
         _, low, edits = KNOBS[name]
         if not low <= value <= 1 or not math.isfinite(value):
@@ -138,7 +142,14 @@ def knobs(preset, scene, values):
         for category, parameter, delta in edits:
             key = (category, parameter)
             rules[key] = rules.get(key, 0.0) + value * delta
-    return apply_rules(preset, scene, rules, allow_neutral=True, drive=values.get("drive", 0.0), active_only=True)[1]
+            if name in DRY_EFFECT_DIRECTIONS and category in DRY_EFFECT_MIX:
+                mix_knob, mix_percent = DRY_EFFECT_MIX[category]
+                explicit_cut = values.get(mix_knob, 0) < 0 or (
+                    category in {"Delay", "Reverb"} and values.get("space", 0) < 0)
+                if value and parameter != "MIX" and not explicit_cut:
+                    previews[key] = max(previews.get(key, 0), abs(value) * mix_percent)
+    return apply_rules(preset, scene, rules, allow_neutral=True, drive=values.get("drive", 0.0),
+                       active_only=True, previews=previews)[1]
 
 
 def available_knobs(preset, scene):
@@ -167,16 +178,19 @@ def _sync_enabled(model, parameters, scene):
     return False
 
 
-def apply_rules(preset, scene, rules, *, allow_neutral=False, drive=0.0, active_only=False):
+def apply_rules(preset, scene, rules, *, allow_neutral=False, drive=0.0, active_only=False, previews=None):
     result = type(preset)()
     result.CopyFrom(preset)
     changes = []
+    previews = previews or {}
+    preview_categories = {category for category, _ in previews}
     for row, chain in enumerate(result.chains):
         for column, model in enumerate(chain.models):
             info = catalog.lookup(model.hash)
             if not info:
                 continue
             category = info["category"]
+            dry_mix, preview = None, 0.
             if row < len(result.bypass) and column < len(result.bypass[row].colBypass):
                 block = result.bypass[row].colBypass[column]
                 bypass_index = scene if block.sceneMode else 0
@@ -198,10 +212,11 @@ def apply_rules(preset, scene, rules, *, allow_neutral=False, drive=0.0, active_
                 if (category == "Utility" and name == "THRESHOLD" and model.hash != 16003):
                     continue
                 index_in_scene = scene if setting.scene_mode else 0
-                if (param["type"] != "float" or setting.expression
+                if (param["type"] not in {"float", "fader"} or setting.expression
                         or setting.scene_mode and not active_only or index_in_scene >= len(setting.param_values)):
                     continue
-                if not delta and not (drive and category in DRIVE_CATEGORIES):
+                if not delta and not (drive and category in DRIVE_CATEGORIES) and not (
+                        name == "MIX" and category in preview_categories):
                     continue
                 if category == "Delay" and name == "DELAY TIME" and _sync_enabled(model, info["params"], scene):
                     continue
@@ -223,8 +238,11 @@ def apply_rules(preset, scene, rules, *, allow_neutral=False, drive=0.0, active_
                 floor = min(before, low + .15 * (high - low)) if amp_volume or amp_input_gain else low
                 delta += _drive_delta(category, name, drive, before, floor, high, param["units"], amp_volume=amp_volume)
                 after = min(high, max(floor, before + delta))
+                if name == "MIX" and param["units"] == "%" and low == 0 and before == after == 0:
+                    dry_mix = index, setting, value, high
                 if math.isclose(before, after, abs_tol=0.001):
                     continue
+                preview = max(preview, previews.get((category, name), 0.))
                 raw = catalog.to_norm(model.hash, index, after)
                 targets = (value,) if setting.scene_mode else setting.param_values
                 for entry in targets:
@@ -232,6 +250,15 @@ def apply_rules(preset, scene, rules, *, allow_neutral=False, drive=0.0, active_
                         entry.float_value = raw
                 changes.append({"row": row + 1, "column": column + 1, "model": info["name"],
                                 "index": index, "name": param["name"], "from": before, "to": after})
+            if dry_mix and preview:
+                index, setting, value, high = dry_mix
+                after = min(high, preview)
+                raw = catalog.to_norm(model.hash, index, after)
+                for entry in (value,) if setting.scene_mode else setting.param_values:
+                    if entry.WhichOneof("value") == "float_value":
+                        entry.float_value = raw
+                changes.append({"row": row + 1, "column": column + 1, "model": info["name"],
+                                "index": index, "name": "MIX", "from": 0., "to": after})
     if not changes and not allow_neutral:
         raise RuntimeError("The current preset has no compatible parameters for that style.")
     return result, changes

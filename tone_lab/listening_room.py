@@ -15,6 +15,7 @@ from .audio import RATE
 from .knob_panel import KnobPanel
 from .tone_identity import Tone
 from .tone_space_ui import ToneSpacePanel
+from .volume_ui import VolumePanel, saved_settings
 
 
 PAPER = "#14151a"
@@ -57,6 +58,28 @@ def menu(parent, title, *, dark=False, refresh=None):
     return button, entries
 
 
+class ToneTile(tk.Frame):
+    def __init__(self, parent, side, title, caption, command):
+        super().__init__(parent, bg=TILE, padx=6, pady=3, highlightthickness=1, highlightbackground=TILE,
+                         cursor="hand2")
+        self.badge = control(self, side, command, dark=True)
+        self.badge.pack(side="left", padx=(0, 8))
+        body = tk.Frame(self, bg=TILE, cursor="hand2")
+        body.pack(side="left", fill="both", expand=True)
+        name = text(body, variable=title, bold=True, size=11)
+        name.pack(fill="x")
+        hint = text(body, variable=caption, color=SUBTLE, size=9)
+        hint.pack(fill="x")
+        for widget in (self, body, name, hint):
+            widget.configure(cursor="hand2")
+            widget.bind("<ButtonRelease-1>", lambda _: self.badge.invoke())
+
+    def sync(self, *, selected, enabled):
+        self.configure(highlightbackground=ACCENT if selected else TILE)
+        self.badge.configure(bg=ACCENT if selected else TILE, fg=ACCENT_INK if selected else LIGHT,
+                             state="normal" if enabled else "disabled")
+
+
 class Desk:
     def __init__(self, root, input_channel, leave):
         self.root, self.input_channel, self.leave = root, input_channel, leave
@@ -72,7 +95,12 @@ class Desk:
         self.live_messages = Queue()
         self.side = "b"
         self.shapes = {"a": {}, "b": {}}
+        self.tone_revisions = {"a": 0, "b": 1}
+        self.tone_revision = 1
+        self.confirmed_tones = {}
+        self.tone_requests = {}
         self.active_side = None
+        self.active_revision = None
         self.audition_values = {}
         self.available = None
         self.monitor_controls = {}
@@ -91,6 +119,9 @@ class Desk:
         self.qc_name = self.qc_position = self.qc_scene = None
         self.state_file = session.SESSIONS / "desk.json"
         self.state = self.read_state(self.state_file)
+        self.volume_settings = saved_settings(self.state.get("volume"))
+        self.level_feedback = {}
+        self.set_player_level()
         saved_shapes = self.state.get("tone_shapes") or {"b": self.state.get("shape", {})}
         for side in ("a", "b"):
             self.shapes[side] = draft_render.clean_values(saved_shapes.get(side))
@@ -149,11 +180,6 @@ class Desk:
         header = tk.Frame(page, bg=PAPER)
         header.pack(fill="x", pady=(0, 9))
         text(header, "Tone Lab", size=19, bold=True).pack(side="left", padx=(0, 15))
-        self.tabs = {}
-        for name in ("Shape", "Sounds", "Lab", "Setup"):
-            tab = control(header, name, lambda chosen=name: self.show_tab(chosen))
-            tab.pack(side="left", padx=(0, 3))
-            self.tabs[name] = tab
         self.tools, tools = menu(header, "QC")
         tools.add_command(label="Open Cortex Control", command=self.open_editor)
         tools.add_command(label="Check current preset", command=self.check_qc)
@@ -162,6 +188,8 @@ class Desk:
         guitar.configure(textvariable=self.guitar)
         for name in session.GUITARS:
             guitars.add_command(label=name, command=lambda value=name: self.select_guitar(value))
+        guitars.add_separator()
+        guitars.add_command(label="Learn guitar controls", command=self.show_guitar_calibration)
         guitar.pack(side="right", padx=5)
         text(header, variable=self.hardware, size=9, color=SUBTLE).pack(side="right", padx=(6, 0))
 
@@ -189,11 +217,13 @@ class Desk:
         self.loop_button.pack(side="left", padx=(0, 4))
         self.pause = control(line, "■", self.stop, dark=True)
         self.pause.pack(side="left")
-        text(line, variable=self.output, size=10, color=SOFT).pack(side="left", padx=9)
+        self.volume = VolumePanel(deck, line, self.volume_settings, self.change_volume)
+        self.volume.button.pack(side="left", padx=(5, 0))
         self.save_button = control(line, "Save to QC", self.save, primary=True)
         self.save_button.pack(side="right")
         self.detail_menu, self.details = menu(line, "Details", dark=True, refresh=self.list_details)
         self.detail_menu.pack(side="right", padx=5)
+        text(line, variable=self.output, size=10, color=SOFT).pack(side="left", padx=9)
 
         context = tk.Frame(deck, bg=DARK)
         context.pack(fill="x", pady=(8, 0))
@@ -224,8 +254,10 @@ class Desk:
         pair = tk.Frame(deck, bg=DARK)
         pair.pack(fill="x", pady=(7, 4))
         pair.columnconfigure((0, 1), weight=1, uniform="pair")
-        self.a_tile = self.tile(pair, "A", self.a_name, self.a_context, lambda: self.select_side("a"), 0)
-        self.b_tile = self.tile(pair, "B", self.b_name, self.b_context, lambda: self.select_side("b"), 1)
+        self.a_tile = ToneTile(pair, "A", self.a_name, self.a_context, lambda: self.select_side("a"))
+        self.a_tile.grid(row=0, column=0, sticky="ew", padx=(0, 4))
+        self.b_tile = ToneTile(pair, "B", self.b_name, self.b_context, lambda: self.select_side("b"))
+        self.b_tile.grid(row=0, column=1, sticky="ew", padx=(4, 0))
         self.playhead = tk.Canvas(deck, background=TILE, height=3, highlightthickness=0)
         self.playhead.pack(fill="x")
         self.position = self.playhead.create_rectangle(0, 0, 0, 3, fill=ACCENT, width=0)
@@ -235,6 +267,14 @@ class Desk:
         self.keep_button = control(status_row, "Keep choice", self.keep, dark=True)
         self.keep_button.pack(side="right")
 
+        tabs = tk.Frame(page, bg=PAPER)
+        tabs.pack(fill="x", pady=(0, 1))
+        self.tabs = {}
+        for name in ("Shape", "Sounds", "Lab", "Setup"):
+            tab = control(tabs, name, lambda chosen=name: self.show_tab(chosen))
+            tab.pack(side="left", padx=(0, 3))
+            self.tabs[name] = tab
+        tk.Frame(page, bg=RULE, height=1).pack(fill="x", pady=(0, 6))
         viewport = tk.Frame(page, bg=PAPER)
         viewport.pack(fill="both", expand=True)
         self.knobs = KnobPanel(viewport, self)
@@ -249,21 +289,6 @@ class Desk:
         self.pages = {"Shape": self.knobs, "Sounds": self.browser, "Lab": self.space, "Setup": self.setup}
         self.show_tab("Shape")
 
-    @staticmethod
-    def tile(parent, side, title, hint, action, column):
-        frame = tk.Frame(parent, bg=TILE, padx=5, pady=3)
-        frame.grid(row=0, column=column, sticky="ew", padx=(0, 5) if column == 0 else (5, 0))
-        button = control(frame, side, action, dark=True)
-        button.pack(side="left", padx=(0, 7))
-        info = tk.Frame(frame, bg=TILE)
-        info.pack(side="left", fill="x", expand=True)
-        label = text(info, "", bold=True, size=11)
-        label.pack(anchor="w")
-        label.configure(width=39)
-        title.trace_add("write", lambda *_: label.configure(text=title.get()))
-        text(info, variable=hint, color=SUBTLE, size=9).pack(anchor="w")
-        return button
-
     def show_tab(self, name):
         for page in self.pages.values():
             page.pack_forget()
@@ -271,6 +296,10 @@ class Desk:
         for title, button in self.tabs.items():
             button.configure(bg=ACCENT if title == name else WHITE, fg=ACCENT_INK if title == name else INK)
         self.tab = name
+
+    def show_guitar_calibration(self):
+        self.show_tab("Setup")
+        self.setup.show_calibration()
 
     def set_status(self, value):
         self.status.set(value)
@@ -300,6 +329,7 @@ class Desk:
                 "kept": str(self.kept) if self.kept else None, "kept_note": self.kept_note,
                 "draft": self.draft["id"] if self.draft else None,
                 "shape": self.shapes["b"], "tone_shapes": self.shapes, "active_tone": self.side,
+                "volume": self.volume_settings,
                 "tone_a": self.tone_a.to_record(),
                 "tone_b": self.tone_b.to_record() if self.tone_b else None,
                 "reference": self.reference.to_record() if self.reference else None,
@@ -339,8 +369,10 @@ class Desk:
         if remember:
             self.bind_recorded_tone()
         self.resolve_audio()
-        if live_monitor and self.requested_source == "phrase":
-            self.start_source("phrase")
+        if live_monitor:
+            self.send_levels()
+            if self.requested_source == "phrase":
+                self.start_source("phrase")
         if remember:
             self.remember()
         self.update()
@@ -407,13 +439,25 @@ class Desk:
         self.side = side
         self.available = None
         self.base_bypassed = False
-        if self.task_if_active("monitor") and not self.stop_signal.is_set():
-            self.output.set(f"Switching to tone {side.upper()}…")
-            self.control_mail.put({"event": "tone", "config": self.monitor_config(self.requested_source, side=side)})
-        else:
+        if not self.update_live_tone():
             self.set_status(f"Tone {side.upper()} selected. Guitar or ▶ Phrase starts the input.")
         self.remember()
         self.update()
+
+    def update_live_tone(self):
+        if not self.task_if_active("monitor") or self.stop_signal.is_set():
+            return False
+        self.output.set(f"Switching to tone {self.side.upper()}…")
+        self.send_levels()
+        config = self.monitor_config(self.requested_source)
+        self.tone_requests[config["tone_revision"]] = self.tone_snapshot(self.side)
+        if len(self.tone_requests) > 16:
+            self.tone_requests.pop(next(iter(self.tone_requests)))
+        self.control_mail.put({"event": "tone", "config": config})
+        return True
+
+    def tone_snapshot(self, side):
+        return self.tone(side), dict(self.shapes[side]), self.tone_revisions[side]
 
     def audition_shape(self):
         if self.task_if_active("monitor"):
@@ -439,17 +483,68 @@ class Desk:
         if side == self.side and self.task_if_active("monitor"):
             self.base_bypassed = False
             self.control_mail.put({"event": "knobs", "values": value_map, "tone_id": side})
+            confirmed = self.confirmed_tones.get(side)
+            if confirmed and confirmed[2] == self.tone_revisions[side]:
+                self.confirmed_tones[side] = self.tone_snapshot(side)
             self.show_monitor_output()
+        elif self.task_if_active("monitor"):
+            self.send_levels()
         elif self.playing:
             self.set_status("Shape queued. Start Guitar or ▶ Phrase to hear these controls on the Quad Cortex.")
+        self.schedule_state_save()
+        self.update()
+
+    def schedule_state_save(self):
         if getattr(self, "shape_writer", None) is not None:
             self.root.after_cancel(self.shape_writer)
         self.shape_writer = self.root.after(350, self.write_shape)
-        self.update()
 
     def write_shape(self):
         self.shape_writer = None
         self.remember()
+
+    def set_player_level(self):
+        settings = self.volume_settings
+        self.player.gain = 0. if settings["muted"] else 10 ** (settings["master_db"] / 20.)
+        self.player.match = settings["match"]
+
+    def change_volume(self, settings):
+        self.volume_settings = saved_settings(settings)
+        self.set_player_level()
+        self.send_levels()
+        self.schedule_state_save()
+        self.sync_volume()
+
+    def level_config(self, source):
+        return {**self.volume_settings, "measurements": {}, "take": str(self.take.folder) if self.take else None,
+                "contexts": {side: self.monitor_config(source, side=side)
+                             for side in ("a", "b") if self.selectable(side)}}
+
+    def send_levels(self):
+        if self.task_if_active("monitor") and not self.stop_signal.is_set():
+            self.control_mail.put({"event": "level", **self.level_config(self.requested_source)})
+
+    def sync_volume(self):
+        settings = self.volume_settings
+        level = self.level_feedback.get(self.side, {})
+        status = level.get("status") if self.task_if_active("monitor") else None
+        text = "Plays at each tone’s own loudness."
+        if settings["match"]:
+            if status == "matched":
+                text = f"Loudness matched · {self.side.upper()} trim {level['match_db']:+.1f} dB"
+            elif status == "unavailable":
+                text = level.get("reason") or "Loudness matching is unavailable for this tone."
+            elif self.playing and self.play_group and len(self.play_group) == 2:
+                text = "Captured A and B are loudness matched."
+            elif self.active_source == "phrase":
+                text = "Measuring · let the same phrase loop once on A and on B."
+            else:
+                text = "Match by playing the same recorded phrase through A and B."
+        elif status == "unavailable":
+            text = level.get("reason") or "Volume is unavailable for this tone."
+        if level.get("limited") and self.task_if_active("monitor"):
+            text += f"  ·  Output limit {level['applied_db']:+.1f} dB"
+        self.volume.sync(settings, text)
 
     def toggle_base(self):
         if (self.task_if_active("monitor") and self.active_side == self.side and self.active_source
@@ -460,7 +555,8 @@ class Desk:
             self.update()
 
     def show_monitor_output(self):
-        if self.active_source and self.active_side == self.side:
+        if (self.active_source and self.active_side == self.side
+                and self.active_revision in (None, self.tone_revisions[self.side])):
             shape = " · base" if self.base_bypassed else ""
             side = f"{self.active_side.upper()} · " if self.active_side else ""
             self.output.set(f"{self.active_source.title()} → {side}{self.active_monitor_name}{shape} · Quad Cortex")
@@ -481,7 +577,6 @@ class Desk:
         live_monitor = self.task_if_active("monitor") and not self.stop_signal.is_set()
         can_select = idle or live_monitor
         for button, enabled in (
-                (self.a_tile, can_select), (self.b_tile, can_select),
                 (self.ask_button, self.thinking is None and self.leaving is None),
                 (self.take_menu, (idle or live_monitor) and self.takes), (self.ref_menu, idle),
                 (self.hear_reference, idle and self.reference), (self.match_button, idle and self.take and self.reference),
@@ -492,11 +587,11 @@ class Desk:
                 (self.pause, not idle and self.stop_signal or self.playing or self.play_job)):
             button.configure(state="normal" if enabled else "disabled")
         for side, tile in (("a", self.a_tile), ("b", self.b_tile)):
-            selected = self.side == side
-            tile.configure(bg=ACCENT if selected else TILE, fg=ACCENT_INK if selected else LIGHT)
+            tile.sync(selected=self.side == side, enabled=can_select)
         for name, button in (("guitar", self.live_button), ("phrase", self.loop_button)):
             is_selected = self.active_source == name
             button.configure(bg=ACCENT if is_selected else TILE, fg=ACCENT_INK if is_selected else LIGHT)
+        self.sync_volume()
         sound = self.selected_sound()
         if sound and sound.path == self.kept:
             self.keep_button.configure(text="Kept", state="disabled")
@@ -509,8 +604,11 @@ class Desk:
         else:
             self.step.set("Guitar or ▶ Phrase starts the selected tone.")
         selected_tone = self.shape_tone()
+        recipe = self.tone_draft()
+        expandable = (can_select and selected_tone and selected_tone.kind == "draft" and recipe
+                      and preset_design.additional_shaping(recipe))
         self.knobs.sync(f"{self.side.upper()} · {selected_tone.name if selected_tone else 'Current Quad Cortex'}",
-                        self.values, self.available)
+                        self.values, self.available, expandable=bool(expandable))
         if self.tab == "Lab":
             self.space.sync(self.values, self.available)
         self.browser.sync()
@@ -568,9 +666,9 @@ class Desk:
         return "break"
 
     def prepare_playback(self, pair, index, cancel):
-        tracks = listening.prepare(pair)
+        tracks, gains = listening.playback_material(pair)
         if not cancel.is_set():
-            return self.player.open(tracks, index)
+            return self.player.open(tracks, index, gains=gains)
 
     def started_playing(self, sound):
         self.last_heard = self.playing = sound
@@ -618,7 +716,7 @@ class Desk:
         self.set_status(f"{sound.name} is ready on {side.upper()}.")
 
     def restore_draft_comparison(self):
-        if not self.draft or self.job is not None:
+        if not self.draft or self.job is not None and not self.task_if_active("monitor"):
             self.set_status("Prepare a draft first.")
             return
         self.set_tone(Tone.from_draft(self.draft))
@@ -639,22 +737,49 @@ class Desk:
         self.remember()
         self.set_status(f"Captured {side.upper()} is ready in Details.")
 
-    def set_tone(self, tone, *, side="b", select=True):
+    def set_tone(self, tone, *, side="b", select=True, shape=None):
         self.stop_audio()
         self.last_heard = None
         if side == "a":
             self.tone_a = tone or Tone.original()
         else:
             self.tone_b = tone
-        self.shapes[side] = {}
+        self.shapes[side] = dict(shape or {})
+        self.tone_revision += 1
+        self.tone_revisions[side] = self.tone_revision
+        self.level_feedback.pop(side, None)
         if select and self.selectable(side):
             self.side = side
-        self.available = None
-        if tone and tone.draft_id in self.drafts:
-            self.draft = self.drafts[tone.draft_id]
         self.resolve_audio()
+        if side == self.side:
+            self.available = None
+            self.base_bypassed = False
+            if self.selectable(side):
+                self.update_live_tone()
+        else:
+            self.send_levels()
         self.remember()
         self.update()
+
+    def tone_draft(self, side=None):
+        tone = self.tone(side)
+        return self.drafts.get(tone.draft_id) if tone else None
+
+    def install_draft(self, draft, *, shape=None):
+        self.draft = self.drafts[draft["id"]] = draft
+        self.set_tone(Tone.from_draft(draft), shape=shape)
+
+    def expand_tone(self):
+        current = self.tone_draft()
+        if current is None or self.job is not None and not self.task_if_active("monitor"):
+            return
+        try:
+            expanded = preset_design.variant_with_shaping(current)
+        except (ValueError, RuntimeError, OSError) as error:
+            self.set_status(str(error))
+            return
+        self.install_draft(expanded, shape=self.values)
+        self.set_status(f"{expanded['name']} is on B with more shaping controls.")
 
     def use_as_tone(self, preset, scene=None, *, side="b"):
         self.set_tone(Tone.from_preset(preset, scene), side=side)
@@ -673,8 +798,7 @@ class Desk:
         except (ValueError, RuntimeError, OSError) as error:
             self.set_status(str(error))
             return
-        self.drafts[draft["id"]] = draft
-        self.set_tone(Tone.from_draft(draft))
+        self.install_draft(draft)
         self.set_status(f"{asset.name} is in the new B tone.")
         self.show_tab("Shape")
 
@@ -859,11 +983,11 @@ class Desk:
         query = self.request.get().strip()
         if not query or self.thinking is not None:
             return
-        has_recipe = self.tone_b is not None and self.tone_b.draft_id in self.drafts
-        action, value = listening.route(query, has_draft=has_recipe)
+        current = self.tone_draft()
+        action, value = listening.route(query, has_draft=current is not None)
         if styles.intent(query):
             action = "adjust-live"
-        if action in ("reference", "draft", "match") and self.job is not None:
+        if action in ("reference", "match") and self.job is not None:
             self.set_status("Finish or stop the current hardware action, then try that request again.")
             return
         self.request.set("")
@@ -896,7 +1020,7 @@ class Desk:
         self.intent = action
         self.intent_side = self.side
         if action in ("create", "refine"):
-            prior = (self.drafts.get(self.tone_b.draft_id) if self.tone_b else None) if action == "refine" else None
+            prior = current if action == "refine" else None
             prompt_context = f"Selected listening reference: {self.reference.name}" if self.reference else ""
             if self.kept_note and self.alternative and self.alternative.path == self.kept:
                 prompt_context += f"\nPlayer's listening note on this version: {self.kept_note}"
@@ -912,19 +1036,19 @@ class Desk:
                 self.thinking = self.advisor.submit(lambda: (f"Try {styles.KNOBS[key][0].lower()} at {next_value:.0%}.",
                                                              {key: next_value}))
             else:
-                self.thinking = self.advisor.submit(advisor.ask, value, take, self.values)
+                available = None if self.available is None else frozenset(self.available)
+                self.thinking = self.advisor.submit(advisor.ask, value, take, self.values, available=available)
         self.update()
 
     def answered(self, result):
         if self.intent in ("create", "refine"):
-            self.draft = result
-            self.drafts[result["id"]] = result
-            if not self.task_if_active("monitor"):
-                self.set_tone(Tone.from_draft(result))
-            else:
-                self.set_status(f"{result['name']} is ready. Stop the current audition and choose it from Details.")
+            if self.job is not None and not self.task_if_active("monitor"):
+                self.draft = self.drafts[result["id"]] = result
+                self.set_status(f"{result['name']} is ready in Details.")
+                self.remember()
                 return
-            self.set_status(f"{result['target']} · {result['name']} is ready to try.")
+            self.install_draft(result)
+            self.set_status(f"{result['name']} · {result['target']}")
         else:
             reply, knobs = result
             if knobs:
@@ -949,9 +1073,11 @@ class Desk:
             self.details.add_command(label=f"Pin {self.tone_b.name} as A", command=self.pin_baseline)
         if self.take:
             self.details.add_command(label="Restore the phrase's original tone on A", command=self.original_on_a)
-        if self.draft:
-            recipe = self.draft
-            self.details.add_command(label=f"Compare {recipe['name']}", command=self.restore_draft_comparison)
+        current = self.tone_draft()
+        if self.draft and (not self.tone_b or self.tone_b.draft_id != self.draft["id"]):
+            self.details.add_command(label=f"Use {self.draft['name']} as B", command=self.restore_draft_comparison)
+        if current:
+            recipe = current
             self.details.add_command(label="Why this sound?", command=lambda: self.set_status(recipe["explanation"]))
             self.details.add_command(label="Show signal chain", command=lambda: self.set_status(preset_design.chain_text(recipe)))
             for source in recipe["sources"]:
@@ -968,7 +1094,7 @@ class Desk:
             for scene_index, scene in enumerate(device.SCENES):
                 self.details.add_command(label=f"Capture reference scene {scene}",
                                          command=lambda index=scene_index: self.use_preset(self.reference_choice, index))
-        if not self.draft and not self.reference_choice:
+        if not current and not self.reference_choice and not self.tone_b and not self.take:
             self.details.add_command(label="Choose a sound to see its details", state="disabled")
 
     def reference_on_a(self):
@@ -978,14 +1104,10 @@ class Desk:
         self.set_tone(Tone.from_sound(self.reference), side="a", select=False)
 
     def pin_baseline(self):
-        if self.job is not None or not self.tone_b:
+        if not self.tone_b or self.job is not None and not self.task_if_active("monitor"):
             return
-        self.stop_audio()
-        tone = self.tone_b
-        self.set_tone(tone, side="a", select=False)
-        self.shapes["a"] = dict(self.shapes["b"])
-        self.remember()
-        self.update()
+        self.set_tone(self.tone_b, side="a", select=False, shape=self.shapes["b"])
+        self.set_status(f"{self.tone_b.name} pinned as A.")
 
     def original_on_a(self):
         if self.job is None:
@@ -1052,7 +1174,8 @@ class Desk:
         side = side or self.side
         tone = self.shape_tone(side)
         config = {"take": str(self.take.folder) if self.take else None, "mode": source,
-                  "tone_id": side, "physical_input": self.input_channel, "values": dict(self.shapes[side]),
+                  "tone_id": side, "tone_revision": self.tone_revisions[side],
+                  "physical_input": self.input_channel, "values": dict(self.shapes[side]),
                   "name": tone.name if tone else self.qc_name or "Current Quad Cortex"}
         if tone and tone.preset:
             config["preset"] = {"position": tone.preset.position, "name": tone.preset.name}
@@ -1060,7 +1183,7 @@ class Desk:
         elif tone and tone.kind == "draft":
             config["draft"] = self.drafts[tone.draft_id]
             proof = self.baseline if side == "a" else self.alternative
-            if proof and proof.folder:
+            if proof and proof.draft_id == tone.draft_id and proof.folder:
                 config["gain"] = self.read_state(proof.folder / "session.json").get("output_gain_db")
         return config
 
@@ -1083,9 +1206,13 @@ class Desk:
         self.control_mail = Queue()
         self.live_messages = Queue()
         self.monitor_controls.clear()
+        self.level_feedback.clear()
+        self.tone_requests.clear()
+        self.confirmed_tones = {side: self.tone_snapshot(side) for side in ("a", "b")}
         self.requested_source = source
         config = self.monitor_config(source)
         config["guitar_config"] = self.setup.live_config()
+        config["level"] = self.level_config(source)
         self.active_monitor_name = config["name"]
         self.submit("monitor", f"Preparing {config['name']} on the Quad Cortex…", live_client.run_monitor,
                     config, self.stop_signal, self.control_mail, self.live_messages.put,
@@ -1178,6 +1305,7 @@ class Desk:
             self.record.configure(text="● Rec")
             if task == "monitor":
                 self.available = self.active_source = self.requested_source = self.active_side = None
+                self.active_revision = None
                 self.phrase_progress = None
                 self.base_bypassed = False
                 self.setup.live_event({"event": "guitar-stopped"})
@@ -1246,16 +1374,17 @@ class Desk:
         reason = message.get("reason")
         if event == "controls":
             self.monitor_controls[side] = set(message["available"])
+        elif event == "level":
+            self.level_feedback[side] = message
+            self.sync_volume()
         elif event == "loading-tone" and side == self.side:
             self.output.set(f"Loading {message['name']} on the Quad Cortex…")
         elif event == "tone":
             self.active_side = side
+            self.active_revision = message.get("tone_revision")
             self.active_monitor_name = message["name"]
-            if reason and self.side != side:
-                self.side = side
-                self.base_bypassed = False
-                self.remember()
-            if self.active_side == self.side:
+            self.resolve_monitor_tone(message)
+            if self.active_side == self.side and self.active_revision in (None, self.tone_revisions[self.side]):
                 self.available = self.monitor_controls.get(side)
                 self.show_monitor_output()
                 self.set_status(reason or "")
@@ -1286,6 +1415,34 @@ class Desk:
                 self.write_shape()
                 self.show_monitor_output()
                 self.update()
+
+    def resolve_monitor_tone(self, message):
+        side, revision = message["tone_id"], message.get("tone_revision")
+        reason = message.get("reason")
+        if not reason:
+            snapshot = self.tone_requests.pop(revision, None)
+            if revision == self.tone_revisions[side]:
+                snapshot = self.tone_snapshot(side)
+            if snapshot:
+                self.confirmed_tones[side] = snapshot
+            return
+        attempted = message.get("requested_revision")
+        self.tone_requests.pop(attempted, None)
+        if attempted is not None and self.tone_revisions[self.side] != attempted:
+            return
+        if side == self.side and (previous := self.confirmed_tones.get(side)) and previous[2] == revision:
+            tone, shape, version = previous
+            if side == "a":
+                self.tone_a = tone
+            else:
+                self.tone_b = tone
+            self.shapes[side] = shape
+            self.tone_revisions[side] = version
+            self.resolve_audio()
+            self.send_levels()
+        self.side = side
+        self.base_bypassed = False
+        self.remember()
 
     def close(self, destination):
         self.leaving = destination or "exit"

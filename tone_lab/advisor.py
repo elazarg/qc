@@ -43,19 +43,22 @@ def codex_executable():
     raise RuntimeError("Could not find Codex. Install the Windows Codex app or set TONE_LAB_CODEX to codex.exe.")
 
 
-def ask(text, take, values, history=()):
+def ask(text, take, values, history=(), *, available=None):
+    supported = set(styles.KNOBS if available is None else available)
     schema = {"type": "object", "additionalProperties": False, "required": ["reply", "knobs"],
               "properties": {"reply": {"type": "string"}, "knobs": {"type": "object", "additionalProperties": False,
                               "required": list(styles.KNOBS), "properties": {
                                   key: {"type": ["number", "null"]} for key in styles.KNOBS}}}}
-    context = {key: take[key] for key in ("guitar", "song", "wet_preset") if key in take}
+    context = {key: take[key] for key in ("guitar", "pickup_note", "song", "wet_preset", "active_tone") if key in take}
     hints = getattr(styles, "KNOB_HINTS", {})
     directions = {name: {"label": label, "minimum": minimum, "maximum": 1, "positive": hints.get(name, "")}
-                  for name, (label, minimum, _) in styles.KNOBS.items()}
+                  for name, (label, minimum, _) in styles.KNOBS.items() if name in supported}
     prompt = (
         "You are the guitar-tone assistant in Tone Lab. Reply in at most two short sentences. "
         "You receive text only and have not heard this guitar. Use no tools and read no files. "
         "If the user asks for a tone change, suggest absolute values for the relevant knobs. "
+        "Only propose knobs listed in directions. Each listed knob can change the selected chain. "
+        "If the request needs a device that the chain lacks, explain the missing stage. "
         "Use null for each knob you would leave alone. Zero is the preset baseline. If asked a question, answer it and leave all knobs null. "
         "Jazz is 0 to 1 and reduces distortion, softens treble, adds mids and reduces ambience. "
         "Drive, warmth and space are -1 to 1, where zero means the original preset. "
@@ -67,6 +70,8 @@ def ask(text, take, values, history=()):
     result = request(prompt, schema, web=False)
     suggestions = {}
     for key, (_, minimum, _) in styles.KNOBS.items():
+        if key not in supported:
+            continue
         value = result["knobs"].get(key)
         if (type(value) in (float, int) and math.isfinite(value) and minimum <= value <= 1):
             suggestions[key] = round(value, 2)

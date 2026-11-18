@@ -32,7 +32,8 @@ class PresetDraftTest(unittest.TestCase):
                 second = preset_design.design("Tighter bass", "Les Paul", {}, first, "too woolly")
             self.assertTrue(provider.call_args_list[0].kwargs["web"])
             self.assertFalse(provider.call_args_list[1].kwargs["web"])
-            self.assertEqual([row["model_id"] for row in first["chain"]], [1120, 12026])
+            self.assertEqual([row["model_id"] for row in first["chain"] if not row.get("reserved")], [1120, 12026])
+            self.assertEqual(len(draft_render.compile_chain(first, -12)), 8)
             self.assertEqual(second["parent"], first["id"])
             self.assertEqual([row["id"] for row in preset_design.history()], [second["id"], first["id"]])
             self.assertEqual(draft_render.compile_chain(first, -12)[-1], (draft_render.OUTPUT_GAIN, [(0, -12)]))
@@ -113,7 +114,7 @@ class PresetDraftTest(unittest.TestCase):
         with TemporaryDirectory() as folder, patch.object(session, "SESSIONS", Path(folder)):
             with patch.object(advisor, "request", return_value={**raw_draft(), "owned_assets": ["asset1"]}):
                 draft = preset_design.design("Use Own closed back", "Les Paul", {}, assets=[capture, ir])
-                self.assertEqual(draft["chain"][-1]["asset"]["key"], ir.key)
+                self.assertEqual(next(block["asset"]["key"] for block in draft["chain"] if "asset" in block), ir.key)
             with patch.object(advisor, "request", return_value={**raw_draft(), "owned_assets": ["asset2"]}):
                 with self.assertRaisesRegex(ValueError, "unusable draft"):
                     preset_design.design("Use Own closed back", "Les Paul", {}, assets=[capture, ir])
@@ -123,6 +124,38 @@ class PresetDraftTest(unittest.TestCase):
         for values in ({"warmth": 1.1}, {"warmth": float("nan")}, {"warmth": True}, {"unknown": .3}):
             with self.assertRaises(ValueError):
                 draft_render.clean_values(values)
+
+    def test_expanding_a_legacy_recipe_keeps_musical_settings_and_has_a_new_identity(self):
+        original = {**raw_draft(), "id": "legacy", "guitar": "Charvel", "excluded_stages": ["Modulation"]}
+        original["chain"].append({"model_id": 6004, "settings": [{"name": "MIX", "value": 17}]})
+        self.assertEqual(preset_design.additional_shaping(original), ("Compressor", "Equalizer", "Reverb"))
+        with TemporaryDirectory() as folder, patch.object(session, "SESSIONS", Path(folder)):
+            expanded = preset_design.variant_with_shaping(original)
+            self.assertEqual(preset_design.history()[0]["chain"], expanded["chain"])
+        self.assertNotEqual(expanded["id"], original["id"])
+        self.assertEqual(expanded["parent"], original["id"])
+        self.assertEqual(expanded["target"], original["target"])
+        self.assertEqual(expanded["excluded_stages"], ["Modulation"])
+        self.assertEqual([block for block in expanded["chain"] if not block.get("reserved")],
+                         preset_design.validate(original)["chain"])
+        for block in expanded["chain"]:
+            if block.get("reserved") and block["settings"]:
+                self.assertIn({"name": "MIX", "value": 0}, block["settings"])
+        self.assertFalse(preset_design.additional_shaping(expanded))
+
+    def test_rejects_an_overfull_lane_before_the_draft_can_be_sent(self):
+        recipe = raw_draft()
+        recipe["chain"].extend({"model_id": model, "settings": []}
+                               for model in (16003, 5005, 18, 4005, 6004, 8000))
+        with self.assertRaisesRegex(ValueError, "seven device blocks"):
+            draft_render.compile_chain(recipe, -12)
+
+    def test_advisor_discards_suggestions_for_unavailable_controls(self):
+        output = {"reply": "Try changing the tone.", "knobs": {"drive": .2, "reverb": .6}}
+        with patch.object(advisor, "request", return_value=output) as provider:
+            self.assertEqual(advisor.ask("shorter and darker", {}, {}, available=("drive",))[1], {"drive": .2})
+            context = json.loads(provider.call_args.args[0].split("\n", 1)[1])
+            self.assertEqual(set(context["directions"]), {"drive"})
 
     def test_save_verifies_the_shaped_readback_and_keeps_the_native_address(self):
         choice = SavedPreset("Goldtop Bite", "Tone Lab", "2_q", 3)
