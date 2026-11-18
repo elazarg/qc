@@ -7,7 +7,7 @@ import time
 import numpy as np
 from qc_mcp import catalog, preset as wire
 
-from . import audio, capture, device, session, styles
+from . import audio, capture, device, presets, session, styles
 
 SCRATCH_NAME = "Tone Lab Style"
 SCRATCH = {"folder_key": "/media/p4/Presets/My Presets", "position": 254, "is_factory": False}
@@ -18,13 +18,31 @@ def routes(preset):
     return [(chain.in_portid, chain.out_portid) for chain in preset.chains]
 
 
+def reamp_routes(source, physical_input, *, monitor=False):
+    original = routes(source)
+    if (len(original) != 4 or physical_input not in (1, 2)
+            or any(in_port not in (0, physical_input) or out_port not in (0, 16, 17, 18, 19)
+                   for in_port, out_port in original)
+            or not any(in_port == physical_input for in_port, _ in original)
+            or not any(out_port == 19 for _, out_port in original)):
+        raise ValueError("This preset uses other inputs or outputs. Use a single guitar input and Multi Out for direct reamping.")
+    return [(12 if in_port == physical_input else in_port,
+             14 if out_port == 19 and not monitor else out_port) for in_port, out_port in original]
+
+
+def sound_state(preset):
+    grid = wire.describe(preset)
+    return ([[chain[k] for k in ("models", "split_points", "splitter", "mixer", "combined_splitter")]
+             for chain in grid["chains"]], grid["bypass"])
+
+
 def recall(qc, position, name):
     qc.recall(**position)
     for _ in range(4):
         time.sleep(.25)
         if qc.get_setlist_position() == position:
             current = device.read_preset(qc)
-            if current.name == name:
+            if name is None or current.name == name:
                 return current
     raise RuntimeError(f"Could not confirm preset {name} at the expected slot.")
 
@@ -40,8 +58,48 @@ def verify_fixture(qc, source, expected_routes=USB_ROUTES):
     return readback
 
 
-def apply_changes(qc, source, changes):
-    initial = verify_fixture(qc, source)
+def set_routes(qc, expected):
+    current = routes(device.read_preset(qc))
+    for row, (before, after) in enumerate(zip(current, expected)):
+        if before != after:
+            qc.set_routing(row, *after)
+            time.sleep(.10)
+    time.sleep(.35)
+
+
+def prepare_fixture(qc, source_position, source, physical_input):
+    """Reuse or refresh the single Tone Lab-owned slot, keeping both presets locally."""
+    expected = reamp_routes(source, physical_input)
+    if source_position == SCRATCH or qc.get_setlist_position() != source_position:
+        raise RuntimeError("The original preset is no longer selected.")
+    presets.archive(source, source_position, qc.firmware, reason="Before Tone Lab reamp")
+    fixture = recall(qc, SCRATCH, None)
+    blank = (fixture.name.strip().lower() in ("", "unsaved")
+             and not any(model.hash for chain in fixture.chains for model in chain.models))
+    if not blank and fixture.name != SCRATCH_NAME:
+        raise RuntimeError("My Presets 32G is occupied by another preset. Tone Lab left it untouched.")
+    if not blank and sound_state(fixture) == sound_state(source) and routes(fixture) == expected:
+        return fixture
+    if not blank:
+        presets.archive(fixture, SCRATCH, qc.firmware, reason="Previous Tone Lab working copy")
+    saved = recall(qc, source_position, source.name)
+    if sound_state(saved) != sound_state(source):
+        raise RuntimeError("The recalled preset differs from the working version. Tone Lab kept a local snapshot and skipped the copy.")
+    qc.write_preset_file(SCRATCH["folder_key"], SCRATCH["position"], SCRATCH_NAME)
+    time.sleep(.55)
+    copy = recall(qc, SCRATCH, SCRATCH_NAME)
+    if sound_state(copy) != sound_state(source):
+        raise RuntimeError("The new test copy did not match the saved preset.")
+    set_routes(qc, expected)
+    verify_fixture(qc, source, expected)
+    qc.write_preset_file(SCRATCH["folder_key"], SCRATCH["position"], SCRATCH_NAME)
+    time.sleep(.55)
+    recall(qc, SCRATCH, SCRATCH_NAME)
+    return verify_fixture(qc, source, expected)
+
+
+def apply_changes(qc, source, changes, expected_routes=USB_ROUTES):
+    initial = verify_fixture(qc, source, expected_routes)
     expected = []
     for edit in changes:
         r, c, i = edit["row"] - 1, edit["column"] - 1, edit["index"]
@@ -51,11 +109,73 @@ def apply_changes(qc, source, changes):
         expected.append((r, c, i, raw, edit["name"]))
         time.sleep(.08)
     time.sleep(.35)
-    actual = verify_fixture(qc, source)
+    actual = verify_fixture(qc, source, expected_routes)
     for r, c, i, raw, name in expected:
         setting = actual.chains[r].models[c].params[i]
         if not setting.param_values or abs(setting.param_values[0].float_value - raw) > .005:
             raise RuntimeError(f"The adjusted {name} did not read back correctly.")
+
+
+def take_audio(take):
+    info = json.loads((take / "clip.json").read_text(encoding="utf-8"))
+    start, end = info.get("selected_passage_seconds", [0, info["duration_seconds"]])
+    selection = slice(round(start * audio.RATE), round(end * audio.RATE))
+    dry, wet = [audio.read_wave(take / filename)[selection].copy() for filename in ("dry.wav", "wet.wav")]
+    if len(dry) != len(wet) or len(dry) < audio.RATE // 2 or dry.shape[1] != 1 or wet.shape[1] != 2:
+        raise ValueError("Use a take with synchronized mono dry and stereo wet audio.")
+    return info, (start, end), dry, wet
+
+
+def calibration_offset(qc):
+    calibration = json.loads((session.SESSIONS / "calibration.json").read_text(encoding="utf-8"))
+    offset = calibration["reamp_offset_samples"]
+    if calibration["rate"] != audio.RATE or not 0 <= offset < audio.RATE or qc.firmware != calibration["firmware"]:
+        raise RuntimeError("Run the USB bypass calibration again before making aligned comparisons.")
+    return offset
+
+
+def render_knobs(take, values):
+    """Save a level-matched comparison using the current preset and knob settings."""
+    from . import live
+
+    take = Path(take)
+    info, selection, dry, wet = take_audio(take)
+    with device.connect(write=True) as qc:
+        offset = calibration_offset(qc)
+        position = qc.get_setlist_position()
+        source = device.read_preset(qc)
+        scene = device.active_scene(qc)
+        if not position or position == SCRATCH:
+            raise ValueError("Select the saved preset you want to use as a starting point.")
+        physical_input = info.get("physical_input", 1)
+        try:
+            base = prepare_fixture(qc, position, source, physical_input)
+            if device.active_scene(qc) != scene:
+                device.select_scene(qc, scene)
+            edits = live.update(qc, base, scene, values, {})
+            verify_fixture(qc, source, reamp_routes(source, physical_input))
+            samples = audio.reamp(dry)[offset:offset + len(dry)].copy()
+            if samples.shape != wet.shape:
+                raise RuntimeError("The reamp return did not match this take's length.")
+            measured = audio.describe(samples)
+            if measured["clipped_samples"] or measured["lufs"] is None:
+                raise RuntimeError("The saved tone clipped or returned silence.")
+        finally:
+            restored = recall(qc, position, source.name)
+            if device.active_scene(qc) != scene:
+                device.select_scene(qc, scene)
+            if sound_state(restored) != sound_state(source):
+                raise RuntimeError("The saved preset was recalled. Its starting working state is in the local preset history.")
+    folder, data = session.new_session("knobs", info.get("guitar", ""), info.get("pickup_note", ""), info.get("song", ""))
+    data.update(source_clip=take.name, selection_seconds=list(selection), original_preset=source.name,
+                original_scene=device.SCENES[scene], knob_values=values)
+    fade = np.linspace(0, 1, 480)[:, None]
+    for track in (wet, samples):
+        track[:480] *= fade
+        track[-480:] *= fade[::-1]
+    return session.make_shortlist(folder, data, [({"name": "Recorded wet baseline"}, wet),
+                                                ({"name": source.name + " · saved controls", "changes": list(edits.values()),
+                                                  "knobs": values}, samples)], wet)
 
 
 def render(note, *, take=None, arm=False, progress=lambda message: None):
@@ -70,19 +190,9 @@ def render(note, *, take=None, arm=False, progress=lambda message: None):
             raise ValueError("The latest take does not have a verified dry track.")
         take = Path(latest["dry"]).parent
     take = Path(take)
-    info = json.loads((take / "clip.json").read_text(encoding="utf-8"))
-    start, end = info.get("selected_passage_seconds", [0, info["duration_seconds"]])
-    selection = slice(round(start * audio.RATE), round(end * audio.RATE))
-    dry, wet = [audio.read_wave(take / filename)[selection].copy() for filename in ("dry.wav", "wet.wav")]
-    if len(dry) != len(wet) or len(dry) < audio.RATE // 2 or dry.shape[1] != 1 or wet.shape[1] != 2:
-        raise ValueError("Use a take with synchronized mono dry and stereo wet audio.")
-    calibration = json.loads((session.SESSIONS / "calibration.json").read_text(encoding="utf-8"))
-    offset = calibration["reamp_offset_samples"]
-    if calibration["rate"] != audio.RATE or not 0 <= offset < audio.RATE:
-        raise RuntimeError("Run the USB bypass calibration first.")
+    info, (start, end), dry, wet = take_audio(take)
     with device.connect(write=True) as qc:
-        if qc.firmware != calibration["firmware"]:
-            raise RuntimeError("The Quad Cortex firmware changed. Run the USB bypass calibration again.")
+        offset = calibration_offset(qc)
         position = qc.get_setlist_position()
         source = device.read_preset(qc)
         scene = device.active_scene(qc)
@@ -90,13 +200,12 @@ def render(note, *, take=None, arm=False, progress=lambda message: None):
                 or device.SCENES[scene] != info.get("wet_scene")
                 or (info.get("wet_position") and position != info["wet_position"])):
             raise ValueError("Load the same preset and scene that produced this take’s wet track.")
-        if routes(source) != [(info.get("physical_input", 1), 19), (0, 0), (0, 0), (0, 0)]:
-            raise ValueError("This tone uses routing the style renderer cannot yet copy safely.")
+        physical_input = info.get("physical_input", 1)
+        expected_routes = reamp_routes(source, physical_input)
         renders = [({"name": "Recorded wet baseline"}, wet)]
         try:
-            recall(qc, SCRATCH, SCRATCH_NAME)
             progress("Checking the preset copy against the wet take…")
-            copy = verify_fixture(qc, source)
+            copy = prepare_fixture(qc, position, source, physical_input)
             if device.active_scene(qc) != scene:
                 device.select_scene(qc, scene)
             baseline = audio.reamp(dry)[offset:offset + len(dry)]
@@ -112,7 +221,7 @@ def render(note, *, take=None, arm=False, progress=lambda message: None):
                 recall(qc, SCRATCH, SCRATCH_NAME)
                 if device.active_scene(qc) != scene:
                     device.select_scene(qc, scene)
-                apply_changes(qc, source, changes)
+                apply_changes(qc, source, changes, expected_routes)
                 samples = audio.reamp(dry)[offset:offset + len(dry)].copy()
                 measures = audio.describe(samples)
                 if measures["clipped_samples"] or measures["lufs"] is None:

@@ -19,6 +19,12 @@ def parser():
     sub.add_parser("shortcut", help="Create a Windows shortcut with Tone Lab's taskbar identity")
     sub.add_parser("doctor", help="Check the QC connection and open the ASIO stream without starting it")
     sub.add_parser("inspect", help="Read current preset, routing, scene and parameters")
+    sub.add_parser("snapshot", help="Archive the current preset locally without writing to the Quad Cortex")
+    sub.add_parser("presets", help="List local Quad Cortex preset snapshots")
+    search = sub.add_parser("search", help="Find tones you have already rendered or recorded")
+    search.add_argument("query", nargs="?", default="")
+    search.add_argument("--reference", type=Path, help="Match a local reference WAV")
+    search.add_argument("--take", help="Prefer results from this take ID")
     demo = sub.add_parser("demo", help="Generate a silent, offline example session")
     demo.add_argument("--guitar", choices=session.GUITARS, default="Charvel")
     record = sub.add_parser("record", help="Record a mono DI WAV over ASIO")
@@ -89,6 +95,19 @@ def run(args):
                 result.pop("lanes")
                 result["audio"] = audio.check_asio()
             return result
+        case "snapshot" | "presets":
+            from . import presets
+
+            if args.action == "presets":
+                return presets.history()
+            with device.connect() as qc:
+                return presets.archive(device.read_preset(qc), qc.get_setlist_position(), qc.firmware,
+                                       reason="Manual snapshot")
+        case "search":
+            from . import tone_search
+
+            return [{key: str(value) if isinstance(value, Path) else value for key, value in row.items()}
+                    for row in tone_search.search(args.query, reference=args.reference, take_id=args.take)]
         case "demo":
             return session.demo(args.guitar)
         case "record":

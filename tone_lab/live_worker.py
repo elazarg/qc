@@ -64,8 +64,8 @@ def main():
             if args.recover:
                 recover()
                 return 0
-            if args.take is None or args.mode is None:
-                raise ValueError("A take and live mode are required.")
+            if args.mode is None or (args.mode == "reamp" and args.take is None):
+                raise ValueError("Choose a live mode and supply a dry take for reamping.")
             diagnostics.LOG.info("Live worker started mode=%s muted=%s", args.mode, args.muted)
             stop, commands = Event(), Queue()
             Thread(target=read_commands, args=(stop, commands), daemon=True).start()

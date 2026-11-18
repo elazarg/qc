@@ -1,8 +1,14 @@
 # Tone Lab for Quad Cortex
 
-Use the chat to say what you want to play and how the tone should change. For example, “Les Paul bridge, the chorus riff. Use my last clip and try a tighter low end.” The agent can retrieve the latest clip and use it with the recording and comparison tools below.
+Open **Tone Lab.lnk** to go straight to **Live**. Keep Cortex Control closed while using the direct USB controls. Tone Lab uses the loaded saved preset as a starting point and a verified working copy in **My Presets → 32G**. It supports a single physical guitar input feeding Multi Out, including parallel lanes. It archives the original and previous working copies locally before changing the scratch slot.
 
-Open **Tone Lab.lnk** for the Windows taskbar launcher. Click **Record clip**, wait for **Recording · dry + wet**, play, and click **Stop and save**. One take saves the mono dry DI for reamping and the stereo wet signal from Quad Cortex outputs 1/2 as the baseline. The recorder uses physical guitar input 1 by default and checks the Quad Cortex USB Dry/Wet Swap setting while recording. Keep that setting fixed for the take. Tell the chat what you want to try on the last clip.
+| Intent | What to use |
+| --- | --- |
+| Change how the guitar feels under your fingers | **Live guitar** puts the working copy on the Quad Cortex hardware path. Start with Drive, Warmth, Space and Jazz. **More controls** exposes Response, EQ and Effects separately. |
+| Compare changes on the exact same performance | **Record clip** captures synchronized dry DI and wet audio. **Loop take** reamps that DI through the currently loaded preset's working copy. **Save A/B** records the current settings against the wet take and adds the render to the library. |
+| Describe a sound or research a song | **Ask AI** turns a request into suggested knobs. **Tone Search** finds saved takes and renders by name, notes and audio traits. **Research rig** runs a separate live web search and returns sources. |
+| Get closer to a reference | In **Tone Match**, choose a WAV or use the take's wet audio. Set the relative importance of tone, dynamics and ambience, and audition the closest saved results at matched loudness. The scores describe similarity within the library. Build or render more candidates when the library has no close match. |
+| Say what worked | Write a note in **Feedback**. The note stays attached to its comparison and letter mapping. |
 
 ## Optional workbench
 
@@ -12,14 +18,14 @@ The workbench is available via `python -m tone_lab ui` in the local environment.
 
 The main window shows the latest take separately from its reamps. Use **Older** and **Newer** to move between comparisons of that take. Use the one text box for notes such as “A is closer. B is too dry.” Each note keeps its comparison and A/B/C mapping. The saved take, its renders, and the notes remain separate files.
 
-Three short requests also act like style controls. **More jazz** reduces drive, softens the top end and backs off ambience. **Less delay** lowers mix and feedback. **Darker** softens supported tone, treble and presence controls. The renderer tests two amounts and produces a level-matched A/B/C with your original wet take. Keep Cortex Control closed during a direct USB render. The current hardware fixture is a USB-only copy of the Vai preset at **My Presets → 32G**, with the same preset and scene loaded as the recording. The engine checks the copy against the wet take before using it. Open-ended feedback is saved for the next conversation.
+Three short requests also act like style controls. **More jazz** reduces drive, softens the top end and backs off ambience. **Less delay** lowers mix and feedback. **Darker** softens supported tone, treble and presence controls. With the take's recorded preset and scene loaded, these requests produce two variations against the original wet track. Open-ended feedback is saved for the next conversation.
 
 ### Live controls and the tone advisor
 
-Open **Live controls** to turn **Jazz**, **Drive**, **Warmth**, and **Space**. Drag on a knob or use its arrow keys. The controls combine their changes against the fixed preset baseline. **Reset knobs** returns the controls to that baseline.
+Drag, scroll, or use arrow keys to turn a knob. The controls combine their changes against the fixed preset baseline. **Reset** returns to that baseline. Drive at its minimum backs off gain and bypasses compatible active drive pedals. A modeled capture can retain the distortion of its source. Choose a clean model or capture when you want a genuinely clean starting point.
 
 - **Loop recorded take** feeds the same dry passage into the Quad Cortex and monitors through its normal outputs. Start with the Quad Cortex volume low. A separate audio process handles the driver and the Lab can stop it and restore the original preset if the driver stops responding.
-- **Live guitar** routes the temporary copy to the guitar input and monitor outputs. The guitar stays on the Quad Cortex signal path while the knobs adjust its settings over USB. **Stop live** recalls the original preset and scene. Both modes use the prepared Vai test copy and need the editor closed.
+- **Live guitar** routes the temporary copy to the guitar input and monitor outputs. The guitar stays on the Quad Cortex signal path while the knobs adjust its settings over USB. **Stop live** recalls the original saved preset and scene.
 - In **Tone advisor**, dictate into the text box with Windows **Win+H** or type. **Ask AI** uses the authenticated Codex client and sends the request, knob positions and short take labels. **Speak reply** uses the Windows voice. **Use suggested knobs** applies proposed settings, including during a live loop. The Lab sends text to Codex and keeps guitar WAVs local. [Windows voice typing](https://support.microsoft.com/en-us/accessibility/windows/use-voice-typing-to-talk-instead-of-type-on-your-pc)
 
 ## First hardware session
@@ -70,4 +76,4 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m tone_lab doctor
 ```
 
-Paired dry/wet recording, USB reamping and direct parameter changes were checked on CorOS 4.1.1. Session data stays in `tone_sessions`. The desktop tools log capture and reamp status in `tone_sessions/tone-lab.log`. `tone_sessions/live-driver.log` collects stack traces if the live worker stalls. Recreate the Windows launcher with `python -m tone_lab shortcut` from the local environment.
+Paired dry/wet recording, USB reamping and direct parameter changes were checked on CorOS 4.1.1. Session data and preset snapshots stay in `tone_sessions` outside Git. Use `python -m tone_lab presets` to list local snapshots and `python -m tone_lab snapshot` to archive the current working state. Snapshot replay is not yet automated. The desktop tools log capture and reamp status in `tone_sessions/tone-lab.log`. `tone_sessions/live-driver.log` collects stack traces if the live worker stalls. Recreate the Windows launcher with `python -m tone_lab shortcut` from the local environment.

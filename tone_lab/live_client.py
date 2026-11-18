@@ -23,7 +23,9 @@ def worker_command():
 
 
 def run(take, mode, stop, commands, report, *, audible=True):
-    argv = worker_command() + ["--take", str(take), "--mode", mode]
+    argv = worker_command() + ["--mode", mode]
+    if take is not None:
+        argv += ["--take", str(take)]
     if not audible:
         argv.append("--muted")
     process = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
@@ -78,6 +80,8 @@ def run(take, mode, stop, commands, report, *, audible=True):
                 deadline = time.monotonic() + HEARTBEAT_TIMEOUT
             if event["event"] == "status":
                 report(event["text"])
+            elif event["event"] == "controls":
+                report(event)
             elif event["event"] == "error":
                 raise RuntimeError(event["text"])
             elif event["event"] == "done":

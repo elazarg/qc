@@ -45,17 +45,14 @@ class ClipRecorder:
         self.close_when_finished = False
         self.status = tk.StringVar(value="Ready")
         root.title("Tone Lab")
-        root.configure(background="#151a1d", padx=24, pady=20)
-        root.resizable(False, False)
-        root.protocol("WM_DELETE_WINDOW", self.close)
+        from .widgets import BG
 
-        self.button = tk.Button(root, text="Record clip", command=self.press, width=20,
-                                font=("Segoe UI Semibold", 13), background="#d3ec9c",
-                                foreground="#1d2914", activebackground="#e1f5b6", relief="flat",
-                                padx=10, pady=8, cursor="hand2")
-        self.button.pack(fill="x")
-        tk.Label(root, textvariable=self.status, background="#151a1d", foreground="#f0f1e8",
-                 width=38, wraplength=295, font=("Segoe UI", 10)).pack(pady=(10, 0))
+        root.configure(background=BG)
+        root.minsize(960, 680)
+        width = min(1140, max(960, root.winfo_screenwidth() - 80))
+        height = min(740, max(680, root.winfo_screenheight() - 100))
+        root.geometry(f"{width}x{height}")
+        root.protocol("WM_DELETE_WINDOW", self.close)
         from .review import Review
 
         self.review = Review(root, self, latest_clip)
@@ -65,6 +62,8 @@ class ClipRecorder:
             self.stop.set()
             self.button.configure(state="disabled")
             self.status.set("Saving clip…")
+            return
+        if self.review.busy():
             return
 
         self.stop = Event()
@@ -152,16 +151,19 @@ class ClipRecorder:
         self.status.set(result)
         if not self.review.text.get().strip():
             self.review.read_state()
+        else:
+            self.review.update_buttons()
 
     def close(self):
-        if self.review.live_panel is not None:
-            self.review.live_panel.close(self.close)
+        if self.review.live_active():
+            self.review.live_panel.stop_and_close(self.close)
             return
         if self.review.pending is not None:
             self.status.set("Waiting for the Quad Cortex to finish rendering")
             return
         self.review.stop()
         if self.stop is None:
+            self.review.shutdown()
             self.worker.shutdown(wait=False)
             self.root.destroy()
         else:

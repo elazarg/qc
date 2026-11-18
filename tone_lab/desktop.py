@@ -22,6 +22,10 @@ def show_in_taskbar(root):
     ancestor.argtypes = (wintypes.HWND, wintypes.UINT)
     ancestor.restype = wintypes.HWND
     hwnd = ancestor(root.winfo_id(), 2)  # Tk's native top-level wrapper.
+    dark_title = wintypes.BOOL(True)
+    dark_mode = ctypes.windll.dwmapi.DwmSetWindowAttribute
+    dark_mode.argtypes = (wintypes.HWND, wintypes.DWORD, ctypes.c_void_p, wintypes.DWORD)
+    dark_mode(hwnd, 20, ctypes.byref(dark_title), ctypes.sizeof(dark_title))
     get_style = user32.GetWindowLongW
     set_style = user32.SetWindowLongW
     get_style.argtypes = (wintypes.HWND, ctypes.c_int)
