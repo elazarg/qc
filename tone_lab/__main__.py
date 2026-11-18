@@ -25,6 +25,22 @@ def parser():
     search.add_argument("query", nargs="?", default="")
     search.add_argument("--reference", type=Path, help="Match a local reference WAV")
     search.add_argument("--take", help="Prefer results from this take ID")
+    compensation = sub.add_parser("test-compensation", help="Test a bounded tone-pot EQ correction offline")
+    compensation.add_argument("reference", type=Path, help="Open-tone dry WAV")
+    compensation.add_argument("rolled", type=Path, help="Same notes played with the tone pot rolled back")
+    compensation.add_argument("output", type=Path, help="New WAV for the result")
+    levels = sub.add_parser("levels", help="Measure dry/wet levels or plan relative post-chain preset trims")
+    levels.add_argument("--take", type=Path, help="Measure this dry/wet take. Defaults to the latest take.")
+    levels.add_argument("--comparison", type=Path, help="Plan trims from this saved comparison's raw renders")
+    levels.add_argument("--reference", help="Comparison letter or raw render filename to use as the anchor")
+    levels.add_argument("--target-lufs", type=float, help="Optional target loudness for the anchor")
+    levels.add_argument("--ceiling-dbtp", type=float, default=-3.0, help="Estimated peak ceiling for proposed trims")
+    levels.add_argument("--offset", action="append", default=[], metavar="CANDIDATE=DB",
+                        help="Intentional relative lift or cut, e.g. B=2")
+    stage = sub.add_parser("stage-preview", help="Make offline, level-matched EQ listening candidates")
+    stage.add_argument("wet", type=Path, help="Processed guitar WAV")
+    stage.add_argument("output", type=Path, help="New directory for the preview")
+    stage.add_argument("--context", choices=("frfr", "cab", "mix"), default="frfr")
     demo = sub.add_parser("demo", help="Generate a silent, offline example session")
     demo.add_argument("--guitar", choices=session.GUITARS, default="Charvel")
     record = sub.add_parser("record", help="Record a mono DI WAV over ASIO")
@@ -108,6 +124,36 @@ def run(args):
 
             return [{key: str(value) if isinstance(value, Path) else value for key, value in row.items()}
                     for row in tone_search.search(args.query, reference=args.reference, take_id=args.take)]
+        case "test-compensation":
+            from . import guitar_compensation
+
+            if args.output.suffix.lower() != ".wav" or args.output.exists():
+                raise ValueError("Choose a new WAV path for the compensation result.")
+            output, report = guitar_compensation.compare(audio.read_wave(args.reference), audio.read_wave(args.rolled))
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            audio.write_wave(args.output, output, pcm16=True)
+            return {**report, "output": str(args.output.resolve())}
+        case "levels":
+            from . import level_plan
+
+            if not args.comparison:
+                if args.reference or args.target_lufs is not None or args.offset:
+                    raise ValueError("Supply --comparison to plan relative trims.")
+                return level_plan.take_report(args.take)
+            if args.take:
+                raise ValueError("Measure one take or plan levels for one comparison at a time.")
+            offsets = {}
+            for item in args.offset:
+                key, sep, value = item.partition("=")
+                if not sep or not key:
+                    raise ValueError("Enter each offset as CANDIDATE=DB, for example B=2.")
+                offsets[key] = float(value)
+            return level_plan.comparison_plan(args.comparison, reference=args.reference, target_lufs=args.target_lufs,
+                                              ceiling_dbtp=args.ceiling_dbtp, offsets=offsets)
+        case "stage-preview":
+            from . import stage_check
+
+            return stage_check.create_preview(args.wet, args.output, context=args.context)
         case "demo":
             return session.demo(args.guitar)
         case "record":

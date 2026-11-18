@@ -204,8 +204,13 @@ class LivePanel:
         self.reports = SimpleQueue()
         self.commands.put(self.values())
         self.status.set("Loading the Quad Cortex test copy…")
+        try:
+            guitar_config = self.review.guitar_inputs.live_config() if mode == "guitar" else None
+        except (OSError, ValueError) as error:
+            self.status.set(str(error))
+            return
         self.future = self.review.recorder.worker.submit(live_client.run, self.review.take, mode, self.stop_signal,
-                                                         self.commands, self.reports.put)
+                                                         self.commands, self.reports.put, guitar_config=guitar_config)
         self.review.recorder.button.configure(state="disabled")
         self.review.update_buttons()
         self.root.after(100, self.poll)
@@ -232,7 +237,12 @@ class LivePanel:
             try:
                 report = self.reports.get_nowait()
                 if isinstance(report, dict):
-                    self.available_controls = set(report["available"])
+                    if report["event"] == "controls":
+                        self.available_controls = set(report["available"])
+                    else:
+                        self.review.guitar_inputs.live_event(report)
+                        if report.get("applied") and report["control"] in self.knobs:
+                            self.knobs[report["control"]].set(report["value"])
                 else:
                     self.status.set(report)
             except Empty:
@@ -251,6 +261,7 @@ class LivePanel:
             success = True
         self.future = None
         self.available_controls = None
+        self.review.guitar_inputs.live_event({"event": "guitar-stopped"})
         keep, self.keep_request = self.keep_request, None
         self.review.recorder.button.configure(state="normal")
         self.review.update_buttons()

@@ -6,8 +6,10 @@ import tkinter as tk
 import winsound
 
 from . import diagnostics, feedback, styles
+from .guitar_ui import GuitarInputPanel
 from .library_ui import LibraryPanel
 from .live_ui import LivePanel
+from .soundcheck_ui import SoundCheck
 from .widgets import ACCENT, BG, INK, LINE, MUTED, PANEL, TEXT, add_scrollbar, button, card, entry, label, theme
 
 
@@ -37,7 +39,8 @@ class Review:
         nav = tk.Frame(header, bg=BG)
         nav.pack(side="right")
         self.tabs = {}
-        for key, name in (("live", "Live"), ("search", "Tone search"), ("match", "Tone match")):
+        for key, name in (("live", "Live"), ("search", "Tone search"), ("match", "Tone match"),
+                          ("soundcheck", "Sound check"), ("guitar", "Guitar input")):
             choice = button(nav, name, lambda view=key: self.show_view(view), compact=True)
             choice.pack(side="left", padx=(6, 0))
             self.tabs[key] = choice
@@ -65,6 +68,8 @@ class Review:
         self.live_status.pack(anchor="e")
         self.search = LibraryPanel(self, self.views["search"], self.library_worker)
         self.match = LibraryPanel(self, self.views["match"], self.library_worker, matching=True)
+        self.soundcheck = SoundCheck(self, self.views["soundcheck"], self.library_worker)
+        self.guitar_inputs = GuitarInputPanel(self, self.views["guitar"], self.library_worker)
         self.build_sidebar(sidebar)
         self.show_view("live")
 

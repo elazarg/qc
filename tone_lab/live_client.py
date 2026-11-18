@@ -22,12 +22,14 @@ def worker_command():
     return [str(executable), "-m", "tone_lab.live_worker"]
 
 
-def run(take, mode, stop, commands, report, *, audible=True):
+def run(take, mode, stop, commands, report, *, audible=True, guitar_config=None):
     argv = worker_command() + ["--mode", mode]
     if take is not None:
         argv += ["--take", str(take)]
     if not audible:
         argv.append("--muted")
+    if mode == "guitar" and guitar_config:
+        argv += ["--guitar-config", json.dumps(guitar_config, ensure_ascii=True)]
     process = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                                text=True, encoding="utf-8", bufsize=1, creationflags=subprocess.CREATE_NO_WINDOW)
     incoming, outgoing = SimpleQueue(), SimpleQueue()
@@ -80,7 +82,7 @@ def run(take, mode, stop, commands, report, *, audible=True):
                 deadline = time.monotonic() + HEARTBEAT_TIMEOUT
             if event["event"] == "status":
                 report(event["text"])
-            elif event["event"] == "controls":
+            elif event["event"] in ("controls", "guitar-state", "guitar-gesture", "guitar-status"):
                 report(event)
             elif event["event"] == "error":
                 raise RuntimeError(event["text"])

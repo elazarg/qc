@@ -1,6 +1,6 @@
 """Hold the test preset while physical controls update the sound."""
 
-from contextlib import nullcontext
+from contextlib import ExitStack, nullcontext
 import json
 from pathlib import Path
 from queue import Empty
@@ -35,7 +35,8 @@ def update(qc, base, scene, values, previous):
     return next_values
 
 
-def run(take, mode, stop, commands, report, *, audible=True, capture_return=False, events=lambda event: None):
+def run(take, mode, stop, commands, report, *, audible=True, capture_return=False, guitar_config=None,
+        events=lambda event: None):
     if mode not in ("reamp", "guitar"):
         raise ValueError("Choose Reamp loop or Live guitar.")
     if take is None and mode == "reamp":
@@ -66,7 +67,8 @@ def run(take, mode, stop, commands, report, *, audible=True, capture_return=Fals
             base = iterate.prepare_fixture(qc, original_address, original, physical_input)
             if device.active_scene(qc) != scene:
                 device.select_scene(qc, scene)
-            events({"event": "controls", "available": styles.available_knobs(base, scene)})
+            available = styles.available_knobs(base, scene)
+            events({"event": "controls", "available": available})
             if mode == "guitar":
                 iterate.set_routes(qc, physical_routes)
                 iterate.verify_fixture(qc, original, physical_routes)
@@ -79,9 +81,24 @@ def run(take, mode, stop, commands, report, *, audible=True, capture_return=Fals
             if stop.is_set():
                 return {}
             audition = audio.loop_feed(dry, monitor_return=capture_return) if mode == "reamp" else nullcontext((None, {}))
-            with audition as (stream, meters):
+            with ExitStack() as stack:
+                stream, meters = stack.enter_context(audition)
+                observer = None
+                armed = False
+                if mode == "guitar" and guitar_config and not stop.is_set():
+                    from . import guitar_runtime
+
+                    try:
+                        channel = device.recording_channels_from(qc, physical_input)[0]
+                        observer = stack.enter_context(guitar_runtime.listen(guitar_config, channel))
+                    except Exception as error:
+                        events({"event": "guitar-status", "text": f"Guitar input experiment unavailable: {error}"})
+                    else:
+                        armed = observer.allow_changes and observer.detector is not None
+                        events({"event": "guitar-status", "text": "Guitar input is briefly armed" if armed else "Observing dry guitar only"})
                 report("Reamp loop running" if mode == "reamp" else "Live guitar · turn the knobs while you play")
                 previous = {}
+                settings = {}
                 last_check = time.monotonic()
                 last_frames = 0
                 while not stop.is_set():
@@ -95,8 +112,27 @@ def run(take, mode, stop, commands, report, *, audible=True, capture_return=Fals
                         except Empty:
                             break
                     if values is not None and not stop.is_set():
+                        settings = dict(values)
                         previous = update(qc, base, scene, values, previous)
                     now = time.monotonic()
+                    if observer is not None and not stop.is_set():
+                        if armed and not observer.detector.is_armed(now):
+                            armed = False
+                            events({"event": "guitar-status", "text": "Arm expired · observing dry guitar only"})
+                        observation, gesture = observer.poll(now)
+                        if observation is not None:
+                            events(observation)
+                        if gesture is not None:
+                            applied = (observer.allow_changes and observer.detector.is_armed(now)
+                                       and gesture.control in available)
+                            if applied:
+                                next_settings = gesture.apply(settings)
+                                applied = next_settings != settings
+                                if applied:
+                                    previous = update(qc, base, scene, next_settings, previous)
+                                    settings = next_settings
+                            events({**gesture.to_dict(), "event": "guitar-gesture", "applied": bool(applied),
+                                    "value": settings.get(gesture.control, 0.0)})
                     if now - last_check >= .8:
                         if device.live_position(qc) != iterate.SCRATCH:
                             raise RuntimeError("Stopped because the preset changed on the Quad Cortex.")

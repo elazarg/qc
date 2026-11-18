@@ -55,6 +55,7 @@ def main():
     parser.add_argument("--mode", choices=("guitar", "reamp"))
     parser.add_argument("--muted", action="store_true")
     parser.add_argument("--capture-return", action="store_true")
+    parser.add_argument("--guitar-config", type=json.loads)
     parser.add_argument("--recover", action="store_true")
     args = parser.parse_args()
     diagnostics.configure()
@@ -78,7 +79,8 @@ def main():
                 emit(event)
 
             result = live.run(args.take, args.mode, stop, commands, lambda text: emit({"event": "status", "text": text}),
-                              audible=not args.muted, capture_return=args.capture_return, events=events)
+                              audible=not args.muted, capture_return=args.capture_return,
+                              guitar_config=args.guitar_config, events=events)
             RECOVERY.unlink(missing_ok=True)
             diagnostics.LOG.info("Live worker stopped %s", result)
             emit({"event": "done", "audio": result})

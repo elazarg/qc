@@ -53,13 +53,21 @@ def live_position(qc):
             qc._pending.clear()
 
 
-def recording_channels(physical_input, *, include_context=False):
+def recording_channels_from(qc, physical_input):
     if physical_input not in (1, 2):
         raise ValueError("Choose physical guitar input 1 or 2.")
-    with connect() as qc:
+    io = qc.read_message("IOSettings")
+    if io is None:
         io = qc.read_message("IOSettings")
-        if io is None:
-            io = qc.read_message("IOSettings")
+    if (io is None or not io.HasField("settings") or not io.settings.HasField("usb_port")
+            or io.settings.usb_port.dry_wet not in (0, 1)):
+        raise RuntimeError("Could not read the Quad Cortex USB Dry/Wet setting. Check the connection and retry.")
+    return (physical_input + 2, 1, 2) if io.settings.usb_port.dry_wet else (physical_input, 3, 4)
+
+
+def recording_channels(physical_input, *, include_context=False):
+    with connect() as qc:
+        channels = recording_channels_from(qc, physical_input)
         context = {}
         if include_context:
             try:
@@ -67,10 +75,6 @@ def recording_channels(physical_input, *, include_context=False):
                            "wet_position": qc.get_setlist_position(), "coros": qc.firmware}
             except Exception:
                 logging.getLogger("tone_lab").warning("Recording preset context unavailable", exc_info=True)
-    if (io is None or not io.HasField("settings") or not io.settings.HasField("usb_port")
-            or io.settings.usb_port.dry_wet not in (0, 1)):
-        raise RuntimeError("Could not read the Quad Cortex USB Dry/Wet setting. Check the connection and retry.")
-    channels = (physical_input + 2, 1, 2) if io.settings.usb_port.dry_wet else (physical_input, 3, 4)
     return (channels, context) if include_context else channels
 
 
