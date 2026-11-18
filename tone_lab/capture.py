@@ -233,6 +233,7 @@ def launch(input_channel, *, workbench=False):
     screen = "workbench" if workbench else "desk"
     while screen != "exit":
         root = tk.Tk()
+        root.withdraw()
         root.report_callback_exception = lambda kind, error, trace: diagnostics.LOG.error(
             "Tone Lab interface callback failed", exc_info=(kind, error, trace))
         destination = "exit"
@@ -249,5 +250,6 @@ def launch(input_channel, *, workbench=False):
 
             Desk(root, input_channel, leave)
         desktop.show_in_taskbar(root)
+        diagnostics.LOG.info("Tone Lab workspace ready (%s)", screen)
         root.mainloop()
         screen = destination

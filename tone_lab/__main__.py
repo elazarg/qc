@@ -91,12 +91,14 @@ def parser():
 
 def run(args):
     match args.action:
-        case "clip" | "latest-clip":
+        case "clip":
+            from . import desktop
+
+            desktop.open_desk(args.input, workbench=args.workbench)
+        case "latest-clip":
             from . import capture
 
-            if args.action == "latest-clip":
-                return capture.latest_clip(pair=args.pair)
-            capture.launch(args.input, workbench=args.workbench)
+            return capture.latest_clip(pair=args.pair)
         case "ui":
             from .ui import launch
 
