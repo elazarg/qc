@@ -30,7 +30,7 @@ Sounds, rounds, songs, phrases, the assistant's ledger and the unit's directory 
 
 ## The assistant
 
-Designs and revisions are made by the Codex CLI (`codex login` once). Every call is written to `ledger.jsonl` with its kind, who asked (you, or the app preparing three more), its length and outcome, and the app stops making calls of its own after 80 a day. A round takes about a minute; listening to its three designs about another minute.
+Designs and revisions are made by the Codex CLI (`codex login` once). Every call is written to `ledger.jsonl` with its kind, who asked (you, or the app preparing three more), its length and outcome, and no more than 80 calls are made in a day, yours and the app's together. A round takes about a minute; listening to its three designs about another minute.
 
 ## Command line
 
