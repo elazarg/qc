@@ -18,8 +18,10 @@ internal static class Program
     [DllImport("user32.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
     private static extern int MessageBoxW(IntPtr owner, string message, string title, uint flags);
 
+    // Arguments are passed on to start.pyw: "--new" opens the rewritten desk, "--old" the old one. Without
+    // either, start.pyw decides (TONE_LAB_DESK, then launcher.json in the data folder, then the old desk).
     [STAThread]
-    private static int Main()
+    private static int Main(string[] args)
     {
         try
         {
@@ -33,7 +35,10 @@ internal static class Program
             if (!File.Exists(startup))
                 return Fail("The Tone Lab startup file is missing. Open Tone Lab from its project folder.");
 
-            var start = new ProcessStartInfo(python, "\"" + startup + "\"")
+            string arguments = "\"" + startup + "\"";
+            foreach (string argument in args)
+                arguments += " " + Quote(argument);
+            var start = new ProcessStartInfo(python, arguments)
             {
                 WorkingDirectory = folder,
                 UseShellExecute = false,
@@ -53,6 +58,23 @@ internal static class Program
         {
             return Fail("Windows couldn't start Tone Lab." + Environment.NewLine + error.Message);
         }
+    }
+
+    private static string Quote(string argument)
+    {
+        // Simple flags such as --new pass as they are; anything else is quoted for the Windows command line.
+        if (argument.Length > 0 && argument.IndexOfAny(new[] { ' ', '\t', '"' }) < 0)
+            return argument;
+        var quoted = new System.Text.StringBuilder("\"");
+        int slashes = 0;
+        foreach (char c in argument)
+        {
+            if (c == '\\') { slashes++; continue; }
+            // Backslashes before a quote are doubled and the quote escaped; elsewhere they stand as they are.
+            quoted.Append('\\', c == '"' ? slashes * 2 + 1 : slashes).Append(c);
+            slashes = 0;
+        }
+        return quoted.Append('\\', slashes * 2).Append('"').ToString();
     }
 
     private static int Fail(string message)

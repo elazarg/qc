@@ -27,8 +27,22 @@ SHARED = REPO / "tone_lab" / "knowledge"
 
 
 def home():
-    """Where the app keeps the player's data. TONE_LAB_HOME overrides it."""
-    folder = Path(os.environ.get("TONE_LAB_HOME") or REPO / "tone_sessions" / "lab")
+    """Where the app keeps the player's data: `%LOCALAPPDATA%\\Tone Lab`. TONE_LAB_HOME overrides it.
+
+    Local, not roaming: the data is tied to this computer and its unit (the USB delay, which cache slot holds
+    what, the note of a borrowed preset to give back after a crash), and recordings are too large to roam.
+    The first time, what an earlier version kept in the program folder is copied here (`setup.move_old_home`).
+    """
+    chosen = os.environ.get("TONE_LAB_HOME")
+    if chosen:
+        folder = Path(chosen)
+    else:
+        base = os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local"
+        folder = Path(base) / "Tone Lab"
+        if not folder.exists():
+            from .setup import move_old_home
+
+            move_old_home(REPO / "tone_sessions" / "lab", folder)
     folder.mkdir(parents=True, exist_ok=True)
     return folder
 

@@ -59,7 +59,7 @@ class DesktopStartupTest(unittest.TestCase):
               patch.object(sys, "path", list(sys.path)),
               patch.object(desktop, "open_desk", side_effect=ValueError("Initialization failed")),
               patch.object(bootstrap["ctypes"].windll.user32, "MessageBoxW", dialog)):
-            self.assertEqual(main(), 2)
+            self.assertEqual(main(["--old"]), 2)
             failure = main.__globals__["write_log"].call_args.args[0]
             self.assertIn("ValueError: Initialization failed", failure)
         self.assertIn("Initialization failed", dialog.call_args.args[1])

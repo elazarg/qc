@@ -98,6 +98,12 @@ class WindowTest(unittest.TestCase):
         if self.learner is not None:
             self.learner.shutdown()
         self.root.destroy()
+        # Free the window's Tk variables here, on the main thread: if a later test's worker thread happens to run
+        # the collector, Tk aborts the whole interpreter.
+        import gc
+
+        self.learner = self.root = None
+        gc.collect()
 
     def settle(self):
         deadline = time.monotonic() + 20

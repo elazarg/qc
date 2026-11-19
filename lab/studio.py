@@ -546,12 +546,14 @@ class Studio:
 
     def recorded_phrases(self):
         found = []
-        for folder in sorted((self.folder / "phrases").glob("*"), key=lambda path: path.stat().st_mtime_ns, reverse=True):
+        for folder in (self.folder / "phrases").glob("*"):
             try:
-                found.append(json.loads((folder / "phrase.json").read_text(encoding="utf-8")))
+                found.append((folder.stat().st_mtime_ns, json.loads((folder / "phrase.json").read_text(encoding="utf-8"))))
             except (OSError, ValueError):
                 continue
-        return found
+        # Newest first, by when it was played; the file time only breaks ties.
+        found.sort(key=lambda pair: (pair[1].get("recorded", ""), pair[0]), reverse=True)
+        return [item for _, item in found]
 
     def guitar_profile(self):
         """What the current instrument puts out at each pickup setting, from the phrases recorded on it."""
@@ -559,7 +561,8 @@ class Studio:
         from .profile import profile
 
         takes = [(item["setting"], read_wave(self.folder / "phrases" / item["id"] / "dry.wav")[:, :1])
-                 for item in self.recorded_phrases() if item["instrument"] == self.state.instrument]
+                 for item in self.recorded_phrases()
+                 if item["instrument"] == self.state.instrument and item.get("setting", "unknown") != "unknown"]
         if not takes:
             return {}, [f"No phrase has been recorded on the {self.state.instrument} with its pickup setting noted. "
                         "Record the same short phrase on each setting."]

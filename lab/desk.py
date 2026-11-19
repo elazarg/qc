@@ -70,7 +70,9 @@ class Desk:
         studio.listeners.append(lambda state: self.draw())
         root.bind("<Key>", self.key)
         root.protocol("WM_DELETE_WINDOW", self.close)
-        self.choose_phrase(phrases()[0] if phrases() else None)
+        recorded = studio.recorded_phrases()
+        if recorded:
+            self.choose_recorded(recorded[0])
         studio.open()
         self.tick()
 
@@ -466,13 +468,9 @@ class Desk:
         menu.delete(0, "end")
         menu.add_command(label="Record a phrase…", command=self.record)
         menu.add_separator()
-        for item in self.studio.recorded_phrases()[:12]:
+        for item in self.studio.recorded_phrases()[:20]:
             menu.add_command(label=f"{item['instrument']} · {item['setting']} · {item['recorded'][5:16]}",
                              command=lambda item=item: self.choose_recorded(item))
-        menu.add_separator()
-        for take in phrases()[:12]:
-            note = take[2].get("pickup_note") or ""
-            menu.add_command(label=f"{take[0][5:]}  {note}"[:60], command=lambda take=take: self.choose_phrase(take))
 
     def record(self):
         instrument = self.studio.store.instrument(self.studio.state.instrument) or {}
@@ -486,8 +484,8 @@ class Desk:
             self.studio.record(choice.strip())
 
     def choose_recorded(self, item):
-        self.studio.phrase = (item["id"], read_wave(self.studio.folder / "phrases" / item["id"] / "dry.wav")[:, :1])
-        self.phrase_menu.configure(text=f"Phrase · {item['setting']}")
+        self.studio.phrase = (item["id"], loudest(self.studio.folder / "phrases" / item["id"] / "dry.wav"))
+        self.phrase_menu.configure(text=f"Phrase · {item.get('instrument', '')} · {item['setting']}")
 
     def panel_guitar(self):
         _, lines = self.studio.guitar_profile()
@@ -495,12 +493,6 @@ class Desk:
         for line in lines:
             label(self.tray, line, size=9, wrap=400).pack(fill="x", pady=2)
         button(self.tray, "Record a phrase", self.record).pack(fill="x", pady=(8, 0))
-
-    def choose_phrase(self, take):
-        if take is None:
-            return
-        self.studio.phrase = (take[0], loudest(take[1]))
-        self.phrase_menu.configure(text=f"Phrase · {take[0][5:20]}")
 
     def calibrate(self):
         self.studio.set(working="Measuring the USB round trip…")
@@ -605,10 +597,33 @@ def main(arguments):
     simulated = "--simulated" in arguments
     folder = home() / ("simulated" if simulated else "")
     folder.mkdir(parents=True, exist_ok=True)
-    host = Host(folder, simulated=simulated)
     root = tk.Tk()
+    if not simulated:
+        first_run(root, folder)
+    host = Host(folder, simulated=simulated)
     Desk(root, Studio(host, folder))
     root.mainloop()
+
+
+def first_run(root, folder):
+    """Once: check what the app needs, bring the earlier app's history in, and say what is missing."""
+    from tkinter import messagebox
+
+    from . import migrate, setup
+
+    if not setup.first_run_needed(folder):
+        return
+    findings = setup.checks(folder)
+    try:
+        moved = migrate.summary(migrate.migrate(folder))[0]
+    except Exception as error:  # noqa: BLE001
+        moved = f"The earlier app's history could not be brought in: {error}"
+    setup.record(folder, findings)
+    missing = [item["say"] for item in findings if not item["ok"]]
+    text = ("\n\n".join(missing) if missing else "Everything the app needs is here.") + "\n\n" + moved
+    root.withdraw()
+    (messagebox.showwarning if missing else messagebox.showinfo)("Tone Lab · first run", text, parent=root)
+    root.deiconify()
 
 
 if __name__ == "__main__":
