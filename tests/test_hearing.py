@@ -51,7 +51,11 @@ class HearingTest(unittest.TestCase):
         ring = (dry[:audio.RATE // 2] * .2).astype(np.float32)
         heard = hearing.describe(dry, dry, dry * hearing.SOFTER, ring)
         self.assertEqual(heard.space, "wet")
-        self.assertEqual(hearing.describe(dry, dry, dry * hearing.SOFTER, ring * .05).space, "ambient")
+        self.assertEqual(hearing.describe(dry, dry, dry * hearing.SOFTER, ring * .1).space, "ambient")
+        # An echo 80 ms after the phrase stops is heard, although nothing rings half a second later.
+        echo = np.zeros((audio.RATE, 1), dtype=np.float32)
+        echo[round(.08 * audio.RATE):round(.2 * audio.RATE)] = dry[:round(.12 * audio.RATE)] * .5
+        self.assertIn(hearing.describe(dry, dry, dry * hearing.SOFTER, echo).space, ("ambient", "wet"))
         # Delay and reverb follow level exactly, so they never read as drive.
         self.assertAlmostEqual(heard.squash, 0., places=2)
 
@@ -64,6 +68,42 @@ class HearingTest(unittest.TestCase):
         self.assertEqual(heard.to_record()["tone"], "dark")
         self.assertEqual(heard.said(), "clean, dark, dry")
 
+
+    def test_a_compressor_that_leaves_the_peaks_standing_is_not_called_distortion(self):
+        def squeeze(sound):  # Holds the level down as a whole, as a slow compressor does. Nothing is clipped.
+            return sound * (.02 / max(float(np.sqrt(np.mean(sound ** 2))), 1e-9))
+
+        heard = hearing.describe(*through(squeeze, note(4.)))
+        self.assertGreater(heard.squash, .82)
+        self.assertGreater(heard.crest_db, hearing.PEAKS_INTACT)
+        self.assertEqual(heard.drive, "edge of breakup")
+
+    def test_two_channels_in_opposite_phase_are_heard_and_not_cancelled(self):
+        dry = note()
+        wide = np.hstack([dry, -dry])
+        heard = hearing.describe(dry, wide, wide * hearing.SOFTER, np.full((audio.RATE // 2, 2), 1e-7))
+        self.assertEqual((heard.tone, heard.drive), ("balanced", "clean"))
+        self.assertAlmostEqual(heard.level_db, hearing._level(dry), places=1)
+
+    def test_a_pass_is_refused_once_the_unit_has_left_the_draft(self):
+        from unittest.mock import patch
+
+        dry = note()
+        played = []
+
+        def reamp(sound, *, tail, cancel=None):
+            played.append(len(sound))
+            return np.zeros((len(sound) + round(tail * audio.RATE) + 100, 2), dtype=np.float32) + .01
+
+        positions = iter([hearing.draft_render.WORK_SLOT, {"position": 7}])
+        with patch.object(hearing.device, "live_position", side_effect=lambda qc: next(positions)), \
+                patch.object(hearing.device, "active_scene", return_value=0), \
+                patch.object(hearing.device, "read_preset"), \
+                patch.object(hearing.iterate, "routes", return_value=hearing.iterate.USB_ROUTES), \
+                patch.object(hearing.audio, "reamp", reamp):
+            with self.assertRaises(hearing.Moved):
+                hearing.proof(object(), dry, 0)
+        self.assertEqual(len(played), 1)  # The quieter pass was never sent into the preset the player chose.
 
 if __name__ == "__main__":
     unittest.main()

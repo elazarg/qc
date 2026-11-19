@@ -3,8 +3,11 @@
 from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
+
+import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -121,7 +124,8 @@ class RoundTest(unittest.TestCase):
         self.assertTrue(self.request.call_args.kwargs["web"])  # Later rounds may take the time to look things up.
         self.assertIn("The player now says: brighter, and more echo", prompt)
         self.assertIn('"player_said": "right fuzz, still too dark"', prompt)
-        self.assertIn('"knobs_moved": {"drive": 1.0, "warmth": -0.8}', prompt)
+        self.assertIn('"knobs_when_measured": {"drive": 1.0, "warmth": -0.8}', prompt)
+        self.assertIn('"knobs_now": {"drive": 1.0, "warmth": -0.8}', prompt)
         self.assertIn('"measured_as_designed": {"drive": "edge of breakup", "tone": "dark", "space": "ambient"}', prompt)
         self.assertIn('"player_heard_it": false', prompt)
         self.assertEqual(second["parent"], found["id"])
@@ -137,6 +141,78 @@ class RoundTest(unittest.TestCase):
         rounds.show(rounds.check(rounds.start("the solo of Time", "Charvel"), hear=Ear()), lines.append)
         self.assertIn("Aiming for: saturated, bright, ambient. A singing fuzz lead.", lines[1])
 
+
+    # ---- The findings of the review of 2026-11-19 (SUGGESTIONS_BRANCH_REVIEW.md) ----
+
+    def test_three_names_over_one_chain_are_one_design(self):
+        same = reply()
+        for design in same["designs"][1:]:
+            design["chain"] = same["designs"][0]["chain"]
+        self.request.return_value = same
+        self.assertEqual([c["name"] for c in rounds.start("x", "Charvel")["candidates"]], ["By the book"])
+
+    def test_a_design_that_cannot_be_listened_to_does_not_stop_the_others(self):
+        ear = Ear()
+
+        def hear(draft, values):
+            if draft["name"] == "By the book":
+                raise RuntimeError("The draft returned silence.")
+            return ear(draft, values)
+
+        found = rounds.check(rounds.start("the solo of Time", "Charvel"), hear=hear, reorder=False)
+        first, second, third = found["candidates"]
+        self.assertEqual((first["failed"], first["heard"]), ("The draft returned silence.", None))
+        self.assertEqual(second["tags"][-1], "on the aim")
+        self.assertIsNotNone(third["heard"])
+        self.assertEqual(rounds.unchecked(found), [])  # It is not tried again and again.
+        self.assertEqual(rounds.closest(found), 1)
+
+    def test_the_worker_writes_nothing_and_a_stop_keeps_what_was_finished(self):
+        found = rounds.start("the solo of Time", "Charvel")
+        calls = []
+
+        def hear(draft, values):
+            calls.append(draft["name"])
+            if draft["name"] == "Measured":
+                raise rounds.Stopped()
+            return Ear()(draft, values)
+
+        result = rounds.check(found, hear=hear, reorder=False, persist=False)
+        self.assertIsNotNone(result["candidates"][0]["heard"])
+        self.assertIsNone(result["candidates"][1]["heard"])
+        self.assertNotIn("Another way", calls)
+        self.assertIsNone(rounds.load(found["id"])["candidates"][0]["heard"])  # Nothing reached the disk.
+
+    def test_what_was_measured_is_kept_with_the_knobs_it_was_measured_at(self):
+        found = rounds.check(rounds.start("the solo of Time", "Charvel"), hear=Ear())
+        book = next(c for c in found["candidates"] if c["name"] == "By the book")
+        self.assertEqual(book["served_shape"], {"drive": 1., "warmth": -.8})
+        played = rounds.start("the solo of Time", "Charvel")
+        played["candidates"][0].update(played=True, shape={"drive": .6})
+        mine = rounds.check(played, hear=Ear(), reorder=False)["candidates"][0]
+        self.assertEqual((mine["shape"], mine["served_shape"], mine["tags"][0]), ({"drive": .6}, {"drive": .6}, "crunch"))
+
+    def test_a_round_with_an_owned_impulse_response_can_be_summarised(self):
+        found = rounds.check(rounds.start("the solo of Time", "Charvel"), hear=Ear())
+        asset = SimpleNamespace(name="My V30 IR")
+        drafts = {c["draft"]: rounds.draft_of(c) for c in found["candidates"]}
+        with patch.object(rounds, "draft_of", lambda candidate: drafts[candidate["draft"]]),                 patch.object(preset_design, "asset_attachment", lambda block: asset if block["model_id"] == V30 else None):
+            blocks = rounds.summary(found)["designs"][0]["blocks"]
+        self.assertIn("My V30 IR", [part["model"] for part in blocks])
+
+    def test_listening_refuses_a_unit_that_is_elsewhere_or_being_played(self):
+        qc = object()
+        with patch.object(rounds.device, "live_position", return_value={"position": 9}):
+            with self.assertRaisesRegex(rounds.Busy, "Another preset"):
+                rounds.idle(qc, {"position": 3}, 1)
+        loud = np.full((100, 1), .05, dtype=np.float32)
+        with patch.object(rounds.device, "live_position", return_value={"position": 3}), \
+                patch.object(rounds.device, "recording_channels_from", return_value=(1, 3, 4)), \
+                patch.object(rounds.audio, "record_di", return_value=loud) as record:
+            with self.assertRaisesRegex(rounds.Busy, "being played"):
+                rounds.idle(qc, {"position": 3}, 1)
+            record.return_value = loud * .001
+            rounds.idle(qc, {"position": 3}, 1)
 
 if __name__ == "__main__":
     unittest.main()

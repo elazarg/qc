@@ -215,7 +215,7 @@ Drives have not been swept the way amps were.
 
 Measured on 2026-11-19 on the saved drafts: the clean Twin drafts 0.00, a Plexi at gain 2.3 0.18, the "Time" draft 0.35 as written and 0.99 with Drive at full, a crunch solo 0.50, the Timmons lead 0.80, the Rectifier rhythm 0.87 and the Santana lead 0.92. The words change at 0.18 (edge of breakup), 0.40 (crunch), 0.62 (overdriven) and 0.82 (saturated).
 
-Nothing uses it yet. `SUGGESTIONS.md` proposes how it would gate what the designer returns.
+A chain whose peaks still stand 15 dB over its average is called at most the edge of breakup, so that a compressor is not read as distortion. Ambience is what sounds from 40 ms after the phrase stops, against the phrase: chains with no delay or reverb measured −45 to −72 dB, a room at 9 to 11% −35 to −37, a lead delay at 21% −15 to −17. `SUGGESTIONS.md` describes how the desk uses it.
 
 ## What each control does
 

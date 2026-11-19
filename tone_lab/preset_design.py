@@ -744,14 +744,19 @@ def design_round(text, guitar, take, *, earlier=None, research=False, assets=Non
         returned = list(result["designs"])[:3]
     except (KeyError, TypeError, AttributeError) as error:
         raise ValueError(f"The AI returned an unusable round. Try the request again. {error}") from error
-    designs = []
+    designs, seen = [], set()
     for item in returned:
         differs = str(item.pop("differs", "")).strip()
         try:
-            recipe = _recipe(item, None, library)
+            recipe = _with_shaping(_recipe(item, None, library))
         except ValueError:
             continue  # One unusable design does not sink the round.
-        designs.append((_persist(_with_shaping(recipe), request=text, guitar=guitar, parent=None), differs))
+        # Three names over one chain are one design. Only what would sound different counts.
+        sound = json.dumps([recipe["chain"], recipe.get("parallel"), recipe.get("blend")], sort_keys=True)
+        if sound in seen:
+            continue
+        seen.add(sound)
+        designs.append((_persist(recipe, request=text, guitar=guitar, parent=None), differs))
     if not designs:
         raise ValueError("The AI returned no usable design. Try the request again.")
     return aim, designs

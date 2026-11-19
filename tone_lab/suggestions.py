@@ -27,6 +27,7 @@ class Suggestions:
 
     AFTER_ARRIVAL = 25_000  # ms the unit is left alone when a round arrives, in case the player plays at once
     AFTER_PLAYING = 4_000   # ms after the input stops before the app takes the unit to listen
+    WHEN_BUSY = 30_000      # ms before looking again when the unit was found in use
 
     def __init__(self, desk):
         self.desk = desk
@@ -37,6 +38,8 @@ class Suggestions:
         self.then = None         # What the player asked for while the app held the unit.
         self.timer = None
         self.reviewing = None    # (round id, place) while the request line is taking a review.
+        self.sent = {}           # The knobs each design had when it was sent to be listened to.
+        self.outdated = False    # The player said something after the next round was asked for.
 
     # ---- What is on show ----
 
@@ -52,8 +55,11 @@ class Suggestions:
                      if candidate["draft"] == tone.draft_id), None)
 
     def restore(self, round_id):
+        """Return to the round that was on show. Without one, the latest is shown, so that rounds are never hidden."""
         if any(found["id"] == round_id for found in self.rounds):
             self.shown = round_id
+        elif self.shown is None and self.rounds:
+            self.shown = self.rounds[-1]["id"]
 
     def adopt(self, found):
         """Take a round into the desk: its designs become drafts the desk knows."""
@@ -65,9 +71,9 @@ class Suggestions:
     # ---- A round arrives ----
 
     @staticmethod
-    def design(text, guitar, take, cancel):
-        """Runs off the main thread."""
-        return rounds.start(text, guitar, take, cancel=cancel)
+    def design(text, guitar, take, cancel, phrase=None):
+        """Runs off the main thread. `phrase` is the take the whole round will be listened to on."""
+        return rounds.start(text, guitar, take, cancel=cancel, phrase=phrase)
 
     def arrived(self, found, current):
         desk = self.desk
@@ -95,14 +101,16 @@ class Suggestions:
 
     def step(self, place):
         found = self.found()
-        if not found or not 0 <= place < len(found["candidates"]) or place == self.place():
+        if self.desk.blind or not found or not 0 <= place < len(found["candidates"]) or place == self.place():
             return
         self.put(place)
 
     def put(self, place, *, announce=True):
         desk, found = self.desk, self.found()
         if desk.task_if_active("listen"):
-            self.interrupt(lambda: self.put(place, announce=announce))
+            # The choice is of this design in this round, whatever is on show by the time the unit is back.
+            chosen = (found["id"], found["candidates"][place]["draft"])
+            self.interrupt(lambda: self.put_chosen(*chosen, announce=announce))
             return
         if desk.job is not None and not desk.task_if_active("monitor"):
             desk.set_status("Wait for the Quad Cortex to finish, then try again.")
@@ -117,9 +125,17 @@ class Suggestions:
             desk.set_status(f"{place + 1} of {len(found['candidates'])} · {candidate['name']} is on B.",
                             actions=(("Undo", desk.undo_last),))
 
+    def put_chosen(self, round_id, draft_id, *, announce=True):
+        found = next((found for found in self.rounds if found["id"] == round_id), None)
+        place = next((place for place, candidate in enumerate(found["candidates"] if found else ())
+                      if candidate["draft"] == draft_id), None)
+        if place is not None:
+            self.shown = round_id
+            self.put(place, announce=announce)
+
     def browse(self, delta):
         """Look at an earlier or later round. B stays as it is until a design is chosen."""
-        if not self.rounds:
+        if not self.rounds or self.desk.blind:
             return
         ids = [found["id"] for found in self.rounds]
         at = ids.index(self.shown) if self.shown in ids else len(ids) - 1 if delta < 0 else -1
@@ -150,6 +166,7 @@ class Suggestions:
         tags = found["candidates"][place]["user_tags"]
         tags.remove(word) if word in tags else tags.append(word)
         rounds.save(found)
+        self.outdated = self.pending is not None
         self.desk.update()
         self.consider()
 
@@ -171,7 +188,13 @@ class Suggestions:
         found = next(found for found in self.rounds if found["id"] == round_id)
         found["candidates"][place]["review"] = text
         rounds.save(found)
-        self.desk.set_status("Noted. The next three will use it.", actions=(("Three more now", self.more),))
+        if self.pending is not None:
+            # The three being prepared were asked for before this was said. They cannot know it.
+            self.outdated = True
+            self.desk.set_status("Noted. Three are already being prepared without it. Ask for three more "
+                                 "afterwards to have it used.")
+        else:
+            self.desk.set_status("Noted. The next three will use it.", actions=(("Three more now", self.more),))
         self.desk.update()
         self.consider()
 
@@ -194,6 +217,7 @@ class Suggestions:
         self.sync()
         found["followed"] = True
         rounds.save(found)
+        self.outdated = False
         self.pending = desk.advisor.submit(rounds.again, deepcopy(found))
         if asked:
             desk.set_status("Preparing three more from what was measured and what you said. About a minute…",
@@ -213,8 +237,11 @@ class Suggestions:
                                  actions=(("Try again", self.more),))
             return
         self.adopt(found)
-        self.desk.set_status(f"Three more are ready, aiming for {aim_words(found)}.", kind="reading",
-                             actions=(("Show them", lambda: self.show(found["id"])),))
+        late, self.outdated = self.outdated, False
+        self.desk.set_status(f"Three more are ready, aiming for {aim_words(found)}."
+                             + (" They were prepared before your last remark." if late else ""), kind="reading",
+                             actions=(("Show them", lambda: self.show(found["id"])),
+                                      *((("Three more, with the remark", self.more),) if late else ())))
         self.desk.update()
 
     # ---- Listening, whenever the unit is free ----
@@ -231,23 +258,33 @@ class Suggestions:
         desk = self.desk
         waiting = next((found for found in [self.found(), *self.rounds[::-1]] if found and rounds.unchecked(found)), None)
         if (waiting is None or desk.job is not None or desk.leaving is not None or desk.thinking is not None
-                or not desk.takes or desk.playing):
+                or not desk.take or desk.playing or desk.blind):
             return
         self.sync()
+        if not waiting.get("phrase"):
+            # Every design of a round is listened to on one phrase: the one selected now.
+            waiting["phrase"] = desk.take.folder.name
+            rounds.save(waiting)
         self.stop = Event()
+        self.sent = {candidate["draft"]: dict(candidate["shape"]) for candidate in waiting["candidates"]}
         desk.submit("listen", "Listening to the designs, silently. Guitar or Phrase takes the unit back at once.",
-                    self.listen, deepcopy(waiting), self.stop, done=self.listened)
+                    self.listen, deepcopy(waiting), self.stop, desk.qc_position, desk.input_channel,
+                    done=self.listened)
         if desk.task_if_active("listen"):
             desk.stop_signal = self.stop  # Space, and closing the desk, end it like any other job.
 
     @staticmethod
-    def listen(found, stop):
-        """Runs off the main thread. A failure is handed back with the round, so that the desk can carry on."""
+    def listen(found, stop, expect, physical_input):
+        """Runs off the main thread, and does the listening in a process of its own."""
         try:
-            return rounds.check(found, stop=stop, reorder=False), None
+            return rounds.audition(found, stop, expect=expect, physical_input=physical_input)
         except Exception as error:  # noqa: BLE001
             diagnostics.LOG.exception("Listening to the designs failed")
-            return found, error
+            return found, "error", str(error)
+
+    def forget(self):
+        """The player pressed Stop. Whatever was waiting for the unit is dropped with it."""
+        self.then = None
 
     def close(self):
         if self.timer is not None:
@@ -266,26 +303,42 @@ class Suggestions:
     def listened(self, outcome):
         """Fold what the app heard into the round, leaving alone whatever the player changed meanwhile."""
         desk = self.desk
-        result, error = outcome
-        stopped = self.stop is not None and self.stop.is_set()
+        result, status, message = outcome
+        error = message if status == "error" else None
+        stopped = status == "stopped" or self.stop is not None and self.stop.is_set()
         self.stop = None
         if error is not None:
             desk.set_status(f"The designs could not be listened to. {error}", kind="error")
+        elif status == "busy":
+            # The unit is in use away from Tone Lab. It was not touched. Look again later, quietly.
+            desk.set_status("")
+            then, self.then = self.then, None
+            desk.update()
+            if then:
+                desk.root.after_idle(then)
+            else:
+                self.rest(self.WHEN_BUSY)
+            return
         found = next((found for found in self.rounds if found["id"] == result["id"]), None)
         if found:
             on_b = self.place() if found["id"] == self.shown else None
+            found["phrase"] = result.get("phrase") or found.get("phrase")
             for place, candidate in enumerate(found["candidates"]):
                 heard = next((other for other in result["candidates"] if other["draft"] == candidate["draft"]), None)
+                if heard and heard.get("failed"):
+                    candidate["failed"] = heard["failed"]
                 if not heard or heard["heard"] is None:
                     continue
-                candidate.update({key: heard[key] for key in ("heard", "served", "tags", "miss")})
-                if not candidate["played"] and heard["shape"] != candidate["shape"]:
-                    # Nobody has heard this one yet, so the knobs the app found for it become its own.
+                candidate.update({key: heard[key] for key in ("heard", "served", "served_shape", "tags", "miss")})
+                untouched = candidate["shape"] == self.sent.get(candidate["draft"])
+                if not candidate["played"] and untouched and heard["shape"] != candidate["shape"]:
+                    # Nobody has heard this one and its knobs are as they were sent, so the knobs the app
+                    # found for it become its own. Knobs the player has turned since are left alone.
                     candidate["shape"] = dict(heard["shape"])
                     if place == on_b:
                         desk.set_shape(candidate["shape"], side="b", checkpoint=False)
             rounds.save(found)
-            if not rounds.unchecked(found):
+            if not rounds.unchecked(found) and rounds.closest(found) is not None:
                 best = rounds.closest(found)
                 winner = found["candidates"][best]
                 desk.set_status(f"Listened to all {len(found['candidates'])}. Closest to the aim: {best + 1} · "
@@ -350,7 +403,11 @@ class RoundStrip(tk.Frame):
         """One line on a design: how it differs, what the app heard of it, and what the player said."""
         parts = [candidate["differs"]] if candidate["differs"] else []
         if candidate["served"] is not None:
-            parts.append("heard: " + ", ".join(candidate["tags"]))
+            # What was heard describes the knobs it was heard with. Once they move it is the past.
+            moved = candidate.get("served_shape") is not None and candidate["served_shape"] != candidate["shape"]
+            parts.append(("heard before the knobs moved: " if moved else "heard: ") + ", ".join(candidate["tags"]))
+        elif candidate.get("failed"):
+            parts.append("could not be listened to")
         else:
             parts.append("not listened to yet")
         yours = [*candidate["user_tags"], *([f"“{candidate['review']}”"] if candidate["review"] else [])]
@@ -363,7 +420,11 @@ class RoundStrip(tk.Frame):
         found, place = suggestions.found(), suggestions.place()
         key = (found and (found["id"], place, len(suggestions.rounds), suggestions.pending is not None,
                           [(c["name"], c["played"], c["served"] is not None, tuple(c["tags"]), tuple(c["user_tags"]),
-                            c["review"]) for c in found["candidates"]]))
+                            c["review"], c.get("failed"), c.get("served_shape") == c["shape"])
+                           for c in found["candidates"]]))
+        if suggestions.desk.blind:
+            found = None  # A blind comparison must not be given away by a name, a highlight or a mark.
+            key = None
         if key == self.shown:
             return
         self.shown = key

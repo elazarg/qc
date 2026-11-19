@@ -22,8 +22,9 @@ class Desk:
     def __init__(self):
         self.drafts, self.shapes = {}, {"a": {}, "b": {}}
         self.tone_b = self.draft = self.job = self.task = self.thinking = self.leaving = self.playing = None
-        self.stop_signal = None
-        self.takes, self.live = ["a take"], None
+        self.stop_signal = self.blind = None
+        self.take, self.live = SimpleNamespace(folder=Path("clip-chosen")), None
+        self.qc_position, self.input_channel = {"position": 3}, 1
         self.said, self.timers, self.submitted, self.asked_for = [], [], [], []
         self.root = SimpleNamespace(after=lambda ms, action: self.timers.append((ms, action)) or len(self.timers),
                                     after_cancel=lambda timer: None, after_idle=lambda action: action())
@@ -134,12 +135,13 @@ class SuggestionsTest(unittest.TestCase):
         self.suggestions.sync()
         self.desk.live = None
         self.suggestions.idle()
-        task, work, (copy, stop), _ = self.desk.submitted[-1]
+        task, work, (copy, stop, expect, channel), _ = self.desk.submitted[-1]
         self.assertEqual(task, "listen")
         self.assertIs(self.desk.stop_signal, stop)
+        self.assertEqual((expect, channel, copy["phrase"]), ({"position": 3}, 1, "clip-chosen"))
         self.assertIsNot(copy, self.found)  # The worker has its own copy. The desk's stays the player's.
         checked = rounds.check(copy, hear=Ear(), reorder=False)
-        self.desk.finish((checked, None))
+        self.desk.finish((checked, "done", ""))
         # The one the player heard keeps their knob. The others take the knobs the app found for them.
         self.assertEqual(first["shape"], {"drive": .3})
         self.assertEqual(first["tags"][0], "crunch")
@@ -156,7 +158,7 @@ class SuggestionsTest(unittest.TestCase):
         self.arrive()
         self.suggestions.idle()
         checked = rounds.check(self.desk.submitted[-1][2][0], hear=Ear(), reorder=False)
-        self.desk.finish((checked, None))
+        self.desk.finish((checked, "done", ""))
         self.assertEqual(self.desk.shapes["b"], {"drive": 1., "warmth": -.8})
 
     def test_the_player_gets_the_unit_back_and_what_they_asked_for_happens_next(self):
@@ -167,18 +169,19 @@ class SuggestionsTest(unittest.TestCase):
         self.suggestions.interrupt(lambda: done.append("guitar"))
         self.assertTrue(stop.is_set())
         self.assertEqual(self.desk.said[-1][0], "Giving the Quad Cortex back…")
-        self.desk.finish((self.desk.submitted[-1][2][0], None))
+        self.desk.finish((self.desk.submitted[-1][2][0], "stopped", ""))
         self.assertEqual(done, ["guitar"])
         self.assertEqual(self.desk.asked_for, [])  # Nothing is prepared behind an interrupted check.
         # Stepping while the app listens does the same.
         self.suggestions.idle()
         self.suggestions.step(2)
-        self.desk.finish((self.desk.submitted[-1][2][0], None))
+        self.desk.finish((self.desk.submitted[-1][2][0], "stopped", ""))
         self.assertEqual(self.suggestions.place(), 2)
 
     def test_nothing_is_listened_to_while_the_unit_or_the_assistant_is_busy(self):
         self.arrive()
-        for change in ({"job": object()}, {"thinking": object()}, {"takes": []}, {"leaving": "exit"}):
+        for change in ({"job": object()}, {"thinking": object()}, {"take": None}, {"leaving": "exit"},
+                       {"blind": {"a": "b"}}, {"playing": object()}):
             desk = self.desk
             before = {key: getattr(desk, key) for key in change}
             vars(desk).update(change)
@@ -189,7 +192,7 @@ class SuggestionsTest(unittest.TestCase):
     def test_a_failed_listen_is_said_once_and_not_retried(self):
         self.arrive()
         self.suggestions.idle()
-        self.desk.finish((self.found, RuntimeError("The draft returned silence.")))
+        self.desk.finish((self.found, "error", "The draft returned silence."))
         self.assertIn("could not be listened to. The draft returned silence.", self.desk.said[-1][0])
         self.assertEqual(len(self.desk.timers), 1)
 
@@ -241,6 +244,10 @@ class SuggestionsTest(unittest.TestCase):
         self.assertEqual((len(again.rounds), again.shown), (2, second["id"]))
         again.restore("gone")
         self.assertEqual(again.shown, second["id"])
+        # With nothing remembered, the latest round is on show: rounds are never hidden.
+        fresh = Suggestions(Desk())
+        fresh.restore(None)
+        self.assertEqual(fresh.shown, second["id"])
 
     def test_a_round_that_could_not_be_prepared_says_so(self):
         self.arrive()
@@ -252,14 +259,95 @@ class SuggestionsTest(unittest.TestCase):
         self.assertIsNone(self.suggestions.pending)
 
     def test_one_line_says_what_a_design_is_what_was_heard_and_what_the_player_said(self):
-        candidate = {"differs": "A pedal into a Plexi.", "served": None, "tags": [], "user_tags": [], "review": ""}
+        candidate = {"differs": "A pedal into a Plexi.", "served": None, "tags": [], "user_tags": [], "review": "",
+                     "shape": {}, "served_shape": None}
         self.assertEqual(RoundStrip.about(self.found, candidate), "A pedal into a Plexi.  ·  not listened to yet")
-        candidate.update(served={}, tags=["saturated", "bright", "dry", "drier than the aim"], user_tags=["Closer"],
-                         review="more echo")
+        candidate.update(served={}, served_shape={}, tags=["saturated", "bright", "dry", "drier than the aim"],
+                         user_tags=["Closer"], review="more echo")
         self.assertEqual(RoundStrip.about(self.found, candidate),
                          "A pedal into a Plexi.  ·  heard: saturated, bright, dry, drier than the aim  ·  "
                          "you: Closer, “more echo”")
 
+        candidate["shape"] = {"drive": .5}  # The tags describe the sound before this knob was turned.
+        self.assertIn("heard before the knobs moved: saturated", RoundStrip.about(self.found, candidate))
+        self.assertIn("could not be listened to",
+                      RoundStrip.about(self.found, {**candidate, "served": None, "failed": "silence"}))
+
+    # ---- The findings of the review of 2026-11-19 (SUGGESTIONS_BRANCH_REVIEW.md) ----
+
+    def test_stop_drops_whatever_was_waiting_for_the_unit(self):
+        self.arrive()
+        self.suggestions.idle()
+        started = []
+        self.suggestions.interrupt(lambda: started.append("guitar"))
+        self.suggestions.forget()  # Space, pressed while the unit is being given back.
+        self.desk.finish((self.desk.submitted[-1][2][0], "stopped", ""))
+        self.assertEqual(started, [])
+
+    def test_a_unit_in_use_elsewhere_is_left_alone_and_looked_at_again_later(self):
+        self.arrive()
+        self.suggestions.idle()
+        self.desk.finish((self.desk.submitted[-1][2][0], "busy", "The guitar is being played."))
+        self.assertEqual(self.desk.timers[-1][0], Suggestions.WHEN_BUSY)
+        self.assertEqual(self.desk.said[-1][0], "")
+        self.assertEqual(self.desk.asked_for, [])
+
+    def test_a_design_chosen_while_the_unit_is_busy_is_the_one_loaded_even_after_browsing(self):
+        first_round = self.arrive()
+        other = rounds.start("another sound", "Charvel")
+        self.suggestions.adopt(other)
+        self.suggestions.idle()
+        self.suggestions.step(1)             # Design 2 of the first round, chosen while the app listens.
+        self.suggestions.browse(1)           # Then the other round is looked at.
+        self.assertEqual(self.suggestions.shown, other["id"])
+        self.desk.finish((self.desk.submitted[-1][2][0], "stopped", ""))
+        self.assertEqual(self.desk.tone_b.draft_id, first_round[1]["draft"])
+        self.assertEqual(self.suggestions.shown, self.found["id"])
+
+    def test_knobs_turned_while_the_app_listened_are_not_replaced_by_the_apps(self):
+        first, second, _ = self.arrive()
+        self.suggestions.idle()
+        copy = self.desk.submitted[-1][2][0]
+        checked = rounds.check(copy, hear=Ear(), reorder=False, persist=False)
+        self.desk.shapes["b"] = {"drive": .2}   # The player turns a knob on the design on B, unheard as yet.
+        self.suggestions.sync()
+        self.suggestions.mark(1, "Closer")      # And marks another. The worker's older copy must not undo it.
+        self.assertEqual(rounds.load(self.found["id"])["candidates"][1]["user_tags"], ["Closer"])
+        self.desk.finish((checked, "done", ""))
+        self.assertEqual(first["shape"], {"drive": .2})
+        self.assertEqual(first["served_shape"], {"drive": 1., "warmth": -.8})
+        self.assertEqual(second["user_tags"], ["Closer"])
+        self.assertEqual(rounds.load(self.found["id"])["candidates"][1]["user_tags"], ["Closer"])
+        self.assertIn("heard before the knobs moved", RoundStrip.about(self.found, first))
+
+    def test_a_remark_made_after_the_next_three_were_asked_for_is_said_to_be_missing_from_them(self):
+        self.arrive()
+        self.suggestions.more()
+        self.suggestions.review(0)
+        self.suggestions.reviewed("far too dark")
+        self.assertIn("already being prepared without it", self.desk.said[-1][0])
+        second = rounds.start("the solo of Time", "Charvel", parent=self.found["id"])
+        self.suggestions.pending.set_result(second)
+        self.suggestions.poll()
+        text, actions = self.desk.said[-1]
+        self.assertIn("They were prepared before your last remark.", text)
+        self.assertIn("Three more, with the remark", actions)
+
+    def test_a_blind_comparison_is_not_given_away_and_cannot_be_changed_from_the_strip(self):
+        self.arrive()
+        self.desk.blind = {"a": "b", "b": "a"}
+        self.suggestions.step(1)
+        self.suggestions.browse(-1)
+        self.assertEqual(self.suggestions.place(), 0)
+
+    def test_the_round_is_listened_to_on_the_phrase_selected_when_it_was_first_checked(self):
+        self.arrive()
+        self.suggestions.idle()
+        self.assertEqual(rounds.load(self.found["id"])["phrase"], "clip-chosen")
+        self.desk.finish((self.desk.submitted[-1][2][0], "stopped", ""))
+        self.desk.take = SimpleNamespace(folder=Path("clip-newer"))
+        self.suggestions.idle()
+        self.assertEqual(self.desk.submitted[-1][2][0]["phrase"], "clip-chosen")
 
 if __name__ == "__main__":
     unittest.main()

@@ -1212,6 +1212,8 @@ class Desk:
             self.output.set("Stopped")
 
     def stop(self):
+        self.suggestions.forget()  # Stop means stop: nothing that was waiting for the unit starts afterwards.
+        self.reference_waiting = False
         self.stop_audio()
         if self.stop_signal is not None:
             self.stop_signal.set()
@@ -1719,7 +1721,8 @@ class Desk:
                 # A new sound is answered with an aim and three designs. The first goes on B as soon as it arrives.
                 self.set_status("Designing three ways to get there. About a minute…", kind="progress", actions=cancel)
                 self.thinking = self.advisor.submit(self.suggestions.design, value, take["guitar"], take,
-                                                    self.cancel_signal)
+                                                    self.cancel_signal,
+                                                    self.take.folder.name if self.take else None)
         else:
             if tone:
                 take["active_tone"] = tone.name

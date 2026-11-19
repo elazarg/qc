@@ -8,7 +8,9 @@ The phrase is played at its own level and again 12 dB quieter. A chain that
 adds no distortion or compression returns the second pass 12 dB quieter too.
 A saturated one returns it almost as loud, because it was already flat out.
 That difference is independent of the phrase, of equalization, and of delay
-and reverb, which follow level exactly.
+and reverb, which follow level exactly. A compressor swallows level as well,
+without flattening the peaks, so a chain whose peaks still stand tall is never
+called more than the edge of breakup.
 
 Run from the repository root: python -m tone_lab.hearing <draft id> [...]
 """
@@ -26,12 +28,20 @@ from . import audio, device, draft_render, iterate, session
 STEP_DB = 12.
 SOFTER = 10 ** (-STEP_DB / 20)
 TAIL = 1.5
+EARLY = (.04, .40)   # Seconds after the phrase stops: a short echo or a small room sounds here.
+LATE = (.40, 1.5)    # A long delay or reverb still sounds here.
 # Where the words change, in the share of the 12 dB step that the chain swallowed. Set from chains measured on
 # the unit: see TONE_KNOWLEDGE.md, "Listening to a draft".
 DRIVE = ((.82, "saturated"), (.62, "overdriven"), (.40, "crunch"), (.18, "edge of breakup"), (0., "clean"))
+PEAKS_INTACT = 15.   # dB of peak over average. Above this the chain is squeezing level, not clipping.
 BRIGHTNESS = ((.45, "bright"), (-.25, "balanced"), (-9., "dark"))  # Octaves against the dry guitar.
-# The tail against the phrase, dB. A 9% room measured -57, light delay and plate -46, a lead delay at 21% -26.
-AMBIENCE = ((-24., "wet"), (-40., "ambient"), (-70., "a touch of room"), (-999., "dry"))
+# The louder of the two tails against the phrase, dB. Measured on the unit: chains with no delay or reverb -45
+# to -72, a room at 9 to 11% -35 to -37, light delay and plate -32, a lead delay at 21% -15 to -17.
+AMBIENCE = ((-22., "wet"), (-34., "ambient"), (-42., "a touch of room"), (-999., "dry"))
+
+
+class Moved(RuntimeError):
+    """The unit is no longer on the chain being listened to."""
 
 
 @dataclass(frozen=True)
@@ -45,7 +55,10 @@ class Heard:
 
     @property
     def drive(self):
-        return next(word for floor, word in DRIVE if self.squash >= floor)
+        word = next(word for floor, word in DRIVE if self.squash >= floor)
+        if self.crest_db >= PEAKS_INTACT and word not in ("clean", "edge of breakup"):
+            return "edge of breakup"  # Level is being held down, but nothing is clipping.
+        return word
 
     @property
     def tone(self):
@@ -63,14 +76,26 @@ class Heard:
                 "drive": self.drive, "tone": self.tone, "space": self.space}
 
 
+def _channels(samples):
+    samples = np.asarray(samples, dtype=np.float64)
+    return samples[:, None] if samples.ndim == 1 else samples
+
+
 def _level(samples):
-    return audio.db(float(np.sqrt(np.mean(np.square(samples, dtype=np.float64)))) + 1e-10)
+    """The level of all channels together. Channels are never added to each other, which could cancel them."""
+    return audio.db(float(np.sqrt(np.mean(np.square(_channels(samples))))) + 1e-10)
+
+
+def _crest(samples):
+    sides = _channels(samples)
+    loudest = sides[:, int(np.argmax(np.mean(np.square(sides), axis=0)))]
+    return audio.db(float(np.max(np.abs(loudest))) + 1e-10) - _level(loudest)
 
 
 def _spectrum(samples):
-    mono = np.asarray(samples, dtype=np.float64)
-    mono = mono.mean(axis=1) if mono.ndim == 2 else mono
-    freq, power = signal.welch(mono, audio.RATE, nperseg=8192)
+    sides = _channels(samples)
+    freq, power = signal.welch(sides, audio.RATE, nperseg=8192, axis=0)
+    power = power.sum(axis=1)
     heard = (freq >= 60) & (freq <= 12000)
     total = max(float(power[heard].sum()), 1e-30)
     centre = float((freq[heard] * power[heard]).sum() / total)
@@ -79,45 +104,65 @@ def _spectrum(samples):
 
 
 def describe(dry, loud, soft, tail):
-    """What a chain did to a phrase, from its return at full level, 12 dB quieter, and after the phrase ended."""
-    mono = loud.mean(axis=1) if loud.ndim == 2 else loud
+    """What a chain did to a phrase, from its return at full level, 12 dB quieter, and after the phrase ended.
+
+    `tail` starts where the phrase stops.
+    """
     step = _level(loud) - _level(soft)
     centre, lows = _spectrum(loud)
     dry_centre, dry_lows = _spectrum(dry)
-    peak = audio.db(float(np.max(np.abs(mono))) + 1e-10)
-    return Heard(squash=float(min(1., max(0., 1 - step / STEP_DB))), crest_db=peak - _level(mono),
+    tail = _channels(tail)
+    windows = [tail[round(start * audio.RATE):round(end * audio.RATE)] for start, end in (EARLY, LATE)]
+    rings = max((_level(window) for window in windows if len(window)), default=-200.)
+    return Heard(squash=float(min(1., max(0., 1 - step / STEP_DB))), crest_db=_crest(loud),
                  brightness=float(np.log2(max(centre, 1.) / max(dry_centre, 1.))), low_end_db=lows - dry_lows,
-                 ambience_db=_level(tail) - _level(loud), level_db=_level(loud))
+                 ambience_db=rings - _level(loud), level_db=_level(loud))
 
 
-def proof(qc, dry, offset):
-    """Listen to whatever chain is on the unit's USB path now."""
+def on_the_draft(qc):
+    """Refuse to go on if the unit has left the working slot, its first scene or its USB routing."""
+    if (device.live_position(qc) != draft_render.WORK_SLOT or device.active_scene(qc) != 0
+            or iterate.routes(device.read_preset(qc)) != iterate.USB_ROUTES):
+        raise Moved("The Quad Cortex left the draft that was being listened to.")
+
+
+def proof(qc, dry, offset, *, cancel=None):
+    """Listen to whatever chain is on the unit's USB path now.
+
+    The unit is checked before each pass and before the result is accepted, so
+    that nothing is played into a preset the player has switched to and
+    nothing measured there is believed. `cancel` ends a pass at once.
+    """
     if np.max(np.abs(dry)) < 1e-4:
         raise ValueError("The phrase is silent.")
-    raw = audio.reamp(dry, tail=TAIL)
+    on_the_draft(qc)
+    raw = audio.reamp(dry, tail=TAIL, cancel=cancel)
+    on_the_draft(qc)
     loud = raw[offset:offset + len(dry)].copy()
-    # Let the repeats of the phrase's last note pass, then listen to what is left.
-    tail = raw[offset + len(dry) + audio.RATE // 4:].copy()
-    soft = audio.reamp(dry * SOFTER, tail=.3)[offset:offset + len(dry)].copy()
+    tail = raw[offset + len(dry):].copy()
+    soft = audio.reamp(dry * SOFTER, tail=.3, cancel=cancel)[offset:offset + len(dry)].copy()
+    on_the_draft(qc)
     if _level(loud) < -90:
         raise RuntimeError("The draft returned silence.")
     return describe(dry, loud, soft, tail)
 
 
-def phrase(seconds=3.5):
-    """The loudest stretch of the newest take, as mono dry audio."""
+def phrase(take=None, seconds=3.5):
+    """The loudest stretch of a take, as (take name, mono dry audio). Without a name, the newest take long enough."""
     length = round(seconds * audio.RATE)
-    for take in sorted((session.SESSIONS / "recordings").glob("clip-*"), reverse=True):
+    folder = session.SESSIONS / "recordings"
+    takes = [folder / take] if take else sorted(folder.glob("clip-*"), reverse=True)
+    for path in takes:
         try:
-            dry = audio.read_wave(take / "dry.wav")
+            dry = audio.read_wave(path / "dry.wav")
         except (OSError, ValueError):
             continue
         if len(dry) <= length:
             continue
         energy = np.concatenate(([0.], np.cumsum(np.square(dry[:, 0], dtype=np.float64))))
         start = int(np.argmax(energy[length:] - energy[:-length]))
-        return take.name, dry[start:start + length].copy()
-    raise RuntimeError("Record a phrase first.")
+        return path.name, dry[start:start + length].copy()
+    raise RuntimeError(f"The phrase {take} cannot be used for listening." if take else "Record a phrase first.")
 
 
 def listen(drafts, dry=None, *, values=None, report=None):
