@@ -145,8 +145,11 @@ def source_links(items):
     return links
 
 
-def request(prompt, schema, *, web, cancel=None):
-    """Run one Codex exchange. Setting `cancel` ends the process and raises Cancelled."""
+def request(prompt, schema, *, web, cancel=None, seconds=None):
+    """Run one Codex exchange. Setting `cancel` ends the process and raises Cancelled.
+
+    `seconds` is how long to wait for a reply that is known to take longer than a single design.
+    """
     executable = codex_executable()
     search = "live" if web else "disabled"
     with TemporaryDirectory(prefix="tone-advisor-") as directory:
@@ -160,7 +163,7 @@ def request(prompt, schema, *, web, cancel=None):
              "--sandbox", "read-only", "--output-schema", str(schema_file), "-o", str(result_file), "-"],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=root, encoding="utf-8",
             creationflags=subprocess.CREATE_NO_WINDOW)
-        deadline = time.monotonic() + (85 if web else 50)
+        deadline = time.monotonic() + (seconds or (85 if web else 50))
         pending = prompt
         try:
             while True:
