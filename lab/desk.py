@@ -136,6 +136,8 @@ class Desk:
                 widget.bind("<Button-3>", lambda event, side=side: self.tile_menu(event, side))
             self.tiles[side] = (tile, name, caption, air, marks)
 
+        self.scene_row = tk.Frame(main, bg=PAPER)
+        self.scene_row.pack(fill="x", pady=(8, 0))
         self.strip = tk.Frame(main, bg=PAPER)
         self.strip.pack(fill="x", pady=(10, 0))
         self.chips = tk.Frame(self.strip, bg=PAPER)
@@ -166,7 +168,7 @@ class Desk:
         self.request = tk.Entry(ask, font=(FONT, 12), bg=DARK, fg=INK, relief="flat", insertbackground=INK)
         self.request.pack(side="left", fill="x", expand=True, ipady=9, padx=12)
         self.request.bind("<Return>", lambda _: self.ask())
-        self.request.bind("<Escape>", lambda _: self.root.focus_set())
+        self.request.bind("<Escape>", lambda _: self.studio.cancel() or self.root.focus_set())
         label(ask, "/", size=9, color=DIM).pack(side="right", padx=12)
 
     # ---- drawing ----
@@ -193,6 +195,7 @@ class Desk:
         self.guitar.configure(bg=mix(LIVE, TILE, .4) if state.mode == "guitar" else TILE)
         self.loop.configure(bg=mix(LIVE, TILE, .4) if state.mode == "phrase" else TILE)
         self.draw_strip()
+        self.draw_scenes()
         if self.panel:
             self.fill_panel()
 
@@ -212,6 +215,22 @@ class Desk:
         if sound.saved:
             parts.append(f"saved as {sound.saved['name']}")
         return " · ".join(parts)
+
+    def draw_scenes(self):
+        for child in self.scene_row.winfo_children():
+            child.destroy()
+        scenes = self.studio.scenes()
+        if not scenes:
+            return
+        label(self.scene_row, "Scene", size=9, color=DIM).pack(side="left", padx=(0, 6))
+        for scene, name in scenes:
+            chosen = scene == self.studio.state.scene
+            chip = tk.Label(self.scene_row, text=f"{'ABCDEFGH'[scene]}{'  ' + name if name else ''}", padx=8, pady=3,
+                            cursor="hand2", font=(FONT, 9, "bold" if chosen else "normal"),
+                            bg=mix(SIDE[self.studio.state.side], DARK, .3) if chosen else TILE,
+                            fg=INK if chosen else SOFT)
+            chip.pack(side="left", padx=(0, 4))
+            chip.bind("<ButtonRelease-1>", lambda _, scene=scene: self.studio.scene(scene))
 
     def draw_strip(self):
         for child in self.chips.winfo_children():
@@ -430,6 +449,7 @@ class Desk:
                    "g": lambda: self.toggle_play("guitar"), "p": lambda: self.toggle_play("phrase"),
                    "space": self.studio.stop, "z": self.studio.undo, "slash": self.request.focus_set,
                    "1": lambda: self.studio.step(0), "2": lambda: self.studio.step(1), "3": lambda: self.studio.step(2),
+                   "escape": self.studio.cancel,
                    "k": lambda: self.studio.mark("keeper"), "d": lambda: self.studio.mark("not this"),
                    "t": self.mark_with_word, "x": self.studio.blind, "n": self.studio.round_forward,
                    "bracketright": self.studio.round_forward, "bracketleft": self.studio.round_back,
@@ -511,8 +531,33 @@ class Desk:
         try:
             self.studio.poll()
             self.seat_tick()
+            self.come_forward()
         finally:
             self.root.after(80, self.tick)
+
+    def answer_second_launch(self):
+        import socket
+
+        try:
+            self.door = socket.socket()
+            self.door.bind(("127.0.0.1", PORT))
+            self.door.listen(2)
+            self.door.setblocking(False)
+        except OSError:
+            self.door = None
+
+    def come_forward(self):
+        door = getattr(self, "door", None)
+        if door is None:
+            return
+        try:
+            knock, _ = door.accept()
+        except (BlockingIOError, OSError):
+            return
+        knock.close()
+        self.root.deiconify()
+        self.root.lift()
+        self.root.focus_force()
 
     def seat_tick(self):
         seat = getattr(self, "seat", None)
@@ -595,14 +640,34 @@ def main(arguments):
     from .host import Host
 
     simulated = "--simulated" in arguments
+    if not simulated and not only_desk():
+        return
     folder = home() / ("simulated" if simulated else "")
     folder.mkdir(parents=True, exist_ok=True)
     root = tk.Tk()
     if not simulated:
         first_run(root, folder)
     host = Host(folder, simulated=simulated)
-    Desk(root, Studio(host, folder))
+    desk = Desk(root, Studio(host, folder))
+    if not simulated:
+        desk.answer_second_launch()
     root.mainloop()
+
+
+PORT = 47231            # on this computer only: a second desk asks the first to come forward, and leaves
+
+
+def only_desk():
+    """True when no other desk is open. Otherwise ask that one to come forward and say no: two desks would fight
+    over the unit."""
+    import socket
+
+    try:
+        with socket.create_connection(("127.0.0.1", PORT), timeout=.5) as other:
+            other.sendall(b"raise")
+        return False
+    except OSError:
+        return True
 
 
 def first_run(root, folder):

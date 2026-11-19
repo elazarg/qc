@@ -40,6 +40,7 @@ class State:
     song: str | None = None
     revision: int = 0                 # bumped whenever A or B changes
     blind: bool = False               # names hidden while comparing; A and B may have been swapped
+    scene: int = 0                    # the scene heard, 0 to 7
 
 
 class Studio:
@@ -53,6 +54,8 @@ class Studio:
         self.history = []                 # earlier states, for undo
         self.jobs = []                    # (future, done, failed)
         self.preparing = None             # the round whose next three are being designed
+        self.remark = None                # (text, sound id, remedies, the one applied) of the last remark
+        self.cancel_signal = None         # set to drop the request the assistant is working on
         self.phrase = phrase              # (name, mono dry audio) or None
         self.listeners = []
 
@@ -185,6 +188,36 @@ class Studio:
         for side, level in levels.items():
             self.later(self.host.call("level", side, PREVIEW_DB + quietest - level), lambda result: None)
 
+    def scene(self, scene):
+        """Hear another scene of the sounds on show."""
+        self.set(scene=scene)
+        sound = self.sound(self.state.side)
+        label = sound.chain.labels[scene] if sound and scene < len(sound.chain.labels) else ""
+        self.later(self.host.call("scene", scene), lambda result: None)
+        self.say(f"Scene {'ABCDEFGH'[scene]}" + (f" · {label}" if label else ""))
+
+    def scenes(self, side=None):
+        """The scenes of the sound on a side that make a difference, as (index, label)."""
+        sound = self.sound(side or self.state.side)
+        if sound is None:
+            return []
+        count = sound.chain.scenes_in_use()
+        return [(scene, sound.chain.labels[scene]) for scene in range(count)] if count > 1 else []
+
+    def cancel(self):
+        """Drop the request the assistant is working on; its answer, if it still comes, is ignored."""
+        if self.cancel_signal is None or self.cancel_signal.is_set():
+            return False
+        self.cancel_signal.set()
+        self.set(working="", status="Request cancelled.")
+        return True
+
+    def _request(self):
+        from threading import Event
+
+        self.cancel_signal = Event()
+        return self.cancel_signal
+
     def select(self, side):
         if self.state.mode:
             self.play(self.state.mode, side)
@@ -229,9 +262,19 @@ class Studio:
         moves = None
         if reading and sound:
             ways = words.usable(reading, set(knobs.available(sound.chain)))
-            if ways:
-                moves = dict(ways[0].moves)
-                said = f"{reading.said}: {ways[0].say}."
+            again = self.remark is not None and self.remark[:2] == (text.casefold(), sound.id)
+            turn = self.remark[3] + 1 if again else 0
+            if again and turn < len(ways):
+                # Said again: the first remedy was not it. Take it back and try the next.
+                values = dict(sound.knobs)
+                for key, step in ways[turn - 1].moves.items():
+                    values[key] = round(values.get(key, 0.) - step, 2)
+                sound.knobs = {key: value for key, value in values.items() if value}
+            if ways and turn < len(ways):
+                moves = dict(ways[turn].moves)
+                self.remark = (text.casefold(), sound.id, ways, turn)
+                following = f" Say it again for: {ways[turn + 1].say}." if turn + 1 < len(ways) else ""
+                said = f"{reading.said}: {ways[turn].say}.{following}"
         if moves is None and sound:
             moves = knobs.direction(text)
             said = text
@@ -279,12 +322,16 @@ class Studio:
         if not quietly:
             self.set(working="Designing three ways to get there. About a minute…")
         instrument = self._instrument()
-        future = self.thinking.submit(design.round_of_three, self.assistant, text, instrument, earlier=earlier, by=by)
+        stop = self._request() if not quietly else None
+        future = self.thinking.submit(design.round_of_three, self.assistant, text, instrument, earlier=earlier, by=by,
+                                      cancel=stop)
         revision = self.state.revision
         self.preparing = after
 
         def arrived(result):
             self.preparing = None
+            if stop is not None and stop.is_set():
+                return
             aim, designs = result
             record = {"id": knowledge_id(), "request": text, "aim": aim, "created": _now(),
                       "previous": after, "by": by, "candidates": []}
@@ -313,6 +360,8 @@ class Studio:
 
         def failed(error):
             self.preparing = None
+            if stop is not None and stop.is_set():
+                return
             if not quietly:
                 self.set(working="", status=str(error))
 
@@ -418,10 +467,13 @@ class Studio:
 
     def revise(self, sound, text):
         self.set(working=f"Revising {sound.name}…")
-        future = self.thinking.submit(design.revise, self.assistant, sound, text, self._instrument())
+        stop = self._request()
+        future = self.thinking.submit(design.revise, self.assistant, sound, text, self._instrument(), cancel=stop)
         revision = self.state.revision
 
         def revised(result):
+            if stop.is_set():
+                return
             self.set(working="")
             result.notes.append({"at": _now(), "text": text})
             self.store.save(result)
@@ -431,7 +483,7 @@ class Studio:
             else:
                 self.say(f"The revision of {sound.name} is ready in History. B changed meanwhile.")
 
-        self.later(future, revised)
+        self.later(future, revised, lambda error: None if stop.is_set() else self.set(working="", status=str(error)))
 
     # ---- rounds ----
 

@@ -219,5 +219,51 @@ class StudioTest(unittest.TestCase):
         self.assertEqual(self.studio.store.song("Time")["parts"][0]["scene"], 2)
 
 
+    def test_a_scene_is_chosen_and_kept_when_a_and_b_are_made_ready_again(self):
+        from lab.chain import Block, Chain, Row
+        from lab.sounds import Sound
+        drive = Block(PLEXI).set(0, (.2, .2, .9) + (.2,) * 5)
+        chain = Chain((Row((drive, Block(GREENBACK)), inlet=1, outlet=19),))
+        self.assertEqual(chain.scenes_in_use(), 3)
+        self.studio.put("b", Sound("Scenes", chain, {"kind": "designed"}))
+        settle(self.studio)
+        self.assertEqual([scene for scene, _ in self.studio.scenes()], [0, 1, 2])
+        self.studio.scene(2)
+        settle(self.studio)
+        self.studio.play("guitar")
+        settle(self.studio)
+        self.assertEqual(self.host.call("lab.tools.probe.scene").result(10), 2)
+
+    def test_a_remark_said_again_takes_back_the_first_remedy_and_tries_the_next(self):
+        self.script.answers.append(self.three("One", "Two", "Three"))
+        self.studio.ask("make a classic rock crunch")
+        settle(self.studio, 20)
+        self.studio.ask("muddy")
+        first = dict(self.studio.sound("b").knobs)
+        self.assertIn("Say it again for", self.studio.state.status)
+        self.studio.ask("muddy")
+        second = dict(self.studio.sound("b").knobs)
+        self.assertNotEqual(first, second)
+        self.assertEqual(len(self.script.asked), 1)
+
+    def test_a_cancelled_request_leaves_b_alone(self):
+        import threading
+        release = threading.Event()
+        script = self.script
+
+        def slow(prompt, schema, *, web, seconds, cancel):
+            release.wait(10)
+            return script(prompt, schema, web=web, seconds=seconds, cancel=cancel)
+
+        self.studio.assistant.run = slow
+        self.script.answers.append(self.three("One", "Two", "Three"))
+        self.studio.ask("make a classic rock crunch")
+        self.assertTrue(self.studio.cancel())
+        release.set()
+        settle(self.studio, 20)
+        self.assertIsNone(self.studio.sound("b"))
+        self.assertEqual(self.studio.state.status, "Request cancelled.")
+
+
 if __name__ == "__main__":
     unittest.main()

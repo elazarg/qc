@@ -176,6 +176,21 @@ class Chain:
         named = [index for index, label in enumerate(self.labels) if label]
         return max(named) + 1 if named else 0
 
+    def scenes_in_use(self):
+        """How many scenes make a difference: the named ones, or up to the last scene where a value or a
+        block's switching differs from scene A. 0 for one sound."""
+        last = 0
+        for _, _, block in self.blocks:
+            states = [value for _, value in block.params if isinstance(value, tuple)]
+            if isinstance(block.bypass, tuple):
+                states.append(tuple(float(flag) for flag in block.bypass))
+            for state in states:
+                for scene in range(len(state) - 1, 0, -1):
+                    if isinstance(state[scene], float) and abs(state[scene] - state[0]) > .006:
+                        last = max(last, scene)
+                        break
+        return max(self.scenes, last + 1 if last else 0)
+
     def sound(self):
         """What makes the chain sound as it does, without its routing, levels or names.
 

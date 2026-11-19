@@ -136,6 +136,7 @@ class Engine:
                     wanted = wanted.with_row(r, replace(row, output=tuple({**dict(row.output), VOLUME: level,
                                                                            MUTE: 0.}.items())))
             self.unit.apply(wanted)
+            self._keep_scene()
             self._loop(mode, phrase)
             self.active, self.mode = side, mode
             return {"side": side, "mode": mode}
@@ -150,6 +151,7 @@ class Engine:
                           output=tuple({**dict(wanted.rows[first].output), VOLUME: level, MUTE: 0. if on else 1.}.items()))
             wanted = wanted.with_row(first, row)
         self.unit.apply(wanted)
+        self._keep_scene()
         self._loop(mode, phrase)
         self.active, self.mode = side, mode
         return {"side": side, "mode": mode}
@@ -168,6 +170,18 @@ class Engine:
         slot, held = self.rig.ready(chain)
         self.knobs[side] = {}
         self.shown = ("recall", slot, held)
+
+    def scene(self, scene):
+        """Choose the scene heard (0 to 7). It is kept when A and B are made ready again or recalled."""
+        self.chosen_scene = scene
+        if self.shown is not None:
+            self.unit.select_scene(scene)
+        return scene
+
+    def _keep_scene(self):
+        chosen = getattr(self, "chosen_scene", None)
+        if chosen is not None and self.unit.scene() != chosen:
+            self.unit.select_scene(chosen)
 
     def quiet(self):
         """Disconnect every input, keeping the place in the phrase."""
