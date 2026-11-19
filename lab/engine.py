@@ -247,3 +247,10 @@ class Engine:
         stored = self.unit.store(target, name)
         self.shown = None
         return target, stored
+
+    def record(self, seconds, *, stop=None):
+        """Record the dry guitar from its input, as it reaches the unit before any processing."""
+        self.quiet()
+        dry_channel = self.physical_input           # USB channels 1 and 2 carry inputs 1 and 2 dry
+        return self.audio.record(seconds, [dry_channel], cancel=stop)
+

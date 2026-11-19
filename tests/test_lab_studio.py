@@ -118,5 +118,17 @@ class StudioTest(unittest.TestCase):
         self.assertEqual(song["instrument"], "Charvel")
 
 
+    def test_phrases_recorded_per_pickup_setting_make_a_profile_of_the_guitar(self):
+        _, lines = self.studio.guitar_profile()
+        self.assertIn("No phrase has been recorded", lines[0])
+        for setting in ("Bridge · Series", "Neck · Parallel"):
+            self.studio.record(setting, seconds=1.)
+            settle(self.studio)
+        self.assertEqual(self.studio.phrase[0], self.studio.recorded_phrases()[0]["id"])
+        summary, lines = self.studio.guitar_profile()
+        self.assertEqual(set(summary), {"Bridge · Series", "Neck · Parallel"})
+        self.assertTrue(any("than Bridge · Series" in line for line in lines))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -18,7 +18,7 @@ from .knowledge import REPO, home
 from .studio import Studio
 from .theme import (ACCENT, DARK, DIM, FONT, INK, LIVE, PAPER, RULE, SIDE, SOFT, SUBTLE, TILE, Tooltip, mix)
 
-PANELS = ("Shape", "Chain", "Sounds", "History", "Song")
+PANELS = ("Shape", "Chain", "Sounds", "History", "Song", "Guitar")
 PHRASE_SECONDS = 3.5
 
 
@@ -383,9 +383,37 @@ class Desk:
 
     def list_phrases(self, menu):
         menu.delete(0, "end")
-        for take in phrases()[:20]:
+        menu.add_command(label="Record a phrase…", command=self.record)
+        menu.add_separator()
+        for item in self.studio.recorded_phrases()[:12]:
+            menu.add_command(label=f"{item['instrument']} · {item['setting']} · {item['recorded'][5:16]}",
+                             command=lambda item=item: self.choose_recorded(item))
+        menu.add_separator()
+        for take in phrases()[:12]:
             note = take[2].get("pickup_note") or ""
             menu.add_command(label=f"{take[0][5:]}  {note}"[:60], command=lambda take=take: self.choose_phrase(take))
+
+    def record(self):
+        instrument = self.studio.store.instrument(self.studio.state.instrument) or {}
+        settings = [f"{position} · {wiring}" for position in instrument.get("settings") or ["Pickup"]
+                    for wiring in (instrument.get("wiring") or [""])]
+        settings = [setting.rstrip(" ·") for setting in settings]
+        choice = simpledialog.askstring(
+            "Record a phrase", f"Pickup setting on the {self.studio.state.instrument}?\n" + "\n".join(settings),
+            initialvalue=settings[0], parent=self.root)
+        if choice:
+            self.studio.record(choice.strip())
+
+    def choose_recorded(self, item):
+        self.studio.phrase = (item["id"], read_wave(self.studio.folder / "phrases" / item["id"] / "dry.wav")[:, :1])
+        self.phrase_menu.configure(text=f"Phrase · {item['setting']}")
+
+    def panel_guitar(self):
+        _, lines = self.studio.guitar_profile()
+        label(self.tray, f"What the {self.studio.state.instrument} puts out", size=10, bold=True).pack(fill="x")
+        for line in lines:
+            label(self.tray, line, size=9, wrap=400).pack(fill="x", pady=2)
+        button(self.tray, "Record a phrase", self.record).pack(fill="x", pady=(8, 0))
 
     def choose_phrase(self, take):
         if take is None:

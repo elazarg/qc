@@ -58,7 +58,7 @@ def _serve(commands, replies, stop, simulated, folder, physical_input):
                 replies.put((ticket, False, "Stopped before it began."))
                 continue
             try:
-                if name in ("show", "hear"):
+                if name in ("show", "hear", "record"):
                     options = {**options, "stop": stop}
                 result = getattr(engine, name)(*args, **options)
                 replies.put((ticket, True, result))

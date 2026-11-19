@@ -149,6 +149,8 @@ class Studio:
         phrase = self.phrase[1] if mode == "phrase" else None
         self.set(mode=mode, side=side)
 
+        self._match_levels()
+
         def playing(result):
             sound = self.sound(side)
             if sound and not sound.played:
@@ -159,6 +161,19 @@ class Studio:
             self.say(f"{side.upper()} · {sound.name} · {mode}")
 
         self.later(self.host.call("play", side, mode, phrase), playing)
+
+    def _match_levels(self):
+        """Play A and B equally loud, when both have been measured: the louder is turned down to the quieter."""
+        from .engine import PREVIEW_DB
+
+        sounds = {side: self.sound(side) for side in ("a", "b")}
+        levels = {side: sound.heard["level_db"] for side, sound in sounds.items()
+                  if sound and sound.heard and sound.heard.get("level_db", -200) > -90}
+        if len(levels) < 2:
+            return
+        quietest = min(levels.values())
+        for side, level in levels.items():
+            self.later(self.host.call("level", side, PREVIEW_DB + quietest - level), lambda result: None)
 
     def select(self, side):
         if self.state.mode:
@@ -353,6 +368,53 @@ class Studio:
             self._show()
 
         self.later(self.host.call("save", chain, name), saved)
+
+    # ---- phrases and the guitar ----
+
+    def record(self, setting, seconds=8.):
+        """Record a phrase on the current instrument, noting the pickup setting it was played on."""
+        self.stop()
+        self.set(working=f"Recording {seconds:g} s · play now…")
+
+        def recorded(dry):
+            from .audio import write_wave
+            from .sounds import new_id
+
+            phrase_id = new_id()
+            folder = self.folder / "phrases" / phrase_id
+            folder.mkdir(parents=True)
+            write_wave(folder / "dry.wav", dry)
+            info = {"id": phrase_id, "instrument": self.state.instrument, "setting": setting, "recorded": _now(),
+                    "seconds": round(len(dry) / 48000, 2)}
+            (folder / "phrase.json").write_text(json.dumps(info, indent=1), encoding="utf-8")
+            self.phrase = (phrase_id, dry[:, :1])
+            peak = float(abs(dry).max()) if len(dry) else 0.
+            level = 20 * __import__("math").log10(max(peak, 1e-9))
+            self.set(working="", status=f"Recorded {info['seconds']:g} s on {setting}, peaking at {level:.0f} dBFS. "
+                                        "It is now the phrase.")
+
+        self.later(self.host.call("record", seconds), recorded)
+
+    def recorded_phrases(self):
+        found = []
+        for folder in sorted((self.folder / "phrases").glob("*"), key=lambda path: path.stat().st_mtime_ns, reverse=True):
+            try:
+                found.append(json.loads((folder / "phrase.json").read_text(encoding="utf-8")))
+            except (OSError, ValueError):
+                continue
+        return found
+
+    def guitar_profile(self):
+        """What the current instrument puts out at each pickup setting, from the phrases recorded on it."""
+        from .audio import read_wave
+        from .profile import profile
+
+        takes = [(item["setting"], read_wave(self.folder / "phrases" / item["id"] / "dry.wav")[:, :1])
+                 for item in self.recorded_phrases() if item["instrument"] == self.state.instrument]
+        if not takes:
+            return {}, [f"No phrase has been recorded on the {self.state.instrument} with its pickup setting noted. "
+                        "Record the same short phrase on each setting."]
+        return profile(takes)
 
     # ---- songs ----
 
