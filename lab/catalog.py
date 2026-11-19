@@ -125,7 +125,13 @@ def to_display(model_id, index, value):
 
 
 def defaults(model_id):
-    """The stored value of every parameter of a model as the unit sets it when the block is added."""
+    """The stored value of every parameter of a model according to the catalog.
+
+    The unit does not always agree: it sets a stock cab's microphone levels
+    half way, where the catalog says 0, which silences the cab. So the app
+    never writes these; a block it adds keeps the unit's own values for
+    whatever the design leaves unset.
+    """
     found = model(model_id)
     if not found:
         return {}

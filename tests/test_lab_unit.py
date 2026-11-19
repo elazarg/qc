@@ -25,11 +25,11 @@ def lead_and_rhythm():
     """Two paths and two scenes: a Rectifier beside a Plexi, the delay on only in the lead scene."""
     gain_index, rhythm = norm(RECTIFIER, "GAIN", 4.)
     _, lead = norm(RECTIFIER, "GAIN", 6.5)
-    rectifier = Block(RECTIFIER, ((gain_index, (rhythm, lead) + (rhythm,) * 6),)).complete()
-    delay = Block(DELAY, bypass=(True, False) + (True,) * 6).complete()
-    upper = Row((Block(GOVERNOR).complete(), rectifier, Block(V30).complete(), None, Block(EQ).complete(), delay),
+    rectifier = Block(RECTIFIER, ((gain_index, (rhythm, lead) + (rhythm,) * 6),))
+    delay = Block(DELAY, bypass=(True, False) + (True,) * 6)
+    upper = Row((Block(GOVERNOR), rectifier, Block(V30), None, Block(EQ), delay),
                 inlet=12, outlet=14, split=(1, 3), mixer=((2, catalog.to_norm(catalog.MIXER, 2, -3.)),))
-    lower = Row((None, Block(PLEXI).complete(), Block(GREENBACK).complete()))
+    lower = Row((None, Block(PLEXI), Block(GREENBACK)))
     return Chain((upper, lower), ("Rhythm", "Lead"))
 
 
@@ -118,7 +118,7 @@ class UnitTest(unittest.TestCase):
     def test_a_row_is_never_turned_up_past_the_ceiling(self):
         unit = fast(SimUnit())
         unit.device.recall(**BUILD)
-        loud = Chain((Row((Block(PLEXI).complete(),), inlet=12, outlet=14,
+        loud = Chain((Row((Block(PLEXI),), inlet=12, outlet=14,
                           output=((catalog.LANE_VOLUME, leveling.norm_of(12.)),)),))
         held = unit.apply(loud)
         self.assertAlmostEqual(held.rows[0].output[catalog.LANE_VOLUME][1], leveling.norm_of(6.), places=4)

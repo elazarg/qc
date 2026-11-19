@@ -13,6 +13,8 @@ or at the wrong level is ever heard.
 
 from dataclasses import replace
 
+from qc_mcp import leveling
+
 from . import catalog
 from .chain import differences
 from .slots import BUILD, BUILD_NAME, cache_name
@@ -21,9 +23,20 @@ from .unit import Mismatch
 USB = (12, 14)   # the phrase from the computer in, the processed sound back to the computer
 
 
+UNITY = (leveling.norm_of(0.), 0.)   # a row's output control at 0 dB, not muted
+
+
 def held_silent(chain):
-    """The chain with every input disconnected and every output kept."""
-    return chain.with_routes([(0, row.outlet) for row in chain.rows])
+    """The chain with every input disconnected, every output kept, and each row's level stated.
+
+    A row's output control that the chain leaves unset is set to 0 dB and not
+    muted. Left unset it would keep whatever the build slot last held, which
+    can be a mute or a trim left by something else.
+    """
+    rows = tuple(replace(row, inlet=0, output=tuple({catalog.LANE_VOLUME: UNITY[0], catalog.LANE_MUTE: UNITY[1],
+                                                     **dict(row.output)}.items()))
+                 for row in chain.rows)
+    return replace(chain, rows=rows)
 
 
 class Rig:
@@ -50,7 +63,7 @@ class Rig:
         self.unit.slot = None
         self.unit.recall(BUILD)
         self.unit.slot = BUILD
-        held = self.unit.apply(held_silent(chain), stop=stop)
+        held = self.unit.apply(held_silent(chain), stop=stop, fresh=True)
         target = self.slots.place_for(digest)
         self.slots.claim(target, cache_name(digest))
         held = self.unit.store(target, cache_name(digest))

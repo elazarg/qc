@@ -1,0 +1,59 @@
+"""Listening to a chain on the unit before anyone hears it, and measuring the USB round trip.
+
+Both are silent in the room: the chain is played from the computer and back
+over USB, with nothing routed to the unit's outputs.
+
+`calibrate` measures how many samples the unit's return lags behind what was
+sent. Every comparison that lines up a dry phrase with its processed return
+needs it. It changes with firmware, so it is kept with the firmware it was
+measured on and measured again when that changes.
+"""
+
+import json
+from pathlib import Path
+
+from .audio import RATE, click, onset
+from .chain import Chain, Row
+from .measure import SOFTER, heard
+from .rig import USB
+
+TAIL = 1.5
+
+
+def calibration(folder, firmware):
+    """The measured delay for this firmware, or None if it has not been measured."""
+    try:
+        found = json.loads((Path(folder) / "calibration.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return found["offset"] if found.get("firmware") == firmware else None
+
+
+def calibrate(rig, audio, folder):
+    """Measure the round trip through an empty row and keep it. Returns the delay in samples."""
+    empty = Chain((Row(),))
+    slot, held = rig.ready(empty)
+    rig.connect(held, [USB, (0, 0), (0, 0), (0, 0)])
+    delays = [onset(audio.reamp(click(), tail=.3)) for _ in range(3)]
+    if max(delays) - min(delays) > 2:
+        raise RuntimeError(f"The round trip was not steady: {delays} samples.")
+    offset = sorted(delays)[1]
+    (Path(folder) / "calibration.json").write_text(
+        json.dumps({"firmware": rig.unit.firmware, "offset": offset}), encoding="utf-8")
+    return offset
+
+
+def listen(rig, audio, chain, dry, offset, *, stop=None):
+    """What `chain` does to the mono phrase `dry`, in the words of `measure.Heard`."""
+    slot, held = rig.ready(chain, stop=stop)
+    held = rig.connect(held, [USB if r == 0 else (0, 0) for r in range(4)])
+    rig.unit.guard()
+    raw = audio.reamp(dry, tail=TAIL, cancel=stop)
+    loud = raw[offset:offset + len(dry)]
+    tail = raw[offset + len(dry):]
+    rig.unit.guard()
+    soft = audio.reamp(dry * SOFTER, tail=.3, cancel=stop)[offset:offset + len(dry)]
+    rig.unit.guard()
+    if len(loud) < len(dry) or len(soft) < len(dry):
+        raise RuntimeError("The unit returned less audio than was sent.")
+    return heard(dry, loud, soft, tail)

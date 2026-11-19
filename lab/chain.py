@@ -21,9 +21,9 @@ to another in the order the unit needs:
    connected.
 5. Inputs and outputs are routed last.
 
-A parameter missing from a wanted block means "leave it as it is". A design
-is made complete by filling every parameter, so that a chain's content, and
-its digest, say exactly how it sounds.
+A parameter missing from a wanted block means "leave it as it is". A block
+the app adds starts with the unit's own values, so a design states only what
+it means to change, and a build starts every block afresh.
 """
 
 from dataclasses import dataclass, field, replace
@@ -98,9 +98,6 @@ class Block:
     def set_display(self, index, display):
         return self.set(index, catalog.to_norm(self.model, index, display))
 
-    def complete(self):
-        """The block with every parameter it leaves unset at the catalog's default."""
-        return replace(self, params={**catalog.defaults(self.model), **self.values})
 
     @property
     def info(self):
@@ -179,34 +176,21 @@ class Chain:
         named = [index for index, label in enumerate(self.labels) if label]
         return max(named) + 1 if named else 0
 
-    def complete(self):
-        return replace(self, rows=tuple(replace(row, cells=tuple(block.complete() if block else None
-                                                                  for block in row.cells))
-                                        for row in self.rows))
-
     def sound(self):
         """What makes the chain sound as it does, without its routing, levels or names.
 
-        Each block is taken with every catalog parameter, unset ones at their
-        defaults, and without the extra value the unit stores; a split's mixer
-        likewise.
+        Only the values the chain states are taken. A design leaves most values
+        to the unit, which sets its own when it adds a block, and those are not
+        always the catalog's defaults (a cab microphone's level is 0 in the
+        catalog and half way on the unit). So two designs that state the same
+        values share a digest, and a design is checked against what was built
+        with `differences`, which ignores what it leaves unset.
         """
-        def block(found):
-            info = found.info
-            known = len(info.params) if info else len(found.params)
-            # A parameter the catalog gives no default (a microphone's name, for one) counts only when set.
-            # The unit fills those in itself, so a design and its readback can differ there: compare a
-            # design with what was built by `differences`, which ignores what the design leaves unset.
-            values = {**catalog.defaults(found.model), **found.values}
-            return {"model": found.model, "params": [[i, values[i]] for i in sorted(values) if i < known],
-                    "bypass": found.bypass}
-
-        mixer_defaults = catalog.defaults(catalog.MIXER)
-        mixer_size = len(catalog.model(catalog.MIXER).params)
-        return {"rows": [{"cells": [None if found is None else block(found) for found in row.cells],
-                          "split": row.split,
-                          "mixer": sorted((i, v) for i, v in {**mixer_defaults, **dict(row.mixer)}.items()
-                                          if i < mixer_size) if row.split else []}
+        return {"rows": [{"cells": [None if found is None else
+                                    {"model": found.model, "params": [[i, v] for i, v in found.params],
+                                     "bypass": found.bypass}
+                                    for found in row.cells],
+                          "split": row.split, "mixer": [[i, v] for i, v in row.mixer] if row.split else []}
                          for row in self.rows]}
 
     def digest(self):
@@ -315,28 +299,33 @@ class Op:
         return self.kind in ("add", "delete")
 
 
-def plan_structure(current, wanted, *, sounding=()):
+def plan_structure(current, wanted, *, sounding=(), fresh=False):
     """Disconnect what is about to change, then remove, split and add blocks.
 
     `sounding` are rows that may keep their input while they change, because
     the caller has made sure nothing is audible (for example a row on USB).
+    `fresh` removes and adds every block, even one already in its place, so
+    that each starts from the unit's own values and nothing is left over from
+    what the slot held before.
     """
+    def differ(a, b):
+        return fresh or (a.model if a else 0) != (b.model if b else 0)
+
     ops = []
     for r, (now, want) in enumerate(zip(current.rows, wanted.rows)):
-        changing = (any((a.model if a else 0) != (b.model if b else 0) for a, b in zip(now.cells, want.cells))
-                    or now.split != want.split)
+        changing = any(differ(a, b) and (a or b) for a, b in zip(now.cells, want.cells)) or now.split != want.split
         if changing and now.inlet and r not in sounding:
             ops.append(Op("route", (r, 0, now.outlet)))
     for r, (now, want) in enumerate(zip(current.rows, wanted.rows)):
         for column, (a, b) in enumerate(zip(now.cells, want.cells)):
-            if a is not None and (b is None or a.model != b.model):
+            if a is not None and (b is None or differ(a, b)):
                 ops.append(Op("delete", (r, column)))
     for r, (now, want) in enumerate(zip(current.rows, wanted.rows)):
         if now.split != want.split:
             ops.append(Op("split", (r, *(want.split or (-1, -1)))))
     for r, (now, want) in enumerate(zip(current.rows, wanted.rows)):
         for column, (a, b) in enumerate(zip(now.cells, want.cells)):
-            if b is not None and (a is None or a.model != b.model):
+            if b is not None and (a is None or differ(a, b)):
                 ops.append(Op("add", (r, column, b.model)))
     return ops
 

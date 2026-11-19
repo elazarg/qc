@@ -198,15 +198,19 @@ class Unit:
                 self.guard()
             self.execute(op)
 
-    def apply(self, wanted, *, stop=None, sounding=()):
+    def apply(self, wanted, *, stop=None, sounding=(), fresh=False):
         """Make the unit hold `wanted`, and return what it holds afterwards.
 
         `sounding` are rows that may stay connected while their blocks change.
+        `fresh` adds every block anew, so that values the chain leaves unset are
+        the unit's own and not what the slot held before.
         """
         wanted = bounded(wanted)
         current = self.read()
-        structure = plan_structure(current, wanted, sounding=sounding)
+        structure = plan_structure(current, wanted, sounding=sounding, fresh=fresh)
         self.run(structure, stop)
+        if fresh:
+            current = self.read()
         if structure:
             def placed():
                 held = self.read()
