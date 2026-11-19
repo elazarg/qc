@@ -185,9 +185,17 @@ def as_form(chain):
         for column, block in row.blocks:
             names = controls(block.model)
             shown = stated(block, every=True)
+            per_scene = []
+            for index, value in block.params:
+                param = next((item for item in block.info.params if item.index == index), None) if block.info else None
+                if isinstance(value, tuple) and param is not None and param.name in names:
+                    per_scene += [{"scene": scene, "name": param.name,
+                                   "value": round(catalog.to_display(block.model, index, value[scene]), 2)}
+                                  for scene in range(1, SCENES) if abs(value[scene] - value[0]) > .006]
+            off = [scene for scene, flag in enumerate(block.bypass) if flag] if isinstance(block.bypass, tuple) else []
             blocks.append({"column": column, "model_id": block.model, "name": block.name,
                            "settings": [{"name": name, "value": value} for name, value in shown.items() if name in names],
-                           "off": block.bypass is True})
+                           "scene_settings": per_scene, "off_in_scenes": off, "off": block.bypass is True})
         if blocks or row.split:
             rows.append({"row": r, "split_at": row.split[0] if row.split else -1,
                          "join_at": row.split[1] if row.split else -1, "blocks": blocks})
@@ -222,16 +230,21 @@ def to_chain(design, *, offered_ids, base=None, physical_input=1):
             if model_id not in offered_ids or catalog.model(model_id) is None:
                 problems.append(f"Model {model_id} is not one of the available models.")
                 continue
-            block, wrong = _block(spec, scenes)
+            kept = base.block(r, column) if base else None
+            kept = kept if kept is not None and kept.model == model_id else None
+            block, wrong = _block(spec, len(scenes) or (SCENES if base else 0), kept)
             problems += wrong
             cells[column] = block
         split = (item.get("split_at", -1), item.get("join_at", -1))
         split = None if split == (-1, -1) else split
-        if split and (r != 0 or not 0 <= split[0] < split[1] <= 7):
+        if base is not None and split == base.rows[r].split:
+            pass                                    # A revision may keep a layout the rules would not allow anew.
+        elif split and (r != 0 or not 0 <= split[0] < split[1] <= 7):
             problems.append("Only row 0 can split, at a column before the one where it joins.")
             split = None
         rows[r] = replace(rows[r], cells=tuple(cells), split=split)
-    if rows[0].split:
+    # The layout rules hold for new designs. A revision keeps whatever layout the sound it revises already has.
+    if rows[0].split and base is None:
         low, high = rows[0].split
         stray = [column for column, _ in rows[1].blocks if not low <= column < high]
         if stray:
@@ -263,10 +276,12 @@ def to_chain(design, *, offered_ids, base=None, physical_input=1):
     return chain, problems
 
 
-def _block(spec, scenes):
+def _block(spec, count, kept=None):
+    """A block from one entry of an answer. `kept` is the same model in the same place in the sound being
+    revised: everything the answer does not say stays as it was there, down to values the assistant never sees."""
     model_id = spec["model_id"]
     names = controls(model_id)
-    values, problems = {}, []
+    values, problems = (dict(kept.values) if kept is not None else {}), []
     for setting in spec.get("settings") or []:
         name, value = setting.get("name"), setting.get("value")
         if name not in names:
@@ -281,7 +296,7 @@ def _block(spec, scenes):
             values[index] = catalog.to_norm(model_id, index, value)
     for setting in spec.get("scene_settings") or []:
         scene, name, value = setting.get("scene"), setting.get("name"), setting.get("value")
-        if not scenes or not isinstance(scene, int) or not 0 <= scene < len(scenes):
+        if not isinstance(scene, int) or not 0 <= scene < count:
             problems.append(f"A scene setting names scene {scene}, which the design does not have.")
             continue
         if name not in names:
@@ -300,9 +315,9 @@ def _block(spec, scenes):
             current[scene] = catalog.to_norm(model_id, index, value)
             values[index] = tuple(current)
     off = spec.get("off_in_scenes") or []
-    bypass = False
+    bypass = kept.bypass if kept is not None and not off and spec.get("off") is None else False
     if off:
-        if not scenes or any(not isinstance(scene, int) or not 0 <= scene < len(scenes) for scene in off):
+        if any(not isinstance(scene, int) or not 0 <= scene < count for scene in off):
             problems.append("A block is switched off in a scene the design does not have.")
         else:
             bypass = tuple(scene in off for scene in range(SCENES))

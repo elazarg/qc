@@ -154,5 +154,19 @@ class DesignTest(unittest.TestCase):
         self.assertEqual(script.asked, [])
 
 
+    def test_an_unchanged_answer_reproduces_a_saved_preset_exactly(self):
+        # Values the assistant never sees (an amp's OUTPUT, microphone names, per-scene switching) are kept.
+        hiwatt = Block(HIWATT).set_display(catalog.model(HIWATT).index("OUTPUT"), 5.4).set(2, "ML_mic")
+        fuzz = Block(FUZZ, bypass=(True, True, False) + (True,) * 5)
+        saved = Chain((Row((fuzz, hiwatt, Block(V30)), inlet=1, outlet=16, split=(5, 5)), Row((Block(HIWATT),))))
+        form = design.as_form(saved)
+        self.assertEqual(form["rows"][0]["blocks"][0]["off_in_scenes"], [0, 1, 3, 4, 5, 6, 7])
+        answer_ = {**form, "name": "x", "target": "t", "explanation": "e", "differs": "",
+                   "blend": {"level_db": 0, "spread": 0}, "sources": []}
+        chain, problems = design.to_chain(answer_, offered_ids={FUZZ, HIWATT, V30}, base=saved)
+        self.assertEqual(problems, [])
+        self.assertEqual(differences(chain, saved), [])
+
+
 if __name__ == "__main__":
     unittest.main()
