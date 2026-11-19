@@ -508,8 +508,8 @@ class Desk:
                           lambda offset: self.studio.set(working="", status=f"Round trip: {offset} samples."))
 
     def open_learner(self):
-        """The Guitar Learner, the window from the earlier app, seated on this desk."""
-        from tone_lab.guitar_learner_ui import GuitarLearner
+        """The Guitar Learner, in a window of its own, seated on this desk."""
+        from .learner import GuitarLearner
 
         if self.learner is None:
             self.learner = GuitarLearner(LearnerSeat(self))
