@@ -151,5 +151,20 @@ class EngineTest(unittest.TestCase):
         self.assertEqual(self.engine.levels["a"], -12)
 
 
+    def test_reading_a_preset_and_closing_gives_the_players_preset_back(self):
+        self.device.save_slot(MY_PRESETS, 7, "Another", [(HIWATT, {}), (V30, {})])
+        self.engine.read({"folder_key": MY_PRESETS, "position": 7, "is_factory": False})
+        self.engine.close()
+        self.assertEqual(self.unit.position()["position"], 5)
+
+    def test_a_preset_the_player_chose_meanwhile_is_left_alone(self):
+        self.device.save_slot(MY_PRESETS, 7, "Another", [(HIWATT, {}), (V30, {})])
+        self.device.save_slot(MY_PRESETS, 8, "Chosen", [(PLEXI, {})])
+        self.engine.read({"folder_key": MY_PRESETS, "position": 7, "is_factory": False})
+        self.device.recall(MY_PRESETS, 8)
+        self.engine.close()
+        self.assertEqual(self.unit.position()["position"], 8)
+
+
 if __name__ == "__main__":
     unittest.main()

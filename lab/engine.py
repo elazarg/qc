@@ -84,7 +84,7 @@ class Engine:
     def close(self):
         self.quiet()
         if self.borrowed is not None:
-            self.slots.give_back(self.borrowed)
+            self.slots.give_back(self.borrowed, also=getattr(self, "visited", None))
             self.borrowed = None
 
     # ---- what is shown ----
@@ -271,6 +271,7 @@ class Engine:
         held = self.unit.recall(slot)
         name = self.unit.name()
         self.shown = None
+        self.visited = slot                 # the app moved the unit here, so it may move it back on close
         return held, name
 
     def save(self, chain, name, knobs=None):

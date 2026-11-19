@@ -165,9 +165,12 @@ class Slots:
             return True
         return bool(self.tone_lab and slot and slot.get("folder_key") == self.tone_lab)
 
-    def give_back(self, record):
-        """Select the player's preset and scene again, if the unit is still on one of the app's slots."""
-        if self.ours(self.unit.position()):
+    def give_back(self, record, also=None):
+        """Select the player's preset and scene again, if the unit is still on one of the app's slots, or on
+        `also`, a preset of the player's the app itself moved to (to read it). A preset the player chose on the
+        unit meanwhile is left alone."""
+        position = self.unit.position()
+        if self.ours(position) or (also is not None and same_slot(position, also)):
             self.unit.slot = None
             self.unit.recall(record["position"])
             if self.unit.scene() != record["scene"]:

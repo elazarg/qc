@@ -317,3 +317,208 @@ def _open(self, handshake=True):
 
 SimUnit.open = _open
 
+
+# ---- The unit's own tables: processing costs and named device presets ----
+#
+# The real unit answers a ModuleStats read with the cost of every model it can load, and a ModelPreset read
+# with the index of Neural DSP's named settings ("device presets"); a named setting's values come back only by
+# loading it onto a block (`load_model_preset`), and `select_model_slot` says which one a block holds. The
+# simulated unit does the same, for a few models, with made-up numbers.
+
+DEFAULT_PRESET = "SpecialFactoryModelPresetID"
+SIM_MODEL_PRESETS = {      # model -> [(id, name, {parameter index: display value}, is_default)]
+    1001: [("f-1001-default", "Default", {}, True), ("f-1001-tight", "Tight Modern", {0: 3., 1: 6.}, False),
+           ("f-1001-hot", "Hot Lead", {0: 8.5, 4: 6.}, False)],
+    6011: [("f-6011-default", "Default", {}, True), ("f-6011-slap", "Slapback", {0: 30., 1: 5.}, False)],
+    4002: [("f-4002-default", "Default", {}, True), ("f-4002-tamer", "Humbucker Tamer", {}, False)],
+}
+
+
+def _module_stats(self):
+    """What the unit says each model costs, made up but steady: (cpu, memory) by model id."""
+    stats = []
+    for found in catalog.models():
+        if found.category in ("Internal Routing", "Lane output control", "Tempo control", "InputGateControl",
+                              "IOSettings Internal", "Mixer", "Splitter"):
+            continue
+        echoes = found.category in ("Delay", "Reverb")
+        stats.append(SimpleNamespace(id=found.id, cpu_percent=round(1 + found.id % 97 / 10, 3),
+                                     dm_heap_bytes=1000 + found.id % 500, pm_heap_bytes=2000 + found.id % 300,
+                                     dmda_bytes=0, pmda_bytes=0, edma_percent=5 + found.id % 20 if echoes else 0,
+                                     latency=0))
+    cores = [SimpleNamespace(id=0, cpu_percent=92., dm_heap_bytes=200000, pm_heap_bytes=300000, dmda_bytes=50000,
+                             pmda_bytes=60000, edma_percent=85., latency=0),
+             SimpleNamespace(id=1, cpu_percent=92., dm_heap_bytes=180000, pm_heap_bytes=300000, dmda_bytes=50000,
+                             pmda_bytes=60000, edma_percent=85., latency=0)]
+    return SimpleNamespace(stats=stats, core_stats=cores)
+
+
+_read_message = SimUnit.read_message
+
+
+def _read_message_with_stats(self, name, **options):
+    if name == "ModuleStats":
+        return _module_stats(self)
+    return _read_message(self, name, **options)
+
+
+def _model_presets(self):
+    return getattr(self, "model_presets", None) or SIM_MODEL_PRESETS
+
+
+def _list_model_presets(self, model_hash=None, **_):
+    rows = []
+    for model_id, presets in _model_presets(self).items():
+        if model_hash is not None and model_id != int(model_hash):
+            continue
+        for preset_id, name, _values, is_default in presets:
+            rows.append({"id": preset_id, "name": name, "model_hash": model_id, "is_factory": True,
+                         "is_default": is_default})
+    return rows
+
+
+def _load_model_preset(self, row, column, model_hash, preset_id, is_factory=True, settle_s=0., **_):
+    self._write("model preset", row, column, model_hash, preset_id)
+    cell = self.working.chains[row].models[column]
+    found = {item[0]: item for item in _model_presets(self).get(int(model_hash), ())}
+    if cell.hash != int(model_hash) or preset_id not in found:
+        return
+    self._fill(cell, cell.hash)
+    for index, display in found[preset_id][2].items():
+        for entry in cell.params[index].param_values:
+            entry.float_value = catalog.to_norm(cell.hash, index, display)
+    loaded = self.__dict__.setdefault("loaded_presets", {})
+    loaded[(row, column)] = preset_id
+
+
+def _select_model_slot(self, row, column, **_):
+    cell = self.working.chains[row].models[column]
+    if not cell.hash:
+        return None
+    loaded = self.__dict__.get("loaded_presets", {})
+    return {"value": loaded.get((row, column), DEFAULT_PRESET), "is_factory": True, "hash": cell.hash}
+
+
+_add_block = SimUnit.add_block
+
+
+def _add_block_fresh(self, model_id, row=0, column=0, **options):
+    self.__dict__.setdefault("loaded_presets", {}).pop((row, column), None)
+    return _add_block(self, model_id, row=row, column=column, **options)
+
+
+SimUnit.read_message = _read_message_with_stats
+SimUnit.list_model_presets = _list_model_presets
+SimUnit.load_model_preset = _load_model_preset
+SimUnit.select_model_slot = _select_model_slot
+SimUnit.add_block = _add_block_fresh
+
+
+# ---- Impulse responses and Neural Captures on the unit ----
+#
+# The directory lists them as the unit does (see `assets.py`): every IR a file of `local_ir_root` with its name
+# and `CIR_` key, links to them by key with blank names in "My IRs", and the factory IRs in a folder of their own
+# with no keys; every capture a file of `local_nc_root`, and the factory ones also in "Factory Captures V1" or
+# "V2". A block binds one by its strings (IR PATH 2 and IR NAME 22; a capture's file_name 5, key then name), and a
+# capture block reads back with the name the unit has for that key.
+
+SIM_IRS = [("CIR_5a11ed0000000000000000000000001", "YA MES 212 V30 Mix 04"),
+           ("CIR_5a11ed0000000000000000000000002", "Celestion G12M SM57 Cap")]
+SIM_FACTORY_IRS = ["Factory 412 Greenback 57"]
+SIM_CAPTURES = [("a" * 64, "Brit 2555 Lead 16", 1, True), ("b" * 64, "Bogna Fish 8", 2, True),
+                ("c" * 64, "Dark Jazz", None, False)]       # (key, name, factory version or None, factory)
+
+
+def _assets(self):
+    if "irs" not in self.__dict__:
+        self.irs = [{"key": key, "name": name} for key, name in SIM_IRS]
+        self.captures = [{"key": key, "name": name, "version": version, "factory": factory}
+                         for key, name, version, factory in SIM_CAPTURES]
+    return self.irs, self.captures
+
+
+def _add_ir(self, name, key=None):
+    """Put an IR on the simulated unit, as the player would with Cortex Control. Returns its key."""
+    irs, _ = _assets(self)
+    key = key or f"CIR_{len(irs) + 1:031x}"
+    irs.append({"key": key, "name": name})
+    return key
+
+
+def _add_capture(self, name, key=None, *, version=None, factory=False):
+    """Put a capture on the simulated unit. `version` 1 or 2 lists it in that factory folder. Returns its key."""
+    _, captures = _assets(self)
+    key = key or f"{len(captures) + 1:064x}"
+    captures.append({"key": key, "name": name, "version": version, "factory": factory})
+    return key
+
+
+def _asset_folders(self):
+    irs, captures = _assets(self)
+    entry = lambda index, name, key: {"index": index, "name": name, "key": key}
+    ir_folders = [
+        {"key": "local_ir_root", "name": "IRs Library", "is_factory": False, "is_downloads": False,
+         "files": [entry(index, item["name"], item["key"]) for index, item in enumerate(irs)]},
+        {"key": "2_q", "name": "My IRs", "is_factory": False, "is_downloads": False,
+         "files": [entry(index, "", item["key"]) for index, item in enumerate(irs)]},
+        {"key": "/opt/neuraldsp/impulse_responses", "name": "", "is_factory": True, "is_downloads": False,
+         "files": [entry(index, name, "") for index, name in enumerate(SIM_FACTORY_IRS)]}]
+    capture_folders = [
+        {"key": "local_nc_root", "name": "Captures Library", "is_factory": False, "is_downloads": False,
+         "files": [entry(index, item["name"], item["key"]) for index, item in enumerate(captures)]},
+        {"key": "1_q", "name": "My Captures", "is_factory": False, "is_downloads": False,
+         "files": [entry(index, "", item["key"]) for index, item in enumerate(
+             [item for item in captures if not item["factory"]])]}]
+    for number in (1, 2):
+        capture_folders.append(
+            {"key": f"{number}_f", "name": f"Factory Captures V{number}", "is_factory": True, "is_downloads": False,
+             "files": [entry(index, "", item["key"]) for index, item in enumerate(
+                 [item for item in captures if item["factory"] and item["version"] == number])]})
+    return ir_folders, capture_folders
+
+
+_list_directory = SimUnit.list_directory
+
+
+def _list_directory_with_assets(self, **options):
+    listing = _list_directory(self, **options)
+    listing["irs"], listing["captures"] = _asset_folders(self)
+    return listing
+
+
+_set_param_typed = SimUnit.set_param_typed
+
+
+def _set_param_typed_naming(self, row, column, index, valspecs, scene_mode=False):
+    _set_param_typed(self, row, column, index, valspecs, scene_mode)
+    cell = self.working.chains[row].models[column]
+    text = valspecs[0][2] if valspecs else None
+    if cell.hash in catalog.CAPTURE_MODELS and index == 5 and isinstance(text, str) and index < len(cell.params):
+        _, captures = _assets(self)
+        known = next((item for item in captures if item["key"] == text[:64]), None)
+        if known is not None:
+            for entry in cell.params[index].param_values:
+                entry.string_value = known["key"] + known["name"]
+
+
+def _set_ir(self, row, column, ir_key, ir_name="", stereo=False):
+    echo = self.add_block(29002 if stereo else catalog.IR_LOADER, row=row, column=column)
+    self.set_param_typed(row, column, 2, [[None, None, str(ir_key)]])
+    self.set_param_typed(row, column, 22, [[None, None, str(ir_name)]])
+    return echo
+
+
+def _set_capture(self, row, column, capture_key, capture_name="", version="v1"):
+    model = catalog.CAPTURE_MODELS[1] if str(version).lower() in ("v2", "2") else catalog.CAPTURE_MODELS[0]
+    echo = self.add_block(model, row=row, column=column)
+    self.set_param_typed(row, column, 5, [[None, None, f"{capture_key}{capture_name}"]])
+    return echo
+
+
+SimUnit.add_ir = _add_ir
+SimUnit.add_capture = _add_capture
+SimUnit.list_directory = _list_directory_with_assets
+SimUnit.set_param_typed = _set_param_typed_naming
+SimUnit.set_ir = _set_ir
+SimUnit.set_capture = _set_capture
+
