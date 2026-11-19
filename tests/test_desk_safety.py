@@ -263,7 +263,7 @@ class ReferenceTest(unittest.TestCase):
     def desk(self, **changes):
         desk = SimpleNamespace(reference=SimpleNamespace(name="Plini · E"), job=None, stop_signal=None, heard=[],
                                said=[], reference_waiting=False, task_if_active=lambda name: False,
-                               stopped=[], check_qc=lambda: None,
+                               stopped=[], check_qc=lambda: None, suggestions=Mock(),
                                root=SimpleNamespace(after_idle=lambda action: action()))
         desk.listen = desk.heard.append
         desk.set_status = lambda text, **options: desk.said.append((text, options.get("actions", ())))

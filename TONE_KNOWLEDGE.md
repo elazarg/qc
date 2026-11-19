@@ -23,6 +23,7 @@ A fourth kind was added on 2026-11-19: **measured on the unit**, by replaying on
 | What each model costs in processing and delay memory, and whether a chain fits | `tone_lab/budget.py`, data in `tone_lab/knowledge/costs.json` (`python -m tone_lab.budget` rereads it from the unit) |
 | What every amp control was measured to do, and which models invert the signal | `tone_lab/measured.py`, data in `tone_lab/knowledge/controls.json` and `polarity.json` |
 | The sweeps behind those tables | `research/measure_amps.py`, `research/analyse_amps.py`, `research/measure_polarity.py`, report in `research/amp-controls-report.md` |
+| What a built draft sounds like, measured before anyone hears it | `tone_lab/hearing.py` (`python -m tone_lab.hearing <draft id>`) |
 | Scenes and a second path in a draft | `tone_lab/preset_design.py` (`layout`, `FORM`), `tone_lab/draft_render.py` (`Chain`, `build_grid`) |
 | Raw research with a source per claim | `research/*.json`, `research/qc-internals.md` |
 | Rebuild the knowledge file from the research | `python research/build_knowledge.py` |
@@ -206,7 +207,15 @@ What changed:
 
 Also measured: the Facial Fuzz's undocumented `PICKUP LEVEL` behaves like the guitar's volume (at 5 the sustain gap opened from 1.8 to 4.9 dB), and its `PICKUP` switch changed almost nothing. With the fuzz at 0 the Hiwatt at Gain 10 and Master 8 did saturate (2.4 dB), driven by the pedal's output.
 
-Not done: measuring a built draft against the amount of distortion its request implies, and telling the player or the designer when it falls short. Drives have not been swept the way amps were.
+Drives have not been swept the way amps were.
+
+### Listening to a draft
+
+`tone_lab/hearing.py` builds a draft silently and says what came out of it: how driven, how bright, how much ambience. It replays the phrase at its own level and again 12 dB quieter. The share of that 12 dB step the chain swallows is the measure of drive: 0 for a chain that only follows the playing, near 1 for one that is flat out. Equalization, delay and reverb do not move it. One listen takes 26 s on the unit, about 11 of them the build.
+
+Measured on 2026-11-19 on the saved drafts: the clean Twin drafts 0.00, a Plexi at gain 2.3 0.18, the "Time" draft 0.35 as written and 0.99 with Drive at full, a crunch solo 0.50, the Timmons lead 0.80, the Rectifier rhythm 0.87 and the Santana lead 0.92. The words change at 0.18 (edge of breakup), 0.40 (crunch), 0.62 (overdriven) and 0.82 (saturated).
+
+A chain whose peaks still stand 15 dB over its average is called at most the edge of breakup, so that a compressor is not read as distortion. Ambience is what sounds from 40 ms after the phrase stops, against the phrase: chains with no delay or reverb measured −45 to −72 dB, a room at 9 to 11% −35 to −37, a lead delay at 21% −15 to −17. `SUGGESTIONS.md` describes how the desk uses it.
 
 ## What each control does
 
@@ -293,6 +302,7 @@ From `research/qc-internals.md`, which gives a source and a confidence for each.
 - Input level and impedance are global, not per preset. 1 MΩ and 0 dB are the defaults the community keeps for passive pickups. The per-preset trim is the input block's Input Gain.
 - Bypassing a block frees no processing. The manual gives a ceiling of 90%, and rows 1–2 and 3–4 run on different processors. Measured: each pair of rows has two processors that took 91% and 88%, with separate limits on memory (see "What one sound can carry"). On overload the Global EQ and the Input Gate switch off silently (community report).
 - Parallel paths are aligned in time by the unit when dynamic delay compensation is on, which it is on this unit (measured). Nothing aligns their polarity (see "Polarity").
+- Measured on 2026-11-19 with a steady tone through row 1: adding or removing a block on any row stops all audio for about 0.2 s. Changing a setting, reading or saving the preset and switching scene do not interrupt it, and moving the input from one row to another costs a dip of about 20 ms. So a chain cannot be built while its neighbour plays without stutter, and two chains on different rows of one preset can be switched instantly.
 - A preset change has a gap and cuts tails. A scene change does not. Fifty switch parameters mute briefly when changed, which delays a scene change that uses them.
 - For high gain the community places an Adaptive Gate (S/C) after the amp, keyed from the input. Tone Lab's drafts use a Simple Gate at the front.
 - Models with the same name can have different ids. Address models by id.

@@ -177,8 +177,15 @@ def record_inputs(seconds, channels, *, stop=None, ready=None):
     return samples[:cursor]
 
 
-def reamp(dry, *, tail=2.):
-    """Play a dry take through USB 5 and return what comes back. `tail` is the seconds kept after it."""
+class Cancelled(RuntimeError):
+    """A replay was ended before it finished because the unit was wanted elsewhere."""
+
+
+def reamp(dry, *, tail=2., cancel=None):
+    """Play a dry take through USB 5 and return what comes back. `tail` is the seconds kept after it.
+
+    Setting `cancel` ends the replay within a twentieth of a second and raises Cancelled.
+    """
     if dry.shape[1] != 1:
         raise ValueError("Use a mono dry guitar recording to reamp.")
     if np.max(np.abs(dry)) >= 0.999:
@@ -209,6 +216,9 @@ def reamp(dry, *, tail=2.):
                    callback=process) as stream:
         deadline = time.monotonic() + len(playback) / RATE + 5
         while stream.active and time.monotonic() < deadline:
+            if cancel is not None and cancel.is_set():
+                stream.abort()
+                raise Cancelled("The replay was stopped.")
             sd.sleep(50)
     if cursor != len(playback) or issues:
         raise RuntimeError("The reamp stream was interrupted or dropped audio. Retry after checking the ASIO driver.")

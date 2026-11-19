@@ -43,6 +43,8 @@ class DeskTransportTest(unittest.TestCase):
         desk.level_feedback = {}
         desk.root = Mock()
         desk.tray = Mock()
+        desk.suggestions = Mock(reviewing=None)  # No round of designs is on show in these tests.
+        desk.round_strip = Mock()
         desk.knobs = Mock()
         desk.undo, desk.journal, desk.touched = [], [], []
         desk.chain_seen = set()

@@ -25,6 +25,7 @@ from .volume_ui import VolumePanel, listening_command, saved_settings
 
 from . import theme
 from .desk_panels import ChainPanel, DifferencePanel, HistoryPanel, PhrasePanel, Tray
+from .suggestions import RoundStrip, Suggestions
 from .theme import ACCENT, ACCENT_INK, DARK, DIM, FONT, INK, LIGHT, PAPER, RULE, SOFT, SUBTLE, TILE, WHITE
 
 # The panels a player can call beside the tones, with the bare key that opens each.
@@ -223,6 +224,7 @@ class Desk:
         self.a_name, self.b_name = tk.StringVar(), tk.StringVar()
         self.a_context, self.b_context = tk.StringVar(), tk.StringVar()
         self.r_name, self.r_context, self.air = tk.StringVar(), tk.StringVar(), tk.StringVar()
+        self.suggestions = Suggestions(self)
         self.build()
         selected = next((take for take in self.takes if take.folder.name == self.state.get("take")), None)
         self.select_take(selected or (self.takes[0] if self.takes else None), remember=False)
@@ -321,6 +323,8 @@ class Desk:
         self.live_button.pack(side="left")
         self.loop_button = control(row, "Phrase", lambda: self.toggle_source("phrase"), dark=True)
         self.loop_button.pack(side="left", padx=(2, 0))
+        # The designs a request was answered with. Shown only while there is a round to step through.
+        self.round_strip = RoundStrip(main, self.suggestions, fill="x", pady=(10, 0), before=row)
         theme.Tooltip(self.live_button, "Play through the selected tone  ·  G\nPress again, or Space, to stop")
         theme.Tooltip(self.loop_button, "Loop the recorded phrase through the selected tone  ·  P\n"
                                         "Press again, or Space, to stop")
@@ -477,6 +481,9 @@ class Desk:
             "s": lambda: self.toggle_panel("Shape"), "d": lambda: self.toggle_panel("Difference"),
             "c": lambda: self.toggle_panel("Chain"), "h": lambda: self.toggle_panel("History"),
             "l": lambda: self.toggle_panel("Levels"),
+            "1": lambda: self.suggestions.step(0), "2": lambda: self.suggestions.step(1),
+            "3": lambda: self.suggestions.step(2),
+            "bracketleft": lambda: self.suggestions.browse(-1), "bracketright": lambda: self.suggestions.browse(1),
         }
         if name not in actions:
             return None
@@ -700,6 +707,7 @@ class Desk:
         return self.playing or self.last_heard
 
     def restore_context(self):
+        self.suggestions.restore(self.state.get("round"))
         self.reference = listening.Sound.from_record(self.state.get("reference"))
         if self.state.get("draft") in self.drafts:
             self.draft = self.drafts[self.state["draft"]]
@@ -717,7 +725,9 @@ class Desk:
         self.update()
 
     def remember(self):
+        self.suggestions.sync()
         data = {"guitar": self.guitar.get(), "take": self.take.folder.name if self.take else None,
+                "round": self.suggestions.shown,
                 "kept": str(self.kept) if self.kept else None, "kept_note": self.kept_note,
                 "draft": self.draft["id"] if self.draft else None,
                 "shape": self.shapes["b"], "tone_shapes": self.shapes, "active_tone": self.side,
@@ -1019,7 +1029,10 @@ class Desk:
             self.b_context.set(self.caption("b"))
         idle = self.job is None
         live_monitor = self.task_if_active("monitor") and not self.stop_signal.is_set()
-        can_select = idle or live_monitor
+        # While the app is only listening to designs, the player can take the unit back with any of these.
+        can_select = idle or live_monitor or bool(self.task_if_active("listen"))
+        self.suggestions.sync()
+        self.round_strip.sync()
         on_air = self.on_air()
         for place, tile in (("a", self.a_tile), ("b", self.b_tile)):
             side = hidden[place] if hidden else place
@@ -1199,6 +1212,8 @@ class Desk:
             self.output.set("Stopped")
 
     def stop(self):
+        self.suggestions.forget()  # Stop means stop: nothing that was waiting for the unit starts afterwards.
+        self.reference_waiting = False
         self.stop_audio()
         if self.stop_signal is not None:
             self.stop_signal.set()
@@ -1601,6 +1616,12 @@ class Desk:
         query = (self.request.get() if typed else text).strip()
         if not query:
             return
+        if typed and self.suggestions.reviewing:
+            # The line was asked for a remark on one design. It is kept with that design, not acted on.
+            self.request.set("")
+            self.root.focus_set()
+            self.suggestions.reviewed(query)
+            return
         if self.thinking is not None:
             self.set_status("Still working on your last request.", kind="progress",
                             actions=(("Cancel it", self.cancel_request),))
@@ -1692,11 +1713,16 @@ class Desk:
             prompt_context = f"Selected listening reference: {self.reference.name}" if self.reference else ""
             if self.kept_note and self.alternative and self.alternative.path == self.kept:
                 prompt_context += f"\nPlayer's listening note on this version: {self.kept_note}"
-            self.set_status(f"Revising {prior['name']} as a new version on B…" if prior
-                            else "Building a new sound for B. Research can take a minute…",
-                            kind="progress", actions=cancel)
-            self.thinking = self.advisor.submit(compose, value, take["guitar"], take, prior, prompt_context,
-                                                sounds, self.cancel_signal)
+            if prior:
+                self.set_status(f"Revising {prior['name']} as a new version on B…", kind="progress", actions=cancel)
+                self.thinking = self.advisor.submit(compose, value, take["guitar"], take, prior, prompt_context,
+                                                    sounds, self.cancel_signal)
+            else:
+                # A new sound is answered with an aim and three designs. The first goes on B as soon as it arrives.
+                self.set_status("Designing three ways to get there. About a minute…", kind="progress", actions=cancel)
+                self.thinking = self.advisor.submit(self.suggestions.design, value, take["guitar"], take,
+                                                    self.cancel_signal,
+                                                    self.take.folder.name if self.take else None)
         else:
             if tone:
                 take["active_tone"] = tone.name
@@ -1768,7 +1794,9 @@ class Desk:
         asked = self.asked
         side = asked["side"]
         current = self.tone_revisions[side] == asked["revision"]
-        if asked["action"] in ("create", "refine"):
+        if asked["action"] in ("create", "refine") and "candidates" in result:
+            self.suggestions.arrived(result, current)
+        elif asked["action"] in ("create", "refine"):
             self.drafts[result["id"]] = result
             if self.job is not None and not self.task_if_active("monitor"):
                 self.draft = result
@@ -1985,6 +2013,10 @@ class Desk:
         if source == "phrase" and not self.take:
             self.set_status("Choose or record a phrase first.")
             return
+        if self.task_if_active("listen"):
+            # The app was only listening to designs. The player comes first.
+            self.suggestions.interrupt(lambda: self.start_source(source, reload=reload))
+            return
         if self.task_if_active("monitor") and not self.stop_signal.is_set():
             self.requested_source = source
             self.control_mail.put({"event": "source", "mode": source,
@@ -2016,6 +2048,7 @@ class Desk:
     def restored(self, _):
         self.set_status("Quad Cortex returned to the playing preset.")
         self.check_qc()
+        self.suggestions.rest()  # The unit is free: a good moment to listen to designs nobody has checked.
         if self.reference_waiting:
             self.reference_waiting = False
             self.root.after_idle(self.hear_reference)
@@ -2123,7 +2156,7 @@ class Desk:
             except Exception as error:
                 diagnostics.LOG.exception("Listening desk operation failed")
                 self.set_status(str(error), kind="error")
-                if task in ("monitor", "render", "reference", "save", "load"):
+                if task in ("monitor", "render", "reference", "save", "load", "listen"):
                     self.hardware.set("Quad Cortex · checking current sound")
                     self.check_qc()
             self.update()
@@ -2142,6 +2175,7 @@ class Desk:
                 self.monitor_event(message)
         except Empty:
             pass
+        self.suggestions.poll()
         if self.thinking is not None and self.thinking.done():
             finished, self.thinking = self.thinking, None
             try:
@@ -2270,6 +2304,7 @@ class Desk:
             self.root.after_cancel(self.shape_writer)
             self.shape_writer = None
         self.remember()
+        self.suggestions.close()
         if self.guitar_learner is not None:
             self.guitar_learner.shutdown()
         self.setup.shutdown()
