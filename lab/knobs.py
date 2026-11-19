@@ -6,6 +6,12 @@ value the positions would change, `apply` writes them into a new chain, and
 `moves` says the same in the units the unit shows. Nothing here talks to
 the unit.
 
+Every knob is a quality the player hears (warmth, body, smoothness, echoes),
+never one control or one device: each reaches for whichever controls this
+chain has that do that job. A cab's microphone position is one of the ways
+Warmth and Smoothness work, its low cut one of the ways Tightness and Body
+work; none of them is a knob of its own.
+
 A knob's rules name a control by the kind of block and the control's name,
 so one rule reaches every model that has such a control. `ROLES` gathers the
 names that do one job, with a sign for the ones that work the other way
@@ -75,41 +81,47 @@ JAZZ = [*role(PEDAL, "gain", -4), *role(PEDAL, "treble", -2), (AMP, "GAIN", -3),
         (CAPTURE, "GAIN", -5), (CAPTURE, "TREBLE", -2.5), (CAPTURE, "MID", 1.2), ("Delay", "MIX", -18),
         ("Delay", "FEEDBACK", -12), ("Reverb", "MIX", -8)]
 DARKER = [*role(PEDAL, "treble", -2), *role(AMP, "treble", -2), *role(AMP, "presence", -2), (CAPTURE, "TREBLE", -3)]
+# A cab microphone toward the speaker's edge (POSITION up, measured on the unit) is darker and fuller; nearer the
+# speaker (DISTANCE down) has more low end. Those are means to Warmth, Smoothness and Body, not knobs.
+MIC_TO_EDGE = [(category, "POSITION", 1.0) for category in CABS]
+MIC_CLOSER = [(category, "DISTANCE", -1.0) for category in CABS]
+
+
+def scaled(rules, factor):
+    return [(category, parameter, move * factor) for category, parameter, move in rules]
 
 # key: (title, lower limit, [(block category, parameter, move at full turn)]). Amp and pedal moves are
 # written for a 0-10 knob and scale to the control's own range; every other move is in display units.
 KNOBS = {
     "jazz": ("Jazz", 0, JAZZ),
-    "drive": ("Drive", -1, []),  # Drive is worked out by `_drive_delta`, not by rules.
-    "warmth": ("Warmth", -1, DARKER),
+    "drive": ("Distortion", -1, []),  # Worked out by `_drive_delta`, not by rules.
+    "warmth": ("Warmth", -1, [*DARKER, *scaled(MIC_TO_EDGE, 2.5)]),
+    "smoothness": ("Smoothness", -1, [*HIGH_CUT, *scaled(MIC_TO_EDGE, 1.5)]),
     "space": ("Space", -1, [("Delay", "MIX", 18.0), ("Delay", "FEEDBACK", 12.0),
                             ("Reverb", "MIX", 12.0), ("IRLoaders", "ROOM MIX", 10.0)]),
     "tightness": ("Tightness", -1, [*role(AMP, "bass", -2.0), *role(AMP, "thump", -2.5),
-                                      (CAPTURE, "BASS", -3.0), *role(PEDAL, "bass", -1.8)]),
-    "attack": ("Attack", -1, [("Compressor", "ATTACK", 18.0), ("Compressor", "MIX", -15.0)]),
+                                      (CAPTURE, "BASS", -3.0), *role(PEDAL, "bass", -1.8), *scaled(LOW_CUT, .65)]),
+    "attack": ("Pick attack", -1, [("Compressor", "ATTACK", 18.0), ("Compressor", "MIX", -15.0)]),
     "sustain": ("Sustain", -1, [("Compressor", "THRESHOLD", -10.0), ("Compressor", "MIX", 20.0),
                                   (AMP, "GAIN", 1.2), (CAPTURE, "GAIN", 2.5)]),
-    "gate": ("Gate", -1, [("Utility", "THRESHOLD", 15.0)]),
-    "body": ("Body", -1, [*role(AMP, "bass", 2.0), *role(AMP, "thump", 1.5), (CAPTURE, "BASS", 3.0)]),
+    "gate": ("Quiet between notes", -1, [("Utility", "THRESHOLD", 15.0)]),
+    "body": ("Body", -1, [*role(AMP, "bass", 2.0), *role(AMP, "thump", 1.5), (CAPTURE, "BASS", 3.0),
+                          *scaled(LOW_CUT, -.5), *scaled(MIC_CLOSER, 2.0)]),
     "mids": ("Mids", -1, [*role(AMP, "mid", 2.0), (CAPTURE, "MID", 3.0)]),
     "presence": ("Presence", -1, [*role(AMP, "presence", 2.5), (CAPTURE, "TREBLE", 2.0),
                                     *role(PEDAL, "treble", 1.7)]),
-    "delay": ("Delay mix", -1, [("Delay", "MIX", 30.0)]),
-    "repeats": ("Repeats", -1, [("Delay", "FEEDBACK", 25.0)]),
-    "delay_time": ("Delay time", -1, [("Delay", "DELAY TIME", 150.0)]),
-    "reverb": ("Reverb", -1, [("Reverb", "MIX", 25.0)]),
-    "modulation": ("Modulation", -1, [("Modulation", "MIX", 25.0), ("Modulation", "DEPTH", 20.0)]),
+    "delay": ("Echoes", -1, [("Delay", "MIX", 30.0)]),
+    "delay_time": ("Echo timing", -1, [("Delay", "DELAY TIME", 150.0)]),
+    "reverb": ("Room", -1, [("Reverb", "MIX", 25.0), ("IRLoaders", "ROOM MIX", 10.0)]),
+    "modulation": ("Movement", -1, [("Modulation", "MIX", 25.0), ("Modulation", "DEPTH", 20.0)]),
     "width": ("Width", -1, [("Modulation", "WIDTH", 30.0), ("Delay", "WIDTH", 25.0),
                               ("Delay", "STEREO WIDTH", 25.0), ("Reverb", "WIDTH", 25.0)]),
     "compression": ("Evenness", -1, [("Compressor", "THRESHOLD", -9.0), ("Compressor", "MIX", 19.0),
                                       ("Compressor", "RATIO", 1.4)]),
     "punch": ("Pick bite", -1, [*role(AMP, "presence", 1.8), *role(AMP, "treble", .9), (CAPTURE, "MID", .8),
                                  (CAPTURE, "TREBLE", 1.3), ("Equalizer", "2kHz", 1.8)]),
-    "mic": ("Mic position", -1, [(category, "POSITION", 5.0) for category in CABS]),
-    "low_cut": ("Low cut", -1, LOW_CUT),
-    "soft_top": ("Soft top", -1, HIGH_CUT),
-    "tail": ("Tail length", -1, [("Reverb", "DECAY", .75), ("Delay", "FEEDBACK", 20.0)]),
-    "motion": ("Motion rate", -1, [("Modulation", "RATE", 1.2), ("Modulation", "CHR RATE", .6),
+    "tail": ("Tail length", -1, [("Reverb", "DECAY", .75), ("Delay", "FEEDBACK", 25.0)]),
+    "motion": ("Movement speed", -1, [("Modulation", "RATE", 1.2), ("Modulation", "CHR RATE", .6),
                                     ("Modulation", "VIB RATE", 1.7)]),
     "bloom": ("Bloom", 0, [("Compressor", "THRESHOLD", -5.0), ("Compressor", "MIX", 12.0),
                           ("Compressor", "ATTACK", -5.0), ("Delay", "FEEDBACK", 8.0),
@@ -122,11 +134,26 @@ KNOBS = {
 
 PRIMARY = ("drive", "warmth", "punch", "space", "jazz")
 GROUPS = {
-    "Response": ("tightness", "attack", "sustain", "compression", "gate"),
-    "EQ": ("body", "mids", "presence", "mic", "low_cut", "soft_top"),
-    "Effects": ("delay", "repeats", "delay_time", "reverb", "tail", "modulation", "motion", "width"),
+    "Tone": ("body", "tightness", "mids", "presence", "smoothness"),
+    "Response": ("attack", "sustain", "compression", "gate"),
+    "Effects": ("delay", "delay_time", "reverb", "tail", "modulation", "motion", "width"),
     "Character": ("jazz", "bloom", "band_fit"),
 }
+# Knobs that were named for a mechanism, and the quality that now does their job. Positions stored on a
+# sound under the old name are carried over, so a shaped sound keeps its shape.
+RENAMED = {"low_cut": "tightness", "soft_top": "smoothness", "repeats": "tail", "mic": "warmth"}
+
+
+def normalize(values):
+    """Knob positions with any old, mechanism-named knob carried over to the quality that now does its job.
+    Everything else is left as it is, for `targets` to check."""
+    found = dict(values or {})
+    for old, new in RENAMED.items():
+        if old in found:
+            moved = found.pop(old)
+            merged = found.get(new, 0.) + moved
+            found[new] = round(max(KNOBS[new][1], min(1., merged)), 3) if isinstance(merged, (int, float)) else merged
+    return found
 
 DRIVE_CATEGORIES = {"Guitar Overdrive", "Bass Overdrive", "Guitar Amplifier", "Bass Amplifier", "Neural Capture"}
 PEDAL_CATEGORIES = {"Guitar Overdrive", "Bass Overdrive"}
@@ -142,7 +169,7 @@ DRIVE_BYPASS = -0.98
 # knob named here is turned down.
 DRY_EFFECT_MIX = {"Compressor": ("compression", 25), "Delay": ("delay", 16),
                   "Reverb": ("reverb", 16), "Modulation": ("modulation", 16)}
-DRY_EFFECT_DIRECTIONS = {"attack", "delay_time", "repeats", "tail", "motion", "width"}
+DRY_EFFECT_DIRECTIONS = {"attack", "delay_time", "tail", "motion", "width"}
 
 
 def _volume_is_the_drive():
@@ -307,6 +334,7 @@ def _hold_level(row, column, block, info, lift, scene):
 
 def _plan(chain, values, scene=None):
     """Every edit the knob positions make, in the order the old desk listed them."""
+    values = normalize(values)
     rules, previews = _rules(values)
     drive = float(values.get("drive", 0.))
     preview_categories = {category for category, _ in previews}
@@ -493,7 +521,8 @@ COMPARATIVES = {
 }
 QUANTITIES = {
     "gain": "drive", "drive": "drive", "distortion": "drive", "dirt": "drive", "saturation": "drive",
-    "crunch": "drive", "reverb": "reverb", "delay": "delay", "echo": "delay", "repeats": "repeats",
+    "crunch": "drive", "reverb": "reverb", "delay": "delay", "echo": "delay", "echoes": "delay", "repeats": "tail",
+    "fizz": "smoothness", "smoothness": "smoothness", "movement": "modulation",
     "sustain": "sustain", "mids": "mids", "midrange": "mids", "body": "body", "bass": "body", "low end": "body",
     "lows": "body", "bite": "punch", "punch": "punch", "attack": "attack", "presence": "presence",
     "treble": "presence", "highs": "presence", "top end": "presence", "space": "space", "room": "space",
@@ -502,7 +531,7 @@ QUANTITIES = {
     "gate": "gate",
 }
 COMPLAINTS = {
-    "bright": ("warmth", .3), "harsh": ("warmth", .3), "shrill": ("warmth", .3), "fizzy": ("soft_top", .35),
+    "bright": ("warmth", .3), "harsh": ("warmth", .3), "shrill": ("warmth", .3), "fizzy": ("smoothness", .35),
     "dark": ("warmth", -.3), "dull": ("warmth", -.3), "muddy": ("tightness", .3), "boomy": ("tightness", .3),
     "thin": ("body", .3), "dry": ("space", .3), "wet": ("space", -.3), "washy": ("space", -.3),
     "dirty": ("drive", -.3), "distorted": ("drive", -.3), "clean": ("drive", .3), "noisy": ("gate", .3),

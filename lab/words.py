@@ -41,8 +41,7 @@ def r(say, **moves):
 LEXICON = {
     # Low end
     "muddy": Word(region="150–400 Hz", away=(
-        r("leaner lows in the drive and amp, where mud is made", tightness=.3),
-        r("a higher low cut at the cab", low_cut=.4),
+        r("a tighter low end: leaner lows in the drive and amp and a higher low cut, where mud is made", tightness=.3),
         r("less gain, which smears low notes together", drive=-.2),
         r("less bass in the amp", body=-.3)),
         when={"palm": (r("leaner lows in the drive and amp, so muted notes stop blurring", tightness=.35),
@@ -51,16 +50,13 @@ LEXICON = {
         tips={"palm": "Under high gain the lasting fix is a boost in front that cuts lows before they distort."}),
     "boomy": Word(region="80–200 Hz", away=(
         r("less bass in the amp and its low-end resonance", body=-.3),
-        r("a higher low cut at the cab", low_cut=.45),
         r("leaner lows in the drive and amp", tightness=.3))),
     "flubby": Word(region="below 200 Hz, in time", away=(
         r("leaner lows ahead of and in the amp, so the low strings track", tightness=.35),
-        r("less gain, which loosens the low strings", drive=-.2),
-        r("a higher low cut at the cab", low_cut=.35))),
+        r("less gain, which loosens the low strings", drive=-.2))),
     "thin": Word(region="100–500 Hz", away=(
-        r("more bass and low-end weight in the amp", body=.3),
+        r("more body: low-end weight in the amp, a lower low cut, the microphones closer", body=.3),
         r("more midrange, where a guitar's size comes from", mids=.25),
-        r("a lower low cut at the cab", low_cut=-.4),
         r("a little more gain for thickness", drive=.15)),
         toward=(r("less bass in the amp", body=-.3),), fault=True,
         when={"leads": (r("more midrange, which is what makes a single note sound big", mids=.3),
@@ -74,7 +70,6 @@ LEXICON = {
         away=(r("less bass in the amp", body=-.3), r("leaner lows in the drive and amp", tightness=.3))),
     "tight": Word(toward=(
         r("leaner lows in the drive and amp", tightness=.3),
-        r("a higher low cut at the cab", low_cut=.35),
         r("less gain, for a firmer attack", drive=-.15)),
         away=(r("fuller lows in the drive and amp", tightness=-.3),)),
     "loose": Word(away=(
@@ -96,34 +91,29 @@ LEXICON = {
     "harsh": Word(region="2–5 kHz", away=(
         r("less presence, which is where harshness sits", presence=-.3),
         r("a softer top across the amp and drive", warmth=.25),
-        r("a lower low-pass at the cab", soft_top=.3),
+        r("a smoother top: the cab's low-pass lower", smoothness=.3),
         r("less gain, which adds upper harmonics", drive=-.15)),
         when={"leads": (r("less presence and more midrange, so high notes sing instead of pierce",
                           presence=-.3, mids=.2),),
               "hard": (r("more even dynamics, so hard picking does not spike", compression=.3, presence=-.15),)},
         tips={"leads": "On the guitar, the neck pickup or the tone knob at 7 tames high notes without dulling the rest."}),
     "fizzy": Word(region="5–10 kHz", away=(
-        r("a lower low-pass at the cab, where fizz lives", soft_top=.4),
-        r("the cab microphones moved off the centre of the speaker, where fizz is strongest", mic=.4),
+        r("a smoother top: the cab's low-pass lower and its microphones off the centre of the speaker, where fizz lives", smoothness=.4),
         r("less gain, the usual source of fizz", drive=-.2),
         r("less presence", presence=-.3))),
     "bright": Word(toward=(
         r("a brighter top across the amp and drive", warmth=-.3),
         r("more presence", presence=.3),
-        r("a higher low-pass at the cab", soft_top=-.5),
-        r("the cab microphones moved toward the centre of the speaker", mic=-.4)),
-        away=(r("a softer top across the amp and drive", warmth=.3),
+        r("an open top: the cab's low-pass higher", smoothness=-.5)),
+        away=(r("a warmer tone across the amp, drive and cab microphones", warmth=.3),
               r("less presence", presence=-.3),
-              r("a lower low-pass at the cab", soft_top=.3),
-              r("the cab microphones moved toward the speaker's edge", mic=.4))),
+              r("a smoother top: the cab's low-pass lower", smoothness=.3))),
     "dark": Word(toward=(
         r("a softer top across the amp and drive", warmth=.35),
-        r("less presence", presence=-.3),
-        r("the cab microphones moved toward the speaker's edge", mic=.4)),
-        away=(r("a brighter top across the amp and drive", warmth=-.3),
+        r("less presence", presence=-.3)),
+        away=(r("a brighter tone across the amp, drive and cab microphones", warmth=-.3),
               r("more presence", presence=.3),
-              r("a higher low-pass at the cab", soft_top=-.5),
-              r("the cab microphones moved toward the centre of the speaker", mic=-.4)),
+              r("an open top: the cab's low-pass higher", smoothness=-.5)),
         tips={"": "Check the listening level first: quiet monitoring makes any tone sound dull."}),
     "warm": Word(toward=(
         r("a softer top across the amp and drive", warmth=.3),
@@ -134,7 +124,7 @@ LEXICON = {
         r("a brighter top across the amp and drive", warmth=-.25)),
         away=(r("less presence", presence=-.3), r("a softer top", warmth=.25))),
     "airy": Word(region="above 8 kHz", toward=(
-        r("a higher low-pass at the cab and more presence", soft_top=-.5, presence=.2),
+        r("an open top and more presence", smoothness=-.5, presence=.2),
         r("a little more room", space=.2))),
     # Pick and dynamics
     "punchy": Word(toward=(

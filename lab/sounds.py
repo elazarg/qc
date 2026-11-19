@@ -70,7 +70,10 @@ class Sound:
 
     @classmethod
     def from_record(cls, record):
-        return cls(**{**record, "chain": Chain.from_record(record["chain"])})
+        from .knobs import normalize      # knobs once named for a mechanism are carried to their quality
+
+        return cls(**{**record, "chain": Chain.from_record(record["chain"]),
+                      "knobs": normalize(record.get("knobs") or {})})
 
 
 class Store:

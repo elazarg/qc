@@ -123,7 +123,7 @@ class DeskSideTest(unittest.TestCase):
         self.assertEqual(studio.turned, [{"drive": 1.}])
         self.assertTrue(heard[-1]["applied"])
         self.assertEqual(heard[-1]["value"], 1.)
-        self.assertIn("Moved Drive +10%", studio.statuses[-1])
+        self.assertIn("Moved Distortion +10%", studio.statuses[-1])
 
     def test_unarmed_or_unavailable_gestures_are_only_reported(self):
         for event in (proposal(allowed=False), proposal(control="reverb")):

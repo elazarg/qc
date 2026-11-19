@@ -54,12 +54,12 @@ PLANES = {
         Dimension("Lean", "Weighty", (("body", .83), ("tightness", -.1))),
         "Listen for where the guitar sits against a backing part at a steady playback level."),
     "Note shape": Plane(
-        Dimension("Brief", "Held", (("sustain", .77), ("repeats", .24), ("reverb", .15))),
+        Dimension("Brief", "Held", (("sustain", .77), ("tail", .24), ("reverb", .15))),
         Dimension("Soft front", "Clear front", (("attack", .74), ("presence", .24))),
         "Compare how notes start and how much sound carries into the next note."),
     "Atmosphere": Plane(
         Dimension("Dry", "Bloom", (("reverb", .87), ("space", .18))),
-        Dimension("Still", "In motion", (("modulation", .72), ("repeats", .32), ("delay", .22))),
+        Dimension("Still", "In motion", (("modulation", .72), ("tail", .32), ("delay", .22))),
         "Move from direct sound to wash, then add motion when the chain supports it."),
 }
 BAND_NAMES = tuple(f"{(low * high) ** .5 / 1000:.1f}k" if (low * high) ** .5 >= 1000 else str(round((low * high) ** .5))

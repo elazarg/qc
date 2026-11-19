@@ -18,15 +18,13 @@ class LexiconTest(unittest.TestCase):
                 self.assertTrue(all(knobs.KNOBS[knob][1] <= step <= 1 for knob, step in remedy.moves.items()))
         self.assertTrue(set(words.ALIASES.values()) <= set(words.LEXICON))
 
-    def test_microphone_moves_follow_the_measured_direction(self):
-        # Measured on the unit: a higher POSITION is toward the edge and darker, and the knob raises POSITION.
-        self.assertTrue(all(delta > 0 for _, name, delta in knobs.KNOBS["mic"][2] if name == "POSITION"))
-        darker = [remedy.moves["mic"] for word, side in (("fizzy", "away"), ("bright", "away"), ("dark", "toward"))
-                  for remedy in getattr(words.LEXICON[word], side) if "mic" in remedy.moves]
-        brighter = [remedy.moves["mic"] for word, side in (("bright", "toward"), ("dark", "away"))
-                    for remedy in getattr(words.LEXICON[word], side) if "mic" in remedy.moves]
-        self.assertEqual((len(darker), len(brighter)), (3, 2))
-        self.assertTrue(all(move > 0 for move in darker) and all(move < 0 for move in brighter))
+    def test_microphones_serve_warmth_and_smoothness_in_the_measured_direction(self):
+        # Measured on the unit: a higher POSITION is toward the edge, darker and smoother. Warmth and Smoothness
+        # turned up raise it; no knob is the microphone itself.
+        for knob in ("warmth", "smoothness"):
+            moves = [delta for _, name, delta in knobs.KNOBS[knob][2] if name == "POSITION"]
+            self.assertTrue(moves and all(delta > 0 for delta in moves), knob)
+        self.assertNotIn("mic", knobs.KNOBS)
 
     def test_nothing_from_the_old_package_is_imported(self):
         source = words.__file__
@@ -60,10 +58,10 @@ class ReadTest(unittest.TestCase):
         self.assertEqual(said("the notes die too fast"), ("More sustain", {"sustain": .3}))
         self.assertEqual(said("make it sing"), ("More singing", {"sustain": .3, "mids": .2}))
         self.assertEqual(said("needs more clarity"), ("Clearer", {"drive": -.2}))
-        self.assertEqual(said("too much fizz"), ("Fizzy", {"soft_top": .4}))
+        self.assertEqual(said("too much fizz"), ("Fizzy", {"smoothness": .4}))
 
     def test_amounts_scale_the_step(self):
-        self.assertEqual(said("a bit fizzy"), ("Fizzy", {"soft_top": .2}))
+        self.assertEqual(said("a bit fizzy"), ("Fizzy", {"smoothness": .2}))
         self.assertEqual(said("way too dark"), ("Dark", {"warmth": -.6}))
 
     def test_questions_and_longer_requests_are_left_to_the_assistant(self):
@@ -72,7 +70,7 @@ class ReadTest(unittest.TestCase):
             self.assertIsNone(words.read(text), text)
 
     def test_no_of_a_fault_asks_for_less_and_no_of_a_quality_says_it_is_missing(self):
-        for text, name, move in (("no fizz", "Fizzy", {"soft_top": .4}), ("no mud", "Muddy", {"tightness": .3}),
+        for text, name, move in (("no fizz", "Fizzy", {"smoothness": .4}), ("no mud", "Muddy", {"tightness": .3}),
                                  ("no boom", "Boomy", {"body": -.3}), ("no bite", "More bite", {"punch": .3}),
                                  ("no sustain", "More sustain", {"sustain": .3})):
             reading = words.read(text)
@@ -89,13 +87,13 @@ class RemedyOrderTest(unittest.TestCase):
         self.assertIn("less gain", reading.remedies[1].say)
         # The general remedies follow, less any that move exactly the same knobs as one already offered.
         self.assertEqual([remedy.moves for remedy in reading.remedies[2:]],
-                         [{"low_cut": .4}, {"drive": -.2}, {"body": -.3}])
+                         [{"drive": -.2}, {"body": -.3}])
         self.assertIn("a boost in front", reading.tip)  # What no knob here does.
 
     def test_only_remedies_the_chain_can_perform_are_offered(self):
         reading = words.read("fizzy")
         self.assertEqual([tuple(remedy.moves) for remedy in words.usable(reading, None)],
-                         [("soft_top",), ("mic",), ("drive",), ("presence",)])
+                         [("smoothness",), ("drive",), ("presence",)])
         self.assertEqual([tuple(remedy.moves) for remedy in words.usable(reading, {"drive", "presence"})],
                          [("drive",), ("presence",)])
         self.assertEqual(words.usable(reading, {"reverb"}), ())

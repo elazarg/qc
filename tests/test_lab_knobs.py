@@ -146,7 +146,7 @@ class FiltersTest(EvenAmps):
     def test_owned_ir_filters_participate_in_musical_directions(self):
         model, at = 29001, index(29001, "LOW PASS")
         source = chain(Block(model, {**{i: .25 for i in range(at)}, at: catalog.to_norm(model, at, 8000.)}))
-        edits = knobs.moves(source, {"soft_top": .5})
+        edits = knobs.moves(source, {"smoothness": .5})
         self.assertTrue(any(edit["index"] == at and edit["to"] < edit["from"] for edit in edits))
 
     def test_each_row_moves_only_the_filter_doing_the_work(self):
@@ -156,18 +156,22 @@ class FiltersTest(EvenAmps):
         first = [block(cab, {"HPF": 20., "LPF": 9000.}), block(eq, {"HPF": 85., "LPF": 20001.})]
         second = [block(cab, {"HPF": 120., "LPF": 20000.}), block(eq, {"HPF": 19., "LPF": 6000.})]
         source = chain(rows=[first, second])
-        low = {(edit["row"], edit["column"]) for edit in knobs.moves(source, {"low_cut": .5})}
+        # Tightness reaches the low cut, Smoothness the low-pass (it also moves the cab microphones).
+        low = {(edit["row"], edit["column"]) for edit in knobs.moves(source, {"tightness": .5})
+               if edit["name"] in ("HPF", "HPF FREQ")}
         self.assertEqual(low, {(0, 1), (1, 0)})
-        high = {(edit["row"], edit["column"]) for edit in knobs.moves(source, {"soft_top": .5})}
+        high = {(edit["row"], edit["column"]) for edit in knobs.moves(source, {"smoothness": .5})
+                if edit["name"] in ("LPF", "LPF FREQ")}
         self.assertEqual(high, {(0, 0), (1, 1)})
 
     def test_a_filter_parked_outside_the_audible_span_starts_from_its_edge(self):
-        edits = knobs.moves(chain(block(4005, {"LPF": 20001.})), {"soft_top": 1.})
+        edits = knobs.moves(chain(block(4005, {"LPF": 20001.})), {"smoothness": 1.})
         self.assertAlmostEqual(edits[0]["to"], 14000 * 2 ** -1.5, places=2)
 
     def test_a_bypassed_filter_owns_nothing(self):
         source = chain(block(12006, {"HPF": 20.}), replace_bypass(block(4005, {"HPF": 85.})))
-        self.assertEqual({edit["column"] for edit in knobs.moves(source, {"low_cut": .5})}, {0})
+        self.assertEqual({edit["column"] for edit in knobs.moves(source, {"tightness": .5})
+                          if edit["name"] in ("HPF", "HPF FREQ")}, {0})
 
 
 def replace_bypass(found, flag=True):
@@ -178,11 +182,11 @@ def replace_bypass(found, flag=True):
 class EffectsTest(EvenAmps):
     def test_secondary_delay_knob_auditions_a_dry_delay_and_respects_an_explicit_cut(self):
         source = chain(block(6011, {"MIX": 0.}))
-        self.assertEqual(knobs.moves(source, {"repeats": 0}), [])
-        edits = {edit["name"]: edit["to"] for edit in knobs.moves(source, {"repeats": .5})}
+        self.assertEqual(knobs.moves(source, {"tail": 0}), [])
+        edits = {edit["name"]: edit["to"] for edit in knobs.moves(source, {"tail": .5})}
         self.assertAlmostEqual(edits["MIX"], 8.)
         self.assertAlmostEqual(edits["FEEDBACK"], 37.5)
-        cut = knobs.moves(source, {"repeats": .5, "delay": -1.})
+        cut = knobs.moves(source, {"tail": .5, "delay": -1.})
         self.assertEqual([edit["name"] for edit in cut], ["FEEDBACK"])
         self.assertEqual(source.block(0, 0).get(0), 0.)
 
@@ -281,8 +285,9 @@ class AvailableTest(unittest.TestCase):
                        block(7004, {"RATE": 3.6}, every=False), block(8000, {"MIX": 9.}, every=False))
         found = knobs.controls(source)
         self.assertIn(("Brit Plexi 50 Normal", "Gain"), found["drive"])
-        self.assertEqual(found["low_cut"], (("Graphic-9", "Hpf"),))
-        self.assertEqual(found["soft_top"], (("412 Brit 60B GB 71 (M)", "Lpf"),))
+        self.assertIn(("Graphic-9", "Hpf"), found["tightness"])
+        self.assertIn(("412 Brit 60B GB 71 (M)", "Lpf"), found["smoothness"])
+        self.assertIn(("412 Brit 60B GB 71 (M)", "Position"), found["warmth"])
         self.assertIn(("Tremolo", "Rate"), found["motion"])
         self.assertNotIn("gate", found)
         self.assertNotIn("delay", found)
@@ -291,7 +296,7 @@ class AvailableTest(unittest.TestCase):
     def test_a_guitar_amp_offers_its_tone_knobs(self):
         found = knobs.available(chain(block(1093)))
         self.assertTrue({"drive", "warmth", "body", "mids", "presence", "tightness", "sustain"} <= set(found))
-        self.assertFalse({"delay", "reverb", "gate", "low_cut"} & set(found))
+        self.assertFalse({"delay", "reverb", "gate", "smoothness"} & set(found))
 
     def test_a_bass_amp_offers_drive_through_whatever_it_calls_its_gain(self):
         found = knobs.controls(chain(block(2011)))
@@ -319,11 +324,20 @@ class DirectionTest(unittest.TestCase):
                       "more Andy Timmons", "more", "too", "John Mayer Gravity", "undo"):
             self.assertIsNone(knobs.direction(words), words)
 
-    def test_the_knobs_keep_their_keys(self):
-        from tone_lab import styles
-        self.assertEqual({key: value[:2] for key, value in knobs.KNOBS.items()},
-                         {key: value[:2] for key, value in styles.KNOBS.items()})
-        self.assertEqual(knobs.GROUPS, styles.KNOB_GROUPS)
+    def test_every_knob_is_a_quality_heard_not_a_control_or_a_device(self):
+        mechanisms = {"mic", "microphone", "position", "low cut", "high cut", "low-pass", "high-pass", "filter",
+                      "mix", "gate", "compressor", "attack time", "rate", "time", "feedback", "drive", "repeats",
+                      "modulation", "reverb", "delay", "soft top"}
+        for key, (title, _, _) in knobs.KNOBS.items():
+            self.assertNotIn(title.lower(), mechanisms, key)
+        shown = set(knobs.PRIMARY) | {key for group in knobs.GROUPS.values() for key in group}
+        self.assertEqual(shown, set(knobs.KNOBS))           # every knob has a place on the Shape panel
+
+    def test_a_sound_shaped_with_an_old_knob_keeps_its_shape(self):
+        self.assertEqual(knobs.normalize({"low_cut": .3, "tightness": .2, "soft_top": .4, "repeats": .5}),
+                         {"tightness": .5, "smoothness": .4, "tail": .5})
+        with self.assertRaises(ValueError):
+            knobs.targets(chain(block(1045)), knobs.normalize({"nonsense": .2}))
 
 
 if __name__ == "__main__":
