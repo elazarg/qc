@@ -37,7 +37,7 @@ class StudioTest(unittest.TestCase):
         self.host = Host(self.folder / "unit", simulated=True, local=True)
         self.host.ready.result(10)
         self.script = Scripted()
-        self.studio = Studio(self.host, self.folder, assistant=Assistant(self.folder, run=self.script),
+        self.studio = Studio(self.host, self.folder, assistant=Assistant(self.folder, automatic=False, run=self.script),
                              phrase=("take", (np.sin(np.arange(24000) / 48000 * 2 * np.pi * 196) * .2)[:, None]))
         self.addCleanup(self.studio.close)
         self.studio.open()
@@ -128,6 +128,95 @@ class StudioTest(unittest.TestCase):
         summary, lines = self.studio.guitar_profile()
         self.assertEqual(set(summary), {"Bridge · Series", "Neck · Parallel"})
         self.assertTrue(any("than Bridge · Series" in line for line in lines))
+
+
+    def three(self, *names):
+        return reply(*[answer(name, [block(PLEXI, 0, gain=gain), block(GREENBACK, 1)], differs=name)
+                       for name, gain in zip(names, (3, 6, 9))])
+
+    def test_three_more_are_informed_by_what_was_heard_and_marked_and_rounds_can_be_paged(self):
+        self.script.answers += [self.three("One", "Two", "Three"), self.three("Four", "Five", "Six")]
+        self.studio.ask("make a classic rock crunch")
+        settle(self.studio, 20)
+        first = self.studio.state.round
+        self.studio.mark("not this")
+        self.studio.more()
+        settle(self.studio, 20)
+        prompt = self.script.asked[-1][0]
+        self.assertIn('"player_marks": ["not this"]', prompt)
+        self.assertIn('"heard": {"drive"', prompt)
+        self.assertEqual(self.studio.sound("b").name, "Four")
+        self.assertEqual(self.studio.round()["previous"], first)
+        self.studio.round_back()
+        settle(self.studio)
+        self.assertEqual((self.studio.state.round, self.studio.sound("b").name), (first, "One"))
+        self.studio.round_forward()                      # already made: no new call
+        settle(self.studio)
+        self.assertEqual((self.studio.sound("b").name, len(self.script.asked)), ("Four", 2))
+
+    def test_an_automatic_assistant_prepares_three_more_once_the_round_is_heard_and_no_further(self):
+        self.studio.assistant.automatic = True
+        self.script.answers += [self.three("One", "Two", "Three"), self.three("Four", "Five", "Six")]
+        self.studio.ask("make a classic rock crunch")
+        settle(self.studio, 30)
+        found = self.studio.round()
+        self.assertTrue(found.get("next"))
+        self.assertEqual(self.studio.sound("b").name, "One")       # Prepared, not put on show.
+        self.assertIn("Three more designs are ready", self.studio.state.status)
+        self.assertEqual(self.studio.round(found["next"])["by"], "app")
+        self.studio.round_forward()
+        settle(self.studio, 30)
+        self.assertEqual(len(self.script.asked), 2)       # The app's own round leads to no further call.
+
+    def test_marks_copy_and_blind_comparison(self):
+        self.script.answers.append(self.three("One", "Two", "Three"))
+        self.studio.ask("make a classic rock crunch")
+        settle(self.studio, 20)
+        self.studio.mark("keeper")
+        self.studio.mark("not this")
+        self.assertEqual(self.studio.sound("b").marks, ["not this"])
+        self.studio.copy_to_a()
+        settle(self.studio)
+        self.assertEqual(self.studio.sound("a").id, self.studio.sound("b").id)
+        self.studio.step(2)
+        settle(self.studio)
+        names = {self.studio.sound("a").name, self.studio.sound("b").name}
+        self.studio.blind()
+        settle(self.studio)
+        self.assertTrue(self.studio.state.blind)
+        self.assertEqual({self.studio.sound("a").name, self.studio.sound("b").name}, names)
+        self.studio.blind()
+        self.assertFalse(self.studio.state.blind)
+        self.assertIn("A was", self.studio.state.status)
+
+    def test_a_preset_name_typed_as_a_request_brings_that_preset_in(self):
+        import json
+        (self.folder / "directory.json").write_text(json.dumps([
+            {"slot": {"folder_key": "/opt/neuraldsp/Factory Library", "position": 0, "is_factory": False},
+             "name": "Brit 2203", "setlist": "My Presets"}]), encoding="utf-8")
+        import lab.studio as studio_module
+        original = studio_module.Studio._preset_named
+
+        def named(studio, text):
+            found = json.loads((studio.folder / "directory.json").read_text(encoding="utf-8"))
+            return next(((item["slot"], item["name"]) for item in found
+                         if item["name"].casefold() == text.strip().casefold()), None)
+
+        studio_module.Studio._preset_named = named
+        self.addCleanup(setattr, studio_module.Studio, "_preset_named", original)
+        self.studio.ask("brit 2203")
+        settle(self.studio)
+        self.assertEqual(self.studio.sound("a").origin["kind"], "preset")
+        self.assertEqual(self.script.asked, [])
+        self.assertIn('ask "make Brit 2203"', self.studio.state.status)
+
+    def test_a_part_can_be_one_scene_of_a_sound(self):
+        self.studio.work_on({"folder_key": "/opt/neuraldsp/Factory Library", "position": 0, "is_factory": True},
+                            "Brit 2203")
+        settle(self.studio)
+        self.studio.set(song="Time")
+        self.studio.add_part("Lead", scene=2)
+        self.assertEqual(self.studio.store.song("Time")["parts"][0]["scene"], 2)
 
 
 if __name__ == "__main__":

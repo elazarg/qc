@@ -309,3 +309,11 @@ class SimAudio:
         note = .2 * np.sin(2 * np.pi * 196 * time) * np.exp(-2 * time)
         return np.repeat(note[:, None], len(channels), axis=1).astype(np.float32)
 
+
+def _open(self, handshake=True):
+    """Opening the simulated unit, so that it can be connected like the real one (`device.connect`)."""
+    return self
+
+
+SimUnit.open = _open
+

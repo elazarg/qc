@@ -39,6 +39,7 @@ class State:
     instrument: str = "Charvel"
     song: str | None = None
     revision: int = 0                 # bumped whenever A or B changes
+    blind: bool = False               # names hidden while comparing; A and B may have been swapped
 
 
 class Studio:
@@ -51,6 +52,7 @@ class Studio:
         self.state = State()
         self.history = []                 # earlier states, for undo
         self.jobs = []                    # (future, done, failed)
+        self.preparing = None             # the round whose next three are being designed
         self.phrase = phrase              # (name, mono dry audio) or None
         self.listeners = []
 
@@ -109,6 +111,14 @@ class Studio:
                                                             if stale else ""))
 
         self.later(self.host.call("open"), opened)
+        # The player's presets, for the Sounds panel and for requests that name one: read again when the last
+        # read is over half a day old (it holds the unit about ten seconds). Quiet if it fails.
+        import time
+
+        listing = self.folder / "directory.json"
+        if not listing.exists() or time.time() - listing.stat().st_mtime > 12 * 3600:
+            self.later(self.host.call("lab.library.directory", folder=str(self.folder)), lambda entries: None,
+                       lambda error: None)
 
     def put(self, side, sound):
         """Put a sound on A or B, and get both ready on the unit."""
@@ -236,25 +246,48 @@ class Studio:
             self.store.save(sound)
             self.say(said)
             return
+        named = self._preset_named(text)
+        if named is not None:
+            slot, name = named
+            self.work_on(slot, name, note=f"That is your preset's name. For a new design in its spirit, "
+                                          f"ask \"make {name}\".")
+            return
         b = self.sound("b")
         if b is not None and not _wants_new(text):
             self.revise(b, text)
         else:
             self.new_round(text)
 
+    def _preset_named(self, text):
+        """A request that is exactly the name of one of the player's presets on the unit means that preset."""
+        try:
+            from .library import cached
+        except ImportError:
+            return None
+        wanted = text.strip().casefold()
+        found = [item for item in cached(self.folder) or [] if not item["slot"].get("is_factory")
+                 and item["name"].strip().casefold() == wanted]
+        return (found[0]["slot"], found[0]["name"]) if len(found) == 1 else None
+
     def _instrument(self):
         return self.store.instrument(self.state.instrument)
 
-    def new_round(self, text, *, earlier=None, by="player"):
-        self.set(working="Designing three ways to get there. About a minute…")
+    def new_round(self, text, *, earlier=None, by="player", after=None):
+        """Three designs for `text`. `after` is the round these follow, whose designs and what was heard of them
+        (`earlier`) inform these."""
+        quietly = by == "app"
+        if not quietly:
+            self.set(working="Designing three ways to get there. About a minute…")
         instrument = self._instrument()
         future = self.thinking.submit(design.round_of_three, self.assistant, text, instrument, earlier=earlier, by=by)
         revision = self.state.revision
+        self.preparing = after
 
         def arrived(result):
+            self.preparing = None
             aim, designs = result
             record = {"id": knowledge_id(), "request": text, "aim": aim, "created": _now(),
-                      "candidates": []}
+                      "previous": after, "by": by, "candidates": []}
             for sound, differs in designs:
                 sound.tags = [f"aim: {aim['drive']}, {aim['tone']}, {aim['space']}"]
                 if self.state.song:
@@ -262,6 +295,14 @@ class Studio:
                 self.store.save(sound)
                 record["candidates"].append({"sound": sound.id, "differs": differs})
             self._save_round(record)
+            if after:
+                earlier_round = self.round(after)
+                if earlier_round is not None:
+                    earlier_round["next"] = record["id"]
+                    self._save_round(earlier_round)
+            if quietly:
+                self.say("Three more designs are ready, informed by what was heard: press N.")
+                return
             self.set(working="", round=record["id"])
             if self.state.revision == revision:
                 self.put("b", self.store.sound(record["candidates"][0]["sound"]))
@@ -270,7 +311,110 @@ class Studio:
             else:
                 self.say(f"{len(designs)} designs are ready. B changed meanwhile, so it was left alone.")
 
-        self.later(future, arrived)
+        def failed(error):
+            self.preparing = None
+            if not quietly:
+                self.set(working="", status=str(error))
+
+        self.later(future, arrived, failed)
+
+    def more(self, *, by="player"):
+        """Three more for the round on show, informed by its designs, what listening heard and the player's marks."""
+        found = self.round()
+        if found is None:
+            self.say("Ask for a sound first.")
+            return
+        if found.get("next"):
+            self.go_round(found["next"])
+            return
+        if self.preparing == found["id"]:
+            self.say("Three more are on their way.")
+            return
+        earlier = []
+        for candidate in found["candidates"]:
+            sound = self.store.sound(candidate["sound"])
+            earlier.append({"name": sound.name, "differs": candidate["differs"], "chain": describe(sound.chain),
+                            "heard": {key: sound.heard[key] for key in ("drive", "tone", "space")}
+                            if sound.heard else None,
+                            "player_marks": sound.marks, "player_said": [note["text"] for note in sound.notes],
+                            "played": sound.played})
+        if by == "player":
+            self.set(working="Designing three more, from what was heard and what you marked…")
+        self.new_round(found["request"], earlier=earlier, by=by, after=found["id"])
+
+    def go_round(self, round_id):
+        found = self.round(round_id)
+        if found is None:
+            return
+        self.set(round=round_id)
+        self.put("b", self.store.sound(found["candidates"][0]["sound"]))
+        self.say(f"Round: {found['request']} · {found['aim']['drive']}, {found['aim']['tone']}, "
+                 f"{found['aim']['space']}")
+
+    def round_back(self):
+        found = self.round()
+        if found and found.get("previous"):
+            self.go_round(found["previous"])
+
+    def round_forward(self):
+        found = self.round()
+        if found and found.get("next"):
+            self.go_round(found["next"])
+        elif found:
+            self.more()
+
+    def _prepare_next(self):
+        """When every design of the round on show has been heard, prepare three more in the background, if the
+        assistant may be called without asking. Never more than two rounds ahead of the player."""
+        found = self.round()
+        if found is None or found.get("next") or self.preparing or not self.assistant.automatic:
+            return
+        if found.get("by") == "app":
+            return
+        if all(self.store.sound(candidate["sound"]).heard for candidate in found["candidates"]):
+            self.more(by="app")
+
+    # ---- the player's marks, copying, blind comparison ----
+
+    def mark(self, word, side=None):
+        """Put a mark on the sound on a side, or take it off. "keeper" and "not this" exclude each other."""
+        sound = self.sound(side or self.state.side)
+        if sound is None:
+            return
+        word = word.strip()[:24]
+        if not word:
+            return
+        if word in sound.marks:
+            sound.marks.remove(word)
+        else:
+            opposite = {"keeper": "not this", "not this": "keeper"}.get(word)
+            sound.marks = [item for item in sound.marks if item != opposite] + [word]
+        self.store.save(sound)
+        self.say(f"{sound.name}: " + (", ".join(sound.marks) if sound.marks else "no marks"))
+
+    def copy_to_a(self):
+        b = self.sound("b")
+        if b is None:
+            return
+        self.put("a", b)
+        self.set(side="b")
+        self.say(f"{b.name} is on A too, to compare the next change on B against.")
+
+    def blind(self):
+        """Hide the names, and swap A and B or not, at random. Calling it again shows what was where."""
+        import random
+
+        if self.state.blind:
+            self.set(blind=False, status=f"A was {self.sound('a').name}, B was {self.sound('b').name}.")
+            return
+        if self.sound("a") is None or self.sound("b") is None:
+            self.say("Blind comparison needs a sound on both A and B.")
+            return
+        if random.random() < .5:
+            self.checkpoint()
+            self.set(a=self.state.b, b=self.state.a, revision=self.state.revision + 1)
+            self._show()
+        self.set(blind=True, status="Names hidden. Play A and B, then press X to see which was which.")
 
     def revise(self, sound, text):
         self.set(working=f"Revising {sound.name}…")
@@ -323,16 +467,21 @@ class Studio:
                 def heard(result, sound=sound):
                     sound.heard = {"phrase": self.phrase[0], "digest": sound.chain.digest(), **result.to_record()}
                     self.store.save(sound)
+                    if result.level_db is not None and result.level_db > -90:
+                        sound.tags = [tag for tag in sound.tags if not tag.startswith("heard:")] + [
+                            f"heard: {result.drive}, {result.tone}, {result.space}"]
+                        self.store.save(sound)
                     self.set(working="")
                     self._show() if self.state.shown is None else None
                     self.listen_when_free()
 
                 self.later(self.host.call("hear", sound.chain, self.phrase[1]), heard)
                 return
+        self._prepare_next()
 
     # ---- presets on the unit ----
 
-    def work_on(self, slot, name):
+    def work_on(self, slot, name, *, note=""):
         """Bring a preset saved on the unit in: it goes on A as it is, and a copy on B to change."""
         self.set(working=f"Reading {name}…")
 
@@ -344,7 +493,7 @@ class Studio:
             self.store.save(copy)
             self.checkpoint()
             self.set(a=original.id, b=copy.id, side="b", working="", revision=self.state.revision + 1,
-                     status=f"{held_name} is on A as saved, and on B to work on.")
+                     status=f"{held_name} is on A as saved, and on B to work on. {note}".strip())
             self._show()
 
         self.later(self.host.call("read", slot), read)
@@ -418,16 +567,23 @@ class Studio:
 
     # ---- songs ----
 
-    def add_part(self, part):
+    def add_part(self, part, scene=None):
+        """Make the sound on show (or one scene of it, 0 to 7) a part of the song being worked on."""
         if not self.state.song:
             self.say("Name the song first.")
             return
+        sound = self.sound(self.state.side)
+        if sound is None:
+            return
         song = self.store.song(self.state.song)
         song["instrument"] = self.state.instrument
-        sound = self.sound(self.state.side)
-        song["parts"] = [item for item in song["parts"] if item["name"] != part] + [{"name": part, "sound": sound.id}]
+        entry = {"name": part, "sound": sound.id, **({"scene": scene} if scene is not None else {})}
+        song["parts"] = [item for item in song["parts"] if item["name"] != part] + [entry]
+        if self.phrase and not song.get("phrase"):
+            song["phrase"] = self.phrase[0]
         self.store.save_song(song)
-        self.say(f"{sound.name} is the {part} of {song['name']}.")
+        where = f", scene {'ABCDEFGH'[scene]}" if scene is not None else ""
+        self.say(f"{sound.name}{where} is the {part} of {song['name']}.")
 
     def chain_text(self, side=None):
         sound = self.sound(side or self.state.side)

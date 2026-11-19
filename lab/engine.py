@@ -266,6 +266,11 @@ class Engine:
     def record(self, seconds, *, stop=None):
         """Record the dry guitar from its input, as it reaches the unit before any processing."""
         self.quiet()
-        dry_channel = self.physical_input           # USB channels 1 and 2 carry inputs 1 and 2 dry
+        dry_channel = self.physical_input
+        if hasattr(self.unit.device, "read_message"):
+            from .device import recording_channels
+
+            # Which USB channels carry the dry input depends on the unit's USB Dry/Wet setting.
+            dry_channel = recording_channels(self.unit.device, self.physical_input)[0]
         return self.audio.record(seconds, [dry_channel], cancel=stop)
 

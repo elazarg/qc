@@ -33,10 +33,10 @@ def _engine(simulated, folder, physical_input):
         audio = SimAudio(device)
         context = None
     else:
-        from tone_lab import device as old_device   # Cortex Control priority and the library's quirks live there
+        from . import device as qc_device
         from .audio import Audio
 
-        context = old_device.connect(write=True)
+        context = qc_device.connect(write=True)
         unit = Unit(context.__enter__())
         audio = Audio()
     return Engine(unit, Slots(unit, folder), audio, physical_input=physical_input), context

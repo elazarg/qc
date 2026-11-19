@@ -47,6 +47,11 @@ def sections(*names):
     return "\n\n".join(parts[name].strip() for name in names)
 
 
+def craft_for(kind):
+    """The section on how sounds are made for this kind of instrument: the guitar's craft, or its own."""
+    return kind if kind in ("bass", "acoustic", "classical") else "craft"
+
+
 # ---- What the assistant may use ----
 
 def usable(model_id, kind):
@@ -379,7 +384,7 @@ def round_of_three(assistant, text, instrument, *, phrase=None, earlier=None, re
     """An aim and up to three sounds that reach it by different routes."""
     kind = (instrument or {}).get("kind", "electric")
     models = offered(text, kind)
-    names = ("task", "chain", "craft", "scenes", "paths", "budget", "round")
+    names = ("task", "chain", craft_for(kind), "scenes", "paths", "budget", "round")
     prompt = sections(*names) + "\n\n" + json.dumps(
         facts(text, instrument, phrase=phrase, earlier=earlier, models=models), ensure_ascii=False)
     physical = (instrument or {}).get("input", 1)
@@ -413,7 +418,7 @@ def revise(assistant, sound, text, instrument, *, phrase=None, by="player", canc
     """A new sound: `sound` changed as the request asks, everything else kept."""
     kind = (instrument or {}).get("kind", "electric")
     models = offered(text, kind, sound.chain)
-    prompt = sections("task", "chain", "revise", "craft", "scenes", "paths", "budget") + "\n\n" + json.dumps(
+    prompt = sections("task", "chain", "revise", craft_for(kind), "scenes", "paths", "budget") + "\n\n" + json.dumps(
         facts(text, instrument, phrase=phrase, chain=sound.chain, models=models), ensure_ascii=False)
 
     def check(reply):

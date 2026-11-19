@@ -26,6 +26,18 @@ A cab's POSITION moves both microphones between the centre of the speaker (0, br
 
 community_recipe is the usual chain for the sound named, in generic blocks, and instrument describes the player's guitar: use both as background.
 
+## bass
+
+The instrument is a bass. Build bass chains, not guitar chains with a bass in front: a bass amp and a bass cab, or no amp at all for a direct sound. The usual studio bass is two paths blended: a clean direct path that keeps the low end (a compressor, an EQ, nothing distorted) and a driven path that carries the grit, often with its lows cut below about 200 Hz so the low end stays clean and tight. Compress more than on guitar, with a slow enough attack to keep the pick or finger. Keep reverb and delay small or out unless asked; bass mostly sits under them. Guitar drives may be used on the driven path.
+
+## acoustic
+
+The instrument is an acoustic guitar with a pickup. There is no amp and no cab in this sound: the work is done with EQ, compression and space. Tame the pickup's harsh, papery mids and its boom with EQ (a cut somewhere around 200 to 300 Hz, and a gentle notch where it honks, often 800 Hz to 1.2 kHz), keep a high-pass around 80 Hz, add a light compressor for even strumming, and a room or hall reverb for air. Chorus or a short delay only when asked.
+
+## classical
+
+The instrument is a classical (nylon-string) guitar with a pickup. There is no amp and no cab: EQ, compression and reverb. A piezo under nylon strings sounds quacky in the upper mids: soften 1 to 3 kHz gently, keep the warmth around 150 to 250 Hz without boom, roll off below about 70 Hz, compress lightly, and use a warm hall or room reverb. No distortion unless asked.
+
 ## scenes
 
 scenes: leave empty for a single sound. When the player asks for several sounds in one preset, such as rhythm and lead or clean and crunch, name two to four scenes in the order they will be played. Scenes switch instantly with no gap and keep delay and reverb tails, so they suit the parts of one song. A block's settings apply in every scene; scene_settings give a control another value in one scene, counted from 0 in the order named, and off_in_scenes switches a block off there. A lead scene is the rhythm sound with 2 to 4 dB more clean level after the amp, a small lift around 1 kHz and some delay. It does not need more amp gain. Do not switch an amp off in a scene: the unit crossfades it and that is heard as a dropout. A tail that rings across a scene change takes on the new scene's values, so keep a delay's time and feedback the same in both and change only its MIX or whether it is on.

@@ -58,7 +58,8 @@ class Sound:
     heard: dict | None = None             # what the app measured: {"phrase", "digest", "knobs", "words", ...}
     knobs: dict = field(default_factory=dict)
     notes: list = field(default_factory=list)   # [{"at", "text"}], what the player said
-    tags: list = field(default_factory=list)
+    tags: list = field(default_factory=list)   # the app's: aim, what listening heard
+    marks: list = field(default_factory=list)  # the player's: "keeper", "not this", or any word
     played: bool = False
     saved: dict | None = None             # {"slot", "name"} once written to the unit for keeps
 
