@@ -1859,7 +1859,7 @@ class Desk:
             self.remember()
             self.update()
 
-    def heard(self, side):
+    def sounding(self, side):
         """The tone, shape and revision last confirmed as sounding on a side.
 
         While the unit is still loading a newly chosen tone the old one keeps
@@ -1873,7 +1873,7 @@ class Desk:
     def is_kept(self):
         side = self.on_air()
         if side:
-            _, shape, revision = self.heard(side)
+            _, shape, revision = self.sounding(side)
             return self.kept_live == (side, revision, tuple(sorted(shape.items())))
         sound = self.selected_sound()
         return bool(sound and sound.path == self.kept)
@@ -1882,7 +1882,7 @@ class Desk:
         """Record a preference for the sound being heard. Saving to the unit is a separate act."""
         side = self.on_air()
         if side:
-            tone, shape, revision = self.heard(side)
+            tone, shape, revision = self.sounding(side)
             record = tone.to_record() if tone else {"kind": "current", "name": self.qc_name or "Current Quad Cortex"}
             try:
                 listening.keep_tone(record, shape, self.take, source=self.active_source,
