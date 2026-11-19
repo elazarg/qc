@@ -435,3 +435,26 @@ def differences(current, wanted):
         if label and old != label:
             found.append(f"scene {scene + 1} is called {old!r}, wanted {label!r}")
     return found
+
+
+INTERNAL = {0, 16, 17, 18}        # ports that join rows inside the preset, or nothing
+
+
+def routed(chain, inlet, outlet):
+    """The chain's own routing with its instrument input replaced by `inlet` and its outputs by `outlet`.
+
+    A row fed from an instrument input (or USB) takes `inlet`; a row that leaves
+    the preset takes `outlet`; rows joined inside the preset keep their ports.
+    A chain with no input anywhere gets `inlet` on its first row.
+    """
+    routes, fed = [], False
+    for row in chain.rows:
+        new_in = inlet if row.inlet not in INTERNAL else row.inlet
+        new_out = outlet if row.outlet not in INTERNAL else row.outlet
+        fed = fed or new_in == inlet
+        routes.append((new_in, new_out))
+    if not fed:
+        first = next((r for r, row in enumerate(chain.rows) if row.blocks), 0)
+        routes[first] = (inlet, routes[first][1] if routes[first][1] not in (0,) else outlet)
+    return chain.with_routes(routes)
+

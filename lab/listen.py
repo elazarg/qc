@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 
 from .audio import RATE, click, onset
-from .chain import Chain, Row
+from .chain import Chain, Row, routed
 from .measure import SOFTER, heard
 from .rig import USB
 
@@ -46,7 +46,9 @@ def calibrate(rig, audio, folder):
 def listen(rig, audio, chain, dry, offset, *, stop=None):
     """What `chain` does to the mono phrase `dry`, in the words of `measure.Heard`."""
     slot, held = rig.ready(chain, stop=stop)
-    held = rig.connect(held, [USB if r == 0 else (0, 0) for r in range(4)])
+    # The chain's own routing, fed from the computer and returned to it: a preset spread over several rows is
+    # heard whole.
+    held = rig.connect(held, routed(chain, *USB).routes)
     rig.unit.guard()
     raw = audio.reamp(dry, tail=TAIL, cancel=stop)
     loud = raw[offset:offset + len(dry)]

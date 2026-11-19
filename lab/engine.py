@@ -23,7 +23,7 @@ from dataclasses import replace
 from qc_mcp import leveling
 
 from . import catalog
-from .chain import COLUMNS, Chain, Row
+from .chain import COLUMNS, Chain, Row, routed
 from .listen import calibrate, calibration, listen
 from .rig import Rig
 from .unit import same_slot
@@ -127,6 +127,18 @@ class Engine:
             self._recall_side(side)
         port = USB_IN if mode == "phrase" else self.physical_input
         held = self.unit.read()
+        if self.shown[0] == "recall":
+            # One sound on its own preset, played with its own routing: a preset spread over several rows whole.
+            wanted = held.with_routes(routed(self.sides[side], port, MULTI_OUT).routes)
+            level = leveling.norm_of(self.levels[side])
+            for r, row in enumerate(wanted.rows):
+                if row.outlet not in (0, 16, 17, 18):
+                    wanted = wanted.with_row(r, replace(row, output=tuple({**dict(row.output), VOLUME: level,
+                                                                           MUTE: 0.}.items())))
+            self.unit.apply(wanted)
+            self._loop(mode, phrase)
+            self.active, self.mode = side, mode
+            return {"side": side, "mode": mode}
         wanted = held
         for name in ("a", "b"):
             if self.shown[0] != "pair" and name != side:
@@ -138,6 +150,11 @@ class Engine:
                           output=tuple({**dict(wanted.rows[first].output), VOLUME: level, MUTE: 0. if on else 1.}.items()))
             wanted = wanted.with_row(first, row)
         self.unit.apply(wanted)
+        self._loop(mode, phrase)
+        self.active, self.mode = side, mode
+        return {"side": side, "mode": mode}
+
+    def _loop(self, mode, phrase):
         if mode == "phrase" and self.loop is None and phrase is not None:
             from .audio import Loop
 
@@ -145,8 +162,6 @@ class Engine:
         if mode != "phrase" and self.loop is not None:
             self.loop.stop()
             self.loop = None
-        self.active, self.mode = side, mode
-        return {"side": side, "mode": mode}
 
     def _recall_side(self, side):
         chain = self.sides[side]

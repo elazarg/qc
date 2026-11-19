@@ -188,5 +188,17 @@ class SlotsTest(unittest.TestCase):
                 pass
 
 
+
+class RoutingTest(unittest.TestCase):
+    def test_a_preset_spread_over_rows_keeps_its_inner_routing_when_fed_from_elsewhere(self):
+        from lab.chain import routed
+        # As the player's Pink Floyd Time: row 1 from the guitar into row 2 inside the preset, rows 3 and 4 out.
+        floyd = Chain((Row((Block(PLEXI),), inlet=1, outlet=16), Row((Block(PLEXI),), inlet=1, outlet=0),
+                       Row((Block(DELAY),), inlet=0, outlet=19), Row((Block(DELAY),))))
+        self.assertEqual(routed(floyd, 12, 14).routes, [(12, 16), (12, 0), (0, 14), (0, 0)])
+        bare = Chain((Row((Block(PLEXI),)),))
+        self.assertEqual(routed(bare, 12, 14).routes[0], (12, 14))
+
+
 if __name__ == "__main__":
     unittest.main()
