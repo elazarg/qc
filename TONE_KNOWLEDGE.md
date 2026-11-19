@@ -177,6 +177,37 @@ The builder now sets the mixer's phase switch whenever the two paths of a draft 
 
 Not measured, because the run was stopped: whether a cab's other microphones share its polarity. Drives could not be measured this way. A path with no mono block on it carries the USB input on its left channel only, so a dry second path, panned right, was silent.
 
+### A fuzz lead that came out too tame
+
+The player asked for the solo of Pink Floyd's "Time" and got the right gear on paper: a Fuzz Face-type into a Hiwatt and its 4×12, tape echo and plate. It sounded nowhere near as distorted as the record, with the Drive knob at maximum too. Measured on the unit on 2026-11-19, the Charvel phrase through the draft with its delay and reverb off. "Loud to quiet" is how far the quiet quarter of the phrase sits under its loudest moments. Saturation closes that gap, which is what sustain is. The dry guitar measures 14.2 dB.
+
+| Setting | Loud to quiet | Peaks over average | Brightness (centroid) | Level |
+| --- | --- | --- | --- | --- |
+| As drafted: Fuzz 7.6, pedal Volume 5.3, amp Gain 5.4 | 5.5 dB | 10.4 dB | 586 Hz | −38.4 dB |
+| Drive at maximum as it then was: Fuzz 9.1, Gain 6.7 | 3.3 dB | 9.9 dB | 627 Hz | −34.6 dB |
+| Fuzz 10 alone | 1.7 dB | 9.5 dB | 966 Hz | −35.6 dB |
+| Fuzz 10, with Treble 6 and the cab's low-pass at 10 kHz | 1.4 dB | 10.4 dB | 1,204 Hz | −36.5 dB |
+| For scale: a Rectifier at its defaults in the same chain | 1.8 dB | 8.0 dB | 766 Hz | −34.7 dB |
+
+What went wrong, in order of weight:
+
+- **A Fuzz Face does most of its work in its last point.** From 7.6 to 9.1 the sustain gap closed from 5.5 to 3.3 dB. From 9.1 to 10 it closed to 1.7 dB and the sound became half again as bright. The designer's own notes said the pedal is run at or near maximum, and it chose 7.6, under an instruction of mine to use less gain than seems needed. That instruction is right for rhythm parts and wrong for a fuzz lead.
+- **The Drive knob stopped short.** Full right added a fixed 1.5 points to each gain control, which left the fuzz at 9.1. Full left already went to the floor of each control.
+- **The tone was filtered dark, and dark distortion does not sound distorted.** Treble 3.5, a low-pass at 7.8 kHz and the microphones moved towards the edge left the result darker than the dry guitar (586 against 824 Hz). Each choice has a source. Together they hid the fuzz.
+- **The Hiwatt adds nothing by itself.** In the amp sweep both of its channels measured clean at gain 2, 5 and 8. The designer was not told.
+- **Nothing ever listens to a draft.** The designer writes settings and the app builds them. No step compares the result with how distorted the request implies it should be.
+
+What changed:
+
+- Drive at full right now takes every gain control to its top, on a square-law taper so that small turns stay small (`styles._drive_delta`). On this draft it measures 2.7 dB loud to quiet.
+- Drive takes back, at the amp's clean Output, the level the amp's gain was measured to add (`styles._hold_level`). Without it, full right on this draft was 10.5 dB louder, because a clean amp's gain is mostly volume. With it, 3.2 dB.
+- Each amp's card now carries `measured_drive`: how distorted the amp was at three settings of its gain, in words, from the sweep (`measured.drive_curve`). For the Hiwatt: "GAIN 2 clean, 5 clean, 8 clean". For a Rectifier: "GAIN 2 clean, 5 saturated, 8 saturated".
+- The designer is told to decide how distorted the sound is and make the chain reach it, to run a fuzz at or near maximum, and to keep a lead bright enough to cut. "Less gain than seems needed" now applies to rhythm parts.
+
+Also measured: the Facial Fuzz's undocumented `PICKUP LEVEL` behaves like the guitar's volume (at 5 the sustain gap opened from 1.8 to 4.9 dB), and its `PICKUP` switch changed almost nothing. With the fuzz at 0 the Hiwatt at Gain 10 and Master 8 did saturate (2.4 dB), driven by the pedal's output.
+
+Not done: measuring a built draft against the amount of distortion its request implies, and telling the player or the designer when it falls short. Drives have not been swept the way amps were.
+
 ## What each control does
 
 `styles.ROLES` names controls by what they do, wherever a model has them, with a sign for controls that work the other way round:

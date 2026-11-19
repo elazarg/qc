@@ -192,13 +192,38 @@ def _card(model_id):
         named = dict(list(named_settings(model_id).items())[:7])
         if named:
             card["named_settings"] = named
+    if model["role"] == "Amp" and (heard := measured_drive(model_id)):
+        card["measured_drive"] = heard
     return card
+
+
+def measured_drive(model_id):
+    """How distorted an amp was on this unit at three settings of its gain, in words, or None if not measured."""
+    controls = choices()[model_id]["controls"]
+    order = ("GAIN", "INPUT GAIN", "GAIN 1", "GAIN NORMAL", "GAIN OD", "DRIVE", "VOLUME", "VOLUME BRIGHT",
+             "VOLUME NORMAL")
+    name, found = measured.drive_curve(model_id, [name for name in order if name in controls])
+    if not found:
+        return None
+    index, low, high = controls[name]
+    params = catalog.lookup(model_id)["params"]
+    default = float(params[index]["default"])
+    step = (float(params[index]["max"]) - float(params[index]["min"])) / 10
+    return name + " " + ", ".join(f"{min(high, max(low, default + moved * step)):g} {word}" for moved, word in found)
 
 
 CRAFT = (
     "Work the way players and engineers do unless the request says otherwise. named_settings are the maker's and "
     "the community's own starting points for a model: adapt one in preference to inventing numbers. about and "
-    "watch_out say how a model really behaves, including controls that run backwards. Use less amp gain than "
+    "watch_out say how a model really behaves, including controls that run backwards. measured_drive "
+    "says how distorted each amp was on this unit at three settings of its gain, with this player's bridge "
+    "humbucker and nothing in front of it. First decide how distorted the sound itself is, then make sure the "
+    "chain reaches that: a singing, sustaining lead needs an amp that measures overdriven or saturated, or a "
+    "fuzz or distortion pedal doing the work. An amp that stays clean at every setting adds no distortion of "
+    "its own. A fuzz of the Fuzz Face or Big Muff kind runs with its fuzz or sustain at or near maximum, and "
+    "its last point does the most: measured here, a Fuzz Face-type at 7.6 gave a third of the sustain it gave "
+    "at 10, and sounded much darker. Distortion that is filtered dark stops sounding distorted, so keep the "
+    "treble and the cab's low-pass open enough for a lead to cut. For rhythm parts use less amp gain than "
     "seems needed. For tight high gain put a Tube Screamer-type drive first with its drive at 0 to 2, tone near 5 "
     "and level at 8 to 10, and keep the amp's bass low, because the pedal removes lows before they distort. "
     "On an amp with no master, the volume or gain is its only drive. A control listed under switches takes "

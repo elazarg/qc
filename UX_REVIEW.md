@@ -50,6 +50,12 @@ Fixed on 2026-11-19 after the review in `CLAUDE_WORK_REVIEW.md`, which also reco
 - "No fizz" asks for less. "No bite" still says bite is missing.
 - Panels that do not fit fold to their titles (`desk_panels.Tray.fit`).
 
+Changed on 2026-11-19 after the player asked for Pink Floyd's "Time" and got a tame fuzz (measurements in `TONE_KNOWLEDGE.md`, "A fuzz lead that came out too tame"):
+
+- Drive at full right reaches the top of every gain control, and holds the level by trimming the amp's Output.
+- R answers a click at any time. While the unit is on air it says that it is a recording that plays through Windows, and offers to stop and play it. Before, it was dead with no explanation.
+- The designer is told how distorted each amp measured, and to run a fuzz near maximum.
+
 Verified on the Quad Cortex (CorOS as installed on 2026-11-18, output muted through the lane mute, return peak −80 dBFS): reading the unit, loading a draft, Phrase and Guitar input, switching input without changing tones, A/B flips, a knob change, an instant direction, undo, Keep, blind flips, stop and restore to the original preset and scene, and a silent capture followed by a measured difference against the reference.
 
 Not verified on the unit: recording a new phrase, Save to QC, trimming the loop while it plays (the `reload` path in `monitor.run`), saved presets as tones (only drafts were on A and B), and anything audible, since every run was muted.

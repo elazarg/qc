@@ -191,6 +191,7 @@ class Desk:
         self.last_heard = self.kept = self.playing = self.play_group = None
         self.kept_note = ""
         self.kept_live = None
+        self.reference_waiting = False  # R was asked for while the unit was busy.
         self.undo, self.journal, self.abandoned = [], [], []
         self.asked = self.followup = self.problem = self.level_problem = self.line_timer = None
         self.static_cache, self.chain_seen = {}, set()
@@ -303,7 +304,7 @@ class Desk:
         self.a_tile.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
         self.b_tile = ToneTile(pair, "B", self.b_name, self.b_context, lambda: self.pick("b"), color=theme.TONE_B)
         self.b_tile.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
-        self.r_tile = ToneTile(pair, "R", self.r_name, self.r_context, lambda: self.listen("reference"),
+        self.r_tile = ToneTile(pair, "R", self.r_name, self.r_context, self.hear_reference,
                                color=theme.REFERENCE, compact=True)
         self.r_shown = False
         self.a_tile.on_menu(lambda event: self.tile_menu("a", event))
@@ -311,7 +312,7 @@ class Desk:
         self.r_tile.on_menu(self.reference_menu)
         theme.Tooltip(self.a_tile.badge, "Select A  ·  A")
         theme.Tooltip(self.b_tile.badge, "Select B  ·  B")
-        theme.Tooltip(self.r_tile.badge, "Hear the reference  ·  R")
+        theme.Tooltip(self.r_tile.badge, "The recording you set as the sound to aim for. Hear it  ·  R")
 
         # The input. Guitar and Phrase are equally direct and never change either tone.
         row = tk.Frame(main, bg=PAPER)
@@ -577,10 +578,23 @@ class Desk:
             self.select_side(side)
 
     def hear_reference(self):
+        """Play the reference: a recording kept as the sound to aim for. It plays through Windows, not the unit."""
         if self.reference is None:
             self.set_status("There is no reference yet. Choose one from the ⋯ menu.")
+        elif self.task_if_active("monitor") and not self.stop_signal.is_set():
+            # The unit is sounding the guitar or the phrase, and the recording cannot play over it.
+            self.set_status(f"R is a recording, {self.reference.name}, kept as the sound to aim for. It plays "
+                            "through Windows, so the input has to stop first.",
+                            actions=(("Stop and play R", self.stop_for_reference),))
+        elif self.job is not None:
+            self.set_status("The Quad Cortex is busy. R plays when it has finished.")
+            self.reference_waiting = True
         else:
             self.listen("reference")
+
+    def stop_for_reference(self):
+        self.reference_waiting = True
+        self.stop()
 
     def toggle_source(self, source):
         running = self.task_if_active("monitor") and not self.stop_signal.is_set()
@@ -1016,12 +1030,13 @@ class Desk:
                       note="● on air" if on_air == side else "● captured, through Windows" if captured else "")
         if self.reference:
             self.r_name.set(self.reference.name)
-            self.r_context.set("Reference")
+            self.r_context.set("Reference recording")
             if not self.r_shown:
                 self.r_tile.grid(row=0, column=2, sticky="nsew", padx=(10, 0))
                 self.r_shown = True
             heard = self.playing is not None and self.playing == self.reference
-            self.r_tile.sync(selected=False, enabled=idle, on_air=heard, note="● playing" if heard else "")
+            # Always answers a click: while the unit is sounding it says why the recording cannot play yet.
+            self.r_tile.sync(selected=False, enabled=True, on_air=heard, note="● playing" if heard else "")
         elif self.r_shown:
             self.r_tile.grid_remove()
             self.r_shown = False
@@ -2001,6 +2016,9 @@ class Desk:
     def restored(self, _):
         self.set_status("Quad Cortex returned to the playing preset.")
         self.check_qc()
+        if self.reference_waiting:
+            self.reference_waiting = False
+            self.root.after_idle(self.hear_reference)
 
     @staticmethod
     def read_qc():

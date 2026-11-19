@@ -41,6 +41,37 @@ def effect(model_id, name):
     return amp.get("knobs", {}).get(name) or amp.get("switches", {}).get(name)
 
 
+# How distorted a phrase sounds through an amp, from how far its peaks stand above its average. The dry
+# guitar measured 17.6 dB, a clean amp near 20 and a saturated one 8 to 10.
+BREAKUP = ((17., "clean"), (14., "edge of breakup"), (12., "crunch"), (10.5, "overdriven"), (0., "saturated"))
+
+
+def breakup(crest):
+    return next(word for floor, word in BREAKUP if crest >= floor)
+
+
+def drive_curve(model_id, names):
+    """How distorted an amp was at three settings of its gain control, as [(points from default, word)].
+
+    `names` are the controls that can be the amp's gain, most likely first.
+    Measured with the bridge humbucker and nothing in front of the amp, so an
+    amp that stays clean here can still be driven hard by a pedal.
+    """
+    amp = table()["amps"].get(str(model_id))
+    name = next((name for name in names if name in (amp or {}).get("knobs", {})), None)
+    if not name:
+        return None, []
+    knob, start = amp["knobs"][name], amp["default"]["crest"]
+    found = []
+    for side in ("low", None, "high"):
+        if side is None:
+            found.append((0., breakup(start)))
+        elif side in knob:
+            moved = knob[side]["moved"]
+            found.append((moved, "silent" if knob[side].get("silent") else breakup(start + moved * knob[side]["crest"])))
+    return name, found
+
+
 def inert():
     """The amps the unit loaded and passed the signal through untouched: no control of theirs changed anything."""
     return frozenset(table().get("inert", ()))

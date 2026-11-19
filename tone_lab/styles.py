@@ -107,7 +107,8 @@ KNOB_GROUPS = {
     "Character": ("jazz", "bloom", "band_fit"),
 }
 KNOB_HINTS = {
-    "drive": "Changes pedal and amp input drive. Full left bypasses active drive pedals.",
+    "drive": "Changes pedal and amp input drive. Full right is every gain control at its top. "
+             "Full left bypasses active drive pedals.",
     "warmth": "Softens the upper end of the amp, capture and drive tone controls, whichever way each one runs.",
     "space": "Changes how much ambience and how many repeats you hear.",
     "jazz": "A rounded direction with less gain and ambience and more midrange.",
@@ -316,11 +317,39 @@ def _drive_delta(category, name, drive, before, low, high, units, *, amp_volume)
     if category in DRIVE_CATEGORIES and gain_control:
         if drive < 0:
             return (before - low) * drive
-        return (high - low) * .15 * drive
+        # Full right is the top of the control, as full left is its floor. The square keeps small turns small:
+        # a third of the way adds about a tenth of what is left. A fuzz does most of its work in the last point,
+        # so a knob that stopped short of the top never reached it.
+        return (high - before) * drive * drive
     if drive < 0 and category in PEDAL_CATEGORIES and name in PEDAL_LEVEL_NAMES:
         unity = 0 if units == "dB" and low <= 0 <= high else low + .55 * (high - low)
         return max(0, before - unity) * drive
     return 0.0
+
+
+def _hold_level(model, info, scene, lift, active_only, row, column, changes):
+    """Take back, at the amp's clean Output, the level its gain was measured to add.
+
+    Drive asks for more distortion, not more volume. On an amp that stays
+    clean, gain is mostly volume: a Hiwatt taken from 5 to 10 measured 8 dB
+    louder. The figure is the amp's own, measured with nothing in front of it,
+    so with a pedal driving it the result errs towards quieter.
+    """
+    for index, (setting, param) in enumerate(zip(model.params, info["params"])):
+        slot = scene if setting.scene_mode else 0
+        if (param["name"] != "OUTPUT" or param["units"] != "dB" or setting.expression
+                or setting.scene_mode and not active_only or slot >= len(setting.param_values)
+                or setting.param_values[slot].WhichOneof("value") != "float_value"):
+            continue
+        before = catalog.to_display(model.hash, index, setting.param_values[slot].float_value)
+        after = max(float(param["min"]), before - lift)
+        raw = catalog.to_norm(model.hash, index, after)
+        for entry in (setting.param_values[slot],) if setting.scene_mode else setting.param_values:
+            if entry.WhichOneof("value") == "float_value":
+                entry.float_value = raw
+        changes.append({"row": row + 1, "column": column + 1, "model": info["name"],
+                        "index": index, "name": "OUTPUT", "from": before, "to": after})
+        return
 
 
 def _sync_enabled(model, parameters, scene):
@@ -374,6 +403,7 @@ def apply_rules(preset, scene, rules, *, allow_neutral=False, drive=0.0, active_
                 continue
             category = info["category"]
             dry_mix, preview = None, 0.
+            lift = 0.  # dB the amp gets louder from the gain the Drive knob adds.
             if row < len(result.bypass) and column < len(result.bypass[row].colBypass):
                 block = result.bypass[row].colBypass[column]
                 bypass_index = scene if block.sceneMode else 0
@@ -431,8 +461,12 @@ def apply_rules(preset, scene, rules, *, allow_neutral=False, drive=0.0, active_
                 # amp. Keep low-drive macros audible even when their offsets stack.
                 amp_input_gain = category in AMP_CATEGORIES and name in AMP_INPUT_GAIN_NAMES and (low, high) == (0, 10)
                 floor = min(before, low + .15 * (high - low)) if amp_volume or amp_input_gain else low
-                delta += _drive_delta(category, name, drive, before, floor, high, param["units"], amp_volume=amp_volume)
+                pushed = _drive_delta(category, name, drive, before, floor, high, param["units"], amp_volume=amp_volume)
+                delta += pushed
                 after = min(high, max(floor, before + delta))
+                if pushed > 0 and category == AMP and after > before:
+                    louder = ((measured.effect(model.hash, name) or {}).get("high") or {}).get("level") or 0.
+                    lift += max(0., louder) * min(pushed, after - before) / ((high - low) / 10)
                 if name == "MIX" and param["units"] == "%" and low == 0 and before == after == 0:
                     dry_mix = index, setting, value, high
                 if math.isclose(before, after, abs_tol=0.001):
@@ -454,6 +488,8 @@ def apply_rules(preset, scene, rules, *, allow_neutral=False, drive=0.0, active_
                         entry.float_value = raw
                 changes.append({"row": row + 1, "column": column + 1, "model": info["name"],
                                 "index": index, "name": "MIX", "from": 0., "to": after})
+            if lift > .05:
+                _hold_level(model, info, scene, lift, active_only, row, column, changes)
     if not changes and not allow_neutral:
         raise RuntimeError("The current preset has no compatible parameters for that style.")
     return result, changes

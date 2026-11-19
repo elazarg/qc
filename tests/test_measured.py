@@ -151,6 +151,28 @@ class InertTest(unittest.TestCase):
         self.assertFalse({RECTIFIER, TOP_BOOST} & locked)
 
 
+class DriveCurveTest(unittest.TestCase):
+    def test_an_amp_is_described_at_three_settings_of_its_gain(self):
+        side = lambda moved, crest: {"moved": moved, "level": 1., "bands": [0.] * 5, "crest": crest}
+        table = {"typical": {}, "amps": {"1": {"default": {"crest": 13.}, "switches": {}, "knobs": {
+            "GAIN": {"low": side(-3., -2.), "high": side(3., -1.)}, "BASS": {"low": side(-3., 0.)}}}}}
+        with patch.object(measured, "table", return_value=table):
+            # Three points down the peaks stand 6 dB higher, three points up 3 dB lower.
+            self.assertEqual(measured.drive_curve(1, ["INPUT GAIN", "GAIN"]),
+                             ("GAIN", [(-3., "clean"), (0., "crunch"), (3., "saturated")]))
+            self.assertEqual(measured.drive_curve(1, ["VOLUME"]), (None, []))
+            self.assertEqual(measured.drive_curve(2, ["GAIN"]), (None, []))
+        self.assertEqual([measured.breakup(crest) for crest in (19.7, 15., 11.3, 9.5)],
+                         ["clean", "edge of breakup", "overdriven", "saturated"])
+
+    def test_the_designer_is_told_that_a_hiwatt_stays_clean_and_a_rectifier_does_not(self):
+        from tone_lab import preset_design
+
+        self.assertEqual(preset_design.measured_drive(1063), "GAIN 2 clean, 5 clean, 8 clean")
+        self.assertIn("5 saturated", preset_design.measured_drive(RECTIFIER))
+        self.assertEqual(preset_design._card(1063)["measured_drive"], "GAIN 2 clean, 5 clean, 8 clean")
+
+
 class SwitchAndPolarityTest(unittest.TestCase):
     def test_a_switch_that_changed_nothing_in_any_position_is_idle(self):
         still = {"from": "0", "level": 0., "bands": [0., 0., None, 0., 0.]}

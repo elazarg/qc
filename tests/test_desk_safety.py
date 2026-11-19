@@ -257,6 +257,50 @@ class SceneTest(unittest.TestCase):
         self.assertEqual((again.kind, again.draft_id, again.scene), ("draft", "d1", 1))
 
 
+class ReferenceTest(unittest.TestCase):
+    """R is a recording that plays through Windows. It always answers, and says why when it cannot play yet."""
+
+    def desk(self, **changes):
+        desk = SimpleNamespace(reference=SimpleNamespace(name="Plini · E"), job=None, stop_signal=None, heard=[],
+                               said=[], reference_waiting=False, task_if_active=lambda name: False,
+                               stopped=[], check_qc=lambda: None,
+                               root=SimpleNamespace(after_idle=lambda action: action()))
+        desk.listen = desk.heard.append
+        desk.set_status = lambda text, **options: desk.said.append((text, options.get("actions", ())))
+        desk.stop = lambda: desk.stopped.append(True)
+        desk.hear_reference = lambda: listening_room.Desk.hear_reference(desk)
+        desk.stop_for_reference = lambda: listening_room.Desk.stop_for_reference(desk)
+        vars(desk).update(changes)
+        return desk
+
+    def test_it_plays_when_the_unit_is_free(self):
+        desk = self.desk()
+        desk.hear_reference()
+        self.assertEqual((desk.heard, desk.said), (["reference"], []))
+
+    def test_while_the_guitar_is_live_it_says_what_it_is_and_offers_to_stop_and_play(self):
+        live = Event()
+        desk = self.desk(job=object(), stop_signal=live, task_if_active=lambda name: name == "monitor")
+        desk.hear_reference()
+        self.assertEqual(desk.heard, [])
+        text, actions = desk.said[0]
+        self.assertIn("recording, Plini · E", text)
+        self.assertIn("plays through Windows", text)
+        self.assertEqual(actions[0][0], "Stop and play R")
+        actions[0][1]()
+        self.assertTrue(desk.stopped and desk.reference_waiting)
+        # The unit has been released and its preset restored: now the recording plays.
+        desk.job, desk.task_if_active = None, lambda name: False
+        listening_room.Desk.restored(desk, None)
+        self.assertEqual(desk.heard, ["reference"])
+        self.assertFalse(desk.reference_waiting)
+
+    def test_with_no_reference_it_says_where_to_choose_one(self):
+        desk = self.desk(reference=None)
+        desk.hear_reference()
+        self.assertIn("no reference yet", desk.said[0][0])
+
+
 class KeepTest(unittest.TestCase):
     def desk(self, **changes):
         old, new = Tone("preset", "Old", preset=None), Tone("preset", "New", preset=None)
