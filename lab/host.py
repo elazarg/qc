@@ -60,7 +60,16 @@ def _serve(commands, replies, stop, simulated, folder, physical_input):
             try:
                 if name in ("show", "hear", "record"):
                     options = {**options, "stop": stop}
-                result = getattr(engine, name)(*args, **options)
+                if "." in name:
+                    # A side tool's own operation, `lab.tools.x.function(engine, ...)`, run where the unit is held.
+                    from importlib import import_module
+
+                    module, function = name.rsplit(".", 1)
+                    if not module.startswith("lab."):
+                        raise ValueError(f"Not an operation of this app: {name}")
+                    result = getattr(import_module(module), function)(engine, *args, **{**options, "stop": stop})
+                else:
+                    result = getattr(engine, name)(*args, **options)
                 replies.put((ticket, True, result))
             except Exception as error:  # noqa: BLE001
                 replies.put((ticket, False, f"{error}" if str(error) else type(error).__name__,))

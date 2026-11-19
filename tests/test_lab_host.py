@@ -33,5 +33,18 @@ class HostTest(unittest.TestCase):
             host.close()
 
 
+    def test_a_side_tool_runs_its_own_operation_where_the_unit_is_held(self):
+        from tempfile import TemporaryDirectory
+        from lab.host import Host
+
+        with TemporaryDirectory() as folder:
+            host = Host(folder, simulated=True, local=True)
+            host.ready.result(10)
+            self.assertEqual(host.call("lab.tools.probe.firmware").result(10), "4.1.1")
+            with self.assertRaises(RuntimeError):
+                host.call("os.getcwd").result(10)
+            host.close()
+
+
 if __name__ == "__main__":
     unittest.main()
