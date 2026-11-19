@@ -91,6 +91,8 @@ class Desk:
         more = tk.Menubutton(top, text="⋯", bg=PAPER, fg=SUBTLE, relief="flat", font=(FONT, 14), cursor="hand2")
         menu = tk.Menu(more, tearoff=False, bg="#252834", fg=INK)
         menu.add_command(label="Guitar Learner", command=self.open_learner)
+        menu.add_command(label="Guitar input calibration", command=self.open_calibration)
+        menu.add_command(label="Gestures on / off", command=self.toggle_gestures)
         menu.add_command(label="Measure the USB round trip", command=self.calibrate)
         instruments = tk.Menu(menu, tearoff=False, bg="#252834", fg=INK)
         for item in self.studio.store.instruments():
@@ -466,8 +468,15 @@ class Desk:
             return
         if self.studio.state.mode == mode:
             self.studio.stop()
-        else:
-            self.studio.play(mode)
+            return
+        if mode == "phrase":
+            # The phrase loop and gesture listening would both want the audio driver.
+            from .learner import gestures
+
+            if gestures.running():
+                gestures.stop()
+                self.studio.say("Gestures off while the phrase plays.")
+        self.studio.play(mode)
 
     def ask(self):
         text = self.request.get()
@@ -519,12 +528,34 @@ class Desk:
         self.studio.later(self.studio.host.call("measure_round_trip"),
                           lambda offset: self.studio.set(working="", status=f"Round trip: {offset} samples."))
 
+    def learner_seat(self):
+        return getattr(self, "seat", None) or LearnerSeat(self)
+
+    def open_calibration(self):
+        from .learner import calibration
+
+        calibration.open(self.learner_seat())
+
+    def toggle_gestures(self):
+        from .learner import gestures
+
+        if gestures.running():
+            gestures.stop()
+            self.studio.say("Gestures off.")
+            return
+        try:
+            gestures.start(self.learner_seat())
+        except ValueError as error:
+            self.studio.say(f"Gestures: {error}")
+            return
+        self.studio.say("Gestures on: play, and the mapped control turns the knob on the sound on show.")
+
     def open_learner(self):
         """The Guitar Learner, in a window of its own, seated on this desk."""
         from .learner import GuitarLearner
 
         if self.learner is None:
-            self.learner = GuitarLearner(LearnerSeat(self))
+            self.learner = GuitarLearner(self.learner_seat())
         self.learner.show()
 
     def tick(self):

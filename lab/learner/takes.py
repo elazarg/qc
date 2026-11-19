@@ -2,6 +2,7 @@
 
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from uuid import uuid4
@@ -20,6 +21,25 @@ def clip_paths():
     clips = [*folder.glob("clip-*.wav"), *folder.glob("clip-*/dry.wav"),
              *(raw for raw in folder.glob("clip-*/inputs.wav") if not raw.with_name("dry.wav").is_file())]
     return sorted(clips, key=lambda clip: clip.stat().st_mtime_ns, reverse=True)
+
+
+def clip_info(path):
+    """What is known of a take: its clip.json, with the paths of its dry and wet recordings."""
+    path = Path(path)
+    if path.name == "inputs.wav":
+        info = json.loads((path.parent / "clip.json").read_text(encoding="utf-8"))
+        return {**info, "raw": str(path), "dry": None, "wet": None}
+    if path.name != "dry.wav":
+        return {"dry": str(path), "wet": None}
+    info = json.loads((path.parent / "clip.json").read_text(encoding="utf-8"))
+    return {**info, "dry": str(path), "wet": str(path.with_name("wet.wav"))}
+
+
+def latest_clip():
+    paths = clip_paths()
+    if not paths:
+        raise ValueError("There is no take yet. Record one first.")
+    return clip_info(paths[0])
 
 
 def infer_editor_pair(samples, input_channel):

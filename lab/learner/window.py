@@ -18,7 +18,7 @@ from uuid import uuid4
 
 import numpy as np
 
-from . import configuration as model, dataset as data, folders, takes as recorder, worker
+from . import configuration as model, dataset as data, folders, gestures, takes as recorder, worker
 from .board import (ACCENT, ACTIVE_INK, ALERT, BG, FONT, INK, LINE, MUTED, PANEL, SURFACE,
                     GuitarBoard, LAYOUTS_SHOWN, button, mark_button, setting, word)
 from .folders import LOG
@@ -720,6 +720,9 @@ class GuitarLearner:
         if self.desk.task_if_active("monitor"):
             self.desk.stop()
             self.status.set("Releasing the Quad Cortex playback loop…")
+        if gestures.running():
+            gestures.stop()
+            self.status.set("Ending gesture listening first…")
         self.poll_capture()
 
     def poll_capture(self):
@@ -731,7 +734,7 @@ class GuitarLearner:
                 self.status.set("Recording cancelled.")
                 self.sync()
                 return
-            if self.desk.job is None:
+            if self.desk.job is None and not gestures.running():
                 self.record_started = True
                 self.desk.ready = self.ready
                 self.desk.stop_signal = self.stop
@@ -856,6 +859,9 @@ class GuitarLearner:
         if self.desk.task_if_active("monitor"):
             self.desk.stop()
             self.live_status.set("Releasing the current Tone Lab playback loop…")
+        if gestures.running():
+            gestures.stop()
+            self.live_status.set("Ending gesture listening first…")
         self.follow()
         self.poll_live()
 
@@ -872,7 +878,7 @@ class GuitarLearner:
             if self.live_stop.is_set() or self.desk.leaving:
                 self.live_finished((None, None))
                 return
-            if self.desk.job is None:
+            if self.desk.job is None and not gestures.running():
                 self.live_started = True
                 self.desk.stop_signal = self.live_stop
                 config = {"physical_input": self.desk.input_channel, "guitar": GUITAR, "profile": self.profile}

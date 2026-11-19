@@ -5,6 +5,9 @@ tell them from the sound alone.
     learner = GuitarLearner(seat)     # seat: see lab.desk.LearnerSeat
     learner.show()
 
+    calibration    guitar input calibration, one control at a time: calibration.open(seat)
+    gestures       a return gesture on a guitar control turns a Shape knob: gestures.start(seat), gestures.stop()
+    compensation   whether a high shelf can make up for a rolled-back tone pot
     board          the guitar's controls, drawn on a photograph of it
     window         the window itself
     dataset        labelled excerpts of dry takes, per guitar and layout
@@ -12,7 +15,7 @@ tell them from the sound alone.
     state          pitch and harmonic readings of mono dry audio, and one-control profiles
     continuous     following live playing, and noticing a change of setup on a held note
     live           the live listening loop, run inside the worker process
-    worker         that process, and its supervisor on the desk's side
+    worker         that process (live listening or gesture listening), and its supervisor on the desk's side
     takes          recording a take
     inputs         the unit's ASIO inputs and its USB dry/wet routing
     folders        where everything is kept

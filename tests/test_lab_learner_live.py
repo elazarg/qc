@@ -150,6 +150,20 @@ class WorkerBoundaryTest(unittest.TestCase):
         self.assertEqual([event["event"] for event in events], ["learner-ready", "learner-snapshot"])
         self.assertEqual(events[1]["request_id"], "r1")
 
+    def test_gesture_listening_events_come_back_too(self):
+        script = ('import json, sys\n'
+                  'print(json.dumps({"event": "guitar-state", "label": "Neck"}), flush=True)\n'
+                  'sys.stdin.readline()\n'
+                  'print(json.dumps({"event": "done", "audio": {}}), flush=True)\n')
+        stop, events = Event(), []
+
+        def report(event):
+            events.append(event)
+            stop.set()
+
+        self.assertEqual(worker.supervise([sys.executable, "-c", script], stop, Queue(), report), {})
+        self.assertEqual(events, [{"event": "guitar-state", "label": "Neck"}])
+
     def test_a_worker_error_is_raised_to_the_window(self):
         failing = 'import json; print(json.dumps({"event": "error", "text": "no dry input"}), flush=True)'
         with self.assertRaisesRegex(RuntimeError, "no dry input"):

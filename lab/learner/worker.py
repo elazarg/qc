@@ -1,6 +1,10 @@
 """Live listening in a process of its own, so that a failure of the audio driver cannot hold the window.
 
-`run` is called on the desk's worker thread. It starts
+The process runs one of two things, chosen by the settings' "mode": the
+learner's live listening (`live.run`, the default) or gesture listening
+(`gestures.run`, mode "gestures").
+
+`run` is called on a thread of the desk's side. It starts
 `python -m lab.learner.worker <config.json>`, sends it the window's commands
 (a new profile, a request to keep a clip, stop) as JSON lines, and passes the
 events it prints back to `report` until it finishes.
@@ -100,7 +104,7 @@ def supervise(argv, stop, commands, report):
                 deadline = time.monotonic() + HEARTBEAT_TIMEOUT
             if event["event"] == "status":
                 report(event["text"])
-            elif event["event"].startswith("learner-"):
+            elif event["event"].startswith(("learner-", "guitar-")):
                 report(event)
             elif event["event"] == "error":
                 raise RuntimeError(event["text"])
@@ -174,7 +178,12 @@ def main(arguments):
                 emit(event)
 
             config = json.loads(Path(arguments[0]).read_text(encoding="utf-8"))
-            result = live.run(config, stop, commands, events)
+            if config.get("mode") == "gestures":
+                from . import gestures
+
+                result = gestures.run(config, stop, commands, events)
+            else:
+                result = live.run(config, stop, commands, events)
             LOG.info("Learner live worker stopped %s", result)
             emit({"event": "done", "audio": result})
             return 0
