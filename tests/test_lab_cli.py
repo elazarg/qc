@@ -10,7 +10,11 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest import mock
 
+import sys
+
 import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))   # for the POD Go test's fixtures
 
 from lab import cli
 from lab.audio import read_wave, write_wave

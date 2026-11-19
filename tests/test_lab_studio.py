@@ -294,5 +294,30 @@ class StudioTest(unittest.TestCase):
         self.assertNotIn("need to have been listened to", lines[0])
 
 
+    def test_an_ir_goes_into_bs_cab_and_a_capture_in_place_of_its_amp(self):
+        self.script.answers.append(self.three("One", "Two", "Three"))
+        self.studio.ask("make a classic rock crunch")
+        settle(self.studio, 20)
+        found = []
+        self.studio.read_assets(found.extend)
+        settle(self.studio)
+        from lab.assets import cached
+        irs = [item for item in cached(self.studio.folder) if item.kind == "ir" and item.source == "user"]
+        captures = [item for item in cached(self.studio.folder) if item.kind == "capture"]
+        self.assertTrue(found and irs and captures)
+        before = self.studio.sound("b")
+        self.studio.use_asset(irs[0])
+        settle(self.studio)
+        with_ir = self.studio.sound("b")
+        self.assertEqual(with_ir.parent, before.id)
+        self.assertIn(29001, [block.model for _, _, block in with_ir.chain.blocks])
+        self.assertEqual(self.studio.state.shown, "pair")      # built and held on the unit
+        self.studio.use_asset(captures[0], has_cab=True, version=captures[0].capture_version or 2)
+        settle(self.studio)
+        models = [block.model for _, _, block in self.studio.sound("b").chain.blocks]
+        self.assertTrue({14000, 14001} & set(models))
+        self.assertNotIn(PLEXI, models)
+
+
 if __name__ == "__main__":
     unittest.main()

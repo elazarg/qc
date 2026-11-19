@@ -5,7 +5,8 @@ from tempfile import TemporaryDirectory
 import json
 import unittest
 
-from lab import catalog, design
+from lab import assets, catalog, design
+from lab.assets import Asset
 from lab.assistant import Assistant, Refused
 from lab.chain import Block, Chain, Row, differences
 from lab.sounds import Sound, describe
@@ -166,6 +167,67 @@ class DesignTest(unittest.TestCase):
         chain, problems = design.to_chain(answer_, offered_ids={FUZZ, HIWATT, V30}, base=saved)
         self.assertEqual(problems, [])
         self.assertEqual(differences(chain, saved), [])
+
+
+MIX04 = Asset("ir", "CIR_108babccfa301792b0e730ef0fbd889", "YA MES 212 V30 Mix 04")
+SM57 = Asset("ir", "CIR_10e44cd333cf5cadfdc0692a2d7581", "Celestion G12M SM57 Cap")
+KNOWN = [MIX04, SM57, Asset("ir", "CIR_99", "Factory Cab", "factory"),
+         Asset("capture", "a" * 64, "Dark Jazz", "user", None)]
+
+
+class PlayerIRTest(unittest.TestCase):
+    def setUp(self):
+        folder = TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.folder = Path(folder.name)
+
+    def test_the_irs_a_request_names_are_offered_and_no_others(self):
+        self.assertEqual(design.player_irs("Plexi crunch through YA MES 212 V30 Mix 04", known=KNOWN),
+                         {design.ASSET_IDS: MIX04})
+        self.assertEqual(design.player_irs("plexi with my SM57 G12M IR", known=KNOWN), {design.ASSET_IDS: SM57})
+        self.assertEqual(design.player_irs("plexi with an SM57 on a G12M", known=KNOWN), {})  # no IR asked for
+        self.assertEqual(design.player_irs("Factory Cab IR", known=KNOWN), {})                # only the player's
+        held = Chain((Row((Block(PLEXI), assets.block_for(SM57)), inlet=1, outlet=19),))
+        self.assertEqual(list(design.player_irs("YA MES 212 V30 Mix 04 please", held, known=KNOWN).values()),
+                         [SM57, MIX04])                    # what the sound holds first, even if never read
+
+    def test_a_round_may_put_a_named_ir_in_place_of_a_cab(self):
+        script = Scripted(reply(answer("Mine", [block(PLEXI, 0, gain=7), block(design.ASSET_IDS, 1, low_pass=9000)]),
+                                answer("Stock", [block(PLEXI, 0, gain=5), block(V30, 1)])))
+        assistant = Assistant(self.folder, run=script)
+        _, designs = design.round_of_three(assistant, "Plexi through my YA MES 212 V30 Mix 04", CHARVEL,
+                                           assets_known=KNOWN)
+        prompt, schema = script.asked[0][:2]
+        self.assertIn("YA MES 212 V30 Mix 04 (the player's IR)", prompt)
+        self.assertIn(design.ASSET_IDS, schema["properties"]["designs"]["items"]["properties"]["rows"]["items"]
+                      ["properties"]["blocks"]["items"]["properties"]["model_id"]["enum"])
+        loader = designs[0][0].chain.block(0, 1)
+        self.assertEqual(assets.bound(loader), MIX04)
+        self.assertAlmostEqual(loader.display(5), 9000, delta=50)        # the first IR's LOW PASS only
+        self.assertNotIn(13, loader.values)
+
+    def test_a_revision_keeps_the_ir_the_sound_holds_and_may_swap_it(self):
+        loader = assets.block_for(SM57).set_display(3, -3)
+        saved = Sound("Mine", Chain((Row((Block(PLEXI), loader), inlet=1, outlet=19),)), {"kind": "preset"})
+        irs = design.player_irs("swap in the YA MES 212 V30 Mix 04 IR", saved.chain, known=KNOWN)
+        form = design.as_form(saved.chain, irs)
+        self.assertEqual(form["rows"][0]["blocks"][1]["model_id"], design.ASSET_IDS)
+        self.assertEqual(form["rows"][0]["blocks"][1]["name"], SM57.name)
+        models = design._with_irs(design.offered("swap", "electric", saved.chain), irs, saved.chain)
+        self.assertNotIn(catalog.IR_LOADER, models)                       # never an empty loader
+        answer_ = {**form, "name": "x", "target": "t", "explanation": "e", "differs": "",
+                   "blend": {"level_db": 0, "spread": 0}, "sources": []}
+        chain, problems = design.to_chain(answer_, offered_ids=set(models), base=saved.chain, irs=irs)
+        self.assertEqual(problems, [])
+        self.assertEqual(differences(chain, saved.chain), [])            # its level too
+        answer_["rows"][0]["blocks"][1]["model_id"] = design.ASSET_IDS + 1
+        chain, problems = design.to_chain(answer_, offered_ids=set(models), base=saved.chain, irs=irs)
+        self.assertEqual((problems, assets.bound(chain.block(0, 1))), ([], MIX04))
+
+    def test_an_empty_ir_loader_is_not_accepted(self):
+        _, problems = design.to_chain(answer("Empty", [block(PLEXI, 0), block(catalog.IR_LOADER, 1)]),
+                                      offered_ids={PLEXI, catalog.IR_LOADER})
+        self.assertTrue(any("name the IR by its id" in problem for problem in problems))
 
 
 if __name__ == "__main__":

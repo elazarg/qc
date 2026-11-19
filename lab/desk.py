@@ -434,7 +434,19 @@ class Desk:
         draw()
 
     def panel_sounds(self):
-        """Presets saved on the unit, from the last time the app read its directory. Choose one to work on."""
+        """What is on the unit: presets to work on, and the player's IRs and captures to try in B."""
+        kinds = tk.Frame(self.tray, bg=DARK)
+        kinds.pack(fill="x", pady=(0, 6))
+        self.sounds_kind = getattr(self, "sounds_kind", "Presets")
+        for kind in ("Presets", "IRs", "Captures"):
+            chosen = kind == self.sounds_kind
+            tab = tk.Label(kinds, text=kind, padx=8, pady=3, cursor="hand2", font=(FONT, 9, "bold" if chosen else "normal"),
+                           bg=TILE if chosen else DARK, fg=INK if chosen else SUBTLE)
+            tab.pack(side="left", padx=(0, 4))
+            tab.bind("<ButtonRelease-1>", lambda _, kind=kind: (setattr(self, "sounds_kind", kind), self.fill_panel()))
+        if self.sounds_kind != "Presets":
+            self.panel_assets("ir" if self.sounds_kind == "IRs" else "capture")
+            return
         from .library import cached, place
 
         entries = cached(self.studio.folder)
@@ -463,6 +475,66 @@ class Desk:
         search.bind("<KeyRelease>", fill)
         box.bind("<Double-Button-1>", lambda _: self.work_on(box, rows))
         button(self.tray, "Work on this", lambda: self.work_on(box, rows)).pack(fill="x", pady=(6, 0))
+
+    def panel_assets(self, kind):
+        from .assets import cached
+
+        found = [item for item in cached(self.studio.folder) or [] if item.kind == kind]
+        top = tk.Frame(self.tray, bg=DARK)
+        top.pack(fill="x", pady=(0, 6))
+        button(top, "Read the unit again", lambda: self.studio.read_assets(lambda _: self.fill_panel())).pack(
+            side="right")
+        if not found:
+            label(top, "Not read yet.", color=SUBTLE).pack(side="left")
+            return
+        search = tk.Entry(top, font=(FONT, 10), bg=TILE, fg=INK, relief="flat", insertbackground=INK)
+        search.pack(side="left", fill="x", expand=True, ipady=4, padx=(0, 8))
+        mine = tk.BooleanVar(value=True)
+        box = tk.Listbox(self.tray, bg=DARK, fg=INK, selectbackground=TILE, relief="flat", highlightthickness=0,
+                         font=(FONT, 9), height=22)
+        rows = []
+
+        def fill(*_):
+            wanted = search.get().strip().casefold()
+            rows[:] = [item for item in found if wanted in item.name.casefold()
+                       and (item.source == "user" or not mine.get())]
+            box.delete(0, "end")
+            for item in rows[:400]:
+                version = f"  · V{item.capture_version}" if item.capture_version else ""
+                box.insert("end", item.name + version)
+
+        tk.Checkbutton(self.tray, text="Only mine", variable=mine, command=fill, bg=DARK, fg=SOFT,
+                       selectcolor=TILE, activebackground=DARK, font=(FONT, 9)).pack(anchor="w")
+        box.pack(fill="both", expand=True)
+        fill()
+        search.bind("<KeyRelease>", fill)
+
+        def chosen():
+            picked = box.curselection()
+            return rows[picked[0]] if picked else None
+
+        actions = tk.Frame(self.tray, bg=DARK)
+        actions.pack(fill="x", pady=(6, 0))
+        if kind == "ir":
+            button(actions, "Put in B's cab", lambda: chosen() and self.studio.use_asset(chosen())).pack(side="left")
+        else:
+            button(actions, "Instead of B's amp", lambda: self.try_capture(chosen(), False)).pack(side="left")
+            button(actions, "Instead of amp and cab", lambda: self.try_capture(chosen(), True)).pack(
+                side="left", padx=6)
+
+    def try_capture(self, asset, has_cab):
+        if asset is None:
+            return
+        version = asset.capture_version
+        if version is None:
+            from tkinter import messagebox
+
+            answer = messagebox.askyesnocancel("Capture version", f"Is {asset.name} a V2 capture? "
+                                               "(No means V1. Cortex Control shows it.)", parent=self.root)
+            if answer is None:
+                return
+            version = 2 if answer else 1
+        self.studio.use_asset(asset, has_cab=has_cab, version=version)
 
     def read_directory(self):
         self.studio.set(working="Reading the presets on the Quad Cortex…")

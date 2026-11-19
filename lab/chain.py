@@ -62,6 +62,22 @@ def same(a, b):
     return abs(float(a) - float(b)) <= TOLERANCE
 
 
+# Text the unit binds by a key at its start, and text that only names what is bound (see `assets.py`).
+# A capture block's file_name is the capture's 64-character key followed by a name the unit fills in; an IR
+# loader's IR NAME parameters only label the IR its IR PATH holds.
+KEYED = {(model, 5): 64 for model in catalog.CAPTURE_MODELS}
+LABELS = {(model, index) for model in (catalog.IR_LOADER, 29002) for index in (22, 23)}
+
+
+def agrees(model, index, have, want):
+    """Whether a stored value of a block is the wanted one: `same`, except that only the key of a capture's
+    file_name decides."""
+    width = KEYED.get((model, index))
+    if width and isinstance(have, str) and isinstance(want, str) and len(want) >= width:
+        return have[:width].casefold() == want[:width].casefold()
+    return same(have, want)
+
+
 def in_scene(value, scene):
     return value[scene] if isinstance(value, tuple) else value
 
@@ -359,7 +375,7 @@ def plan_values(current, wanted):
             have = a.values if a is not None and a.model == b.model else {}
             for index, value in b.params:
                 before = have.get(index)
-                if before is not None and same(before, value):
+                if before is not None and agrees(b.model, index, before, value):
                     continue
                 if isinstance(value, tuple):
                     if not isinstance(before, tuple):
@@ -433,7 +449,9 @@ def differences(current, wanted):
                 continue
             have = a.values
             for index, value in b.params:
-                if index not in have or not same(have[index], value):
+                if (b.model, index) in LABELS and isinstance(have.get(index), str):
+                    continue        # the unit may name the IR its own way; the IR PATH says which it is
+                if index not in have or not agrees(b.model, index, have[index], value):
                     found.append(f"{where} {b.name} parameter {index} is {have.get(index)}, wanted {value}")
             if a.bypass != b.bypass:
                 found.append(f"{where} {b.name} bypass is {a.bypass}, wanted {b.bypass}")

@@ -139,5 +139,13 @@ class WindowTest(unittest.TestCase):
         self.assertFalse(self.learner.dataset_open)
 
 
+def tearDownModule():
+    # Tk objects left as garbage here must be freed on the main thread: if a later test's worker thread runs
+    # the collector, Tcl aborts the whole interpreter ("Tcl_AsyncDelete").
+    import gc
+
+    gc.collect()
+
+
 if __name__ == "__main__":
     unittest.main()

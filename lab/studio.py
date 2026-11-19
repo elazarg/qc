@@ -375,6 +375,46 @@ class Studio:
                  and item["name"].strip().casefold() == wanted]
         return (found[0]["slot"], found[0]["name"]) if len(found) == 1 else None
 
+    def _assets(self):
+        from .assets import cached
+
+        return cached(self.folder) or []
+
+    def read_assets(self, done=None):
+        """Read the IRs and captures on the unit (about ten seconds) and remember them."""
+        self.set(working="Reading the IRs and captures on the Quad Cortex…")
+
+        def read(records):
+            self.set(working="", status=f"{len(records)} IRs and captures on the unit.")
+            if done:
+                done(records)
+
+        self.later(self.host.call("lab.assets.listing", folder=str(self.folder)), read)
+
+    def use_asset(self, asset, *, has_cab=None, version=None):
+        """A copy of the sound on B with one of the player's IRs in place of its cab, or a capture in place of
+        its amp (and cab, when the capture has one)."""
+        from . import assets
+        from .sounds import Sound
+
+        sound = self.sound("b") or self.sound("a")
+        if sound is None:
+            self.say("Put a sound on B first; the IR or capture goes into it.")
+            return
+        try:
+            if asset.kind == "ir":
+                chain, words = assets.with_ir(sound.chain, asset)
+            else:
+                chain, words = assets.with_capture(sound.chain, asset, has_cab=has_cab, version=version)
+        except ValueError as error:
+            self.say(str(error))
+            return
+        name = f"{sound.name[:19]} {'IR' if asset.kind == 'ir' else 'Cap'}"
+        copy = Sound(name, chain, {"kind": "revised", "from": sound.id, "request": words}, parent=sound.id,
+                     explanation=f"{sound.explanation} {words}".strip(), knobs=dict(sound.knobs))
+        self.put("b", copy)
+        self.say(words + " Z undoes it.")
+
     def _instrument(self):
         return self.store.instrument(self.state.instrument)
 
@@ -387,7 +427,7 @@ class Studio:
         instrument = self._instrument()
         stop = self._request() if not quietly else None
         future = self.thinking.submit(design.round_of_three, self.assistant, text, instrument, earlier=earlier, by=by,
-                                      cancel=stop)
+                                      cancel=stop, assets_known=self._assets())
         revision = self.state.revision
         self.preparing = after
 
@@ -531,7 +571,8 @@ class Studio:
     def revise(self, sound, text):
         self.set(working=f"Revising {sound.name}…")
         stop = self._request()
-        future = self.thinking.submit(design.revise, self.assistant, sound, text, self._instrument(), cancel=stop)
+        future = self.thinking.submit(design.revise, self.assistant, sound, text, self._instrument(), cancel=stop,
+                                      assets_known=self._assets())
         revision = self.state.revision
 
         def revised(result):
