@@ -93,6 +93,12 @@ class Desk:
         menu.add_command(label="Guitar Learner", command=self.open_learner)
         menu.add_command(label="Guitar input calibration", command=self.open_calibration)
         menu.add_command(label="Gestures on / off", command=self.toggle_gestures)
+        menu.add_separator()
+        from .tools.menu import TOOLS, opener
+
+        for title, name in TOOLS:
+            menu.add_command(label=title, command=lambda name=name: opener(name)(self))
+        menu.add_separator()
         menu.add_command(label="Measure the USB round trip", command=self.calibrate)
         instruments = tk.Menu(menu, tearoff=False, bg="#252834", fg=INK)
         for item in self.studio.store.instruments():

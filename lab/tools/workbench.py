@@ -1,0 +1,432 @@
+"""The comparison workbench: several versions of one sound, rendered with the phrase, heard blind.
+
+Carried over from the old first workbench (`python -m tone_lab ui`: reamp scenes, compare WAVs, sweep a
+parameter, blind A/B/C audition, keep a preference) and the style renders of `iterate` (a request rendered
+at two strengths next to the original). On the new core each version is a chain made from the selected
+sound, played silently through the unit with the desk's phrase:
+
+- **Scenes**: each scene the sound names (up to six).
+- **Strengths**: a request such as "darker" or "more jazz" as Shape knob moves, at 40 % and 85 %, next to the
+  sound as it is.
+- **Sweep**: one control of one block at several values, in the units the unit shows.
+- **WAV files**: two or more recordings from elsewhere, no unit needed.
+
+The versions are level-matched (one loudness, only cuts, peaks under −3 dBTP), shuffled under letters and
+played on the computer. "Keep" notes the last one played with a remark; "Which was which?" reveals the
+order; "Put the kept one on B" brings that version to the desk as a sound of its own. Each comparison is
+kept under `comparisons/` in the data folder with its notes (the old `feedback` was tied to a comparison
+the same way).
+"""
+
+from datetime import datetime, timezone
+import json
+from pathlib import Path
+import random
+import tkinter as tk
+from uuid import uuid4
+
+from .. import knobs, words
+from ..audio import read_wave
+from ..measure import match, measure
+from ..sounds import Sound
+from ..theme import FONT, INK, SUBTLE, TILE, WHITE
+from .common import (SCENE_LETTERS, Window, button, gained, heard_chain, label, listbox, menu_choice, phrase, play,
+                     section, with_knobs, write_pcm16)
+
+STRENGTHS = (.4, .85)
+KINDS = ("Scenes", "Strengths", "Sweep", "WAV files")
+
+
+# ---- versions of a sound ----
+
+def scene_versions(sound):
+    chain = heard_chain(sound)
+    count = min(chain.scenes or 1, 6)
+    return [{"name": f"Scene {SCENE_LETTERS[scene]}" + (f" · {chain.labels[scene]}" if chain.labels[scene] else ""),
+             "chain": chain, "scene": scene, "knobs": dict(sound.knobs)} for scene in range(count)]
+
+
+def request_moves(text, chain):
+    """A request as knob moves the chain can make, scaled so the largest is 1, or None."""
+    found = None
+    reading = words.read(text)
+    if reading:
+        ways = words.usable(reading, set(knobs.available(chain)))
+        if ways:
+            found = dict(ways[0].moves)
+    if found is None:
+        found = knobs.direction(text)
+    if not found:
+        return None
+    found = {key: value for key, value in found.items() if key in knobs.available(chain)}
+    largest = max((abs(value) for value in found.values()), default=0.)
+    return {key: value / largest for key, value in found.items()} if largest else None
+
+
+def strength_versions(sound, text, strengths=STRENGTHS):
+    moves = request_moves(text, sound.chain)
+    if moves is None:
+        raise ValueError(f"The selected sound has nothing that answers “{text}”. Try darker, more jazz, "
+                         "less delay, a bit tighter.")
+    versions = [{"name": "As it is", "chain": heard_chain(sound), "scene": None, "knobs": dict(sound.knobs)}]
+    for amount in strengths:
+        values = dict(sound.knobs)
+        for key, step in moves.items():
+            low = knobs.KNOBS[key][1]
+            values[key] = round(max(low, min(1., values.get(key, 0.) + step * amount)), 2)
+        versions.append({"name": f"{text} · {amount:.0%}", "chain": with_knobs(sound.chain, values), "scene": None,
+                         "knobs": values, "request": text, "amount": amount})
+    return versions
+
+
+def controls(chain):
+    """[(label, row, column, index)] for the numeric controls of every block."""
+    found = []
+    for row, column, block in chain.blocks:
+        info = block.info
+        if not info:
+            continue
+        for param in info.params:
+            if param.kind in ("float", "fader", "int") and param.low is not None and param.high is not None:
+                found.append((f"{block.name} · {param.name}", row, column, param.index))
+    return found
+
+
+def sweep_versions(sound, row, column, index, values):
+    chain = heard_chain(sound)
+    block = chain.block(row, column)
+    if block is None:
+        raise ValueError("That block is not in the sound.")
+    param = next(param for param in block.info.params if param.index == index)
+    versions = []
+    for value in values:
+        if not param.low <= value <= param.high:
+            raise ValueError(f"{param.name} goes from {param.low:g} to {param.high:g}.")
+        changed = chain.with_block(row, column, block.set_display(index, value))
+        versions.append({"name": f"{block.name} {param.name} {value:g}{param.units and ' ' + param.units}",
+                         "chain": changed, "scene": None, "knobs": dict(sound.knobs),
+                         "change": {"row": row, "column": column, "index": index, "to": value}})
+    return versions
+
+
+# ---- a comparison ----
+
+def matched(audios, *, ceiling_db=-3.):
+    """Each audio at one loudness; returns (audios, trims, measurements)."""
+    found = [measure(audio) for audio in audios]
+    if any(item.lufs is None for item in found):
+        raise ValueError("A version returned silence. Check that it passes sound.")
+    if any(item.clipped for item in found):
+        raise ValueError("A version reached full scale. Lower the level inside it first.")
+    trims = match(found, ceiling_db=ceiling_db)
+    return [gained(audio, trim) for audio, trim in zip(audios, trims)], trims, found
+
+
+def comparison(folder, versions, audios, *, sound=None, phrase_name=None, kind="", seed=None):
+    """Level-match the versions, shuffle them under letters, and keep it all under `comparisons/`."""
+    if len(versions) < 2:
+        raise ValueError("Compare at least two versions.")
+    leveled, trims, found = matched(audios)
+    order = list(range(len(versions)))
+    random.Random(seed).shuffle(order)
+    stamp = datetime.now(timezone.utc)
+    target = Path(folder) / "comparisons" / f"{stamp:%Y%m%d-%H%M%S}-{kind.lower().replace(' ', '-')}-{uuid4().hex[:6]}"
+    target.mkdir(parents=True)
+    record = {"created": stamp.isoformat(timespec="seconds"), "kind": kind, "phrase": phrase_name,
+              "sound": {"id": sound.id, "name": sound.name} if sound else None, "auditions": {}, "choice": None}
+    for place, index in enumerate(order):
+        letter = SCENE_LETTERS[place]
+        version = versions[index]
+        write_pcm16(target / f"audition-{letter}.wav", leveled[index])
+        record["auditions"][letter] = {
+            "name": version["name"], "file": f"audition-{letter}.wav", "trim_db": round(trims[index], 2),
+            "lufs": found[index].lufs, **{key: version[key] for key in ("scene", "knobs", "request", "amount",
+                                                                        "change", "source") if key in version}}
+        if "chain" in version:
+            record["auditions"][letter]["chain"] = version["chain"].to_record()
+    (target / "comparison.json").write_text(json.dumps(record, indent=1), encoding="utf-8")
+    return target, record
+
+
+def load(target):
+    return json.loads((Path(target) / "comparison.json").read_text(encoding="utf-8"))
+
+
+def keep(target, letter, notes=""):
+    """Note the preferred letter and a remark in the comparison."""
+    record = load(target)
+    if letter not in record["auditions"]:
+        raise ValueError("Play a version before keeping it.")
+    record["choice"] = {"letter": letter, "name": record["auditions"][letter]["name"], "notes": notes.strip(),
+                        "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+    (Path(target) / "comparison.json").write_text(json.dumps(record, indent=1), encoding="utf-8")
+    return record
+
+
+def feedback(target, text, *, audition=None):
+    """A remark about the comparison, kept with it under `feedback/`, without changing anything else."""
+    text = (text or "").strip()
+    record = load(target)
+    if not text or not record.get("auditions"):
+        raise ValueError("Write a note about a completed comparison.")
+    stamp = datetime.now(timezone.utc)
+    directory = Path(target) / "feedback"
+    directory.mkdir(exist_ok=True)
+    path = directory / f"{stamp:%Y%m%d-%H%M%S}-{uuid4().hex[:6]}.json"
+    heard = record["auditions"].get(audition, {})
+    path.write_text(json.dumps({"at": stamp.isoformat(timespec="seconds"), "text": text, "audition": audition,
+                                "audition_name": heard.get("name"),
+                                "auditions": {letter: row["name"] for letter, row in record["auditions"].items()}},
+                               indent=1), encoding="utf-8")
+    return path
+
+
+def notes(target):
+    return [json.loads(path.read_text(encoding="utf-8")) for path in sorted((Path(target) / "feedback").glob("*.json"))]
+
+
+def as_sound(record, letter, parent):
+    """A kept version as a sound of its own, revised from the one it was made from."""
+    from ..chain import Chain
+
+    audition = record["auditions"][letter]
+    if "chain" not in audition:
+        raise ValueError("A recording from elsewhere has no chain to bring to the desk.")
+    chain = Chain.from_record(audition["chain"])
+    origin = {"kind": "revised", "from": parent.id, "request": audition["name"]}
+    # The chain was rendered with the knobs written in; the copy starts with them at rest.
+    sound = Sound(f"{parent.name} · {audition['name']}"[:60], chain, origin, parent=parent.id,
+                  explanation=parent.explanation)
+    if audition.get("scene"):
+        sound.tags = [f"scene {SCENE_LETTERS[audition['scene']]}"]
+    return sound
+
+
+# ---- the window ----
+
+class WorkbenchWindow(Window):
+    TITLE = "Comparison workbench"
+    SIZE = "640x700"
+
+    def build(self):
+        self.target = self.record = self.last = None
+        self.auditions = {}
+        make = section(self.body, "Versions of the selected sound",
+                       "Rendered silently with the desk's phrase, then level-matched and shuffled.")
+        row = tk.Frame(make, bg=make["bg"])
+        row.pack(fill="x")
+        self.kind = tk.StringVar(master=self.top, value=KINDS[0])
+        menu_choice(row, self.kind, KINDS, command=self.kind_changed).pack(side="left")
+        self.argument = tk.Entry(row, font=(FONT, 10), relief="flat", bg=TILE, fg=INK,
+                                 insertbackground=INK, width=28)
+        self.argument.pack(side="left", padx=6, ipady=4)
+        button(row, "Render", self.render).pack(side="right")
+        self.control = tk.StringVar(master=self.top, value="")
+        self.control_menu = tk.Menubutton(make, textvariable=self.control, bg=WHITE, fg=INK, relief="flat",
+                                          font=(FONT, 9), padx=8, pady=4)
+        self.control_options = tk.Menu(self.control_menu, tearoff=False, postcommand=self.list_controls)
+        self.control_menu.configure(menu=self.control_options)
+        self.help = label(make, size=9, color=SUBTLE, wrap=560)
+        self.help.pack(fill="x", pady=(6, 0))
+
+        hear = section(self.body, "Blind audition")
+        self.players = tk.Frame(hear, bg=hear["bg"])
+        self.players.pack(fill="x")
+        self.about = label(hear, size=9, wrap=560)
+        self.about.pack(fill="x", pady=(6, 0))
+        row = tk.Frame(hear, bg=hear["bg"])
+        row.pack(fill="x", pady=(6, 0))
+        self.remark = tk.Entry(row, font=(FONT, 10), relief="flat", bg=TILE, fg=INK,
+                               insertbackground=INK)
+        self.remark.pack(side="left", fill="x", expand=True, ipady=4)
+        button(row, "Keep last played", self.keep).pack(side="left", padx=6)
+        row = tk.Frame(hear, bg=hear["bg"])
+        row.pack(fill="x", pady=(6, 0))
+        button(row, "Which was which?", self.reveal, quiet=True).pack(side="left")
+        button(row, "Put the kept one on B", self.put_kept, quiet=True).pack(side="left", padx=6)
+        button(row, "Note on this comparison", self.note, quiet=True).pack(side="right")
+
+        earlier = section(self.body, "Earlier comparisons")
+        self.earlier = listbox(earlier, height=5)
+        self.earlier.pack(fill="x")
+        self.earlier.bind("<Double-Button-1>", lambda _: self.open_earlier())
+        self.kind_changed()
+        self.list_earlier()
+
+    def kind_changed(self):
+        kind = self.kind.get()
+        self.control_menu.pack_forget()
+        self.argument.delete(0, "end")
+        if kind == "Strengths":
+            self.help.configure(text="A request in words, such as darker, more jazz or less delay. It is rendered at "
+                                     "40 % and 85 % next to the sound as it is.")
+        elif kind == "Sweep":
+            self.control_menu.pack(fill="x", pady=(6, 0), before=self.help)
+            self.help.configure(text="Choose a control, then type the values to compare, such as 3 5 7.")
+        elif kind == "WAV files":
+            self.help.configure(text="Render opens a file chooser for two or more recordings.")
+        else:
+            self.help.configure(text="Each scene the sound names, up to six.")
+
+    def list_controls(self):
+        self.control_options.delete(0, "end")
+        sound = self.studio.sound(self.studio.state.side)
+        for name, row, column, index in controls(sound.chain) if sound else []:
+            self.control_options.add_radiobutton(label=name, value=f"{name}|{row}|{column}|{index}",
+                                                 variable=self.control)
+
+    def versions(self, sound):
+        kind, text = self.kind.get(), self.argument.get().strip()
+        if kind == "Scenes":
+            return scene_versions(sound)
+        if kind == "Strengths":
+            if not text:
+                raise ValueError("Type a request first, such as darker.")
+            return strength_versions(sound, text)
+        if not self.control.get():
+            raise ValueError("Choose a control first.")
+        _, row, column, index = self.control.get().split("|")
+        try:
+            values = [float(value) for value in text.replace(",", " ").split()]
+        except ValueError:
+            raise ValueError("Type the values as numbers, such as 3 5 7.") from None
+        if len(values) < 2:
+            raise ValueError("Type at least two values.")
+        return sweep_versions(sound, int(row), int(column), int(index), values)
+
+    def render(self):
+        if self.kind.get() == "WAV files":
+            self.imported()
+            return
+        sound, taken = self.studio.sound(self.studio.state.side), phrase(self.studio)
+        if sound is None or taken is None:
+            self.say("Put a sound on the desk and choose a phrase first.")
+            return
+        try:
+            versions = self.versions(sound)
+        except ValueError as error:
+            self.say(str(error))
+            return
+        if len(versions) < 2:
+            self.say("The sound names only one scene. Choose another kind of comparison.")
+            return
+
+        def rendered(audios):
+            self.made(versions, audios, sound, taken[0])
+
+        self.call("lab.tools.common.render_many", [(version["chain"], version["scene"]) for version in versions],
+                  taken[1], done=rendered, working=f"Rendering {len(versions)} versions silently on the Quad Cortex…")
+
+    def imported(self):
+        from tkinter import filedialog
+
+        paths = filedialog.askopenfilenames(title="Choose two or more recordings", filetypes=[("WAV audio", "*.wav")],
+                                            parent=self.top)
+        if not paths:
+            return
+        try:
+            audios = [read_wave(path) for path in paths]
+        except (OSError, ValueError) as error:
+            self.say(str(error))
+            return
+        self.made([{"name": Path(path).stem, "source": str(path)} for path in paths], audios, None, None)
+
+    def made(self, versions, audios, sound, phrase_name):
+        try:
+            self.target, self.record = comparison(self.folder, versions, audios, sound=sound, phrase_name=phrase_name,
+                                                  kind=self.kind.get())
+        except ValueError as error:
+            self.say(str(error))
+            return
+        self.show()
+        self.list_earlier()
+
+    def show(self):
+        from ..audio import read_wave as read
+
+        self.auditions = {letter: read(self.target / row["file"]) for letter, row in self.record["auditions"].items()}
+        self.last = None
+        for child in self.players.winfo_children():
+            child.destroy()
+        for letter in self.auditions:
+            button(self.players, f"Play {letter}", lambda letter=letter: self.play(letter)).pack(side="left",
+                                                                                             padx=(0, 4))
+        button(self.players, "Stop", self.stop, quiet=True).pack(side="right")
+        chosen = self.record.get("choice")
+        self.about.configure(text=f"{len(self.auditions)} level-matched versions"
+                                  + (f" of {self.record['sound']['name']}" if self.record.get("sound") else "")
+                                  + (f" · kept {chosen['letter']}" if chosen else ""))
+
+    def play(self, letter):
+        try:
+            play(self.auditions[letter], self.folder / "previews")
+        except (RuntimeError, ImportError) as error:
+            self.say(str(error))
+            return
+        self.last = letter
+        self.say(f"Playing {letter}")
+
+    def stop(self):
+        from .common import silence
+
+        silence()
+
+    def keep(self):
+        if not self.target or not self.last:
+            self.say("Play a version before keeping it.")
+            return
+        self.record = keep(self.target, self.last, self.remark.get())
+        self.remark.delete(0, "end")
+        self.say(f"Kept {self.last}.")
+        self.show()
+
+    def note(self):
+        if not self.target:
+            return
+        try:
+            feedback(self.target, self.remark.get(), audition=self.last)
+        except ValueError as error:
+            self.say(str(error))
+            return
+        self.remark.delete(0, "end")
+        self.say("The note is kept with this comparison.")
+
+    def reveal(self):
+        if self.record:
+            self.about.configure(text="  ·  ".join(f"{letter}: {row['name']}"
+                                                   for letter, row in self.record["auditions"].items()))
+
+    def put_kept(self):
+        if not self.record or not self.record.get("choice"):
+            self.say("Keep one first.")
+            return
+        sound = self.record.get("sound")
+        if not sound:
+            self.say("A recording from elsewhere has no chain to bring to the desk.")
+            return
+        made = as_sound(self.record, self.record["choice"]["letter"], self.studio.store.sound(sound["id"]))
+        self.studio.put("b", made)
+
+    def list_earlier(self):
+        self.found = sorted((self.folder / "comparisons").glob("*/comparison.json"), reverse=True)[:30]
+        self.earlier.delete(0, "end")
+        for path in self.found:
+            try:
+                record = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            chosen = record.get("choice")
+            self.earlier.insert("end", f"{record['created'][:16]}  {record['kind']}"
+                                       + (f" · {record['sound']['name']}" if record.get("sound") else "")
+                                       + (f" · kept {chosen['name']}" if chosen else ""))
+
+    def open_earlier(self):
+        chosen = self.earlier.curselection()
+        if chosen:
+            self.target = self.found[chosen[0]].parent
+            self.record = load(self.target)
+            self.show()
+
+
+def open(desk):  # noqa: A001
+    return WorkbenchWindow.open(desk)

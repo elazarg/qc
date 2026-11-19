@@ -135,5 +135,21 @@ class EngineTest(unittest.TestCase):
         self.assertEqual(self.unit.position()["position"], 5)
 
 
+    def test_a_saved_design_keeps_its_knob_moves_on_values_it_left_to_the_unit(self):
+        design = sound(PLEXI, V30)                       # states no GAIN
+        gain = catalog.model(PLEXI).index("GAIN")
+        self.assertIsNone(design.block(0, 0).get(gain))
+        plain_slot, plain = self.engine.save(design, "Plain")
+        slot, stored = self.engine.save(design, "Driven", {"drive": .6})
+        self.assertGreater(stored.block(0, 0).get(gain), plain.block(0, 0).get(gain) + .05)
+
+    def test_the_listening_level_maps_what_is_asked_and_stays_under_the_ceiling(self):
+        self.engine.level("a", -12)
+        self.engine.listen_at(lambda asked: asked + 30)
+        self.assertEqual(self.engine.levels["a"], 6.)
+        self.engine.listen_at(None)
+        self.assertEqual(self.engine.levels["a"], -12)
+
+
 if __name__ == "__main__":
     unittest.main()

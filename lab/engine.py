@@ -69,6 +69,7 @@ class Engine:
         self.active, self.mode, self.loop = "a", None, None
         self.borrowed = None
         self.offset = None
+        self.asked, self.listening = {}, None      # see `level`
 
     # ---- the session ----
 
@@ -231,9 +232,20 @@ class Engine:
         return knobs.moves(chain, values)
 
     def level(self, side, db):
-        self.levels[side] = max(-40., min(6., db))
+        """Set the level a side is played at. `listening`, when set, maps what is asked to what is played (the
+        Levels window's listening level); the result stays within the floor and the ceiling."""
+        self.asked[side] = db
+        played = self.listening(db) if self.listening else db
+        self.levels[side] = max(-40., min(6., played))
         if self.mode is not None and side == self.active:
             self.play(side, self.mode)
+
+    def listen_at(self, listening):
+        """Play every side through `listening` (asked dB -> played dB) from now on, or as asked when None."""
+        self.listening = listening
+        for side in ("a", "b"):
+            self.level(side, self.asked.get(side, PREVIEW_DB))
+        return dict(self.levels)
 
     # ---- listening, reading, saving ----
 
@@ -261,8 +273,12 @@ class Engine:
         self.shown = None
         return held, name
 
-    def save(self, chain, name):
-        """Write a sound to the next free slot of the Tone Lab setlist, ready to play with the guitar."""
+    def save(self, chain, name, knobs=None):
+        """Write a sound to the next free slot of the Tone Lab setlist, ready to play with the guitar.
+
+        `knobs` are the sound's Shape knob positions. They are applied to the chain as the unit holds it once
+        built, where every value is stated: a design leaves most values to the unit, and a knob can only move
+        a value that is there."""
         self.quiet()
         target = self.slots.free_for_saving()
         playable = chain.with_routes([(self.physical_input, MULTI_OUT) if r == 0 else row.route
@@ -272,6 +288,14 @@ class Engine:
         self.slots.claim(target, name)
         self.unit.slot = None
         self.rig.build(playable)            # assembled and cached silent
+        if knobs:
+            from .knobs import apply as with_knobs
+
+            held = self.unit.read()
+            playable = with_knobs(held.with_routes(playable.routes), knobs)
+            playable = replace(playable, rows=(replace(playable.rows[0], output=tuple(
+                {**dict(playable.rows[0].output), VOLUME: leveling.norm_of(0.), MUTE: 0.}.items())),)
+                               + playable.rows[1:])
         self.unit.apply(playable)          # then connected as it will be played
         stored = self.unit.store(target, name)
         self.shown = None

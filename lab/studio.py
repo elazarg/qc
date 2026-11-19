@@ -557,9 +557,7 @@ class Studio:
         name = (name or sound.name)[:24]
         self.stop()
         self.set(working=f"Saving {name} to the Tone Lab setlist…")
-        from .knobs import apply as with_knobs
-
-        chain = with_knobs(sound.chain, sound.knobs) if sound.knobs else sound.chain
+        chain = sound.chain
 
         def saved(result):
             slot, _ = result
@@ -568,7 +566,7 @@ class Studio:
             self.set(working="", shown=None, status=f"Saved · Tone Lab {slot['position'] + 1} · {name}")
             self._show()
 
-        self.later(self.host.call("save", chain, name), saved)
+        self.later(self.host.call("save", chain, name, sound.knobs or None), saved)
 
     # ---- phrases and the guitar ----
 
