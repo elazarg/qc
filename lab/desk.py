@@ -197,7 +197,7 @@ class Desk:
         if origin == "preset":
             parts.append("Saved on the Quad Cortex")
         elif origin == "revised":
-            parts.append("A revised copy")
+            parts.append("Revised: " + sound.origin["request"][:60] if sound.origin.get("request") else "A copy to work on")
         if sound.heard:
             parts.append("heard: " + ", ".join(sound.heard[key] for key in ("drive", "tone", "space")))
         if sound.knobs:
