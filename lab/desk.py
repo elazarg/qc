@@ -69,6 +69,10 @@ class Desk:
         self.panel = self.learner = None
         root.title("Tone Lab")
         root.configure(bg=PAPER)
+        try:
+            root.iconbitmap(default=str(REPO / "ToneLab.ico"))   # this window and every one it opens
+        except tk.TclError:
+            pass
         root.geometry("1100x680")
         root.minsize(980, 620)
         self.build()
