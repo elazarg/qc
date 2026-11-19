@@ -30,6 +30,10 @@ OVER = {"drive": "more driven than the aim", "tone": "brighter than the aim", "s
 EXTRA_LISTENS = 3  # per design, so that checking a round stays near two minutes
 
 
+class Stopped(Exception):
+    """The player wants the unit back. What was finished is kept and the rest waits."""
+
+
 def folder():
     return session.SESSIONS / "rounds"
 
@@ -60,6 +64,23 @@ def load(round_id):
     return json.loads((folder() / f"{round_id}.json").read_text(encoding="utf-8"))
 
 
+def everything():
+    """Every round on disk, oldest first."""
+    found = []
+    for path in folder().glob("*.json"):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if data["id"] == path.stem and data["candidates"] and all(kind in data["aim"] for kind in AIM):
+                found.append(data)
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+    return sorted(found, key=lambda data: data["created_utc"])
+
+
+def unchecked(found):
+    return [candidate for candidate in found["candidates"] if candidate["heard"] is None]
+
+
 def draft_of(candidate):
     data = json.loads((session.SESSIONS / "drafts" / f"{candidate['draft']}.json").read_text(encoding="utf-8"))
     return {**data, **preset_design.validate(data)}
@@ -77,8 +98,11 @@ def start(text, guitar, take=None, *, earlier=None, research=False, cancel=None,
 
 
 @contextmanager
-def unit(dry=None):
-    """Hold the working slot and return `hear(draft, values)`, which builds a draft once and listens to it."""
+def unit(dry=None, stop=None):
+    """Hold the working slot and return `hear(draft, values)`, which builds a draft once and listens to it.
+
+    Setting `stop` makes the next step raise Stopped, so that the player never waits long for the unit.
+    """
     from . import live
 
     dry = hearing.phrase()[1] if dry is None else dry
@@ -87,11 +111,18 @@ def unit(dry=None):
         with draft_render.working_grid(qc):
             built = {}
 
+            def wanted():
+                if stop is not None and stop.is_set():
+                    raise Stopped()
+
             def hear(draft, values):
+                wanted()
                 if built.get("id") != draft["id"]:
                     chain = draft_render.compile_chain(draft, draft_render.PREVIEW_GAIN)
-                    base = draft_render.build_grid(qc, device.read_preset(qc), chain, draft)
+                    built.clear()  # A build that is abandoned leaves nothing to listen to.
+                    base = draft_render.build_grid(qc, device.read_preset(qc), chain, draft, wanted=wanted)
                     built.update(id=draft["id"], base=base, moved={})
+                    wanted()
                 if values or built["moved"]:
                     built["moved"] = live.update(qc, built["base"], 0, values, built["moved"],
                                                  position=draft_render.WORK_SLOT)
@@ -102,8 +133,16 @@ def unit(dry=None):
 
 
 def check_one(aim, candidate, draft, hear):
-    """Listen to one design, and turn the app's own knobs where it misses the aim."""
+    """Listen to one design, and turn the app's own knobs where it misses the aim.
+
+    A design the player has already heard is theirs: it is listened to as
+    designed and as they left it, and its knobs are not touched.
+    """
     heard = hear(draft, {})
+    if candidate["played"]:
+        served = hear(draft, candidate["shape"]) if candidate["shape"] else heard
+        candidate.update(heard=heard, served=served, tags=tags(aim, served), miss=distance(miss(aim, served)))
+        return candidate
     best = ({}, heard)
     listens = 0
     for kind in AIM:
@@ -130,24 +169,51 @@ def check_one(aim, candidate, draft, hear):
     return candidate
 
 
-def check(found, hear=None, report=None):
-    """Listen to every design of a round that has not been listened to, then put the closest first."""
+def check(found, hear=None, report=None, *, stop=None, reorder=True):
+    """Listen to every design of a round that has not been listened to, then put the closest first.
+
+    On the desk the designs keep the places the player has seen them in, so `reorder` is off there.
+    """
     def run(hear):
         for candidate in found["candidates"]:
             if candidate["heard"] is None:
-                check_one(found["aim"], candidate, draft_of(candidate), hear)
+                progress = dict(candidate)
+                check_one(found["aim"], progress, draft_of(candidate), hear)
+                candidate.update(progress)  # Only a design that was listened to in full is marked as heard.
                 save(found)
                 if report:
                     report(candidate)
 
-    if hear is None:
-        with unit() as hear:
+    try:
+        if hear is None:
+            with unit(stop=stop) as hear:
+                run(hear)
+        else:
             run(hear)
-    else:
-        run(hear)
-    # A design the player has heard keeps its place. The rest are ordered by how near they came.
-    found["candidates"].sort(key=lambda candidate: (not candidate["played"], candidate.get("miss", 99)))
+    except Stopped:
+        return save(found)
+    if reorder:
+        # A design the player has heard keeps its place. The rest are ordered by how near they came.
+        found["candidates"].sort(key=lambda candidate: (not candidate["played"], candidate.get("miss", 99)))
     return save(found)
+
+
+def closest(found):
+    """The place of the design that came nearest the aim, once every design has been listened to."""
+    if unchecked(found):
+        return None
+    return min(range(len(found["candidates"])), key=lambda place: found["candidates"][place]["miss"])
+
+
+def wants_more(found):
+    """Whether the next three should be prepared without being asked for.
+
+    Only once per request, and only when there is something to learn from: a
+    design that missed the aim, or anything the player has said.
+    """
+    said = any(candidate["review"] or candidate["user_tags"] for candidate in found["candidates"])
+    missed = any(candidate.get("miss") for candidate in found["candidates"])
+    return not found.get("parent") and not found.get("followed") and not unchecked(found) and (said or missed)
 
 
 def summary(found):

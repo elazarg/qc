@@ -291,7 +291,8 @@ def _build_scenes(qc, chain):
             raise RuntimeError("The Quad Cortex did not confirm which blocks are on in each scene.")
 
 
-def build_grid(qc, scratch, chain, draft=None):
+def build_grid(qc, scratch, chain, draft=None, *, wanted=None):
+    """Build a chain in the working slot. `wanted` is called before each block and may raise to abandon the build."""
     assets = _attachments(chain, draft)
     _confirm_assets(qc, assets)
     if device.live_position(qc) != WORK_SLOT:
@@ -322,6 +323,8 @@ def build_grid(qc, scratch, chain, draft=None):
         for column, (model_id, settings) in enumerate(cells):
             if not model_id:
                 continue
+            if wanted is not None:
+                wanted()
             still_working(qc)
             if row == 0 and column in assets:
                 qc_library.add_asset(qc, assets[column], 0, column)

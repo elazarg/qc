@@ -1,6 +1,6 @@
 # Suggestions: several checked designs, and learning from what you say
 
-Branch `suggestions`. Updated 2026-11-19 after the player's answers. Listening and the round itself are built and run from the command line. Nothing here is in the desk yet.
+Branch `suggestions`. Updated 2026-11-19. Listening, the round and its place in the desk are built. Nobody has yet played through a round.
 
 ## What this is for
 
@@ -67,14 +67,24 @@ The call took 54 s and listening to all three took 164 s. The Fuzz Face design, 
 
 `python -m tone_lab.rounds "<request>"` runs a round. `python -m tone_lab.rounds --again <round id> "<what you think>"` runs the next.
 
+## In the desk
+
+Built on 2026-11-19 (`tone_lab/suggestions.py`), checked in the real window and, for listening, on the unit:
+
+- A request for a new sound returns a round. The aim is said on the line and the first design goes on B.
+- Three markers under the tones step between the designs (keys 1, 2, 3). One line says how the design on B differs, what the app heard of it and what you said. ◆ marks the one that measured closest to the aim.
+- Each design keeps its own knob positions. Stepping away stores them and stepping back restores them. A design is marked as heard once it has been on air.
+- The app listens when the unit has been free for 4 seconds after playing, or 25 seconds after a round arrives. Guitar, Phrase, Space or a step takes the unit back: measured, 3.9 s after asking. The knobs the app finds for a design become that design's own only if you have not heard it yet.
+- Right-click a marker: say what you think, or mark it Closer, Not it or This is it.
+- The next three are prepared once without being asked, when the round has been listened to and a design missed the aim or you said something. "Three more" asks again at any time. They are offered on the line when ready and nothing moves until you choose.
+- Earlier rounds: mouse wheel over the markers, [ and ], or the arrows. B stays as it is until a design is chosen.
+
 ## What is left to build, in order
 
-1. **Serve a round in the desk.** Ask, show the aim on the line, build the first design and put it on B (about 65 s after asking: 54 s for the call and 11 s for the build). Three small markers under B step between the designs of the round. Each shows its one-line difference and its tags. Scrolling there goes back through earlier rounds.
-2. **A round as one preset.** Put the three designs on separate rows of one preset in a Tone Lab slot, so that stepping is instant. This needs the builder and the Shape knobs to work on one row of a preset, which they do not yet. A design with a second path takes two rows, so a round with one of those holds two designs in the preset and the third is a recall away.
-3. **Listen after serving.** The design you are playing cannot be replayed over USB at the same time. It is listened to when the input next stops, and the other two as they are built.
-4. **Review.** Right-click a design: a few words, or a tag. Your knob moves on a design are kept with it. All of it goes to the next round.
-5. **The next three, prepared while you play.** Once the first round has been listened to, the assistant designs the next round with what was measured and anything you have said, and may search the web this time. That is a second call per request. If all three were on the aim and you have said nothing, it waits for you. Unheard designs of the earlier round give way to the new ones.
-6. **Build in the pauses.** Watch the guitar's level and add blocks only while it is silent, so that the next designs are ready without your stopping. Until this exists, they are built when the input stops, or when you step to one, which is a wait of about 11 s.
+1. **Quick stepping.** Stepping to a design while you play rebuilds it, about 17 s. Storing each design in its own slot at the end of the Tone Lab setlist when the app listens to it would make a step a recall, two to three seconds.
+2. **A round as one preset.** Three designs on separate rows of one preset step in 20 ms. This needs the builder and the Shape knobs to work on one row of a preset.
+3. **Build in the pauses.** Watch the guitar's level and add blocks only while it is silent, so that designs are built and listened to without your stopping.
+4. **Words in the request line.** "More like the second but brighter" should be read as a review and a request for three more. Today that takes a right-click.
 
 ## Rules
 
