@@ -120,7 +120,9 @@ class Engine:
     def play(self, side, mode, phrase=None):
         """Hear one side: from the guitar (`mode` "guitar") or from the recorded phrase ("phrase")."""
         if self.shown is None:
-            raise RuntimeError("Nothing is ready to play.")
+            if not any(self.sides.values()):
+                raise RuntimeError("Nothing is ready to play.")
+            self.show(self.sides["a"], self.sides["b"])   # Listening or saving used the unit meanwhile.
         if self.shown[0] == "recall" and side != self.active or self.shown[0] == "recall" and self.mode is None:
             self._recall_side(side)
         port = USB_IN if mode == "phrase" else self.physical_input

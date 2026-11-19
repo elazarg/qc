@@ -216,6 +216,7 @@ class Studio:
                 low = knobs.KNOBS[key][1]
                 values[key] = round(max(low, min(1., values.get(key, 0.) + step)), 2)
             self.turn(values, side)
+            sound = self.sound(side)          # as turn left it
             sound.notes.append({"at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "text": text})
             self.store.save(sound)
             self.say(said)
