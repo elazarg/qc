@@ -301,6 +301,25 @@ class ReferenceTest(unittest.TestCase):
         self.assertIn("no reference yet", desk.said[0][0])
 
 
+class NamesTest(unittest.TestCase):
+    def test_no_desk_method_is_defined_twice(self):
+        # A second definition silently replaces the first. That once broke requests to the assistant.
+        import ast
+        import inspect
+
+        tree = ast.parse(inspect.getsource(listening_room))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef):
+                names = [item.name for item in node.body if isinstance(item, ast.FunctionDef)]
+                repeated = sorted({name for name in names if names.count(name) > 1})
+                self.assertEqual(repeated, [], node.name)
+
+    def test_the_sounds_gathered_for_the_assistant_are_the_captured_ones(self):
+        desk = SimpleNamespace(baseline="a.wav", alternative="b.wav", reference="r.wav",
+                               rendered_values=lambda sound: {"drive": .2})
+        self.assertEqual(listening_room.Desk.heard(desk, "b"), ("b.wav", "a.wav", "r.wav", {"drive": .2}))
+
+
 class KeepTest(unittest.TestCase):
     def desk(self, **changes):
         old, new = Tone("preset", "Old", preset=None), Tone("preset", "New", preset=None)
@@ -310,7 +329,7 @@ class KeepTest(unittest.TestCase):
                                kept_live=None, kept_note="", qc_name="", on_air=lambda: "a", statuses=[],
                                update=lambda: None)
         desk.tone_snapshot = lambda side: (desk.tone(side), dict(desk.shapes[side]), desk.tone_revisions[side])
-        desk.heard = lambda side: listening_room.Desk.heard(desk, side)
+        desk.sounding = lambda side: listening_room.Desk.sounding(desk, side)
         desk.set_status = lambda text, **_: desk.statuses.append(text)
         vars(desk).update(changes)
         return desk
