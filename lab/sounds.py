@@ -154,7 +154,17 @@ def settings(block, *, every=False):
     defaults = catalog.defaults(block.model)
     for index, value in block.params:
         param = names.get(index)
-        if param is None or isinstance(value, tuple) or isinstance(value, str):
+        if param is None or isinstance(value, str):
+            continue
+        if isinstance(value, tuple):
+            # A value that differs by scene: its first scene's, then each scene where it differs.
+            if every:
+                continue
+            first = catalog.to_display(block.model, index, value[0])
+            others = [f"{'ABCDEFGH'[scene]} {catalog.to_display(block.model, index, item):.3g}"
+                      for scene, item in enumerate(value) if abs(item - value[0]) > .006]
+            if others:
+                found[param.name] = f"{first:.3g} ({', '.join(others)})"
             continue
         if not every and index in defaults and abs(defaults[index] - value) < .006:
             continue
@@ -172,7 +182,8 @@ def describe(chain, *, every=False):
         parts = []
         for column, block in row.blocks:
             shown = settings(block, every=every)
-            text = block.name + (" (" + ", ".join(f"{key} {value:g}" for key, value in list(shown.items())[:8]) + ")"
+            text = block.name + (" (" + ", ".join(f"{key} {value:g}" if isinstance(value, float) else f"{key} {value}"
+                                                  for key, value in list(shown.items())[:8]) + ")"
                                  if shown else "")
             if block.bypass is True:
                 text += " [off]"
