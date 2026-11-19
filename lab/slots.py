@@ -125,7 +125,9 @@ class Slots:
         index = self.index()
         taken = {entry["position"]: key for key, entry in index.items()}
         for position in CACHE_SLOTS:
-            if position not in taken and not self.held(self.tone_lab_slot(position)):
+            held = self.held(self.tone_lab_slot(position))
+            # Empty, or holding a chain the app cached and has since lost track of.
+            if position not in taken and (not held or held.startswith(CACHE_PREFIX)):
                 return self.tone_lab_slot(position)
         oldest = min(index, key=lambda key: index[key]["used"], default=None)
         if oldest is None:

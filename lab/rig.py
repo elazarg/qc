@@ -1,7 +1,8 @@
 """Putting a chain on the unit so that it can be heard, without ever building it twice.
 
-`Rig.ready(chain)` returns a slot holding the chain. If a chain with the same
-digest was built before, it is recalled from the cache: 1 to 3 s. Otherwise
+`Rig.ready(chain)` returns a slot holding the chain. The cache is keyed by the
+chain's digest, and a recalled slot is checked against the chain itself. If a
+chain with the same digest was built before, it is recalled from the cache: 1 to 3 s. Otherwise
 it is assembled in the build slot and stored in the cache: 11 to 17 s, once.
 
 A cached chain is stored with its inputs disconnected and its outputs as
@@ -13,7 +14,7 @@ or at the wrong level is ever heard.
 from dataclasses import replace
 
 from . import catalog
-from .chain import Chain, Row, SILENT
+from .chain import differences
 from .slots import BUILD, BUILD_NAME, cache_name
 from .unit import Mismatch
 
@@ -36,7 +37,7 @@ class Rig:
         if slot is not None:
             self.unit.slot = None
             held = self.unit.recall(slot)
-            if held.digest() == digest:
+            if not differences(held, held_silent(chain)):
                 self.unit.slot = slot
                 self.slots.touch(digest)
                 return slot, held
@@ -53,8 +54,9 @@ class Rig:
         target = self.slots.place_for(digest)
         self.slots.claim(target, cache_name(digest))
         held = self.unit.store(target, cache_name(digest))
-        if held.digest() != digest:
-            raise Mismatch("The stored chain did not match what was asked for.")
+        wrong = differences(held, held_silent(chain))
+        if wrong:
+            raise Mismatch("The stored chain did not match what was asked for: " + "; ".join(wrong[:3]))
         self.slots.remember(digest, target)
         return target, held
 

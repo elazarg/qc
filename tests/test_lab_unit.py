@@ -7,7 +7,7 @@ import unittest
 from qc_mcp import leveling
 
 from lab import catalog
-from lab.chain import Block, Chain, Row, from_preset, plan_structure
+from lab.chain import Block, Chain, Row, differences, from_preset, plan_structure
 from lab.rig import Rig
 from lab.sim import FACTORY, MY_PRESETS, TONE_LAB, SimUnit
 from lab.slots import BUILD, CACHE_SLOTS, NotOurs, Slots
@@ -64,7 +64,7 @@ class ChainTest(unittest.TestCase):
         self.assertEqual(len(gain), 8)
         self.assertAlmostEqual(catalog.to_display(RECTIFIER, 0, gain[1]), 6.5, places=1)
         self.assertEqual(held.block(0, 5).bypass[:2], (True, False))
-        self.assertEqual(held.digest(), lead_and_rhythm().digest())
+        self.assertEqual(differences(held, lead_and_rhythm()), [])
         # The chain survives being written down and read again.
         self.assertEqual(Chain.from_record(held.to_record()).digest(), held.digest())
 

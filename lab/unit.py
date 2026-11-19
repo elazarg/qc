@@ -144,8 +144,9 @@ class Unit:
         self.device.write_preset_file(slot["folder_key"], slot["position"], name)
         self.until(lambda: same_slot(self.position(), slot), "the saved preset selected")
         stored = self.recall(slot)
-        if stored.digest() != built.digest():
-            raise Mismatch("The saved preset did not match what was built.")
+        wrong = differences(stored, built)
+        if wrong:
+            raise Mismatch("The saved preset did not match what was built: " + "; ".join(wrong[:3]))
         self.slot = slot
         return stored
 

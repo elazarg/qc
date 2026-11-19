@@ -189,20 +189,24 @@ class Chain:
 
         Each block is taken with every catalog parameter, unset ones at their
         defaults, and without the extra value the unit stores; a split's mixer
-        likewise. So a design and the same chain read back from the unit agree.
+        likewise.
         """
         def block(found):
             info = found.info
             known = len(info.params) if info else len(found.params)
-            # A parameter the catalog gives no default starts at 0 on the unit.
-            values = {**{index: 0. for index in range(known)}, **catalog.defaults(found.model), **found.values}
+            # A parameter the catalog gives no default (a microphone's name, for one) counts only when set.
+            # The unit fills those in itself, so a design and its readback can differ there: compare a
+            # design with what was built by `differences`, which ignores what the design leaves unset.
+            values = {**catalog.defaults(found.model), **found.values}
             return {"model": found.model, "params": [[i, values[i]] for i in sorted(values) if i < known],
                     "bypass": found.bypass}
 
         mixer_defaults = catalog.defaults(catalog.MIXER)
+        mixer_size = len(catalog.model(catalog.MIXER).params)
         return {"rows": [{"cells": [None if found is None else block(found) for found in row.cells],
                           "split": row.split,
-                          "mixer": sorted({**mixer_defaults, **dict(row.mixer)}.items()) if row.split else []}
+                          "mixer": sorted((i, v) for i, v in {**mixer_defaults, **dict(row.mixer)}.items()
+                                          if i < mixer_size) if row.split else []}
                          for row in self.rows]}
 
     def digest(self):
