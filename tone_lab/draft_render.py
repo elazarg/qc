@@ -7,9 +7,9 @@ from queue import Empty
 import time
 
 import numpy as np
-from qc_mcp import catalog, protocol
+from qc_mcp import protocol
 
-from . import audio, device, diagnostics, iterate, preset_design, presets, qc_library, session, styles
+from . import audio, device, diagnostics, iterate, measured, models as catalog, preset_design, presets, qc_library, session, styles
 
 
 WORK_SLOT = {**iterate.SCRATCH, "position": 255}
@@ -18,6 +18,28 @@ LEGACY_WORK_NAME = "Tone Lab Vai"
 OUTPUT_GAIN = 16005
 PREVIEW_GAIN = -12.
 ASSET_LOADERS = {29001, 14000, 14001}
+MIXER = 11000
+MIXER_PAN_A, MIXER_LEVEL_B, MIXER_PAN_B, MIXER_PHASE = 1, 2, 3, 4
+
+
+class Chain(list):
+    """The first row of the grid by column, as (model id, settings). An empty cell has model id 0.
+
+    A draft with a second path or with scenes carries them here as well, so code
+    that knows a single row of blocks keeps working on it.
+    """
+
+    side = ()  # The second row by column, in the same form.
+    split = None  # (column of the split, column of the mix)
+    mixer = ()  # [(parameter index, display value)]
+    scenes = ()  # Scene names. Empty for a draft that is one sound.
+    varied = {}  # (row, column, parameter index) -> {scene: display value}
+    off = {}  # (row, column) -> the scenes in which the block is bypassed
+    assets = None  # column -> asset on the first row
+
+
+def rows_of(chain):
+    return (chain, getattr(chain, "side", ()))
 
 
 def my_presets(qc):
@@ -47,7 +69,9 @@ def name_preview_slot(qc, scratch):
 
 
 def label_preview(qc, scene, draft):
-    """Put the logical draft name on the active temporary scene."""
+    """Put the logical draft name on the active temporary scene. A draft with scenes has its own labels."""
+    if draft.get("scenes"):
+        return
     if device.live_position(qc) == WORK_SLOT:
         try:
             qc.set_scene_label(scene, preset_design.preset_name(draft["name"]))
@@ -85,17 +109,56 @@ def working_grid(qc, visited=()):
 def compile_chain(draft, gain):
     recipe = preset_design.validate(draft)
     models = preset_design.choices()
-    chain = []
-    for block in recipe["chain"]:
-        model_id = block["model_id"]
-        controls = models[model_id]["controls"] if model_id in models else {}
-        settings = [(controls[setting["name"]][0], setting["value"]) for setting in block["settings"]]
-        chain.append((model_id, settings))
+    (upper, lower), split = preset_design.layout(recipe)
+    chain = Chain()
+    chain.varied, chain.off, chain.assets = {}, {}, {}
+
+    def cells(row, blocks):
+        placed = []
+        for column, block in enumerate(blocks):
+            if block is None:
+                placed.append((0, []))
+                continue
+            model_id = block["model_id"]
+            controls = models[model_id]["controls"] if model_id in models else {}
+            twins = models[model_id]["twins"] if model_id in models else {}
+            settings = [(index, setting["value"]) for setting in block["settings"]
+                        for index in (controls[setting["name"]][0], *twins.get(setting["name"], ()))]
+            for item in block.get("scene_settings", ()):
+                for index in (controls[item["name"]][0], *twins.get(item["name"], ())):
+                    chain.varied.setdefault((row, column, index), {})[item["scene"]] = item["value"]
+            if block.get("off_in_scenes"):
+                chain.off[row, column] = frozenset(block["off_in_scenes"])
+            if asset := preset_design.asset_attachment(block):
+                chain.assets[column] = asset
+            placed.append((model_id, settings))
+        return placed
+
+    chain.extend(cells(0, upper))
     chain.append((OUTPUT_GAIN, [(0, gain)]))
+    chain.side, chain.split = cells(1, lower), split
+    if split:
+        blend = recipe["blend"]
+        # Two amps of opposite polarity cancel each other when blended, so the mixer turns one path over.
+        paths = [[block["model_id"] for block in row[split[0]:split[1]] if block] for row in (upper, lower)]
+        chain.mixer = [(MIXER_PAN_A, 5 - blend["spread"] / 20), (MIXER_LEVEL_B, blend["level"]),
+                       (MIXER_PAN_B, 5 + blend["spread"] / 20), (MIXER_PHASE, float(measured.opposed(*paths)))]
+    chain.scenes = tuple(recipe.get("scenes", ()))
     return chain
 
 
+def scene_value(chain, row, column, index, scene):
+    """The display value a scene-varying control has in one scene."""
+    per_scene = chain.varied[row, column, index]
+    if scene in per_scene:
+        return per_scene[scene]
+    model_id, settings = rows_of(chain)[row][column]
+    return dict(settings).get(index, float(catalog.lookup(model_id)["params"][index]["default"]))
+
+
 def _attachments(chain, draft):
+    if getattr(chain, "assets", None) is not None:
+        return chain.assets
     needed = {column for column, (model, _) in enumerate(chain) if model in ASSET_LOADERS}
     if not needed:
         return {}
@@ -123,31 +186,96 @@ def _confirm_assets(qc, assets):
 def assert_grid(qc, chain, routing, draft=None, *, edits=None, scene=0):
     assets = _attachments(chain, draft)
     grid = device.read_preset(qc)
-    expected = [[model_id for model_id, _ in chain], [], [], []]
+    rows = rows_of(chain)
+    expected = [[model_id for model_id, _ in cells if model_id] for cells in rows] + [[], []]
     actual = [[model.hash for model in row.models if model.hash] for row in grid.chains]
     if actual != expected or iterate.routes(grid) != routing:
         raise RuntimeError("The Quad Cortex did not confirm the draft blocks and routing.")
+    split = getattr(chain, "split", None)
+    if split and [(point.split, point.mix) for point in grid.chains[0].split_control_points] != [tuple(split)]:
+        raise RuntimeError("The Quad Cortex did not confirm where the draft's two paths part and join.")
     edits = edits or {}
-    for column, (model_id, settings) in enumerate(chain):
-        block = grid.chains[0].models[column]
-        if column in assets and not qc_library.asset_matches(block, assets[column]):
-            raise RuntimeError(f"The Quad Cortex did not confirm the asset binding for {assets[column].name}.")
-        expected_values = dict(settings)
-        expected_values.update({index: edit["to"] for (row, col, index), edit in edits.items()
-                                if row == 0 and col == column and index is not None})
-        for index, display in expected_values.items():
-            raw = catalog.to_norm(model_id, index, display)
-            parameter = block.params[index]
-            selected = scene if parameter.scene_mode else 0
-            values = parameter.param_values
-            if selected >= len(values) or abs(values[selected].float_value - raw) > .006:
-                raise RuntimeError(f"The Quad Cortex did not confirm a setting on {catalog.lookup(model_id)['name']}.")
-        if (change := edits.get((0, column, None))) is not None:
-            bypass = grid.bypass[0].colBypass[column]
-            selected = scene if bypass.sceneMode else 0
-            if selected >= len(bypass.sceneBypass) or bypass.sceneBypass[selected].bypass != change["to"]:
-                raise RuntimeError("The Quad Cortex did not confirm the draft's bypass change.")
+    varied, off = getattr(chain, "varied", {}), getattr(chain, "off", {})
+    for row, cells in enumerate(rows):
+        for column, (model_id, settings) in enumerate(cells):
+            if not model_id:
+                continue
+            block = grid.chains[row].models[column]
+            if row == 0 and column in assets and not qc_library.asset_matches(block, assets[column]):
+                raise RuntimeError(f"The Quad Cortex did not confirm the asset binding for {assets[column].name}.")
+            expected_values = dict(settings)
+            expected_values.update({index: scene_value(chain, row, column, index, scene)
+                                    for (at_row, at_column, index) in varied if (at_row, at_column) == (row, column)})
+            expected_values.update({index: edit["to"] for (at_row, at_column, index), edit in edits.items()
+                                    if (at_row, at_column) == (row, column) and index is not None})
+            for index, display in expected_values.items():
+                raw = catalog.to_norm(model_id, index, display)
+                parameter = block.params[index]
+                selected = scene if parameter.scene_mode else 0
+                values = parameter.param_values
+                if (selected >= len(values) or abs(values[selected].float_value - raw) > .006
+                        or (row, column, index) in varied and not parameter.scene_mode):
+                    raise RuntimeError(
+                        f"The Quad Cortex did not confirm a setting on {catalog.lookup(model_id)['name']}.")
+            wanted = scene in off[row, column] if (row, column) in off else None
+            if (change := edits.get((row, column, None))) is not None:
+                wanted = change["to"]
+            if wanted is not None:
+                bypass = grid.bypass[row].colBypass[column]
+                selected = scene if bypass.sceneMode else 0
+                if selected >= len(bypass.sceneBypass) or bypass.sceneBypass[selected].bypass != wanted:
+                    raise RuntimeError("The Quad Cortex did not confirm which blocks are on in this scene.")
     return grid
+
+
+def _build_scenes(qc, chain):
+    """Give each scene its own values, bypasses and name. Ends on the first scene."""
+    names = getattr(chain, "scenes", ())
+    if not names:
+        return
+    grid = device.read_preset(qc)
+    for row, column, index in chain.varied:
+        qc.assign_param_to_scenes(row, column, index)
+        time.sleep(.05)
+    for row, column in chain.off:
+        # A block's bypass is the control one past its last readable one.
+        qc.assign_param_to_scenes(row, column, len(grid.chains[row].models[column].params))
+        time.sleep(.05)
+    for scene, name in enumerate(names):
+        # A plain write lands on whichever scene is active, so each switch is confirmed first.
+        device.select_scene(qc, scene)
+        if device.live_position(qc) != WORK_SLOT:
+            raise RuntimeError("The selected preset changed while the draft's scenes were being built.")
+        for (row, column, index), per_scene in chain.varied.items():
+            if scene in per_scene:
+                model_id = rows_of(chain)[row][column][0]
+                qc.set_param(row, column, index, catalog.to_norm(model_id, index, per_scene[scene]))
+                time.sleep(.07)
+        for (row, column), scenes in chain.off.items():
+            if scene in scenes:
+                qc.set_block_bypass(row, column, True)
+                time.sleep(.07)
+        qc.set_scene_label(scene, name)
+        time.sleep(.07)
+    device.select_scene(qc, 0)
+    time.sleep(.3)
+    grid = device.read_preset(qc)
+    if list(grid.scene_labels)[:len(names)] != list(names):
+        raise RuntimeError("The Quad Cortex did not confirm the draft's scene names.")
+    for (row, column, index) in chain.varied:
+        parameter = grid.chains[row].models[column].params[index]
+        model_id = rows_of(chain)[row][column][0]
+        for scene in range(len(names)):
+            raw = catalog.to_norm(model_id, index, scene_value(chain, row, column, index, scene))
+            if (not parameter.scene_mode or scene >= len(parameter.param_values)
+                    or abs(parameter.param_values[scene].float_value - raw) > .006):
+                raise RuntimeError(f"The Quad Cortex did not confirm scene {device.SCENES[scene]} on "
+                                   f"{catalog.lookup(model_id)['name']}.")
+    for (row, column), scenes in chain.off.items():
+        bypass = grid.bypass[row].colBypass[column]
+        flags = [entry.bypass for entry in bypass.sceneBypass][:len(names)]
+        if not bypass.sceneMode or flags != [scene in scenes for scene in range(len(names))]:
+            raise RuntimeError("The Quad Cortex did not confirm which blocks are on in each scene.")
 
 
 def build_grid(qc, scratch, chain, draft=None):
@@ -168,19 +296,43 @@ def build_grid(qc, scratch, chain, draft=None):
     cleared = device.read_preset(qc)
     if any(model.hash for row in cleared.chains for model in row.models):
         raise RuntimeError("The temporary Quad Cortex grid did not clear.")
-    for column, (model_id, settings) in enumerate(chain):
-        if device.live_position(qc) != WORK_SLOT:
-            raise RuntimeError("The selected preset changed while the draft was being built.")
-        if column in assets:
-            qc_library.add_asset(qc, assets[column], 0, column)
-        else:
-            qc.add_block(model_id, row=0, column=column)
-        time.sleep(.10)
-        for index, value in settings:
-            qc.set_param(0, column, index, catalog.to_norm(model_id, index, value))
-            time.sleep(.07)
+    split = getattr(chain, "split", None)
+    for row, cells in enumerate(rows_of(chain)):
+        if row == 1 and split:
+            # The second row carries sound only between the split and the mix, so they are set before it is filled.
+            qc.set_split_points(0, *split)
+            time.sleep(.25)
+        for column, (model_id, settings) in enumerate(cells):
+            if not model_id:
+                continue
+            if device.live_position(qc) != WORK_SLOT:
+                raise RuntimeError("The selected preset changed while the draft was being built.")
+            if row == 0 and column in assets:
+                qc_library.add_asset(qc, assets[column], 0, column)
+            else:
+                qc.add_block(model_id, row=row, column=column)
+            time.sleep(.10)
+            for index, value in settings:
+                qc.set_param(row, column, index, catalog.to_norm(model_id, index, value))
+                time.sleep(.07)
+    for index, value in getattr(chain, "mixer", ()):
+        qc.set_lane_param(0, "mixer", index, catalog.to_norm(MIXER, index, value))
+        time.sleep(.07)
     time.sleep(.40)
-    return assert_grid(qc, chain, iterate.USB_ROUTES, draft)
+    placed = device.read_preset(qc)
+    for row, cells in enumerate(rows_of(chain)):
+        for column, (model_id, _) in enumerate(cells):
+            if model_id and placed.chains[row].models[column].hash != model_id:
+                # The unit refuses a block silently when its processors or delay memory are full.
+                raise RuntimeError(f"The Quad Cortex has no processing power left for "
+                                   f"{catalog.lookup(model_id)['name']}. Remove a block or choose a lighter one.")
+    _build_scenes(qc, chain)
+    grid = assert_grid(qc, chain, iterate.USB_ROUTES, draft)
+    mixer = grid.chains[0].mixer[0].params if split and grid.chains[0].mixer else ()
+    for index, value in getattr(chain, "mixer", ()):
+        if index >= len(mixer) or abs(mixer[index].param_values[0].float_value - catalog.to_norm(MIXER, index, value)) > .006:
+            raise RuntimeError("The Quad Cortex did not confirm the blend of the draft's two paths.")
+    return grid
 
 
 def guitar_routes(physical_input):
@@ -259,7 +411,7 @@ def _shape(qc, base, values, scene=None):
     return live.update(qc, base, scene, values, {}, position=WORK_SLOT) if values else {}, scene
 
 
-def hear(draft, take, *, values=None):
+def hear(draft, take, *, values=None, scene=None):
     take = Path(take)
     values = clean_values(values)
     info, selection, dry, wet = iterate.take_audio(take)
@@ -272,8 +424,8 @@ def hear(draft, take, *, values=None):
         offset = iterate.calibration_offset(qc)
         with working_grid(qc) as scratch:
             base = build_grid(qc, scratch, chain, draft)
-            edits, scene = _shape(qc, base, values)
-            if edits:
+            edits, scene = _shape(qc, base, values, scene)
+            if edits or scene:
                 assert_grid(qc, chain, iterate.USB_ROUTES, draft, edits=edits, scene=scene)
             samples = audio.reamp(dry)[offset:offset + len(dry)].copy()
             if samples.shape != wet.shape:

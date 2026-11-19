@@ -1,0 +1,1689 @@
+{
+  "meta": {
+    "generated": "2026-11-18",
+    "scope": "Quad Cortex catalog sections: Guitar Overdrive (46 models, ids 1-52), Compressor, Delay, Modulation, Reverb, plus technique rules covering gates, wah, pitch, post-EQ and stereo.",
+    "settings_convention": "Role settings use QC parameter names and ranges from qc-catalog.txt (mostly 0..10). basis='cited' means the source states the setting or its direction (e.g. 'drive at zero, level up'); the exact number may be a conversion (clock positions: 7 o'clock=0, noon=5, 5 o'clock=10). basis='typical' means a conventional starting point for that role, not a quoted value. Switch values are descriptive strings because the QC switch encoding is not in the catalog.",
+    "source_notes": [
+      "www.electrosmash.com did not resolve during this research; circuit numbers were read from the mirror at electrosmash.mas-effects.com (same articles).",
+      "wiki.fractalaudio.com returned HTTP 403, so no Fractal wiki drive-model notes are included.",
+      "Neural DSP plugin manuals name almost no real pedals; where 'real' is empty for a plugin pedal the resemblance is not documented.",
+      "Entries tagged 'unsourced-character' describe community consensus that was not confirmed against a fetched page."
+    ]
+  },
+  "drives": [
+    {
+      "id": 1,
+      "name": "Myth Drive",
+      "real": "Klon Centaur",
+      "plugin": "",
+      "type": "transparent_clean_blend",
+      "signature": "Clean path blended with Ge hard-clipped path; gain peaks ~1 kHz (mid hump); treble shelf from ~408 Hz (+18/-8 dB); 18 V rail headroom.",
+      "controls": {
+        "GAIN": {"does": "Dual-gang pot: raises the clipped signal while lowering the clean feed-forward blend, so low GAIN is mostly clean boost.", "brighter": ""},
+        "TREBLE": {"does": "Active high shelf above ~400 Hz, about +18 dB to -8 dB; noon is roughly flat.", "brighter": "up"},
+        "LEVEL": {"does": "Output volume (labelled OUTPUT on the pedal); the main control when used as a boost.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "always_on_sweetener", "settings": {"GAIN": 2, "TREBLE": 5, "LEVEL": 6}, "into": ["edge-of-breakup amps", "clean amps"], "basis": "typical", "source": "https://en.wikipedia.org/wiki/Klon_Centaur"},
+        {"role": "lead_boost", "settings": {"GAIN": 4, "TREBLE": 5.5, "LEVEL": 7}, "into": ["crunch amps"], "basis": "typical", "source": "https://en.wikipedia.org/wiki/Klon_Centaur"},
+        {"role": "tight_boost", "settings": {"GAIN": 0, "TREBLE": 6, "LEVEL": 8}, "into": ["high-gain amps"], "basis": "typical", "source": "https://neuraldsp.com/articles/how-to-use-an-overdrive-pedal"}
+      ],
+      "pairs_with": ["fender_clean", "vox", "marshall_plexi", "dumble", "edge_of_breakup"],
+      "watch_out": "Designed to work with an amp's own overdrive, not as the only dirt on a sterile clean amp; it cuts far less bass than a TS, so it tightens high-gain amps less.",
+      "tags": ["boost", "transparent", "clean blend", "mid hump 1 kHz"],
+      "sources": ["https://electrosmash.mas-effects.com/klon-centaur-analysis", "https://www.musicradar.com/how-to/the-fx-files-klon-centaur", "https://en.wikipedia.org/wiki/Klon_Centaur", "https://neuraldsp.com/device-list"]
+    },
+    {
+      "id": 2,
+      "name": "Obsessive Drive",
+      "real": "Fulltone OCD",
+      "plugin": "",
+      "type": "hard_clip_mosfet_overdrive",
+      "signature": "MOSFET clipping, amp-like and full-range with big low end; PEAK HP adds drive, bottom and upper mids, LP stays closer to guitar/amp tone.",
+      "controls": {
+        "PEAK": {"does": "HP/LP = High Peak/Low Peak (not high-pass/low-pass). HP: more drive, volume, bottom and upper-mid emphasis. LP: flatter, closer to the bypassed tone.", "brighter": ""},
+        "TONE": {"does": "Treble roll-off; one source says the PEAK switch also moves its shelving frequency.", "brighter": "up"},
+        "DRIVE": {"does": "Gain; wide range from clean-ish push to distortion.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "standalone_dirt", "settings": {"DRIVE": 4, "TONE": 5, "VOLUME": 6}, "into": ["clean amps at edge of breakup"], "basis": "cited", "source": "https://www.guitarchalk.com/fulltone-ocd-obsessive-compulsive-drive-settings/"},
+        {"role": "british_crunch_on_clean_amp", "settings": {"PEAK": "HP", "DRIVE": 6, "VOLUME": 3}, "into": ["clean amps", "fender_clean"], "basis": "cited", "source": "https://www.guitarchalk.com/fulltone-ocd-obsessive-compulsive-drive-settings/"},
+        {"role": "blues_rhythm", "settings": {"PEAK": "LP", "DRIVE": 3, "VOLUME": 4}, "into": ["clean amps"], "basis": "cited", "source": "https://www.guitarchalk.com/fulltone-ocd-obsessive-compulsive-drive-settings/"}
+      ],
+      "pairs_with": ["fender_clean", "vox", "marshall_plexi", "edge_of_breakup"],
+      "watch_out": "Full low end and high output: as a boost into a high-gain amp it adds bass and flub instead of tightening; HP mode is a volume jump versus LP.",
+      "tags": ["overdrive", "amp-like", "standalone", "full range"],
+      "sources": ["https://www.musicradar.com/how-to/the-fx-files-fulltone-ocd", "https://www.guitarchalk.com/fulltone-ocd-obsessive-compulsive-drive-settings/", "https://neuraldsp.com/device-list"]
+    },
+    {
+      "id": 3,
+      "name": "OD250",
+      "real": "DOD Overdrive Preamp 250",
+      "plugin": "",
+      "type": "hard_clip_distortion",
+      "signature": "Op-amp gain into diodes to ground, no tone control; in the near-identical Distortion+ the bass corner climbs to ~720 Hz at max gain.",
+      "controls": {
+        "GAIN": {"does": "Op-amp gain; raising it also raises the bass roll-off corner (3 Hz at minimum to ~720 Hz at maximum in the sister MXR Distortion+ circuit), so more gain = thinner lows.", "brighter": "up"},
+        "VOLUME": {"does": "Output level; high output makes it a strong amp pusher.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "tight_boost", "settings": {"GAIN": 2, "VOLUME": 8}, "into": ["cranked Marshall-style amps", "crunch amps"], "basis": "typical", "source": "https://neuraldsp.com/articles/how-to-use-an-overdrive-pedal"},
+        {"role": "standalone_dirt", "settings": {"GAIN": 6, "VOLUME": 5}, "into": ["clean amps"], "basis": "typical", "source": "https://electrosmash.mas-effects.com/mxr-distortion-plus-analysis"}
+      ],
+      "pairs_with": ["marshall_plexi", "marshall_jcm800", "edge_of_breakup"],
+      "watch_out": "No tone control and the lows thin out as GAIN rises; raspy into bright clean amps. Circuit numbers come from the MXR Distortion+ analysis (the 250 differs mainly in silicon diodes and a few values).",
+      "tags": ["distortion", "boost", "no tone control", "hard clip"],
+      "sources": ["https://electrosmash.mas-effects.com/mxr-distortion-plus-analysis", "https://barbarach.com/mxr-distortion-plus-on-breadboard/", "https://www.harmonycentral.com/forums/topic/1501541-dod-250-vs-mxr-distortion/", "https://neuraldsp.com/device-list"]
+    },
+    {
+      "id": 4,
+      "name": "Rodent Drive",
+      "real": "ProCo RAT",
+      "plugin": "",
+      "type": "hard_clip_distortion",
+      "signature": "Op-amp gain to 67 dB, lows below ~1.5 kHz get less gain, Si hard clip, slow LM308 softens highs; FILTER low-pass 475 Hz-32 kHz.",
+      "controls": {
+        "FILTER": {"does": "Passive low-pass after clipping, cutoff ~32 kHz down to ~475 Hz. WORKS BACKWARDS: turning up cuts treble.", "brighter": "down"},
+        "DISTORTION": {"does": "Gain 0 to ~67 dB; low = overdrive, above about two-thirds = thick fuzz-like saturation.", "brighter": ""},
+        "VOLUME": {"does": "Passive output level.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "standalone_dirt", "settings": {"DISTORTION": 5, "FILTER": 4, "VOLUME": 5}, "into": ["clean amps", "edge-of-breakup amps"], "basis": "typical", "source": "https://en.wikipedia.org/wiki/Pro_Co_RAT"},
+        {"role": "low_gain_overdrive", "settings": {"DISTORTION": 2, "FILTER": 3, "VOLUME": 7}, "into": ["clean amps"], "basis": "typical", "source": "https://en.wikipedia.org/wiki/Pro_Co_RAT"},
+        {"role": "fuzzy_wall", "settings": {"DISTORTION": 9, "FILTER": 5, "VOLUME": 5}, "into": ["clean amps"], "basis": "typical", "source": "https://www.guitarworld.com/features/19-ways-to-get-more-from-your-drive-pedals"}
+      ],
+      "pairs_with": ["fender_clean", "vox", "marshall_plexi", "roland_jc"],
+      "watch_out": "FILTER is reversed versus every other tone knob (up = darker); any software 'brighter' move must decrease it. Fully up it is extremely dark.",
+      "tags": ["distortion", "hard clip", "reversed tone", "grunge", "alt rock"],
+      "sources": ["https://electrosmash.mas-effects.com/proco-rat", "https://en.wikipedia.org/wiki/Pro_Co_RAT", "https://neuraldsp.com/device-list"]
+    },
+    {
+      "id": 5,
+      "name": "Green 808",
+      "real": "Ibanez TS808",
+      "plugin": "",
+      "type": "soft_clip_mid_hump",
+      "signature": "Lows below 720 Hz get less gain, 723 Hz low-pass after clipping: mid hump around 720 Hz; soft symmetric clip, gain 12x-118x.",
+      "controls": {
+        "OVERDRIVE": {"does": "Clipping-stage gain 12x to 118x (41 dB); even at 0 the pedal still has gain and its bass cut/mid hump.", "brighter": ""},
+        "TONE": {"does": "Active treble control after a fixed 723 Hz low-pass; at maximum it restores highs above ~3.2 kHz, at minimum it removes treble.", "brighter": "up"},
+        "LEVEL": {"does": "Output volume; the control that pushes the amp when used as a boost.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "tight_boost", "settings": {"OVERDRIVE": 0, "TONE": 5.5, "LEVEL": 9}, "into": ["high-gain amps"], "basis": "cited", "source": "https://neuraldsp.com/articles/how-to-use-an-overdrive-pedal"},
+        {"role": "lead_boost", "settings": {"OVERDRIVE": 3, "TONE": 6, "LEVEL": 7}, "into": ["crunch amps", "high-gain amps"], "basis": "typical", "source": "https://neuraldsp.com/articles/how-to-use-an-overdrive-pedal"},
+        {"role": "standalone_dirt", "settings": {"OVERDRIVE": 6, "TONE": 5, "LEVEL": 5}, "into": ["edge-of-breakup amps"], "basis": "typical", "source": "https://neuraldsp.com/articles/how-to-use-an-overdrive-pedal"}
+      ],
+      "pairs_with": ["mesa_rectifier", "5150", "marshall_jcm800", "fender_blackface", "high_gain_modern"],
+      "watch_out": "Cuts lows and adds 700-800 Hz honk: thin and nasal alone into a clean amp, and too much midrange on an amp that is already mid-heavy or tight.",
+      "tags": ["boost", "mid hump", "tightener", "soft clip"],
+      "sources": ["https://electrosmash.mas-effects.com/tube-screamer-analysis", "https://premierguitar.com/articles/27607-tone-tips-ask-doctor-pete-seeking-clarity", "https://www.premierguitar.com/features/artist-features/converges-kurt-ballou-heavy-by-design", "https://neuraldsp.com/device-list"]
+    },
+    {
+      "id": 6,
+      "name": "Exotic",
+      "real": "Xotic BB Preamp",
+      "plugin": "",
+      "type": "overdrive_preamp_2band",
+      "signature": "RC Booster core plus clipping diodes and fixed TS-style mid voicing; active bass/treble boost-cut; most gain of the Xotic trio.",
+      "controls": {
+        "BASS": {"does": "Active (Baxandall) low boost/cut; 5 is flat.", "brighter": ""},
+        "TREBLE": {"does": "Active (Baxandall) high boost/cut; 5 is flat.", "brighter": "up"},
+        "GAIN": {"does": "Slightly dirty to heavily overdriven; compresses as it rises.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "lead_boost", "settings": {"GAIN": 4, "BASS": 5, "TREBLE": 5, "VOLUME": 6}, "into": ["crunch amps", "edge-of-breakup amps"], "basis": "typical", "source": "https://aionfx.com/project/perelandra-boost-overdrive/"},
+        {"role": "standalone_dirt", "settings": {"GAIN": 6, "BASS": 5, "TREBLE": 5, "VOLUME": 5}, "into": ["clean amps"], "basis": "typical", "source": "https://aionfx.com/project/perelandra-boost-overdrive/"},
+        {"role": "tight_boost", "settings": {"GAIN": 1, "BASS": 3, "TREBLE": 6, "VOLUME": 8}, "into": ["high-gain amps"], "basis": "typical", "source": "https://neuraldsp.com/articles/how-to-use-an-overdrive-pedal"}
+      ],
+      "pairs_with": ["marshall_plexi", "fender_clean", "edge_of_breakup"],
+      "watch_out": "BASS above noon into a dirty amp adds flub; the EQ is boost/cut, so 'neutral' is 5, not 0.",
+      "tags": ["overdrive", "preamp", "2-band EQ", "lead"],
+      "sources": ["https://aionfx.com/project/perelandra-boost-overdrive/", "https://forum.orangeamps.com/viewtopic.php?t=20415", "https://neuraldsp.com/device-list"]
+    },
+    {
+      "id": 8,
+      "name": "Freeman BOD",
+      "real": "Friedman BE-OD",
+      "plugin": "",
+      "type": "amp_in_a_box_high_gain",
+      "signature": "Friedman BE-style cascaded high-gain preamp distortion; TIGHT cuts bass before clipping; bass/treble/presence EQ; very high output.",
+      "controls": {
+        "TIGHT": {"does": "Bass cut at the first gain stage, before clipping; up = tighter, less low end into the distortion (forum reading of the schematic).", "brighter": ""},
+        "TRIM": {"does": "Model of the pedal's internal gain trimmer: sets the overall gain range, from vintage-ish to extreme. Owners report running it low (about 8:30-9 o'clock).", "brighter": ""},
+        "PRESENCE": {"does": "Upper-treble cut-through; raise for clarity in a band mix.", "brighter": "up"},
+        "BASS": {"does": "Post-distortion low end; interacts with TIGHT.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "standalone_dirt", "settings": {"GAIN": 4, "BASS": 5, "TREBLE": 5, "PRESENCE": 6, "TIGHT": 6, "VOLUME": 4}, "into": ["clean amps", "power amp / clean platform"], "basis": "typical", "source": "https://www.guitarchalk.com/friedman-be-od-deluxe-settings/"}
+      ],
+      "pairs_with": ["fender_clean", "hiwatt", "clean_platform"],
+      "watch_out": "It is a complete high-gain preamp: into an already distorted amp it becomes noisy, fizzy and over-compressed. Keep TRIM and GAIN low and gate it.",
+      "tags": ["distortion", "amp-in-a-box", "high gain", "standalone"],
+      "sources": ["https://www.guitarchalk.com/friedman-be-od-deluxe-settings/", "https://www.thegearpage.net/board/index.php?threads/post-your-friedman-be-od-settings.1748355/", "https://neuraldsp.com/device-list"]
+    },
+    {
+      "id": 9,
+      "name": "Brit Blues",
+      "real": "Marshall BluesBreaker (pedal)",
+      "plugin": "",
+      "type": "transparent_soft_clip_low_gain",
+      "signature": "Low-gain op-amp soft clipping with an open, un-humped midrange and a low gain ceiling; drive comes on gradually.",
+      "controls": {
+        "GAIN": {"does": "Low overall range; even high settings stay in light-overdrive territory.", "brighter": ""},
+        "TONE": {"does": "Single treble control (no 3-band EQ like the Guv'nor).", "brighter": "up"}
+      },
+      "roles": [
+        {"role": "always_on_sweetener", "settings": {"GAIN": 3, "TONE": 5, "VOLUME": 7}, "into": ["clean amps", "edge-of-breakup amps"], "basis": "typical", "source": "https://guitar.com/reviews/effects-pedal/marshall-bluesbreaker-review/"},
+        {"role": "stack_base", "settings": {"GAIN": 4, "TONE": 5, "VOLUME": 6}, "into": ["another overdrive", "edge-of-breakup amps"], "basis": "typical", "source": "https://neuraldsp.com/articles/how-to-use-an-overdrive-pedal"}
+      ],
+      "pairs_with": ["fender_clean", "vox", "edge_of_breakup"],
+      "watch_out": "Low gain and no real bass cut: it will not tighten a high-gain amp and cannot reshape mids.",
+      "tags": ["overdrive", "transparent", "low gain", "blues"],
+      "sources": ["https://guitar.com/reviews/effects-pedal/marshall-bluesbreaker-review/", "https://en.wikipedia.org/wiki/Marshall_Bluesbreaker", "https://neuraldsp.com/device-list"]
+    },
+    {
+      "id": 10,
+      "name": "Chief DS1",
+      "real": "BOSS DS-1",
+      "plugin": "",
+      "type": "hard_clip_distortion",
+      "signature": "Transistor booster (35 dB) + op-amp (to 26.5 dB) into Si hard clip; Muff-style tone tilts LP 234 Hz / HP 1063 Hz around a ~500 Hz scoop.",
+      "controls": {
+        "TONE": {"does": "Blends a 234 Hz low-pass against a 1063 Hz high-pass; mids are scooped around 500 Hz at noon. Up = treble side.", "brighter": "up"},
+        "DISTORTION": {"does": "Op-amp gain 0 to 26.5 dB on top of a fixed transistor boost; bass corner rises to ~72 Hz at maximum.", "brighter": ""},
+        "LEVEL": {"does": "Output; the circuit loses level internally, so it usually sits well above noon.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "standalone_dirt", "settings": {"DISTORTION": 5, "TONE": 4, "LEVEL": 6}, "into": ["clean amps"], "basis": "typical", "source": "https://electrosmash.mas-effects.com/boss-ds1-analysis.html"},
+        {"role": "amp_pusher", "settings": {"DISTORTION": 2, "TONE": 4, "LEVEL": 8}, "into": ["crunch amps", "marshall-style amps"], "basis": "typical", "source": "https://neuraldsp.com/articles/how-to-use-an-overdrive-pedal"}
+      ],
+      "pairs_with": ["marshall_jcm800", "marshall_plexi", "fender_clean"],
+      "watch_out": "Scooped around 500 Hz and fizzy above noon TONE, so it can vanish in a band mix into a clean amp; it is the opposite EQ shape to a Tube Screamer.",
+      "tags": ["distortion", "hard clip", "mid scoop"],
+      "sources": ["https://electrosmash.mas-effects.com/boss-ds1-analysis.html", "https://www.musicradar.com/how-to/the-fx-files-boss-ds-1", "https://neuraldsp.com/device-list"]
+    },
+    {
+      "id": 11,
+      "name": "Brit Governor",
+      "real": "Marshall Guv'nor",
+      "plugin": "",
+      "type": "amp_in_a_box_distortion",
+      "signature": "LED hard clipping (~1.8-2 V, high headroom), ~70 dB total gain, 723 Hz pre-clip high-pass, Marshall-style interactive 3-band stack.",
+      "controls": {
+        "MID": {"does": "FMV-style stack: almost every setting leaves a scoop between 1 and 3 kHz, so MID usually needs to be up.", "brighter": ""},
+        "BASS": {"does": "Passive, interactive with MID and TREBLE.", "brighter": ""},
+        "TREBLE": {"does": "Passive, interactive.", "brighter": "up"}
+      },
+      "roles": [
+        {"role": "standalone_dirt", "settings": {"GAIN": 5, "BASS": 5, "MID": 6, "TREBLE": 5, "LEVEL": 5}, "into": ["clean amps"], "basis": "typical", "source": "https://electrosmash.mas-effects.com/marshall-guvnor-analysis"}
+      ],
+      "pairs_with": ["fender_clean", "clean_platform", "roland_jc"],
+      "watch_out": "The tone stack is interactive and scooped by default; in front of an already Marshall-voiced dirty amp the voicing doubles up and turns harsh.",
+      "tags": ["distortion", "amp-in-a-box", "marshall voice", "3-band EQ"],
+      "sources": ["https://electrosmash.mas-effects.com/marshall-guvnor-analysis", "https://neuraldsp.com/device-list"]
+    },
+    {
+      "id": 12,
+      "name": "Chief MT",
+      "real": "BOSS MT-2 Metal Zone",
+      "plugin": "",
+      "type": "high_gain_distortion",
+      "signature": "Dual-stage high gain with seven filters pre/post; active LOW/HIGH +/-15 dB and a +/-15 dB MIDDLE sweepable 200 Hz-5 kHz.",
+      "controls": {
+        "MIDFREQ": {"does": "Sweeps the MIDDLE band from 200 Hz to 5 kHz; behaves almost like a global voicing control.", "brighter": ""},
+        "MIDDLE": {"does": "+/-15 dB at MIDFREQ; 5 is flat.", "brighter": ""},
+        "LOW": {"does": "Active +/-15 dB; 5 is flat.", "brighter": ""},
+        "HIGH": {"does": "Active shelving +/-15 dB; rolling back removes fizz but too far removes upper mids.", "brighter": "up"}
+      },
+      "roles": [
+        {"role": "standalone_metal", "settings": {"DIST": 4, "LOW": 5, "MIDDLE": 5, "MIDFREQ": 5, "HIGH": 4, "LEVEL": 5}, "into": ["clean amps"], "basis": "typical", "source": "https://en.wikipedia.org/wiki/Boss_MT-2"},
+        {"role": "preamp_into_power_amp", "settings": {}, "into": ["power amp / FX return"], "basis": "cited", "source": "https://en.wikipedia.org/wiki/Boss_MT-2"}
+      ],
+      "pairs_with": ["clean_platform", "fender_clean", "roland_jc"],
+      "watch_out": "EQ range is +/-15 dB, so move in small steps from 5; maxed DIST and HIGH is the notorious 'buzzing bees' tone. Start with lower gain than seems necessary.",
+      "tags": ["distortion", "metal", "parametric mid", "standalone"],
+      "sources": ["https://en.wikipedia.org/wiki/Boss_MT-2", "https://neuraldsp.com/device-list"]
+    },
+    {
+      "id": 13,
+      "name": "Chief OD1",
+      "real": "BOSS OD-1",
+      "plugin": "",
+      "type": "soft_clip_mid_hump",
+      "signature": "The original asymmetric soft-clipping overdrive (ancestor of TS and SD-1); no tone control; more bass roll-off than the SD-1.",
+      "controls": {
+        "GAIN": {"does": "Overdrive amount; no tone control exists, so voicing is fixed.", "brighter": ""},
+        "LEVEL": {"does": "Output volume.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "tight_boost", "settings": {"GAIN": 0, "LEVEL": 9}, "into": ["high-gain amps", "crunch amps"], "basis": "typical", "source": "https://neuraldsp.com/articles/how-to-use-an-overdrive-pedal"},
+        {"role": "edge_of_breakup_push", "settings": {"GAIN": 4, "LEVEL": 6}, "into": ["edge-of-breakup amps"], "basis": "typical", "source": "https://en.wikipedia.org/wiki/Boss_SD-1"}
+      ],
+      "pairs_with": ["marshall_jcm800", "marshall_plexi", "5150"],
+      "watch_out": "No tone control: if the boosted tone is too dark or too nasal the only fix is amp EQ or another pedal.",
+      "tags": ["boost", "mid hump", "no tone control", "soft clip"],
+      "sources": ["https://en.wikipedia.org/wiki/Boss_SD-1", "https://neuraldsp.com/device-list"]
+    },
+    {
+      "id": 14,
+      "name": "Chief SD1",
+      "real": "BOSS SD-1",
+      "plugin": "",
+      "type": "soft_clip_mid_hump",
+      "signature": "Asymmetric soft clipping (2 diodes one side, 1 the other); midrange focus ~800 Hz; less bass roll-off than OD-1/TS, so fuller.",
+      "controls": {
+        "TONE": {"does": "Treble control added over the OD-1.", "brighter": "up"},
+        "OVERDRIVE": {"does": "Gain; set high it adds grit in front of an already-overdriven amp.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "tight_boost", "settings": {"OVERDRIVE": 0, "TONE": 5, "LEVEL": 10}, "into": ["high-gain amps", "marshall_jcm800"], "basis": "typical", "source": "https://neuraldsp.com/articles/how-to-use-an-overdrive-pedal"},
+        {"role": "more_gain_for_crunch_amp", "settings": {"OVERDRIVE": 6, "TONE": 5, "LEVEL": 6}, "into": ["already-overdriven Marshall-style amps"], "basis": "cited", "source": "https://en.wikipedia.org/wiki/Boss_SD-1"}
+      ],
+      "pairs_with": ["marshall_jcm800", "5150", "marshall_plexi"],
+      "watch_out": "Fuller lows than a Tube Screamer, so on an already boomy amp it tightens less.",
+      "tags": ["boost", "mid hump 800 Hz", "asymmetric", "metal boost"],
+      "sources": ["https://en.wikipedia.org/wiki/Boss_SD-1", "https://neuraldsp.com/device-list"]
+    },
+    {
+      "id": 15,
+      "name": "Fuzz Pi",
+      "real": "Electro-Harmonix Big Muff Pi",
+      "plugin": "",
+      "type": "fuzz",
+      "signature": "Booster + two cascaded diode-clipping stages; tone blends LP/HP around a ~1 kHz notch (about -13.5 dB total at noon); huge sustain.",
+      "controls": {
+        "TONE": {"does": "Single pot blending a low-pass and a high-pass: down = bass side, up = treble side, mids scooped around 1 kHz in the middle. It can never be flat.", "brighter": "up"},
+        "SUSTAIN": {"does": "Level into the clipping stages (gain); high settings hold saturation even from a weak signal.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "standalone_fuzz_wall", "settings": {"SUSTAIN": 7, "TONE": 5, "VOLUME": 6}, "into": ["clean high-headroom amps"], "basis": "typical", "source": "https://electrosmash.mas-effects.com/big-muff-pi-analysis"},
+        {"role": "sustaining_lead", "settings": {"SUSTAIN": 6, "TONE": 4.5, "VOLUME": 6}, "into": ["clean high-headroom amps"], "basis": "typical", "source": "https://electrosmash.mas-effects.com/big-muff-pi-analysis"}
+      ],
+      "pairs_with": ["hiwatt", "fender_clean", "clean_platform"],
+      "watch_out": "Scooped at ~1 kHz, so it disappears in a band mix; into a distorted amp it turns to mush. Pair it with a mid-forward stage (e.g. a TS) rather than more gain.",
+      "tags": ["fuzz", "mid scoop", "sustain", "standalone"],
+      "sources": ["https://electrosmash.mas-effects.com/big-muff-pi-analysis", "https://www.guitarworld.com/features/19-ways-to-get-more-from-your-drive-pedals", "https://neuraldsp.com/device-list"]
+    },
+    {
+      "id": 18,
+      "name": "Chief BD2",
+      "real": "BOSS BD-2 Blues Driver",
+      "plugin": "",
+      "type": "overdrive_full_range",
+      "signature": "Bright, full-range, touch-sensitive overdrive without a pronounced mid hump; cleans up with picking and guitar volume (community consensus).",
+      "controls": {
+        "TONE": {"does": "Treble control.", "brighter": "up"},
+        "GAIN": {"does": "Clean-ish boost at low settings through crunchy overdrive.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "edge_of_breakup_push", "settings": {"GAIN": 3, "TONE": 4, "VOLUME": 6}, "into": ["clean amps", "edge-of-breakup amps"], "basis": "typical", "source": ""},
+        {"role": "standalone_dirt", "settings": {"GAIN": 6, "TONE": 4, "VOLUME": 5}, "into": ["clean amps"], "basis": "typical", "source": ""}
+      ],
+      "pairs_with": ["fender_clean", "vox", "edge_of_breakup"],
+      "watch_out": "No circuit source was fetched for this model; the usual complaint is brightness/harshness with TONE above noon into a bright amp.",
+      "tags": ["overdrive", "full range", "bright", "unsourced-character"],
+      "sources": ["https://neuraldsp.com/device-list"]
+    },
+    {
+      "id": 21,
+      "name": "Rage Booster",
+      "real": "Dallas Rangemaster Treble Booster",
+      "plugin": "",
+      "type": "treble_booster",
+      "signature": "Single germanium transistor, up to 38 dB gain; 5 nF input cap high-passes at ~2.6 kHz so only treble gets full gain; soft clipping.",
+      "controls": {
+        "VOLUME": {"does": "The only control: amount of boost (and, near maximum, soft clipping). There is no tone control; the treble emphasis is fixed.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "push_dirty_amp", "settings": {"VOLUME": 8}, "into": ["already-overdriven British amps (AC30, JTM45, Plexi)"], "basis": "cited", "source": "https://electrosmash.mas-effects.com/dallas-rangemaster"}
+      ],
+      "pairs_with": ["vox", "marshall_jtm45", "marshall_plexi"],
+      "watch_out": "Built to cut the mud from a dark, already-overdriven tube amp; into a clean or bright amp it is thin and shrill. Low input impedance (~10-12 k) means it belongs first in the chain.",
+      "tags": ["treble booster", "germanium", "single knob", "classic rock"],
+      "sources": ["https://electrosmash.mas-effects.com/dallas-rangemaster", "https://en.wikipedia.org/wiki/Dallas_Rangemaster_Treble_Booster", "https://neuraldsp.com/device-list"]
+    },
+    {
+      "id": 22,
+      "name": "Facial Fuzz",
+      "real": "Dunlop Fuzz Face",
+      "plugin": "",
+      "type": "fuzz",
+      "signature": "Two-transistor feedback fuzz; very low input impedance (~5-8 kOhm) loads the pickups, which is why guitar volume cleans it up.",
+      "controls": {
+        "FUZZ": {"does": "Sets second-stage emitter degeneration/feedback: more = more gain and harder clipping. Conventionally run at or near maximum, with the guitar volume used to clean up.", "brighter": ""},
+        "VOLUME": {"does": "Output level; the real circuit has little output gain and lower settings thin the bass.", "brighter": ""},
+        "PICKUP": {"does": "Not documented by Neural DSP. Presumably a pickup-loading simulation for the low-impedance input (unverified).", "brighter": ""},
+        "PICKUP LEVEL": {"does": "Not documented by Neural DSP (unverified; possibly the simulated guitar-volume/pickup level feeding the fuzz).", "brighter": ""}
+      },
+      "roles": [
+        {"role": "standalone_fuzz", "settings": {"FUZZ": 10, "VOLUME": 6}, "into": ["edge-of-breakup amps", "marshall-style amps"], "basis": "typical", "source": "https://electrosmash.mas-effects.com/fuzz-face.html"}
+      ],
+      "pairs_with": ["marshall_plexi", "fender_bassman", "edge_of_breakup"],
+      "watch_out": "Must be first: a buffer, wah or any pedal in front changes it for the worse (low input impedance). PICKUP / PICKUP LEVEL are undocumented, so software should leave them at defaults.",
+      "tags": ["fuzz", "vintage", "first in chain", "volume-knob cleanup"],
+      "sources": ["https://electrosmash.mas-effects.com/fuzz-face.html", "https://www.thegearpage.net/board/index.php?threads/low-input-impedance-pedals-fuzz-face-rangemaster.2063712/", "https://neuraldsp.com/device-list"]
+    },
+    {
+      "id": 23,
+      "name": "Exotic Z Boost",
+      "real": "Xotic RC Booster",
+      "plugin": "",
+      "type": "clean_boost",
+      "signature": "Clean boost / low-gain preamp with active bass and treble; 'clean to slightly dirty'; BB Preamp core without the clipping diodes.",
+      "controls": {
+        "BASS": {"does": "Active low boost/cut; 5 is flat. Cut it to tighten.", "brighter": ""},
+        "TREBLE": {"does": "Active high boost/cut; 5 is flat.", "brighter": "up"},
+        "GAIN": {"does": "Clean to slightly dirty.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "always_on_sweetener", "settings": {"GAIN": 3, "BASS": 5, "TREBLE": 5.5, "VOLUME": 6}, "into": ["clean amps", "edge-of-breakup amps"], "basis": "typical", "source": "https://forum.orangeamps.com/viewtopic.php?t=20415"},
+        {"role": "tight_boost", "settings": {"GAIN": 2, "BASS": 3, "TREBLE": 6, "VOLUME": 8}, "into": ["high-gain amps", "mesa_rectifier"], "basis": "typical", "source": "https://boogieforum.com/threads/xotic-rc-booster-the-od-pedal-alternative-for-rectos.52975/"},
+        {"role": "lead_boost", "settings": {"GAIN": 3, "BASS": 5, "TREBLE": 5, "VOLUME": 8}, "into": ["crunch amps"], "basis": "typical", "source": "https://forum.orangeamps.com/viewtopic.php?t=20415"}
+      ],
+      "pairs_with": ["fender_clean", "mesa_rectifier", "vox", "edge_of_breakup"],
+      "watch_out": "Flat and full-range: it only tightens a high-gain amp if BASS is turned down; BASS above noon adds flub.",
+      "tags": ["clean boost", "2-band EQ", "transparent"],
+      "sources": ["https://forum.orangeamps.com/viewtopic.php?t=20415", "https://boogieforum.com/threads/xotic-rc-booster-the-od-pedal-alternative-for-rectos.52975/", "https://neuraldsp.com/device-list"]
+    },
+    {
+      "id": 24,
+      "name": "Red Drive",
+      "real": "Keeley Red Dirt",
+      "plugin": "",
+      "type": "soft_clip_mid_hump",
+      "signature": "Modded TS9-family overdrive with a FET input stage and Lo/Hi gain modes; TS mid voicing with more range.",
+      "controls": {
+        "MODE": {"does": "Lo/Hi gain. Lo: thicker with more midrange. Hi: fatter with more gain range.", "brighter": ""},
+        "TONE": {"does": "Treble-oriented tone control.", "brighter": "up"}
+      },
+      "roles": [
+        {"role": "tight_boost", "settings": {"MODE": "Lo", "DRIVE": 0, "TONE": 5.5, "LEVEL": 9}, "into": ["high-gain amps"], "basis": "typical", "source": "https://neuraldsp.com/articles/how-to-use-an-overdrive-pedal"},
+        {"role": "standalone_dirt", "settings": {"MODE": "Hi", "DRIVE": 6, "TONE": 5, "LEVEL": 5}, "into": ["clean amps", "edge-of-breakup amps"], "basis": "typical", "source": "https://www.bhphotovideo.com/c/product/1316820-REG/keeley_kred_u_red_dirt_overdrive_guitar.html"}
+      ],
+      "pairs_with": ["marshall_jcm800", "5150", "fender_clean", "mesa_rectifier"],
+      "watch_out": "Same family caveats as a Tube Screamer (bass cut, mid honk); Hi mode in front of a high-gain amp adds gain and noise rather than tightness.",
+      "tags": ["overdrive", "mid hump", "TS family", "two gain modes"],
+      "sources": ["https://www.bhphotovideo.com/c/product/1316820-REG/keeley_kred_u_red_dirt_overdrive_guitar.html", "https://www.gear4music.com/G4M/Keeley-Red-Dirt-Overdrive/6O2O", "https://neuraldsp.com/device-list"]
+    },
+    {
+      "id": 25,
+      "name": "Vemural Ray",
+      "real": "Vemuram Jan Ray",
+      "plugin": "",
+      "type": "transparent_soft_clip_low_gain",
+      "signature": "Low/medium-gain transparent overdrive voiced after blackface Fender 'Magic 6' tones; less compression and colour than a TS.",
+      "controls": {
+        "BASS": {"does": "Low-frequency control (direction on the model not verified).", "brighter": ""},
+        "TREBLE": {"does": "High-frequency control (direction on the model not verified).", "brighter": ""},
+        "GAIN": {"does": "Light breakup to medium overdrive with natural-feeling compression.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "always_on_sweetener", "settings": {"GAIN": 3, "BASS": 5, "TREBLE": 5, "LEVEL": 6}, "into": ["clean amps", "edge-of-breakup amps"], "basis": "typical", "source": "https://mixdownmag.com.au/reviews/guitars/vemuram-jan-ray/"}
+      ],
+      "pairs_with": ["fender_clean", "fender_blackface", "edge_of_breakup"],
+      "watch_out": "Low gain and uncompressed, so not a high-gain tightener; the real pedal's saturation trimmer is not exposed in the QC parameters.",
+      "tags": ["overdrive", "transparent", "low gain", "fender-style"],
+      "sources": ["https://mixdownmag.com.au/reviews/guitars/vemuram-jan-ray/", "https://delicious-audio.com/vemuram-jan-ray-overdrive/", "https://neuraldsp.com/device-list"]
+    },
+    {
+      "id": 26,
+      "name": "No-Bell OD1",
+      "real": "Nobels ODR-1",
+      "plugin": "",
+      "type": "soft_clip_balanced",
+      "signature": "'The other green overdrive': balanced EQ without the TS mid spike and bass cut; SPECTRUM raises highs and lower-mids together.",
+      "controls": {
+        "SPECTRUM": {"does": "Dual filter, not a simple tone knob: turning up boosts highs AND lower-mids at once; turning down cuts both, leaving a more midrange-forward sound.", "brighter": "up"},
+        "BASS CUT": {"does": "Trims the low end, which is otherwise prominent with humbuckers (added on later ODR-1 versions).", "brighter": ""},
+        "MUTE TRIG": {"does": "Internal trigger parameter; leave at default.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "standalone_dirt", "settings": {"DRIVE": 4, "SPECTRUM": 4, "LEVEL": 6}, "into": ["clean amps", "edge-of-breakup amps"], "basis": "typical", "source": "https://en.wikipedia.org/wiki/Nobels_ODR-1"},
+        {"role": "boost", "settings": {"DRIVE": 1, "SPECTRUM": 5, "LEVEL": 8, "BASS CUT": "on"}, "into": ["crunch amps", "high-gain amps"], "basis": "typical", "source": "https://en.wikipedia.org/wiki/Nobels_ODR-1"}
+      ],
+      "pairs_with": ["fender_clean", "vox", "marshall_plexi", "edge_of_breakup"],
+      "watch_out": "Full low end: without BASS CUT it gets boomy with humbuckers or in front of a dirty amp. SPECTRUM changes two bands at once.",
+      "tags": ["overdrive", "balanced EQ", "nashville", "session"],
+      "sources": ["https://en.wikipedia.org/wiki/Nobels_ODR-1", "https://neuraldsp.com/device-list"]
+    },
+    {
+      "id": 27,
+      "name": "Green 808",
+      "real": "Ibanez TS808",
+      "plugin": "",
+      "type": "soft_clip_mid_hump",
+      "signature": "Second catalog entry with the same name and parameters as id 5: bass cut below 720 Hz, mid hump ~720 Hz, soft clip.",
+      "controls": {
+        "OVERDRIVE": {"does": "Clipping-stage gain 12x to 118x; still coloured at 0.", "brighter": ""},
+        "TONE": {"does": "Active treble control after a fixed 723 Hz low-pass.", "brighter": "up"},
+        "LEVEL": {"does": "Output volume.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "tight_boost", "settings": {"OVERDRIVE": 0, "TONE": 5.5, "LEVEL": 9}, "into": ["high-gain amps"], "basis": "cited", "source": "https://neuraldsp.com/articles/how-to-use-an-overdrive-pedal"},
+        {"role": "lead_boost", "settings": {"OVERDRIVE": 3, "TONE": 6, "LEVEL": 7}, "into": ["crunch amps", "high-gain amps"], "basis": "typical", "source": "https://neuraldsp.com/articles/how-to-use-an-overdrive-pedal"},
+        {"role": "standalone_dirt", "settings": {"OVERDRIVE": 6, "TONE": 5, "LEVEL": 5}, "into": ["edge-of-breakup amps"], "basis": "typical", "source": "https://neuraldsp.com/articles/how-to-use-an-overdrive-pedal"}
+      ],
+      "pairs_with": ["mesa_rectifier", "5150", "marshall_jcm800", "fender_blackface", "high_gain_modern"],
+      "watch_out": "Duplicate of id 5 in the catalog (which one is current is not documented); same honk/thin-lows caveats.",
+      "tags": ["boost", "mid hump", "tightener", "duplicate id"],
+      "sources": ["https://electrosmash.mas-effects.com/tube-screamer-analysis", "https://neuraldsp.com/device-list"]
+    },
+    {
+      "id": 28,
+      "name": "Thunderpaw",
+      "real": "Mr. Black ThunderClaw",
+      "plugin": "",
+      "type": "high_gain_distortion",
+      "signature": "High-gain distortion with active bass and treble cut/boost and a wide gain range (very little to a lot).",
+      "controls": {
+        "BASS": {"does": "Active low cut/boost; start at 5.", "brighter": ""},
+        "TREBLE": {"does": "Active high cut/boost; start at 5.", "brighter": "up"},
+        "USE GATE": {"does": "QC-side gate switch; the hardware pedal's documentation found does not mention a gate.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "standalone_metal", "settings": {"DISTORTION": 5, "BASS": 5, "TREBLE": 5, "OUTPUT": 5}, "into": ["clean amps"], "basis": "typical", "source": "https://www.andertons.co.uk/mr-black-thunderclaw-distortion-pedal/"}
+      ],
+      "pairs_with": ["clean_platform", "fender_clean"],
+      "watch_out": "A distortion, not a boost: stacking it into a dirty amp multiplies noise. EQ is active boost/cut, so 5 is neutral.",
+      "tags": ["distortion", "high gain", "active EQ"],
+      "sources": ["https://www.andertons.co.uk/mr-black-thunderclaw-distortion-pedal/", "https://www.perfectcircuit.com/mr-black-thunderclaw.html", "https://neuraldsp.com/device-list"]
+    },
+    {
+      "id": 29,
+      "name": "MK3 Silicon Fuzz",
+      "real": "JHS Bender 1973 London (Tone Bender MKIII-style)",
+      "plugin": "",
+      "type": "fuzz",
+      "signature": "Silicon take on the 1973 Sola Sound Tone Bender MKIII: three-transistor-style fuzz with a tone sweep; smoother and thicker than a Fuzz Face.",
+      "controls": {
+        "ATTACK": {"does": "The fuzz/distortion amount; more = more fuzz.", "brighter": ""},
+        "TONE": {"does": "Sweeps between dark and bright (which direction is brighter was not verified).", "brighter": ""},
+        "LEVEL": {"does": "Output volume.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "standalone_fuzz", "settings": {"ATTACK": 7, "TONE": 5, "LEVEL": 6}, "into": ["clean amps", "edge-of-breakup amps"], "basis": "typical", "source": "https://jhspedals.info/products/bender"}
+      ],
+      "pairs_with": ["marshall_plexi", "vox", "fender_clean"],
+      "watch_out": "TONE direction unverified; the hardware's 'JHS mode' (more gain plus mid boost) is not exposed. Treat like any fuzz: early in the chain, clean-ish amp.",
+      "tags": ["fuzz", "tone bender", "silicon", "vintage"],
+      "sources": ["https://jhspedals.info/products/bender", "https://en.wikipedia.org/wiki/Tone_Bender", "https://neuraldsp.com/device-list"]
+    },
+    {
+      "id": 30,
+      "name": "Plini Drive",
+      "real": "",
+      "plugin": "Archetype: Plini X",
+      "type": "overdrive_with_fuzz_mode",
+      "signature": "Plugin boost/overdrive 'for tighter rhythms and saturated lead'; MODE switches Overdrive to Fuzz for richer harmonic distortion.",
+      "controls": {
+        "MODE": {"does": "Two modes: Overdrive and Fuzz.", "brighter": ""},
+        "TONE": {"does": "High-frequency control.", "brighter": "up"}
+      },
+      "roles": [
+        {"role": "tight_boost", "settings": {"MODE": "Overdrive", "DRIVE": 0, "TONE": 5, "LEVEL": 8}, "into": ["Plini amps", "high-gain amps"], "basis": "typical", "source": "https://neuraldsp.com/plugins/archetype-plini"},
+        {"role": "lead_boost", "settings": {"MODE": "Overdrive", "DRIVE": 4, "TONE": 5, "LEVEL": 6}, "into": ["crunch amps", "lead amps"], "basis": "typical", "source": "https://neuraldsp.com/plugins/archetype-plini"}
+      ],
+      "pairs_with": ["plini_amps", "high_gain_modern"],
+      "watch_out": "No real pedal is named by Neural DSP. Fuzz mode adds harmonic distortion and is not a tightening boost.",
+      "tags": ["plugin", "boost", "overdrive", "fuzz mode"],
+      "sources": ["https://neuraldsp.com/plugins/archetype-plini", "https://downloads.neuraldsp.com/file/archetype-plini-x-installers/v_1.0.0/Archetype-Plini-X-v1.0.0.pdf"]
+    },
+    {
+      "id": 32,
+      "name": "Cory Wong The Tuber",
+      "real": "",
+      "plugin": "Archetype: Cory Wong X",
+      "type": "overdrive_boost",
+      "signature": "Neural: 'a modded classic; a booster loved by tube amp fanatics' (name implies a modded Tube Screamer-style circuit; not stated).",
+      "controls": {
+        "TONE": {"does": "High-frequency shaping.", "brighter": "up"},
+        "BASS": {"does": "Low-end control present on the QC model; not described in the plugin manual v1.0.0.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "always_on_sweetener", "settings": {"DRIVE": 2, "TONE": 5, "LEVEL": 6}, "into": ["clean amps"], "basis": "typical", "source": "https://neuraldsp.com/plugins/archetype-cory-wong"},
+        {"role": "tight_boost", "settings": {"DRIVE": 0, "TONE": 5, "LEVEL": 8}, "into": ["crunch amps", "high-gain amps"], "basis": "typical", "source": "https://neuraldsp.com/articles/how-to-use-an-overdrive-pedal"}
+      ],
+      "pairs_with": ["cory_wong_amps", "fender_clean", "clean_platform"],
+      "watch_out": "Resemblance to a real pedal is inferred from the name only; BASS is undocumented.",
+      "tags": ["plugin", "boost", "funk", "clean push"],
+      "sources": ["https://neuraldsp.com/plugins/archetype-cory-wong", "https://downloads.neuraldsp.com/file/archetype-cory-wong-x/Archetype%20Cory%20Wong%20X%20v1.0.0.pdf"]
+    },
+    {
+      "id": 33,
+      "name": "Cory Wong The Big Rig Overdrive",
+      "real": "",
+      "plugin": "Archetype: Cory Wong X",
+      "type": "high_gain_overdrive",
+      "signature": "Neural: 'a heavy and powerful overdrive pedal that pushes saturation to the beginnings of fuzz'.",
+      "controls": {
+        "TONE": {"does": "High-frequency shaping.", "brighter": "up"},
+        "DRIVE": {"does": "Gain, up to near-fuzz saturation.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "standalone_dirt", "settings": {"DRIVE": 5, "TONE": 5, "LEVEL": 5}, "into": ["clean amps"], "basis": "typical", "source": "https://neuraldsp.com/plugins/archetype-cory-wong"}
+      ],
+      "pairs_with": ["cory_wong_amps", "fender_clean", "clean_platform"],
+      "watch_out": "No real pedal named. Heavy saturation into a clean funk amp can swamp note definition; keep DRIVE moderate.",
+      "tags": ["plugin", "overdrive", "heavy", "near-fuzz"],
+      "sources": ["https://neuraldsp.com/plugins/archetype-cory-wong", "https://downloads.neuraldsp.com/file/archetype-cory-wong-x/Archetype%20Cory%20Wong%20X%20v1.0.0.pdf"]
+    },
+    {
+      "id": 34,
+      "name": "Nolly Overdrive-2",
+      "real": "",
+      "plugin": "Archetype: Nolly X",
+      "type": "overdrive_2band",
+      "signature": "Second 'overdrive/booster' in Archetype: Nolly with gain, bass and treble; a reviewer calls it thicker and beefier, for adding dirt.",
+      "controls": {
+        "BASS": {"does": "Low-frequency control.", "brighter": ""},
+        "TREBLE": {"does": "High-frequency control.", "brighter": "up"}
+      },
+      "roles": [
+        {"role": "standalone_dirt", "settings": {"GAIN": 5, "BASS": 5, "TREBLE": 5, "LEVEL": 5}, "into": ["clean amps", "crunch amps"], "basis": "typical", "source": "https://guitarnoodle.com/neural-dsp-archetype-nolly-review-guitarnoodle-com/"},
+        {"role": "stacked_after_overdrive_1", "settings": {}, "into": ["Nolly amps"], "basis": "cited", "source": "https://neuraldsp.com/articles/how-to-use-an-overdrive-pedal"}
+      ],
+      "pairs_with": ["nolly_amps", "clean_platform", "crunch_amps"],
+      "watch_out": "No real pedal named. In the plugin it sits after Overdrive-1 and Delay-1; stacking both drives with similar EQ can get muddy.",
+      "tags": ["plugin", "overdrive", "2-band EQ", "thick"],
+      "sources": ["https://downloads.neuraldsp.com/file/archetype-nolly-x-installers/Archetype%20Nolly%20X%20v1.0.0.pdf", "https://neuraldsp.com/plugins/archetype-nolly", "https://guitarnoodle.com/neural-dsp-archetype-nolly-review-guitarnoodle-com/"]
+    },
+    {
+      "id": 35,
+      "name": "Nolly Overdrive-1",
+      "real": "",
+      "plugin": "Archetype: Nolly X",
+      "type": "soft_clip_mid_hump",
+      "signature": "First 'overdrive/booster' in Archetype: Nolly; a reviewer calls it the usual green overdrive for tightening; adds a BRIGHT switch.",
+      "controls": {
+        "BRIGHT": {"does": "High-frequency boost for articulation and clarity. Nolly recommends leaving it on unless you want a particularly smooth character.", "brighter": "on"},
+        "TONE": {"does": "High-frequency shaping.", "brighter": "up"}
+      },
+      "roles": [
+        {"role": "tight_boost", "settings": {"DRIVE": 0, "TONE": 5, "LEVEL": 8, "BRIGHT": "on"}, "into": ["Nolly amps", "high-gain amps"], "basis": "typical", "source": "https://neuraldsp.com/plugins/archetype-nolly"}
+      ],
+      "pairs_with": ["nolly_amps", "high_gain_modern", "5150", "mesa_rectifier"],
+      "watch_out": "TS-style identity comes from a reviewer, not Neural DSP. With BRIGHT on plus a bright amp, fizz may need a lower TONE or a post low-pass.",
+      "tags": ["plugin", "boost", "tightener", "bright switch"],
+      "sources": ["https://downloads.neuraldsp.com/file/archetype-nolly-x-installers/Archetype%20Nolly%20X%20v1.0.0.pdf", "https://neuraldsp.com/plugins/archetype-nolly", "https://guitarnoodle.com/neural-dsp-archetype-nolly-review-guitarnoodle-com/"]
+    },
+    {
+      "id": 36,
+      "name": "Gojira DRT",
+      "real": "",
+      "plugin": "Archetype: Gojira X",
+      "type": "hard_clip_distortion",
+      "signature": "Plugin 'Distortion pedal' with DIST / FILTER / VOL, the RAT control layout; FILTER is a low-pass that darkens as it is raised.",
+      "controls": {
+        "FILTER": {"does": "Manual: 'Low-pass filter control. Increase to reduce the amount of high frequencies.' WORKS BACKWARDS.", "brighter": "down"},
+        "DIST": {"does": "Gain.", "brighter": ""},
+        "VOL": {"does": "Output level.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "standalone_dirt", "settings": {"DIST": 5, "FILTER": 4, "VOL": 5}, "into": ["clean amps", "crunch amps"], "basis": "typical", "source": "https://downloads.neuraldsp.com/file/archetype-gojira-x/Archetype%20Gojira%20X%20v1.0.0.pdf"},
+        {"role": "boost_into_high_gain", "settings": {"DIST": 1, "FILTER": 3, "VOL": 7}, "into": ["Gojira amps", "high-gain amps"], "basis": "typical", "source": "https://neuraldsp.com/articles/how-to-use-an-overdrive-pedal"}
+      ],
+      "pairs_with": ["gojira_amps", "high_gain_modern"],
+      "watch_out": "FILTER is reversed (up = darker), like the RAT. Neural DSP does not name a real pedal; the RAT resemblance is by control layout only.",
+      "tags": ["plugin", "distortion", "reversed tone", "metal"],
+      "sources": ["https://downloads.neuraldsp.com/file/archetype-gojira-x/Archetype%20Gojira%20X%20v1.0.0.pdf", "https://neuraldsp.com/plugins/archetype-gojira"]
+    },
+    {
+      "id": 37,
+      "name": "Gojira OD",
+      "real": "",
+      "plugin": "Archetype: Gojira X",
+      "type": "overdrive_boost",
+      "signature": "Plugin 'Overdrive pedal (OD)' with DIST / TONE / LEVEL, placed before the amps for boosting.",
+      "controls": {
+        "TONE": {"does": "High-frequency shaping.", "brighter": "up"},
+        "DIST": {"does": "Gain.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "tight_boost", "settings": {"DIST": 0, "TONE": 5, "LEVEL": 8}, "into": ["Gojira amps", "high-gain amps"], "basis": "typical", "source": "https://neuraldsp.com/articles/how-to-use-an-overdrive-pedal"}
+      ],
+      "pairs_with": ["gojira_amps", "high_gain_modern", "5150"],
+      "watch_out": "No real pedal or frequency behaviour is documented, so the amount of low cut is unknown; verify tightness by ear or measurement.",
+      "tags": ["plugin", "boost", "overdrive", "metal"],
+      "sources": ["https://downloads.neuraldsp.com/file/archetype-gojira-x/Archetype%20Gojira%20X%20v1.0.0.pdf", "https://neuraldsp.com/plugins/archetype-gojira"]
+    },
+    {
+      "id": 38,
+      "name": "SLO-100 Overdrive-2",
+      "real": "",
+      "plugin": "Soldano SLO-100 X",
+      "type": "overdrive",
+      "signature": "The 'overdrive (OD2)' of the Soldano suite; HI PEAK switch adds a hi-mid frequency boost.",
+      "controls": {
+        "HI PEAK": {"does": "Manual: activates/deactivates the hi-mid frequency boost.", "brighter": "on"},
+        "TONE": {"does": "High-frequency shaping.", "brighter": "up"}
+      },
+      "roles": [
+        {"role": "standalone_dirt", "settings": {"DRIVE": 5, "TONE": 5, "LEVEL": 5}, "into": ["SLO clean/crunch", "clean amps"], "basis": "typical", "source": "https://neuraldsp.com/plugins/soldano-slo-100"},
+        {"role": "lead_boost", "settings": {"DRIVE": 3, "TONE": 5, "LEVEL": 7, "HI PEAK": "on"}, "into": ["SLO crunch/overdrive"], "basis": "typical", "source": "https://neuraldsp.com/plugins/soldano-slo-100"}
+      ],
+      "pairs_with": ["soldano_slo", "marshall_plexi", "crunch_amps"],
+      "watch_out": "No real pedal named. HI PEAK plus a bright SLO channel can get harsh in the upper mids.",
+      "tags": ["plugin", "overdrive", "hi-mid switch"],
+      "sources": ["https://downloads.neuraldsp.com/file/soldano-slo-x/v_1.0.0/Soldano%20SLO-100%20X%20v1.0.0.pdf", "https://neuraldsp.com/plugins/soldano-slo-100"]
+    },
+    {
+      "id": 39,
+      "name": "SLO-100 Overdrive-1",
+      "real": "",
+      "plugin": "Soldano SLO-100 X",
+      "type": "overdrive_boost",
+      "signature": "The 'boost (OD1)' of the Soldano suite: drive/tone/level booster ahead of the amp.",
+      "controls": {
+        "TONE": {"does": "High-frequency shaping.", "brighter": "up"},
+        "BASS": {"does": "Low-end control present on the QC model; not described in the plugin manual v1.0.0.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "tight_boost", "settings": {"DRIVE": 0, "TONE": 5, "LEVEL": 8}, "into": ["SLO overdrive channel", "high-gain amps"], "basis": "typical", "source": "https://neuraldsp.com/plugins/soldano-slo-100"}
+      ],
+      "pairs_with": ["soldano_slo", "high_gain_modern"],
+      "watch_out": "No real pedal named and BASS is undocumented; do not assume TS-style low cut.",
+      "tags": ["plugin", "boost"],
+      "sources": ["https://downloads.neuraldsp.com/file/soldano-slo-x/v_1.0.0/Soldano%20SLO-100%20X%20v1.0.0.pdf", "https://neuraldsp.com/plugins/soldano-slo-100"]
+    },
+    {
+      "id": 40,
+      "name": "Fortin Grind",
+      "real": "Fortin Grind",
+      "plugin": "Fortin Nameless Suite X",
+      "type": "boost_fixed_eq",
+      "signature": "One-knob boost (marketed up to +20 dB) with fixed bass cut and upper-mid focus; 'adds clarity and articulation' ahead of high gain.",
+      "controls": {
+        "BOOST": {"does": "Single knob = output level of the boost (labelled GRIND in the plugin). The EQ curve is fixed.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "tight_boost", "settings": {"BOOST": 5}, "into": ["Fortin Nameless", "high-gain amps"], "basis": "typical", "source": "https://neuraldsp.com/plugins/fortin-nameless-suite"}
+      ],
+      "pairs_with": ["fortin_nameless", "5150", "high_gain_modern", "mesa_rectifier"],
+      "watch_out": "Cuts a lot of bass and is a character pedal, not a transparent boost; a hobbyist measurement found far less than the claimed +20 dB, so set BOOST by output level, not by a dB assumption.",
+      "tags": ["plugin", "boost", "single knob", "tightener", "metal"],
+      "sources": ["https://neuraldsp.com/plugins/fortin-nameless-suite", "https://downloads.neuraldsp.com/file/fortin-nameless-x/Fortin%20Nameless%20Suite%20X%20v1.0.0.pdf", "https://fortinamps.com/blogs/news/tighten-your-high-gain-tone-why-fortin-pedals-are-the-ultimate-modeling-amp-upgrade", "https://sevenstring.org/threads/fortin-grind-inbound-mid-boost.333444/", "https://khronscave.blogspot.com/2019/08/45-pedal-pandemonium-part-one-fortin.html"]
+    },
+    {
+      "id": 41,
+      "name": "Fortin Hexdrive",
+      "real": "Fortin Hexdrive",
+      "plugin": "Fortin Nameless Suite X",
+      "type": "overdrive_boost",
+      "signature": "Neural: 'an overdrive pedal with a higher output than most, with additional headroom and an irregular style of clipping'.",
+      "controls": {
+        "TONE": {"does": "High-frequency shaping.", "brighter": "up"},
+        "BASS": {"does": "Low-end control present on the QC model; not described in the plugin manual v1.0.0.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "tight_boost", "settings": {"DRIVE": 0, "TONE": 5, "LEVEL": 7}, "into": ["Fortin Nameless", "high-gain amps"], "basis": "typical", "source": "https://neuraldsp.com/plugins/fortin-nameless-suite"}
+      ],
+      "pairs_with": ["fortin_nameless", "5150", "high_gain_modern"],
+      "watch_out": "Higher output than most overdrives: LEVEL values that suit a TS will hit the amp harder here. BASS is undocumented.",
+      "tags": ["plugin", "boost", "overdrive", "high output", "metal"],
+      "sources": ["https://neuraldsp.com/plugins/fortin-nameless-suite", "https://downloads.neuraldsp.com/file/fortin-nameless-x/Fortin%20Nameless%20Suite%20X%20v1.0.0.pdf"]
+    },
+    {
+      "id": 42,
+      "name": "81 Creations Drive",
+      "real": "1981 Inventions DRV",
+      "plugin": "",
+      "type": "hard_clip_distortion",
+      "signature": "RAT-derived (1985 Whiteface starting point) drive with a fixed-level preamp and far less gain than a RAT; CUT is a treble-cut control.",
+      "controls": {
+        "CUT": {"does": "Treble cut: the further up, the more highs are removed. WORKS BACKWARDS. Interacts with DRV (acts differently at low and high gain).", "brighter": "down"},
+        "DRV": {"does": "Gain, in percent (0..100 %).", "brighter": ""},
+        "LEVEL": {"does": "The pedal's volume knob, in percent.", "brighter": ""},
+        "OUTPUT": {"does": "QC block output trim in dB (-60..12); not a pedal control. Keep at 0 dB unless level-matching.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "standalone_dirt", "settings": {"DRV": 50, "CUT": 40, "LEVEL": 50}, "into": ["clean amps", "edge-of-breakup amps"], "basis": "typical", "source": "https://guitar.com/reviews/effects-pedal/review-1981-inventions-drv/"},
+        {"role": "always_on_sweetener", "settings": {"DRV": 20, "CUT": 50, "LEVEL": 60}, "into": ["clean amps"], "basis": "typical", "source": "https://support.mixwave.com/help/1981-drv-user-guide"}
+      ],
+      "pairs_with": ["fender_clean", "vox", "edge_of_breakup", "marshall_plexi"],
+      "watch_out": "CUT is reversed (up = darker) and this is the only drive whose knobs are in percent with a separate dB OUTPUT; scale-sensitive code must special-case it.",
+      "tags": ["distortion", "RAT family", "reversed tone", "percent units"],
+      "sources": ["https://guitar.com/reviews/effects-pedal/review-1981-inventions-drv/", "https://support.mixwave.com/help/1981-drv-user-guide", "https://neuraldsp.com/device-list"]
+    },
+    {
+      "id": 43,
+      "name": "Petrucci Overdrive",
+      "real": "",
+      "plugin": "Archetype: Petrucci X",
+      "type": "overdrive_boost",
+      "signature": "Plugin overdrive pedal (tone/drive/level) ahead of the Petrucci amps; no real pedal or voicing documented.",
+      "controls": {
+        "TONE": {"does": "High-frequency shaping.", "brighter": "up"},
+        "MODE": {"does": "Present on the QC model; not described in the plugin manual v1.0.0.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "tight_boost", "settings": {"DRIVE": 0, "TONE": 5, "LEVEL": 8}, "into": ["Petrucci Rhythm/Lead", "high-gain amps"], "basis": "typical", "source": "https://neuraldsp.com/articles/how-to-use-an-overdrive-pedal"}
+      ],
+      "pairs_with": ["petrucci_amps", "mesa_mark", "high_gain_modern"],
+      "watch_out": "MODE is undocumented; leave it at default. Voicing unknown, so do not assume TS-style bass cut.",
+      "tags": ["plugin", "boost", "overdrive"],
+      "sources": ["https://downloads.neuraldsp.com/file/archetype-petrucci-x/Archetype%20Petrucci%20X%20v1.0.0.pdf", "https://neuraldsp.com/plugins/archetype-petrucci"]
+    },
+    {
+      "id": 44,
+      "name": "John Mayer Halfman OD",
+      "real": "Klon Centaur (John Mayer's own unit, per Neural DSP)",
+      "plugin": "Archetype: John Mayer X",
+      "type": "transparent_clean_blend",
+      "signature": "'A mid-gain overdrive pedal that pushes amplifiers harder while preserving their natural tone and response.' Klon-style gain/treble/level.",
+      "controls": {
+        "TREBLE": {"does": "Manual: clockwise for brightness, counter-clockwise for darkness.", "brighter": "up"},
+        "GAIN": {"does": "Signal level feeding the overdrive.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "always_on_sweetener", "settings": {"GAIN": 2, "TREBLE": 5, "LEVEL": 6}, "into": ["John Mayer amps", "clean and edge-of-breakup amps"], "basis": "typical", "source": "https://neuraldsp.com/manual/archetype-john-mayer-x"},
+        {"role": "stacked_with_tealbreaker", "settings": {}, "into": ["John Mayer amps"], "basis": "cited", "source": "https://neuraldsp.com/manual/archetype-john-mayer-x"}
+      ],
+      "pairs_with": ["john_mayer_amps", "fender_clean", "dumble", "edge_of_breakup"],
+      "watch_out": "Same family as Myth Drive (id 1): it pushes an amp rather than making all the dirt itself.",
+      "tags": ["plugin", "klon", "transparent", "blues"],
+      "sources": ["https://neuraldsp.com/manual/archetype-john-mayer-x", "https://neuraldsp.com/news/introducing-archetype-john-mayer-x"]
+    },
+    {
+      "id": 45,
+      "name": "John Mayer Justa Boost",
+      "real": "Keeley Katana (per Neural DSP press material)",
+      "plugin": "Archetype: John Mayer X",
+      "type": "clean_boost",
+      "signature": "Boost with two modes: a transparent clean boost and an overdriven boost; used as an always-on thickener for single coils.",
+      "controls": {
+        "BOOST": {"does": "Toggles between the clean boost and the overdrive-style boost mode.", "brighter": ""},
+        "VOLUME": {"does": "Amount of boost applied.", "brighter": ""},
+        "MUTE TRIG": {"does": "Internal trigger parameter; leave at default.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "always_on_sweetener", "settings": {"BOOST": "clean", "VOLUME": 4}, "into": ["John Mayer amps", "clean amps"], "basis": "typical", "source": "https://neuraldsp.com/manual/archetype-john-mayer-x"},
+        {"role": "lead_boost", "settings": {"BOOST": "clean", "VOLUME": 7}, "into": ["edge-of-breakup amps"], "basis": "typical", "source": "https://neuraldsp.com/manual/archetype-john-mayer-x"}
+      ],
+      "pairs_with": ["john_mayer_amps", "fender_clean", "dumble"],
+      "watch_out": "Full-range boost with no EQ: it raises bass as much as treble, so it will not tighten a high-gain amp.",
+      "tags": ["plugin", "clean boost", "always-on"],
+      "sources": ["https://neuraldsp.com/manual/archetype-john-mayer-x", "https://neuraldsp.com/news/introducing-archetype-john-mayer-x"]
+    },
+    {
+      "id": 46,
+      "name": "John Mayer Tealbreaker",
+      "real": "Marshall Bluesbreaker MK1 + Ibanez TS-10 (per Neural DSP press material)",
+      "plugin": "Archetype: John Mayer X",
+      "type": "dual_mode_overdrive",
+      "signature": "Dual-circuit overdrive: TS = smooth, mid-focused, rolls off lows; BB = balanced, clear, keeps the amp's character.",
+      "controls": {
+        "MODEL": {"does": "BB/TS switch between the two overdrive circuits.", "brighter": ""},
+        "TONE": {"does": "Manual: clockwise for brightness, counter-clockwise for darkness.", "brighter": "up"}
+      },
+      "roles": [
+        {"role": "singing_blues_lead", "settings": {"MODEL": "TS", "GAIN": 4, "TONE": 5, "LEVEL": 6}, "into": ["John Mayer amps", "edge-of-breakup amps"], "basis": "typical", "source": "https://neuraldsp.com/manual/archetype-john-mayer-x"},
+        {"role": "always_on_sweetener", "settings": {"MODEL": "BB", "GAIN": 3, "TONE": 5, "LEVEL": 6}, "into": ["clean amps", "edge-of-breakup amps"], "basis": "typical", "source": "https://neuraldsp.com/manual/archetype-john-mayer-x"},
+        {"role": "tight_boost", "settings": {"MODEL": "TS", "GAIN": 0, "TONE": 5.5, "LEVEL": 8}, "into": ["crunch amps", "high-gain amps"], "basis": "typical", "source": "https://neuraldsp.com/articles/how-to-use-an-overdrive-pedal"}
+      ],
+      "pairs_with": ["john_mayer_amps", "fender_clean", "dumble", "edge_of_breakup"],
+      "watch_out": "The two MODEL positions are different pedals: the same knob values do not transfer when the switch changes.",
+      "tags": ["plugin", "bluesbreaker", "tube screamer", "dual mode"],
+      "sources": ["https://neuraldsp.com/manual/archetype-john-mayer-x", "https://neuraldsp.com/news/introducing-archetype-john-mayer-x"]
+    },
+    {
+      "id": 47,
+      "name": "Rabea Colossus Fuzz",
+      "real": "",
+      "plugin": "Archetype: Rabea X",
+      "type": "fuzz",
+      "signature": "Two-circuit fuzz: 'the raw character of vintage fuzz with the tighter, more defined response of a modern design'; bass/treble EQ.",
+      "controls": {
+        "MODE": {"does": "Vintage / Modern circuit select.", "brighter": ""},
+        "BASS": {"does": "Low-frequency amount.", "brighter": ""},
+        "TREBLE": {"does": "High-frequency amount.", "brighter": "up"},
+        "MUTE TRIG": {"does": "Internal trigger parameter; leave at default.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "standalone_fuzz", "settings": {"MODE": "Modern", "FUZZ": 6, "BASS": 5, "TREBLE": 5, "LEVEL": 5}, "into": ["Rabea Clean", "clean amps"], "basis": "typical", "source": "https://neuraldsp.com/manual/archetype-rabea-x"}
+      ],
+      "pairs_with": ["rabea_amps", "clean_platform"],
+      "watch_out": "No real pedals named. Vintage mode is the looser one; into a high-gain amp either mode gets woolly.",
+      "tags": ["plugin", "fuzz", "dual mode", "doom"],
+      "sources": ["https://neuraldsp.com/manual/archetype-rabea-x"]
+    },
+    {
+      "id": 48,
+      "name": "Rabea Paragon Overdrive",
+      "real": "",
+      "plugin": "Archetype: Rabea X",
+      "type": "dual_mode_overdrive",
+      "signature": "Two circuits: vintage mode is a mid-focused overdrive; modern mode is 'more transparent and dynamic'; bass/treble EQ.",
+      "controls": {
+        "MODE": {"does": "Vintage (mid-focused) / Modern (transparent, dynamic).", "brighter": ""},
+        "BASS": {"does": "Low-frequency amount.", "brighter": ""},
+        "TREBLE": {"does": "High-frequency amount.", "brighter": "up"}
+      },
+      "roles": [
+        {"role": "tight_boost", "settings": {"MODE": "Vintage", "DRIVE": 0, "BASS": 4, "TREBLE": 5.5, "LEVEL": 8}, "into": ["Rabea Lead", "high-gain amps"], "basis": "typical", "source": "https://neuraldsp.com/manual/archetype-rabea-x"},
+        {"role": "always_on_sweetener", "settings": {"MODE": "Modern", "DRIVE": 3, "BASS": 5, "TREBLE": 5, "LEVEL": 6}, "into": ["Rabea Clean/Crunch", "edge-of-breakup amps"], "basis": "typical", "source": "https://neuraldsp.com/manual/archetype-rabea-x"}
+      ],
+      "pairs_with": ["rabea_amps", "high_gain_modern", "edge_of_breakup"],
+      "watch_out": "No real pedals named; choose MODE by role (Vintage for mid-push boosting, Modern for transparent drive).",
+      "tags": ["plugin", "overdrive", "dual mode"],
+      "sources": ["https://neuraldsp.com/manual/archetype-rabea-x"]
+    },
+    {
+      "id": 49,
+      "name": "Misha Chaos",
+      "real": "",
+      "plugin": "Archetype: Misha Mansoor X",
+      "type": "hard_clip_distortion_blend",
+      "signature": "Custom DIY pedal inspired by a classic Swedish-metal distortion (HM-2 'chainsaw' style), made to front high-gain amps; clean blend.",
+      "controls": {
+        "MIX": {"does": "Blends the distorted signal with the clean signal (0..10). There is no gain or tone control.", "brighter": ""},
+        "OUTPUT": {"does": "Output level in dB (-60..12).", "brighter": ""}
+      },
+      "roles": [
+        {"role": "chainsaw_layer_into_high_gain", "settings": {"MIX": 4, "OUTPUT": 0}, "into": ["Misha Rhythm", "high-gain amps"], "basis": "typical", "source": "https://neuraldsp.com/manual/archetype-misha-mansoor-x"}
+      ],
+      "pairs_with": ["misha_amps", "high_gain_modern", "5150"],
+      "watch_out": "Only two parameters and OUTPUT is in dB, not 0..10; high MIX into a high-gain amp is very noisy and saturated, so gate after it.",
+      "tags": ["plugin", "distortion", "HM-2 style", "blend", "death metal"],
+      "sources": ["https://neuraldsp.com/manual/archetype-misha-mansoor-x", "https://www.guitarworld.com/gear/plugins-apps/neural-dsp-archetype-misha-mansoor-x"]
+    },
+    {
+      "id": 50,
+      "name": "Horizon Devices Precision Drive",
+      "real": "Horizon Devices Precision Drive",
+      "plugin": "Archetype: Misha Mansoor X",
+      "type": "soft_clip_mid_hump_tight_boost",
+      "signature": "'Inspired by a well-known green pedal, modified for use as a boost with high-gain amps'; ATTACK sets low-end cut; built-in gate.",
+      "controls": {
+        "ATTACK": {"does": "Stepped (rotary) control for the amount of low frequencies: higher = tighter, more picking clarity; lower = more low-mid punch. Neural recommends a fairly high setting to tighten the amp.", "brighter": "up"},
+        "BRIGHT": {"does": "Brightness; turn up until the tone cuts. Intentionally strong and can get harsh at the top of its range on mid/low-gain tones.", "brighter": "up"},
+        "GATE": {"does": "Sensitivity of the built-in noise gate; 0 = gate fully bypassed. Low just removes noise; high gives a very tight, choppy stop.", "brighter": ""},
+        "DRIVE": {"does": "Overdrive amount; start at zero.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "tight_boost", "settings": {"DRIVE": 0, "VOLUME": 7.5, "GATE": 2}, "into": ["high-gain amps"], "basis": "cited", "source": "https://horizondevices.com/pages/faqs"}
+      ],
+      "pairs_with": ["misha_amps", "5150", "mesa_rectifier", "high_gain_modern", "extended_range_low_tunings"],
+      "watch_out": "ATTACK is a rotary switch, not a 0..10 knob; BRIGHT and ATTACK are set by ear after DRIVE/VOLUME. Cranked GATE chokes sustain; reviewers note fizzy edges when pushed.",
+      "tags": ["plugin", "boost", "tightener", "djent", "built-in gate", "rotary control"],
+      "sources": ["https://horizondevices.com/pages/faqs", "https://neuraldsp.com/manual/archetype-misha-mansoor-x", "https://www.guitarworld.com/gear/plugins-apps/neural-dsp-archetype-misha-mansoor-x"]
+    },
+    {
+      "id": 51,
+      "name": "Tim Henson Overdrive",
+      "real": "",
+      "plugin": "Archetype: Tim Henson X",
+      "type": "soft_clip_mid_hump",
+      "signature": "'Based on a classic overdrive circuit with a pronounced midrange character'; adds warmth, grit and saturation.",
+      "controls": {
+        "TONE": {"does": "High-frequency control.", "brighter": "up"},
+        "BASS": {"does": "Low-end control present on the QC model; not described in the plugin manual.", "brighter": ""}
+      },
+      "roles": [
+        {"role": "tight_boost", "settings": {"DRIVE": 0, "TONE": 5, "LEVEL": 8}, "into": ["Tim Henson Lead", "crunch and high-gain amps"], "basis": "typical", "source": "https://neuraldsp.com/manual/archetype-tim-henson-x"},
+        {"role": "lead_boost", "settings": {"DRIVE": 3, "TONE": 5.5, "LEVEL": 7}, "into": ["Tim Henson Crunch", "crunch amps"], "basis": "typical", "source": "https://neuraldsp.com/manual/archetype-tim-henson-x"}
+      ],
+      "pairs_with": ["tim_henson_amps", "crunch_amps", "high_gain_modern"],
+      "watch_out": "The 'classic circuit' is not named (TS-style is implied by the midrange description only); BASS is undocumented.",
+      "tags": ["plugin", "overdrive", "mid hump"],
+      "sources": ["https://neuraldsp.com/manual/archetype-tim-henson-x", "https://neuraldsp.com/plugins/archetype-tim-henson"]
+    },
+    {
+      "id": 52,
+      "name": "Tim Henson Boost",
+      "real": "",
+      "plugin": "Archetype: Tim Henson X",
+      "type": "clean_boost",
+      "signature": "'A transparent clean boost that increases gain without coloring your tone'; doubles as an overdrive; bass/treble EQ.",
+      "controls": {
+        "GAIN": {"does": "Input gain of the pedal.", "brighter": ""},
+        "BASS": {"does": "Low-frequency amount.", "brighter": ""},
+        "TREBLE": {"does": "High-frequency amount.", "brighter": "up"}
+      },
+      "roles": [
+        {"role": "always_on_sweetener", "settings": {"GAIN": 2, "BASS": 5, "TREBLE": 5, "LEVEL": 6}, "into": ["Tim Henson amps", "clean amps"], "basis": "typical", "source": "https://neuraldsp.com/manual/archetype-tim-henson-x"},
+        {"role": "tight_boost", "settings": {"GAIN": 1, "BASS": 3, "TREBLE": 6, "LEVEL": 8}, "into": ["crunch and high-gain amps"], "basis": "typical", "source": "https://neuraldsp.com/manual/archetype-tim-henson-x"}
+      ],
+      "pairs_with": ["tim_henson_amps", "fender_clean", "edge_of_breakup"],
+      "watch_out": "Transparent means no built-in bass cut: to tighten, BASS must be lowered deliberately.",
+      "tags": ["plugin", "clean boost", "2-band EQ"],
+      "sources": ["https://neuraldsp.com/manual/archetype-tim-henson-x", "https://neuraldsp.com/plugins/archetype-tim-henson"]
+    }
+  ],
+  "rules": [
+    {
+      "topic": "boost_in_front",
+      "rule": "To tighten a high-gain amp, put an overdrive in front with drive at or near zero, level high, tone around noon.",
+      "why": "The aim is to shape and tighten the amp's existing distortion, not to add more; the pedal's level pushes the preamp while its EQ pre-shapes the signal.",
+      "numbers": {"drive": "0 (up to ~2/10)", "level": "7-10/10", "tone": "5/10, raise for clarity, lower to thicken"},
+      "genres": ["metal", "hard rock", "djent", "punk"],
+      "confidence": "official",
+      "source": "https://neuraldsp.com/articles/how-to-use-an-overdrive-pedal"
+    },
+    {
+      "topic": "boost_in_front",
+      "rule": "Prefer a Tube Screamer-family pedal for the tightening boost because it cuts bass before clipping and pushes mids.",
+      "why": "In a TS only harmonics above 720 Hz get the full clipping gain (20 dB/decade less below) and a 723 Hz low-pass follows, giving a mid hump. Low end overdrives before high end, so removing bass before the amp's gain stages stops flubby, smeared palm mutes.",
+      "numbers": {"pre_clip_highpass_hz": "720", "post_lowpass_hz": "723", "pedal_gain": "12x-118x (to 41 dB)"},
+      "genres": ["metal", "hard rock"],
+      "confidence": "widely repeated",
+      "source": "https://electrosmash.mas-effects.com/tube-screamer-analysis"
+    },
+    {
+      "topic": "boost_in_front",
+      "rule": "Explain the boost to users as 'less bass into the distortion', not 'more gain'.",
+      "why": "Kurt Ballou: an overdrive's feedback path cuts lows, so the amp receives less bass; low end tends to overdrive before high end. Pete Thorn: TS-type pedals cut bass and boost mids, making the tone more defined and tight at once.",
+      "numbers": {},
+      "genres": ["metal", "hardcore", "hard rock"],
+      "confidence": "widely repeated",
+      "source": "https://www.premierguitar.com/features/artist-features/converges-kurt-ballou-heavy-by-design"
+    },
+    {
+      "topic": "boost_in_front",
+      "rule": "Skip or soften the boost when the amp is already tight and bright, or when the result turns thin, nasal or noisy.",
+      "why": "Amps with an inherently tight low end do not need a boost (Guitar World cites the ENGL Fireball); a mid-hump pedal on a mid-heavy amp stacks honk around 800 Hz, and every boost raises hiss so the gate has to work harder.",
+      "numbers": {"honk_hz": "~800"},
+      "genres": ["metal", "hard rock"],
+      "confidence": "single source",
+      "source": "https://www.guitarworld.com/features/the-best-amps-for-metal"
+    },
+    {
+      "topic": "boost_in_front",
+      "rule": "When a boost is engaged, lower the amp's gain and bass rather than leaving them where they were.",
+      "why": "'As the gain control goes up, cut the bass' and 'start low and raise gain gradually'; at higher gain bass gets flubby, so amp bass often needs to be lower than expected. Boost plus reduced amp gain keeps saturation with better note definition.",
+      "numbers": {},
+      "genres": ["metal", "hard rock", "rock"],
+      "confidence": "widely repeated",
+      "source": "https://www.guitarworld.com/features/19-ways-to-get-more-from-your-drive-pedals"
+    },
+    {
+      "topic": "boost_in_front",
+      "rule": "For the Precision Drive start with DRIVE fully down and VOLUME at about three quarters, raise BRIGHT until it cuts, then set ATTACK by ear, GATE low.",
+      "why": "Manufacturer starting point; the pedal is voiced to tighten high-gain heads and modelers, including low tunings and extended-range guitars. Higher ATTACK = less low end = tighter.",
+      "numbers": {"DRIVE": "0", "VOLUME": "~7.5/10", "GATE": "low for noise only; high for a very tight stop; 0 = bypassed"},
+      "genres": ["djent", "progressive metal", "metal"],
+      "confidence": "official",
+      "source": "https://horizondevices.com/pages/faqs"
+    },
+    {
+      "topic": "boost_in_front",
+      "rule": "Choose the boost by how much low cut is needed: TS/OD-1 (most), SD-1 (less, fuller), Klon or clean boost (little unless BASS is turned down).",
+      "why": "The SD-1 is centred around 800 Hz with less bass roll-off than the OD-1 and TS, so it sounds fuller; the Klon's shelving treble starts at ~408 Hz and it keeps a clean blend, so its lows stay largely intact.",
+      "numbers": {"sd1_mid_focus_hz": "~800", "klon_treble_shelf_hz": "~408"},
+      "genres": ["metal", "hard rock", "rock"],
+      "confidence": "widely repeated",
+      "source": "https://en.wikipedia.org/wiki/Boss_SD-1"
+    },
+    {
+      "topic": "boost_in_front",
+      "rule": "Use a treble booster only into an amp that is already overdriven and on the dark side.",
+      "why": "The Rangemaster high-passes at ~2.6 kHz and adds up to 38 dB; it was designed because British amps (AC30, JTM45) got dark and muddy when overdriven. Into a clean or bright amp the same curve is thin and shrill.",
+      "numbers": {"highpass_hz": "~2600", "max_gain_db": "38"},
+      "genres": ["classic rock", "glam", "early metal", "blues rock"],
+      "confidence": "widely repeated",
+      "source": "https://electrosmash.mas-effects.com/dallas-rangemaster"
+    },
+    {
+      "topic": "gain_stacking",
+      "rule": "Stack lower-gain pedals before higher-gain ones and use the level controls to trim.",
+      "why": "A low-gain stage into a higher-gain one adds clarity while keeping saturation; the first pedal's level sets how hard the second is hit.",
+      "numbers": {},
+      "genres": ["blues", "rock", "indie", "hard rock"],
+      "confidence": "widely repeated",
+      "source": "https://www.guitarworld.com/features/19-ways-to-get-more-from-your-drive-pedals"
+    },
+    {
+      "topic": "gain_stacking",
+      "rule": "Reverse the order (high gain into low gain) only when a more compressed, sustaining sound is wanted.",
+      "why": "The second stage then compresses an already saturated signal instead of pre-shaping it.",
+      "numbers": {},
+      "genres": ["rock", "shoegaze", "lead"],
+      "confidence": "official",
+      "source": "https://neuraldsp.com/articles/how-to-use-an-overdrive-pedal"
+    },
+    {
+      "topic": "gain_stacking",
+      "rule": "Do not stack two drives that boost the same frequency band; offset their tone controls and balance their levels.",
+      "why": "Overlapping EQ emphasis (e.g. two mid-hump pedals) results in a muddy sound; unbalanced levels cause volume jumps when either is switched.",
+      "numbers": {},
+      "genres": ["all"],
+      "confidence": "official",
+      "source": "https://neuraldsp.com/articles/how-to-use-an-overdrive-pedal"
+    },
+    {
+      "topic": "gain_stacking",
+      "rule": "Put a boost before a drive for more saturation and after it for a louder lead with no extra clipping.",
+      "why": "Before: the boost drives the next stage into more clipping and a fatter tone. After: it raises level without adding clipping (only works while the amp has headroom).",
+      "numbers": {},
+      "genres": ["rock", "blues", "lead"],
+      "confidence": "widely repeated",
+      "source": "https://www.musicradar.com/how-to/guitar-pedal-order-how-to-organise-your-pedalboard-signal-chain"
+    },
+    {
+      "topic": "gain_stacking",
+      "rule": "Pair a mid-scooped fuzz or distortion (Big Muff, DS-1) with a mid-forward gain stage instead of adding more gain.",
+      "why": "The Big Muff notches about 1 kHz (-13.5 dB total at noon) and the DS-1 about 500 Hz, so they disappear in a band mix; a second stage with mids restores cut.",
+      "numbers": {"muff_notch_hz": "~1000", "ds1_notch_hz": "~500"},
+      "genres": ["alt rock", "grunge", "stoner", "shoegaze"],
+      "confidence": "widely repeated",
+      "source": "https://www.guitarworld.com/features/19-ways-to-get-more-from-your-drive-pedals"
+    },
+    {
+      "topic": "gain_stacking",
+      "rule": "Keep fuzz, treble booster and octave-fuzz at the very front, before buffers and other pedals.",
+      "why": "These circuits interact directly with the pickups: the Fuzz Face input impedance is only ~5-8 kOhm and the Rangemaster ~10-12 kOhm; a buffer in front makes a germanium Fuzz Face sound 'awful'.",
+      "numbers": {"fuzz_face_input_ohm": "5200-8400", "rangemaster_input_ohm": "10000-12000"},
+      "genres": ["classic rock", "blues rock", "psychedelic"],
+      "confidence": "widely repeated",
+      "source": "https://electrosmash.mas-effects.com/fuzz-face.html"
+    },
+    {
+      "topic": "noise_gate",
+      "rule": "Place the gate before delay and reverb, never after them.",
+      "why": "A gate after time-based effects treats the tails as noise and cuts them off.",
+      "numbers": {},
+      "genres": ["all"],
+      "confidence": "official",
+      "source": "https://articles.boss.info/the-complete-guide-to-noise-gate-and-suppressor-pedals/"
+    },
+    {
+      "topic": "noise_gate",
+      "rule": "For high gain, gate after the gain stages but key the gate from the clean guitar signal (four-cable / side-chain method).",
+      "why": "An in-line gate before the amp cannot remove preamp hiss, and an in-line gate after it sees guitar and hiss as one signal. Detecting on the clean input while attenuating after the preamp is more effective. On the QC this is Adaptive Gate (S/C) placed after the amp with SOURCE = the guitar input.",
+      "numbers": {},
+      "genres": ["metal", "djent", "hard rock"],
+      "confidence": "official",
+      "source": "https://articles.boss.info/the-complete-guide-to-noise-gate-and-suppressor-pedals/"
+    },
+    {
+      "topic": "noise_gate",
+      "rule": "Set the threshold by raising it from minimum until idle noise just disappears, then stop.",
+      "why": "A threshold set higher than needed chops note decay and pinch harmonics; some residual noise is better than truncated sustain. If only an extreme gate makes the patch usable, the gain is too high.",
+      "numbers": {"procedure": "start at lowest, increase until noise disappears; decay/release from shortest upward for natural tails"},
+      "genres": ["all"],
+      "confidence": "official",
+      "source": "https://articles.boss.info/the-complete-guide-to-noise-gate-and-suppressor-pedals/"
+    },
+    {
+      "topic": "noise_gate",
+      "rule": "Use one gate per path on the Quad Cortex: do not leave the Input Gate active when adding a gate block.",
+      "why": "Community reports: two gates with different thresholds interact and cut off pinch harmonics; even at 0 % an enabled gate still clamps, so disable it rather than zero it. A single adaptive gate keyed from Input 1 fixed the problem.",
+      "numbers": {},
+      "genres": ["metal", "rock"],
+      "confidence": "single source",
+      "source": "https://unity.neuraldsp.com/t/noise-gate-block-placement-and-config/16865"
+    },
+    {
+      "topic": "noise_gate",
+      "rule": "Use hard gating only for fast high-gain rhythm; use gentle reduction (or none) for cleans, single coils and sustained leads.",
+      "why": "A gate clamps everything below threshold and can sound artificial or muffled; reduction-style suppression preserves natural decay. Players commonly switch the gate off on clean scenes.",
+      "numbers": {},
+      "genres": ["metal", "clean", "blues", "country"],
+      "confidence": "official",
+      "source": "https://articles.boss.info/the-complete-guide-to-noise-gate-and-suppressor-pedals/"
+    },
+    {
+      "topic": "noise_gate",
+      "rule": "If phaser or flanger swoosh is audible when not playing, place the gate after the modulation.",
+      "why": "A gate after modulation mutes the constant whoosh of flangers and phasers during silences.",
+      "numbers": {},
+      "genres": ["rock", "metal"],
+      "confidence": "single source",
+      "source": "https://www.guitarworld.com/gear/where-to-place-your-effect-pedals-in-your-signal-chain"
+    },
+    {
+      "topic": "compressor",
+      "rule": "Put the compressor at the start of the chain (after wah/pitch, before drives).",
+      "why": "It sends a consistent signal into everything after it. After boosts, drives or fuzz it amplifies their noise; after modulation or delay it flattens their depth.",
+      "numbers": {},
+      "genres": ["all"],
+      "confidence": "official",
+      "source": "https://neuraldsp.com/articles/how-to-use-a-compressor-pedal"
+    },
+    {
+      "topic": "compressor",
+      "rule": "Never place a pedal-style compressor after a noisy gain stage; if post-amp levelling is wanted use a gentle studio-style compressor after the cab and before delay/reverb.",
+      "why": "Gain pedals generate noise that a following compressor boosts. A post-cab bus compressor levels the finished tone, and keeping it ahead of delay and reverb avoids pumping the tails (community practice).",
+      "numbers": {},
+      "genres": ["all"],
+      "confidence": "widely repeated",
+      "source": "https://www.guitarworld.com/gear/where-to-place-your-effect-pedals-in-your-signal-chain"
+    },
+    {
+      "topic": "compressor",
+      "rule": "Funk / tight clean rhythm: medium threshold, about 4:1, fast attack, quick release, output matched to bypass.",
+      "why": "Fast attack keeps strum transients from overwhelming the mix; quick release lets the compressor reset between notes.",
+      "numbers": {"ratio": "4:1", "attack": "fast", "release": "quick", "threshold": "medium"},
+      "genres": ["funk", "pop", "r&b", "disco"],
+      "confidence": "official",
+      "source": "https://neuraldsp.com/articles/how-to-use-a-compressor-pedal"
+    },
+    {
+      "topic": "compressor",
+      "rule": "Country chicken-pickin' squish: use the highest ratio or the fastest attack the compressor offers, with plenty of sustain.",
+      "why": "Heavy, fast compression evens out hybrid-picked snaps and gives the characteristic percussive 'pop' followed by bloom.",
+      "numbers": {"ratio": "highest available", "attack": "fastest available"},
+      "genres": ["country", "rockabilly"],
+      "confidence": "official",
+      "source": "https://articles.boss.info/five-creative-ways-to-use-a-compressor-pedal-for-guitar/"
+    },
+    {
+      "topic": "compressor",
+      "rule": "Smooth lead sustain: about 2:1, slightly lower threshold, slower attack, medium release, level slightly above unity.",
+      "why": "The slower attack keeps pick bite while the body of the note is held up; medium release avoids unnatural pumping.",
+      "numbers": {"ratio": "2:1", "attack": "slower", "release": "medium"},
+      "genres": ["blues", "rock", "fusion"],
+      "confidence": "official",
+      "source": "https://neuraldsp.com/articles/how-to-use-a-compressor-pedal"
+    },
+    {
+      "topic": "compressor",
+      "rule": "Always-on light compression: low ratio with the threshold only catching peaks, and use MIX/BLEND to keep dry dynamics.",
+      "why": "Subtle compression polishes cleans without removing playing dynamics; a blend control mixes the uncompressed signal back in (parallel compression). No sourced MIX percentage was found.",
+      "numbers": {"ratio": "low (2:1-3:1)", "threshold": "just catching peaks", "mix": ""},
+      "genres": ["pop", "worship", "indie", "clean"],
+      "confidence": "official",
+      "source": "https://neuraldsp.com/articles/how-to-use-a-compressor-pedal"
+    },
+    {
+      "topic": "compressor",
+      "rule": "With high-gain tones use little or no pre-amp compression; if any, 6:1 or higher with a high threshold that touches only the loudest peaks.",
+      "why": "Distortion already compresses; extra compression mainly raises noise and can make distortion overly pronounced or muted. Fast attack, quick release so sustain is unaffected.",
+      "numbers": {"ratio": "6:1+", "threshold": "high", "attack": "fast", "release": "quick"},
+      "genres": ["metal", "hard rock"],
+      "confidence": "official",
+      "source": "https://neuraldsp.com/articles/how-to-use-a-compressor-pedal"
+    },
+    {
+      "topic": "delay",
+      "rule": "Slapback: 80-140 ms, feedback 0 (one repeat), repeat level around 50 %.",
+      "why": "Modelled on a tape slap; a single audible repeat thickens without rhythmic clutter. BOSS gives a wider 20-200 ms window with one or two repeats and a low mix.",
+      "numbers": {"time_ms": "80-140", "feedback": "0 (1 repeat)", "level": "~50 %"},
+      "genres": ["rockabilly", "country", "blues", "50s rock"],
+      "confidence": "widely repeated",
+      "source": "https://www.premierguitar.com/diy/pedal-projects/best-delay-pedal-settings"
+    },
+    {
+      "topic": "delay",
+      "rule": "Doubling/thickening: 50-100 ms with one or two repeats; 20-50 ms gives pseudo chorus/flange.",
+      "why": "Very short delays fuse with the dry note and read as a second guitar or as comb-filter colour rather than an echo.",
+      "numbers": {"double_ms": "50-100", "pseudo_chorus_ms": "20-50", "feedback": "minimal"},
+      "genres": ["rock", "pop"],
+      "confidence": "single source",
+      "source": "https://www.premierguitar.com/diy/pedal-projects/best-delay-pedal-settings"
+    },
+    {
+      "topic": "delay",
+      "rule": "For delays over 200 ms in tempo-based music, sync to tempo using ms = factor / bpm.",
+      "why": "Above ~200 ms repeats are heard as distinct notes, so off-tempo repeats clash with the beat.",
+      "numbers": {"quarter": "60000/bpm", "dotted_eighth": "45000/bpm", "eighth": "30000/bpm", "quarter_triplet": "40000/bpm", "sixteenth": "15000/bpm"},
+      "genres": ["all"],
+      "confidence": "widely repeated",
+      "source": "https://www.premierguitar.com/diy/pedal-projects/best-delay-pedal-settings"
+    },
+    {
+      "topic": "delay",
+      "rule": "Dotted-eighth rhythmic delay: sync to a dotted eighth, set the repeat as loud as the dry note, keep feedback low, and play short straight eighths.",
+      "why": "A dotted eighth is 1.5 eighth notes, so each repeat lands between the picked eighths and creates a sixteenth-note pattern; long notes or many repeats blur it.",
+      "numbers": {"time": "45000/bpm ms (450 ms at 100 bpm)", "repeat_level": "equal to dry", "feedback": "low"},
+      "genres": ["arena rock", "worship", "post-rock", "pop"],
+      "confidence": "widely repeated",
+      "source": "https://www.premierguitar.com/diy/pedal-projects/best-delay-pedal-settings"
+    },
+    {
+      "topic": "delay",
+      "rule": "Lead delay: 300-500 ms, two or three repeats, low mix.",
+      "why": "Adds fullness and sustain behind a solo without overwhelming the tone. If a solo sounds washed out, lower the level before the feedback. Forum figures for lead mix run 20-40 %; 15-25 % is the conservative end.",
+      "numbers": {"time_ms": "300-500 (blues solos up to 800)", "repeats": "2-3", "mix": "low; ~15-25 % conservative, forums up to 40 %"},
+      "genres": ["rock", "blues", "metal lead", "fusion"],
+      "confidence": "official",
+      "source": "https://articles.boss.info/the-complete-guide-to-delay-pedals/"
+    },
+    {
+      "topic": "delay",
+      "rule": "Pick analog or tape delay when repeats should sit behind the playing, digital when they must stay precise.",
+      "why": "Analog (BBD) repeats are warm and dark and degrade with each pass; tape repeats are warm, slightly unstable with flutter and degrade further; digital repeats are pristine and only get quieter.",
+      "numbers": {},
+      "genres": ["all"],
+      "confidence": "official",
+      "source": "https://articles.boss.info/the-complete-guide-to-delay-pedals/"
+    },
+    {
+      "topic": "delay",
+      "rule": "Place delay after all gain (after the amp and cab on a modeler); avoid delay into distortion unless the smeared sound is intended.",
+      "why": "Before distortion every repeat is distorted and compressed up in level; after the preamp (effects loop / post-amp) the repeats stay clean. Community default on the QC: time-based effects after the amp, everything else before.",
+      "numbers": {},
+      "genres": ["all"],
+      "confidence": "official",
+      "source": "https://articles.boss.info/the-complete-guide-to-delay-pedals/"
+    },
+    {
+      "topic": "delay",
+      "rule": "Put reverb after delay.",
+      "why": "Reverb after the delays keeps each repeat distinct and then blends them into the space; delay after reverb repeats the whole wash.",
+      "numbers": {},
+      "genres": ["all"],
+      "confidence": "widely repeated",
+      "source": "https://www.musicradar.com/how-to/guitar-pedal-order-how-to-organise-your-pedalboard-signal-chain"
+    },
+    {
+      "topic": "delay",
+      "rule": "Band-limit the repeats with the delay's HIGH PASS and LOW PASS so they stay out of the dry guitar's way.",
+      "why": "Mixing practice: aggressive high-pass filtering on a delay keeps it from adding low-mid clutter; rolling off highs pushes repeats back. No sourced Hz values were found; QC delays expose HIGH PASS 20-800 Hz and LOW PASS 1-16 kHz (tape models stop at 6 kHz).",
+      "numbers": {"high_pass_hz": "", "low_pass_hz": ""},
+      "genres": ["all"],
+      "confidence": "widely repeated",
+      "source": "https://www.izotope.com/en/learn/reverbs-and-delays.html"
+    },
+    {
+      "topic": "delay",
+      "rule": "Use the delay's dynamics/ducking section for busy leads so repeats drop while playing and return in the gaps.",
+      "why": "A ducking (dynamic) delay lets the repeats sit back so they do not step on the notes being played, allowing a higher mix. No sourced depth values were found.",
+      "numbers": {},
+      "genres": ["lead", "metal", "fusion", "worship"],
+      "confidence": "single source",
+      "source": "https://forum.fractalaudio.com/threads/common-delay-settings-for-lead-sounds.107866/"
+    },
+    {
+      "topic": "delay",
+      "rule": "Ambient delay: long time, high feedback, low mix, usually feeding a reverb.",
+      "why": "The echoes then form a wash behind the playing instead of distinct repeats.",
+      "numbers": {},
+      "genres": ["ambient", "post-rock", "shoegaze", "worship"],
+      "confidence": "official",
+      "source": "https://articles.boss.info/the-complete-guide-to-delay-pedals/"
+    },
+    {
+      "topic": "delay",
+      "rule": "After dialling delay or reverb by ear, pull the mix back by 10-25 %.",
+      "why": "Engineers and players tend to exaggerate time-based effects in the moment; what sounds right solo is too wet in a mix.",
+      "numbers": {"reduce_by": "10-25 %"},
+      "genres": ["all"],
+      "confidence": "single source",
+      "source": "https://www.izotope.com/en/learn/reverbs-and-delays.html"
+    },
+    {
+      "topic": "delay",
+      "rule": "Enable TRAILS on delays and reverbs that are switched during a song.",
+      "why": "Trails let echoes decay naturally after the effect is turned off instead of cutting out, giving seamless transitions.",
+      "numbers": {},
+      "genres": ["all"],
+      "confidence": "official",
+      "source": "https://articles.boss.info/the-complete-guide-to-delay-pedals/"
+    },
+    {
+      "topic": "reverb",
+      "rule": "Use pre-delay to keep the dry attack clear: about 40-100 ms on guitar; use zero pre-delay to sink a part back into the mix.",
+      "why": "Pre-delay separates the direct sound from the onset of the tail; with none, the sound blends into the reverb. Values under 20 ms with an audible first reflection can sound phasey.",
+      "numbers": {"guitar_predelay_ms": "40-100", "blend_back_ms": "0", "avoid_ms": "<20 with strong early reflection"},
+      "genres": ["all"],
+      "confidence": "widely repeated",
+      "source": "https://www.izotope.com/en/learn/reverb-pre-delay"
+    },
+    {
+      "topic": "reverb",
+      "rule": "High-pass and low-pass the reverb itself.",
+      "why": "Low-frequency reverb energy creates mud; filtering lows out of the reverb lets the low-mids of the dry parts through, and a low-pass makes the tail more natural and less splashy. SOS patches use low-frequency damping around 100 Hz (plate/small room) and low-pass between 3 and 10 kHz.",
+      "numbers": {"low_damping_hz": "~100 (plate, small room) to ~300 (drum room)", "low_pass_hz": "3000-10000 (plate ~5000)"},
+      "genres": ["all"],
+      "confidence": "widely repeated",
+      "source": "https://www.soundonsound.com/techniques/improving-sound-your-reverb"
+    },
+    {
+      "topic": "reverb",
+      "rule": "Match decay to the reverb type: ambience 0.1-1 s, small room ~1-1.6 s, plate ~2.7 s (natural plates 3-4 s), halls 2-10 s.",
+      "why": "These are the ranges the algorithms are meant to cover; longer decays on dense or fast material wash it out.",
+      "numbers": {"ambience_s": "0.1-1", "room_s": "1-1.6", "plate_s": "2.7 (3-4 natural)", "hall_s": "2-10"},
+      "genres": ["all"],
+      "confidence": "widely repeated",
+      "source": "https://www.soundonsound.com/techniques/reverb-what-do-all-those-knobs-do"
+    },
+    {
+      "topic": "reverb",
+      "rule": "Choose reverb type by genre: spring for surf/country/blues/vintage cleans, plate for classic studio and 80s leads, hall for ballads and ambient, room/ambience for rock and metal rhythm, near-dry for grunge and tight metal.",
+      "why": "Specific spring tanks and plates evoke specific eras and genres; early-digital hall/plate units evoke pop decades; 90s grunge was much drier. Keep spring mix low because it crowds a mix quickly.",
+      "numbers": {"spring_mix": "very low"},
+      "genres": ["surf", "country", "blues", "pop", "ambient", "rock", "metal", "grunge"],
+      "confidence": "widely repeated",
+      "source": "https://www.izotope.com/en/learn/reverbs-and-delays.html"
+    },
+    {
+      "topic": "reverb",
+      "rule": "Ambient pads: long hall or modulated reverb with the top rolled off as a dark bed; add shimmer sparingly for an octave-up halo.",
+      "why": "A dark tail sits behind the dry guitar; shimmer adds pitch-shifted (typically +12) harmonics to the reverberated sound and builds quickly with feedback.",
+      "numbers": {"shimmer_pitch_semitones": "+12 typical (QC range -24..24)"},
+      "genres": ["ambient", "post-rock", "worship", "shoegaze"],
+      "confidence": "widely repeated",
+      "source": "https://www.guitarworld.com/features/a-guide-to-ambient-guitar-channel-your-post-rock-heroes-using-delay-reverb-pedals-and-more"
+    },
+    {
+      "topic": "reverb",
+      "rule": "Keep reverb last (after delay and after the cab); place it before drive only for deliberate shoegaze/dark washes.",
+      "why": "Distorting a reverb tail compresses and smears it into a wall, which is the shoegaze sound but wrecks clarity elsewhere.",
+      "numbers": {},
+      "genres": ["all", "shoegaze"],
+      "confidence": "widely repeated",
+      "source": "https://www.musicradar.com/how-to/guitar-pedal-order-how-to-organise-your-pedalboard-signal-chain"
+    },
+    {
+      "topic": "modulation",
+      "rule": "Default: place chorus, phaser and flanger after drive/amp and before delay and reverb.",
+      "why": "Distorting a modulated signal smears it and loses definition, especially chorus; after the gain the sweep is clear and consistent.",
+      "numbers": {},
+      "genres": ["all"],
+      "confidence": "widely repeated",
+      "source": "https://www.guitarworld.com/gear/where-to-place-your-effect-pedals-in-your-signal-chain"
+    },
+    {
+      "topic": "modulation",
+      "rule": "For the Van Halen sound put the phaser or flanger before the distorted amp, at a slow rate.",
+      "why": "EVH got all his distortion from the amp, so the phaser ran into it: the result is a smoother, warmer, thicker jet-like sweep that is less dramatic than post-distortion phasing.",
+      "numbers": {},
+      "genres": ["hard rock", "80s rock", "classic rock"],
+      "confidence": "widely repeated",
+      "source": "https://www.guitarworld.com/gear/where-to-place-your-effect-pedals-in-your-signal-chain"
+    },
+    {
+      "topic": "modulation",
+      "rule": "Clean chorus: keep rate and depth at or below half; for a lead thickener use rate about half and depth a little lower.",
+      "why": "Above noon the pitch wobble becomes seasick; a slow rate with moderate depth gives the 80s clean shimmer.",
+      "numbers": {"rate": "<=50 % of range", "depth": "<=50 % (lead thickener ~30-35 %)"},
+      "genres": ["80s pop", "new wave", "clean", "funk", "metal cleans"],
+      "confidence": "official",
+      "source": "https://articles.boss.info/five-creative-ways-to-use-a-chorus-pedal-for-guitar/"
+    },
+    {
+      "topic": "modulation",
+      "rule": "Flanger: for the EVH style use a moderate-fast rate, slightly higher depth and gentle regeneration; for the jet sweep use slow rate with high depth and regeneration.",
+      "why": "Regeneration (feedback) sets how metallic and resonant the sweep is; slow rate with high feedback gives the long jet whoosh.",
+      "numbers": {"evh_rate": "~2 o'clock (~70 %)", "evh_regen": "low", "jet_rate": "10-12 o'clock (~30-50 %)", "jet_depth_regen": "high"},
+      "genres": ["hard rock", "80s rock", "psychedelic"],
+      "confidence": "official",
+      "source": "https://articles.boss.info/five-creative-ways-to-use-a-flanger-pedal-for-guitar/"
+    },
+    {
+      "topic": "modulation",
+      "rule": "Place a Uni-Vibe before fuzz or drive for the Hendrix/Trower sound.",
+      "why": "Community convention: the vibe's phasey throb is then thickened by the following gain stage rather than chopping the distorted tone. Not confirmed against a fetched source in this research.",
+      "numbers": {},
+      "genres": ["psychedelic", "blues rock", "classic rock"],
+      "confidence": "widely repeated",
+      "source": ""
+    },
+    {
+      "topic": "modulation",
+      "rule": "Place tremolo after other modulation (and after gain).",
+      "why": "Tremolo is amplitude modulation; before a compressing gain stage its depth is flattened, and after other modulation it chops the finished sound cleanly.",
+      "numbers": {},
+      "genres": ["surf", "country", "indie", "blues"],
+      "confidence": "single source",
+      "source": "https://www.guitarworld.com/gear/where-to-place-your-effect-pedals-in-your-signal-chain"
+    },
+    {
+      "topic": "modulation",
+      "rule": "Treat rotary as a two-speed effect (slow chorale / fast tremolo) and automate the SPEED switch rather than the rate.",
+      "why": "The musical gesture of a Leslie is the acceleration between the two speeds; the QC Rotary exposes SLOW SPEED, FAST SPEED and ACCELERATION for this. Usage convention not confirmed against a fetched source.",
+      "numbers": {},
+      "genres": ["classic rock", "blues", "soul", "psychedelic"],
+      "confidence": "widely repeated",
+      "source": ""
+    },
+    {
+      "topic": "wah_pitch",
+      "rule": "Put wah first, before drive, for the classic vocal sweep; put it after drive or fuzz only for an extreme filter effect.",
+      "why": "Before gain the wah acts as a tone filter feeding the distortion (Hendrix-style); after gain it sweeps the full harmonic content and is far more dramatic. Never put a wah in front of a Fuzz Face-type model: its low input impedance reacts badly.",
+      "numbers": {},
+      "genres": ["funk", "rock", "blues", "metal lead"],
+      "confidence": "widely repeated",
+      "source": "https://www.musicradar.com/how-to/guitar-pedal-order-how-to-organise-your-pedalboard-signal-chain"
+    },
+    {
+      "topic": "wah_pitch",
+      "rule": "Put pitch shifters, octavers and harmonizers at the very front (pitch before wah), ahead of all gain.",
+      "why": "Pitch tracking works best on the clean, unprocessed signal and may fail on a signal already processed by filters or distortion; following drives also smooth the pitch artifacts.",
+      "numbers": {},
+      "genres": ["all"],
+      "confidence": "widely repeated",
+      "source": "https://www.guitarworld.com/gear/where-to-place-your-effect-pedals-in-your-signal-chain"
+    },
+    {
+      "topic": "post_eq",
+      "rule": "High-pass the finished guitar tone at about 70-100 Hz.",
+      "why": "Content below ~70 Hz is rumble that causes muddiness and clashes with bass and kick; the guitar's lowest fundamental is ~82 Hz. Modeler users most often start at 80 Hz, some at 100 Hz.",
+      "numbers": {"high_pass_hz": "70-100 (80 typical)", "slope": "12-24 dB/oct typical"},
+      "genres": ["all"],
+      "confidence": "widely repeated",
+      "source": "https://neuraldsp.com/articles/electric-guitar-eq-guide"
+    },
+    {
+      "topic": "post_eq",
+      "rule": "Low-pass distorted modeler tones somewhere between 5 and 10 kHz, and stop as soon as the fizz is gone.",
+      "why": "Neural DSP advises cutting above 10 kHz to reduce harshness and buzziness; modeler users report 6.5-8 kHz typical and ~5 kHz as the aggressive end, warning that 6-8 kHz already removes the cab's natural air.",
+      "numbers": {"low_pass_hz": "5000-10000 (6500-8000 common)", "floor_hz": "~5000"},
+      "genres": ["metal", "rock", "all distorted"],
+      "confidence": "widely repeated",
+      "source": "https://forum.fractalaudio.com/threads/cutting-cab-highs-and-lows.130569/"
+    },
+    {
+      "topic": "post_eq",
+      "rule": "Use this frequency map for corrective moves: mud 200-400 Hz, boxiness 400-800 Hz (up to 1 kHz), honk ~800 Hz, bite 2.5-4 kHz, presence ~5 kHz, fizz/buzz above ~6-10 kHz, air above 10 kHz.",
+      "why": "Compiled from mixing references: mud/boom 200-400 Hz, boxy 400-800 Hz or 500 Hz-1 kHz, 'green pedal honk' ~800 Hz, bite ~2.5-4 kHz, articulation ~5 kHz, buzziness above 10 kHz. The 'fizz at 6-8 kHz' label is forum usage rather than an official figure.",
+      "numbers": {"mud_hz": "200-400", "boxy_hz": "400-800", "honk_hz": "~800", "bite_hz": "2500-4000", "presence_hz": "~5000", "fizz_hz": "6000-10000 (forum usage)", "air_hz": ">10000"},
+      "genres": ["all"],
+      "confidence": "widely repeated",
+      "source": "https://www.izotope.com/community/blog/eq-cheat-sheet"
+    },
+    {
+      "topic": "post_eq",
+      "rule": "Keep corrective cuts to about 2-5 dB and tonal boosts to about 1-6 dB.",
+      "why": "Neural DSP genre starting points: classic rock 400 Hz -2 to -3 dB and 3 kHz +3 to +6 dB; high-gain metal 250-500 Hz -3 to -5 dB, 3 kHz +3 to +5 dB, 5 kHz +4 to +6 dB (leads); cleans 80 Hz +2 to +4 dB, 800 Hz +1 to +3 dB, 6 kHz +1 to +2 dB.",
+      "numbers": {"metal_mud_cut": "250-500 Hz, -3 to -5 dB", "rock_mud_cut": "400 Hz, -2 to -3 dB", "bite_boost": "3 kHz, +3 to +6 dB", "clean_sparkle": "6 kHz, +1 to +2 dB"},
+      "genres": ["metal", "classic rock", "pop", "jazz"],
+      "confidence": "official",
+      "source": "https://neuraldsp.com/articles/electric-guitar-eq-guide"
+    },
+    {
+      "topic": "post_eq",
+      "rule": "Distinguish pre-amp EQ from post-amp EQ: before the amp it changes how the amp distorts, after it changes only the tone.",
+      "why": "An EQ after the drives cuts problem bands; early in the chain it acts as an extra gain stage for specific bands (a low cut before the amp tightens, a mid boost adds saturation there).",
+      "numbers": {},
+      "genres": ["all"],
+      "confidence": "widely repeated",
+      "source": "https://www.guitarworld.com/features/19-ways-to-get-more-from-your-drive-pedals"
+    },
+    {
+      "topic": "post_eq",
+      "rule": "On the QC implement the cuts with the Low-High Cut block (id 4003) or the IR loader's HI PASS / LOW PASS, and reserve the Parametric EQs for band moves.",
+      "why": "The catalog exposes HPF/LPF with selectable slopes on Low-High Cut (20 Hz-20 kHz) and HI PASS 20-800 Hz / LOW PASS 1-20 kHz on IR loaders; stock cab-sim blocks list no Hz filters.",
+      "numbers": {"low_high_cut_range_hz": "20-20000", "ir_loader_hpf_hz": "20-800", "ir_loader_lpf_hz": "1000-20000"},
+      "genres": ["all"],
+      "confidence": "official",
+      "source": "qc-catalog.txt"
+    },
+    {
+      "topic": "stereo",
+      "rule": "Prefer a real second performance for double-tracked width; use the Doubler / Haas delay only as a secondary effect.",
+      "why": "Two real takes summed to mono just sound thicker; a delayed copy of the same take comb-filters in mono, so parts can change tone or level or vanish.",
+      "numbers": {},
+      "genres": ["metal", "rock", "pop"],
+      "confidence": "widely repeated",
+      "source": "https://www.soundonsound.com/sound-advice/q-can-haas-delays-be-mono-compatible"
+    },
+    {
+      "topic": "stereo",
+      "rule": "When using a Haas-style doubler, keep the spread short and the delayed side several dB lower.",
+      "why": "Haas widening uses roughly 1-40 ms between hard-panned copies; an ~11 ms zero-feedback delay is reported as transparent with good mono compatibility, and dropping the delayed side 3-6 dB (up to 6-10 dB) greatly reduces mono comb filtering. QC Doubler SPREAD is 3-60 ms.",
+      "numbers": {"spread_ms": "1-40 (about 11 for best mono behaviour)", "delayed_side_attenuation_db": "3-6 (up to 6-10)"},
+      "genres": ["all"],
+      "confidence": "widely repeated",
+      "source": "https://www.izotope.com/en/learn/what-is-the-haas-effect"
+    },
+    {
+      "topic": "stereo",
+      "rule": "Always check the patch summed to mono; if the output feeds a mono PA or a single cab, disable Doubler, ping-pong and width tricks.",
+      "why": "Comb filtering appears whenever the two channels are summed, and even from stereo speakers placed close together; ping-pong repeats double in density and wide chorus partly cancels.",
+      "numbers": {},
+      "genres": ["live", "all"],
+      "confidence": "widely repeated",
+      "source": "https://www.izotope.com/en/learn/reverbs-and-delays.html"
+    },
+    {
+      "topic": "stereo",
+      "rule": "Keep the core tone mono through the amp and cab and put stereo (ST) modulation, delay and reverb after the cab.",
+      "why": "A mono block after a stereo effect collapses its width, and amp/cab models are mono sources. Convention; not confirmed against a fetched Neural DSP document.",
+      "numbers": {},
+      "genres": ["all"],
+      "confidence": "widely repeated",
+      "source": ""
+    },
+    {
+      "topic": "stereo",
+      "rule": "For width without phase risk use different delay times left and right or a stereo chorus/dimension effect rather than a short Haas offset.",
+      "why": "Long, clearly different delay times (BOSS example: 12 ms one side, 800 ms the other) or decorrelated modulation create space without the comb filtering of a single short offset.",
+      "numbers": {},
+      "genres": ["ambient", "pop", "worship", "clean"],
+      "confidence": "single source",
+      "source": "https://articles.boss.info/the-complete-guide-to-delay-pedals/"
+    }
+  ],
+  "effects": [
+    {"id": 5001, "name": "Legendary 87 (M)", "category": "Compressor", "real": "Universal Audio 1176", "character": "FET studio limiter: extremely fast attack (0.016-0.8 ms), punchy and coloured; driven by INPUT, no threshold control.", "good_for": ["country snap", "funk", "lead sustain", "parallel squash"]},
+    {"id": 5004, "name": "Solid State Comp (M)", "category": "Compressor", "real": "SSL bus compressor", "character": "VCA bus compressor: clean, punchy 'glue' with stepped ratio.", "good_for": ["post-amp levelling", "clean polish", "always-on light comp"]},
+    {"id": 5005, "name": "VCA Comp (M)", "category": "Compressor", "real": "", "character": "Generic VCA compressor: precise, transparent, ratio 2-10, attack 5-250 ms.", "good_for": ["transparent levelling", "funk", "clean rhythm"]},
+    {"id": 5007, "name": "Opto Comp (M)", "category": "Compressor", "real": "", "character": "Generic optical compressor: smooth, slower, gentle program-dependent action.", "good_for": ["always-on smooth comp", "ballad cleans", "slide", "fingerstyle"]},
+    {"id": 5011, "name": "Jewel", "category": "Compressor", "real": "Diamond Compressor", "character": "Optical pedal compressor with a tilt EQ and blend; smooth and unobtrusive.", "good_for": ["always-on light comp", "country", "clean", "edge-of-breakup"]},
+    {"id": 5012, "name": "Legendary 87 (ST)", "category": "Compressor", "real": "Universal Audio 1176", "character": "Stereo version of the 1176-style FET limiter.", "good_for": ["post-cab stereo squash", "parallel compression"]},
+    {"id": 5013, "name": "Solid State Comp (ST)", "category": "Compressor", "real": "SSL bus compressor", "character": "Stereo VCA bus compressor for gluing a finished stereo patch.", "good_for": ["post-cab glue", "stereo cleans"]},
+    {"id": 5014, "name": "VCA Comp (ST)", "category": "Compressor", "real": "", "character": "Stereo generic VCA compressor, transparent.", "good_for": ["post-cab levelling"]},
+    {"id": 5015, "name": "Opto Comp (ST)", "category": "Compressor", "real": "", "character": "Stereo generic optical compressor, smooth.", "good_for": ["post-cab smoothing", "ambient cleans"]},
+    {"id": 5016, "name": "Chief CS3", "category": "Compressor", "real": "BOSS CS-3 Compression Sustainer", "character": "Classic pedal squash with SUSTAIN/ATTACK/TONE; obvious compression, raises noise at high sustain.", "good_for": ["funk", "country", "clean sustain", "tapping"]},
+    {"id": 5017, "name": "Plini Comp", "category": "Compressor", "real": "", "character": "From Archetype: Plini; Neural calls it a virtual-analog model of a widely used bus compressor.", "good_for": ["clean polish", "tapping", "pre-amp levelling"]},
+    {"id": 5018, "name": "Solid State Comp (S/C)", "category": "Compressor", "real": "SSL bus compressor", "character": "SSL-style compressor keyed from another input (side-chain SOURCE).", "good_for": ["ducking one path under another", "keyed compression"]},
+    {"id": 5019, "name": "Legendary 87 (S/C)", "category": "Compressor", "real": "Universal Audio 1176", "character": "1176-style FET limiter with external side-chain source.", "good_for": ["fast ducking", "keyed compression"]},
+    {"id": 5020, "name": "Opto Comp (S/C)", "category": "Compressor", "real": "", "character": "Optical compressor with external side-chain source.", "good_for": ["smooth ducking"]},
+    {"id": 5021, "name": "VCA Comp (S/C)", "category": "Compressor", "real": "", "character": "VCA compressor with external side-chain source.", "good_for": ["precise ducking"]},
+    {"id": 5022, "name": "SLO-100 Compressor", "category": "Compressor", "real": "", "character": "From Soldano SLO-100 X: simple comp/level pedal with slow/fast attack.", "good_for": ["pre-amp sustain", "clean levelling"]},
+    {"id": 5023, "name": "Nolly Compressor", "category": "Compressor", "real": "", "character": "From Archetype: Nolly: solid-state compressor pedal with Smooth/Snappy attack modes.", "good_for": ["clean levelling", "pre-amp tightening"]},
+    {"id": 5024, "name": "Cory Wong The 4th Position Compressor", "category": "Compressor", "real": "", "character": "Cory Wong's signature squishy, punchy clean compressor with blend and tone.", "good_for": ["funk rhythm", "clean strat tones", "always-on"]},
+    {"id": 5025, "name": "Douglas Shining Comp (M)", "category": "Compressor", "real": "Darkglass Hyper Luminal", "character": "Darkglass hybrid compressor model with FET-style controls and slower attack range (to 80 ms).", "good_for": ["bass", "low-tuned guitar", "transparent levelling"]},
+    {"id": 5026, "name": "Petrucci Compressor", "category": "Compressor", "real": "", "character": "From Archetype: Petrucci: two-knob comp/level conditioner ahead of the amps.", "good_for": ["clean levelling", "lead sustain"]},
+    {"id": 5027, "name": "John Mayer Compressor (ST)", "category": "Compressor", "real": "", "character": "Two-knob (input/output) compressor inspired by one of Mayer's studio units, with automatic gain compensation.", "good_for": ["post-amp studio levelling", "clean polish"]},
+    {"id": 5028, "name": "Rabea Twin Blade Dual Compressor", "category": "Compressor", "real": "", "character": "Two cascaded FET-style compression stages with dry blend.", "good_for": ["heavy sustain", "ambient swells", "parallel squash"]},
+    {"id": 5029, "name": "Horizon Devices Compressor", "category": "Compressor", "real": "Horizon Devices Compressor", "character": "FET studio-style pedal comp, 8:1 or 16:1 (INTENSITY), DETAIL high shelf and MIX blend.", "good_for": ["modern metal cleans", "tapping", "parallel compression"]},
+    {"id": 5030, "name": "Tim Henson Compressor", "category": "Compressor", "real": "", "character": "Strong compression for sustain and note clarity, slow/fast attack.", "good_for": ["tapping", "hybrid picking cleans", "sustain"]},
+
+    {"id": 6001, "name": "Analog Delay (M)", "category": "Delay", "real": "", "character": "BBD-style: warm, dark, degrading repeats with modulation and drive; 200-1100 ms.", "good_for": ["lead delay", "repeats that sit behind", "vintage rock"]},
+    {"id": 6002, "name": "Simple Ping Pong Delay", "category": "Delay", "real": "", "character": "Basic clean delay bouncing left/right with one TONE control.", "good_for": ["stereo cleans", "rhythmic width"]},
+    {"id": 6003, "name": "Simple Delay (ST)", "category": "Delay", "real": "", "character": "Basic clean stereo delay: mix, feedback, tone, time.", "good_for": ["general purpose", "low CPU"]},
+    {"id": 6004, "name": "Tape Delay (ST)", "category": "Delay", "real": "", "character": "Tape echo: wow, flutter, saturation, band-limited repeats (LP max 6 kHz); stereo.", "good_for": ["slapback", "vintage lead", "ambient wash"]},
+    {"id": 6005, "name": "Digital Delay (M)", "category": "Delay", "real": "", "character": "Clean, precise repeats with optional modulation, filters and ducking; 7-6000 ms.", "good_for": ["dotted-eighth", "rhythmic delay", "ducked lead delay"]},
+    {"id": 6006, "name": "Simple Delay (M)", "category": "Delay", "real": "", "character": "Basic clean mono delay.", "good_for": ["general purpose", "pre-amp delay"]},
+    {"id": 6007, "name": "Tape Delay (M)", "category": "Delay", "real": "", "character": "Mono tape echo with wow, flutter and drive.", "good_for": ["slapback", "vintage lead", "pre-amp echo"]},
+    {"id": 6008, "name": "Slapback Delay (ST)", "category": "Delay", "real": "", "character": "Short analog-flavoured delay limited to 40-200 ms, stereo.", "good_for": ["rockabilly", "country", "thickening"]},
+    {"id": 6009, "name": "Slapback Delay (M)", "category": "Delay", "real": "", "character": "Short analog-flavoured delay limited to 40-200 ms, mono.", "good_for": ["rockabilly", "country", "doubling"]},
+    {"id": 6010, "name": "Analog Delay (ST)", "category": "Delay", "real": "", "character": "Stereo BBD-style dark delay with ping-pong option.", "good_for": ["lead delay", "wide dark repeats"]},
+    {"id": 6011, "name": "Digital Delay (ST)", "category": "Delay", "real": "", "character": "Stereo clean digital delay with ping-pong, modulation, filters and ducking.", "good_for": ["dotted-eighth", "stereo rhythmic delay", "ducked lead delay"]},
+    {"id": 6012, "name": "Dual Delay", "category": "Delay", "real": "", "character": "Independent left/right delay times with cross-feedback.", "good_for": ["stereo width", "polyrhythmic repeats", "ambient"]},
+    {"id": 6013, "name": "Reverse Delay (M)", "category": "Delay", "real": "", "character": "Plays repeats backwards.", "good_for": ["psychedelic leads", "swells", "ambient"]},
+    {"id": 6014, "name": "Dual Reverse Delay", "category": "Delay", "real": "", "character": "Stereo reverse delay with separate L/R times.", "good_for": ["ambient", "soundscapes"]},
+    {"id": 6015, "name": "Circular Delay", "category": "Delay", "real": "", "character": "Multi-tap pattern delay with diffusion and a vintage mode.", "good_for": ["rhythmic patterns", "diffuse washes"]},
+    {"id": 6016, "name": "PCOM Tape Delay (ST)", "category": "Delay", "real": "", "character": "Variant of the stereo tape delay with extended low-pass (to 15 kHz); PCOM naming undocumented, apparently for plugin-preset compatibility.", "good_for": ["tape echo with brighter repeats"]},
+    {"id": 6017, "name": "PCOM Tape Delay (M)", "category": "Delay", "real": "", "character": "Mono variant of the tape delay; PCOM naming undocumented.", "good_for": ["tape echo"]},
+    {"id": 6018, "name": "Plini Delay", "category": "Delay", "real": "", "character": "From Archetype: Plini: simple, rich digital delay with tape saturation and tape modulation.", "good_for": ["lead delay", "clean ambience", "prog"]},
+    {"id": 6019, "name": "Gojira DLY", "category": "Delay", "real": "", "character": "From Archetype: Gojira: 'haunting delay with tape saturation'.", "good_for": ["dark metal leads", "atmospheric cleans"]},
+    {"id": 6020, "name": "Plini Pre Delay (M)", "category": "Delay", "real": "", "character": "Mono pre-amp delay pedal, heavily band-limited (LP 1-2.5 kHz), 50-1000 ms.", "good_for": ["delay into amp", "dark smeared repeats"]},
+    {"id": 6021, "name": "Nolly Delay-1 (M)", "category": "Delay", "real": "", "character": "Mono pre-amp delay pedal from Archetype: Nolly, band-limited, 50-1000 ms.", "good_for": ["delay into amp", "vintage-style echo"]},
+    {"id": 6022, "name": "SLO-100 Delay", "category": "Delay", "real": "", "character": "From Soldano SLO-100 X: simplified stereo delay with ping-pong, 16-1500 ms.", "good_for": ["lead delay", "general purpose"]},
+    {"id": 6023, "name": "Nameless Delay", "category": "Delay", "real": "", "character": "From Fortin Nameless Suite: straightforward stereo delay for leads.", "good_for": ["metal lead delay"]},
+    {"id": 6024, "name": "Nolly Delay-2", "category": "Delay", "real": "", "character": "From Archetype: Nolly: 'dreamy' post delay with pitch modulation and dark repeats (LP 0.5-5 kHz).", "good_for": ["ambient cleans", "dark lead repeats"]},
+    {"id": 6025, "name": "Cory Wong Delay-y-y", "category": "Delay", "real": "", "character": "BBD (analog-circuit based) delay engine with separate L/R times.", "good_for": ["funk cleans", "warm stereo echo"]},
+    {"id": 6026, "name": "Crystal Delay", "category": "Delay", "real": "", "character": "Delay with two pitched-up 'crystal' layers on the repeats.", "good_for": ["ambient", "shimmering leads", "prog cleans"]},
+    {"id": 6027, "name": "Petrucci Delay", "category": "Delay", "real": "", "character": "Dual rack-style delay with tape saturation, modulation and 'crystals' pitched layers.", "good_for": ["prog leads", "wide cleans"]},
+    {"id": 6028, "name": "John Mayer Dream Delay (ST)", "category": "Delay", "real": "", "character": "Inspired by classic 1980s rack delays; HARDNESS softens the repeats.", "good_for": ["clean lead delay", "80s studio echo", "blues-pop"]},
+    {"id": 6029, "name": "John Mayer Millipede Delay", "category": "Delay", "real": "", "character": "Analog BBD pedal delay with warm, percussive repeats, 20-290 ms.", "good_for": ["slapback", "short warm echo", "blues"]},
+    {"id": 6030, "name": "Rabea Atlas Delay", "category": "Delay", "real": "", "character": "Studio-style single/dual delay with 'Icicles' pitched-up layers.", "good_for": ["ambient", "post-rock", "lead"]},
+    {"id": 6031, "name": "Arpeggio Delay", "category": "Delay", "real": "", "character": "Three pitch-shifted taps quantised to key/scale, creating arpeggios from single notes.", "good_for": ["special effect", "ambient", "prog"]},
+    {"id": 6032, "name": "Misha Stereo Delay", "category": "Delay", "real": "", "character": "Studio-classic-inspired digital delay with rich modulation and a built-in ducker.", "good_for": ["ducked lead delay", "modern metal leads", "wide cleans"]},
+    {"id": 6033, "name": "Misha Tape Echo", "category": "Delay", "real": "", "character": "Vintage tape-delay model with simple tone and modulation.", "good_for": ["slapback", "lo-fi echo", "vintage lead"]},
+    {"id": 6034, "name": "Tim Henson Delay Modern", "category": "Delay", "real": "", "character": "Digital delay with a saturation control.", "good_for": ["clean lead delay", "rhythmic delay"]},
+    {"id": 6035, "name": "Tim Henson Delay V. Digital", "category": "Delay", "real": "", "character": "Lo-fi vintage digital delay with downsampling control.", "good_for": ["lo-fi", "80s digital grit"]},
+    {"id": 6036, "name": "Tim Henson Delay Diffusion", "category": "Delay", "real": "", "character": "Digital delay with scalable diffusion that smears repeats toward reverb.", "good_for": ["ambient", "washy cleans"]},
+
+    {"id": 7000, "name": "Vintage Chorus", "category": "Modulation", "real": "", "character": "Two-mode chorus/vibrato with separate chorus and vibrato rates (vintage ensemble style; basis not stated).", "good_for": ["80s clean", "warm analog chorus", "vibrato"]},
+    {"id": 7001, "name": "Dual Chorus", "category": "Modulation", "real": "", "character": "Two-voice stereo chorus with tone control.", "good_for": ["wide cleans", "general chorus"]},
+    {"id": 7002, "name": "Vibrato", "category": "Modulation", "real": "", "character": "Pitch vibrato with fade in/out.", "good_for": ["lo-fi wobble", "indie", "special effect"]},
+    {"id": 7003, "name": "Flangerish", "category": "Modulation", "real": "", "character": "Simple flanger with feedback and drive.", "good_for": ["classic flange", "jet sweep"]},
+    {"id": 7004, "name": "Tremolo", "category": "Modulation", "real": "", "character": "Amplitude tremolo with selectable waveform and stereo width.", "good_for": ["surf", "country", "indie", "chop effects"]},
+    {"id": 7006, "name": "Phaser", "category": "Modulation", "real": "", "character": "Simple phaser with speed and mix only.", "good_for": ["classic phase", "pre-amp EVH-style"]},
+    {"id": 7007, "name": "NuVibes", "category": "Modulation", "real": "", "character": "Uni-Vibe-style throbbing phase/chorus (basis not stated).", "good_for": ["Hendrix/Trower", "psychedelic", "before fuzz"]},
+    {"id": 7008, "name": "Rotary", "category": "Modulation", "real": "", "character": "Rotating-speaker simulation with slow/fast speeds and acceleration.", "good_for": ["classic rock", "blues", "organ-like swirl"]},
+    {"id": 7009, "name": "Digital Flanger", "category": "Modulation", "real": "", "character": "Clean digital flanger with delay, polarity and feedback controls.", "good_for": ["precise flange", "metallic sweeps"]},
+    {"id": 7014, "name": "Flanger Engine", "category": "Modulation", "real": "", "character": "Deep-edit flanger with through-zero, waveform shaping, filters and drive.", "good_for": ["through-zero flange", "sound design"]},
+    {"id": 7015, "name": "Chorus Engine", "category": "Modulation", "real": "", "character": "Deep-edit multi-voice chorus with morph, random, filters and drive.", "good_for": ["custom chorus", "ensemble", "wide pads"]},
+    {"id": 7021, "name": "MX Flanger", "category": "Modulation", "real": "MXR M-117R Flanger", "character": "Classic analog flanger with manual, width, speed and regen.", "good_for": ["EVH flange", "70s/80s rock", "jet sweep"]},
+    {"id": 7022, "name": "Dream Chorus (ST)", "category": "Modulation", "real": "TC Electronic The Dreamscape", "character": "Multi-mode TC chorus/flange/vibrato pedal, stereo.", "good_for": ["prog cleans", "lead thickening"]},
+    {"id": 7023, "name": "Chorus 229T", "category": "Modulation", "real": "TC Electronic TC-2290", "character": "Clean, glassy rack-delay chorus.", "good_for": ["80s studio cleans", "subtle widening"]},
+    {"id": 7024, "name": "Chief CE2W (ST)", "category": "Modulation", "real": "BOSS CE-2W", "character": "Warm analog BBD chorus with CE-2/CE-1 type switch, stereo.", "good_for": ["80s clean", "classic chorus"]},
+    {"id": 7025, "name": "Chief CE2W (M)", "category": "Modulation", "real": "BOSS CE-2W", "character": "Warm analog BBD chorus, mono.", "good_for": ["80s clean", "chorus into amp"]},
+    {"id": 7026, "name": "Dream Chorus (M)", "category": "Modulation", "real": "TC Electronic The Dreamscape", "character": "Multi-mode TC chorus/flange/vibrato pedal, mono.", "good_for": ["prog cleans", "lead thickening"]},
+    {"id": 7027, "name": "Chief DC2W (ST)", "category": "Modulation", "real": "BOSS DC-2W Dimension C", "character": "Preset-button spatial chorus that widens without obvious wobble.", "good_for": ["subtle stereo widening", "always-on cleans"]},
+    {"id": 7028, "name": "MX Phase 95", "category": "Modulation", "real": "MXR Phase 95", "character": "Phase 45/90 voices with script/block switch; one speed knob.", "good_for": ["EVH phase", "funk", "classic rock"]},
+    {"id": 7029, "name": "MX Vibe", "category": "Modulation", "real": "MXR Uni-Vibe", "character": "Uni-Vibe chorus/vibrato throb.", "good_for": ["Hendrix/Trower", "psychedelic", "blues rock"]},
+    {"id": 7030, "name": "Chief DC2W (M)", "category": "Modulation", "real": "BOSS DC-2W Dimension C", "character": "Dimension-style spatial chorus, mono entry.", "good_for": ["subtle thickening"]},
+    {"id": 7031, "name": "Phaser", "category": "Modulation", "real": "", "character": "Full-featured phaser with depth, manual and resonance.", "good_for": ["custom phase", "resonant sweeps"]},
+    {"id": 7032, "name": "Gojira CHR", "category": "Modulation", "real": "", "character": "From Archetype: Gojira: chorus with feedback for a stronger, darker effect.", "good_for": ["metal cleans", "eerie textures"]},
+    {"id": 7033, "name": "Gojira PHSR", "category": "Modulation", "real": "", "character": "From Archetype: Gojira: phaser pedal ahead of the amp.", "good_for": ["phased riffs", "pre-amp phase"]},
+    {"id": 7034, "name": "Chief DC2W PCOM", "category": "Modulation", "real": "", "character": "Rate/depth chorus variant; PCOM naming undocumented, apparently for plugin-preset compatibility.", "good_for": ["general chorus"]},
+    {"id": 7035, "name": "Plini Chorus", "category": "Modulation", "real": "", "character": "From Archetype: Plini: chorus with Vintage (80s swirl) and Spatial modes.", "good_for": ["prog cleans", "wide ambience"]},
+    {"id": 7036, "name": "Harmonic Tremolo", "category": "Modulation", "real": "", "character": "Tremolo that alternates low and high bands for a phasey throb.", "good_for": ["vintage brownface-style trem", "swampy cleans"]},
+    {"id": 7037, "name": "SLO-100 Chorus", "category": "Modulation", "real": "", "character": "From Soldano SLO-100 X: 'vintage chorus' with rate, depth and delay.", "good_for": ["80s rock cleans", "lead thickening"]},
+    {"id": 7038, "name": "Cory Wong The 80s", "category": "Modulation", "real": "", "character": "'A lush, shimmering vintage chorus with 80s flair'; chorus/vibrato modes.", "good_for": ["funk cleans", "80s pop"]},
+    {"id": 7039, "name": "Micro Processor (ST)", "category": "Modulation", "real": "Eventide MicroPitch Delay", "character": "Dual micro-pitch detune (+/-50 cents) with short delays for wide thickening.", "good_for": ["lead widening", "stereo thickening", "80s studio detune"]},
+    {"id": 7040, "name": "Pattern Tremolo", "category": "Modulation", "real": "", "character": "Step-sequenced tremolo (up to 16 steps) with swing and ping-pong.", "good_for": ["rhythmic chops", "electronic textures"]},
+    {"id": 7041, "name": "Petrucci Chorus 2", "category": "Modulation", "real": "", "character": "Post-amp stereo chorus with Vintage and Spatial modes.", "good_for": ["prog cleans", "wide leads"]},
+    {"id": 7042, "name": "Petrucci Flanger", "category": "Modulation", "real": "", "character": "Pre-amp flanger with range, depth, rate and feedback.", "good_for": ["flanged riffs", "prog rock"]},
+    {"id": 7043, "name": "Petrucci Chorus 1", "category": "Modulation", "real": "", "character": "Pre-amp chorus with Normal and Tri (three-voice) modes.", "good_for": ["chorus into amp", "prog cleans"]},
+    {"id": 7044, "name": "Petrucci Phaser", "category": "Modulation", "real": "", "character": "One-knob phaser with Phase and Vibe modes.", "good_for": ["pre-amp phase", "vibe leads"]},
+    {"id": 7045, "name": "John Mayer Harmonic Tremolo", "category": "Modulation", "real": "", "character": "Model of Mayer's all-tube harmonic tremolo unit.", "good_for": ["vintage cleans", "blues", "ballads"]},
+    {"id": 7046, "name": "Misha Modulator", "category": "Modulation", "real": "", "character": "Chorus/flanger inspired by a legendary analog unit, swept by expression pedal or auto LFO.", "good_for": ["animated cleans", "expressive swells"]},
+    {"id": 7047, "name": "Tim Henson Chorus", "category": "Modulation", "real": "", "character": "One-knob (mix) stereo chorus with warm analog-style modulation.", "good_for": ["quick clean chorus", "polyphia-style cleans"]},
+
+    {"id": 8000, "name": "Room", "category": "Reverb", "real": "", "character": "Small natural room, decay 0.1-2 s.", "good_for": ["rock/metal rhythm space", "amp-in-room feel", "subtle always-on"]},
+    {"id": 8001, "name": "Spring (ST)", "category": "Reverb", "real": "", "character": "Amp-style spring with damping, tone and 'boing', stereo.", "good_for": ["surf", "country", "blues", "vintage cleans"]},
+    {"id": 8003, "name": "Hall", "category": "Reverb", "real": "", "character": "Large hall, decay 1-10 s.", "good_for": ["ballads", "leads", "ambient"]},
+    {"id": 8006, "name": "Spring (M)", "category": "Reverb", "real": "", "character": "Amp-style spring, mono.", "good_for": ["surf", "country", "blues", "pre-cab spring"]},
+    {"id": 8007, "name": "Modulated", "category": "Reverb", "real": "", "character": "Hall-type reverb with chorus-like modulated tail.", "good_for": ["ambient", "lush cleans", "post-rock"]},
+    {"id": 8008, "name": "Ambience", "category": "Reverb", "real": "", "character": "Very short early-reflection space with size presets.", "good_for": ["dry-sounding depth", "metal rhythm", "headphone realism"]},
+    {"id": 8009, "name": "Cave", "category": "Reverb", "real": "", "character": "Huge dark space, decay 5-20 s.", "good_for": ["drone", "ambient", "doom"]},
+    {"id": 8010, "name": "Shimmer", "category": "Reverb", "real": "", "character": "Long reverb with pitch-shifted (octave) feedback halo.", "good_for": ["ambient pads", "worship", "post-rock"]},
+    {"id": 8011, "name": "Mind Hall", "category": "Reverb", "real": "", "character": "Large stylised hall with damping.", "good_for": ["leads", "ambient"]},
+    {"id": 8012, "name": "Plate Lush", "category": "Reverb", "real": "", "character": "Dense, long, modulated plate.", "good_for": ["lush leads", "80s ballads", "ambient cleans"]},
+    {"id": 8013, "name": "Plate", "category": "Reverb", "real": "", "character": "Classic bright, dense studio plate.", "good_for": ["leads", "classic studio sheen", "pop cleans"]},
+    {"id": 8014, "name": "Plate Tight", "category": "Reverb", "real": "", "character": "Short, controlled plate.", "good_for": ["rhythm guitar", "fast lead lines", "rock"]},
+    {"id": 8015, "name": "Default Reverb", "category": "Reverb", "real": "", "character": "General-purpose algorithmic reverb engine with modulation and pre/post EQ.", "good_for": ["general purpose"]},
+    {"id": 8016, "name": "Gojira REV", "category": "Reverb", "real": "", "character": "From Archetype: Gojira: 'chasmic', dark-voiced reverb.", "good_for": ["dark metal cleans", "atmospheric leads"]},
+    {"id": 8017, "name": "Plini Reverb", "category": "Reverb", "real": "", "character": "From Archetype: Plini: huge 'multidimensional' reverb, decay 2-18 s.", "good_for": ["prog cleans", "ambient leads"]},
+    {"id": 8018, "name": "SLO-100 Reverb", "category": "Reverb", "real": "", "character": "From Soldano SLO-100 X: simplified reverb with tone control, 0.5-8 s.", "good_for": ["rock leads", "general purpose"]},
+    {"id": 8019, "name": "Cory Wong The Wash", "category": "Reverb", "real": "", "character": "Reverb stompbox for dreamy clean ambience.", "good_for": ["funk/pop cleans", "ambient"]},
+    {"id": 8021, "name": "Nolly Reverb", "category": "Reverb", "real": "", "character": "From Archetype: Nolly: 'multi-dimensional' reverb, 1-8.5 s.", "good_for": ["modern metal leads", "cleans"]},
+    {"id": 8023, "name": "Gojira REV Shimmer", "category": "Reverb", "real": "", "character": "Gojira reverb with dark-voiced shimmer.", "good_for": ["eerie pads", "atmospheric metal"]},
+    {"id": 8024, "name": "Cory Wong The Wash Shimmer", "category": "Reverb", "real": "", "character": "The Wash with its shimmer switch engaged.", "good_for": ["dreamy pads", "worship"]},
+    {"id": 8025, "name": "Nameless Reverb", "category": "Reverb", "real": "", "character": "From Fortin Nameless Suite: dark reverb (low-pass 2-6 kHz) for leads.", "good_for": ["metal leads", "dark ambience"]},
+    {"id": 8026, "name": "Spring Reverb Engine (M)", "category": "Reverb", "real": "", "character": "Detailed spring model with tank types and separate chirp/diffusion controls, mono.", "good_for": ["authentic amp spring", "surf drip"]},
+    {"id": 8027, "name": "Spring Reverb Engine (ST)", "category": "Reverb", "real": "", "character": "Detailed spring model with tank types, stereo.", "good_for": ["authentic amp spring", "surf drip"]},
+    {"id": 8028, "name": "Nordic Concert Hall (ST)", "category": "Reverb", "real": "Valhalla VintageVerb (Concert Hall mode)", "character": "Vintage-digital style concert hall: big, dense, modulated.", "good_for": ["80s leads", "ambient", "ballads"]},
+    {"id": 8029, "name": "Studio Plate 70 (ST)", "category": "Reverb", "real": "Lexicon PCM70 (Rich Plate programs)", "character": "Lush 80s digital plate.", "good_for": ["80s leads", "studio cleans", "pop"]},
+    {"id": 8030, "name": "Blossom (ST)", "category": "Reverb", "real": "Strymon BigSky (Bloom mode)", "character": "Slow-building blooming reverb with ducking.", "good_for": ["ambient swells", "post-rock", "worship"]},
+    {"id": 8031, "name": "Petrucci Reverb", "category": "Reverb", "real": "", "character": "From Archetype: Petrucci: dark reverb with damping.", "good_for": ["prog leads", "cleans"]},
+    {"id": 8032, "name": "Petrucci Reverb Shimmer", "category": "Reverb", "real": "", "character": "Petrucci reverb with 'celestial' shimmer layer.", "good_for": ["prog clean pads", "ambient"]},
+    {"id": 8033, "name": "John Mayer Spring Reverb (M)", "category": "Reverb", "real": "", "character": "Inspired by American standalone tube spring reverb units of the 1960s.", "good_for": ["blues", "vintage cleans", "surf"]},
+    {"id": 8034, "name": "John Mayer Studio Verb Hall", "category": "Reverb", "real": "", "character": "Lush, warm hall evoking classic early-digital studio reverbs.", "good_for": ["ballads", "clean leads", "pop"]},
+    {"id": 8035, "name": "John Mayer Studio Verb Plate", "category": "Reverb", "real": "", "character": "Classic 80s algorithmic plate with musical modulation.", "good_for": ["80s cleans", "leads"]},
+    {"id": 8036, "name": "Rabea Aeons Reverb", "category": "Reverb", "real": "", "character": "Studio-unit-inspired reverb with a pitchable Freeze layer.", "good_for": ["ambient", "drone pads", "doom"]},
+    {"id": 8037, "name": "Misha Shimmer", "category": "Reverb", "real": "", "character": "Shimmer mode of the Misha reverb: pitch-shifted harmonics on the tail.", "good_for": ["ambient cleans", "modern metal interludes"]},
+    {"id": 8038, "name": "Misha Reverb", "category": "Reverb", "real": "", "character": "Replica of Misha's favourite boutique unit with downsampled early-digital character and freeze.", "good_for": ["modern metal cleans", "lo-fi ambience"]},
+    {"id": 8039, "name": "Vintage Digital", "category": "Reverb", "real": "OTO Machines BAM Space Generator", "character": "Late-70s/80s style gritty digital reverb with freeze.", "good_for": ["80s textures", "lo-fi ambience", "indie"]},
+    {"id": 8040, "name": "Tim Henson Reverb", "category": "Reverb", "real": "", "character": "Inspired by classic studio reverbs: smooth and spacious with long decay.", "good_for": ["clean ambience", "modern prog"]},
+    {"id": 8041, "name": "Tim Henson Shimmer", "category": "Reverb", "real": "", "character": "Tim Henson reverb in shimmer mode (pitch-shifted harmonics).", "good_for": ["angelic pads", "ambient cleans"]}
+  ]
+}

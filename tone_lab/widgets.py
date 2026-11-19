@@ -3,24 +3,26 @@
 import tkinter as tk
 from tkinter import ttk
 
-BG = "#101413"
-PANEL = "#191f1d"
-RECESS = "#141917"
-LINE = "#2f3b34"
-TEXT = "#edf3eb"
-MUTED = "#a9b7ad"
-ACCENT = "#ccef9e"
-INK = "#1a2719"
-FONT = "Segoe UI"
+from . import theme as palette
+
+BG = palette.PAPER
+PANEL = palette.DARK
+RECESS = "#181a22"
+LINE = palette.RULE
+TEXT = palette.INK
+MUTED = palette.SUBTLE
+ACCENT = palette.ACCENT
+INK = palette.ACCENT_INK
+FONT = palette.FONT
 
 
 def button(parent, label, command, *, accent=False, compact=False):
     return tk.Button(
         parent, text=label, command=command, font=(FONT, 10, "bold"), relief="flat",
         borderwidth=0, padx=10 if compact else 14, pady=6 if compact else 9,
-        background=ACCENT if accent else "#28332d", foreground=INK if accent else TEXT,
-        activebackground="#e0f7bf" if accent else "#394940", activeforeground=INK if accent else TEXT,
-        disabledforeground="#839083" if not accent else "#4f6246", takefocus=True,
+        background=ACCENT if accent else palette.TILE, foreground=INK if accent else TEXT,
+        activebackground="#ffd7b7" if accent else palette.RULE, activeforeground=INK if accent else TEXT,
+        disabledforeground="#8a8b9a" if not accent else "#7a5a43", takefocus=True,
         highlightthickness=1, highlightcolor=ACCENT, highlightbackground=parent.cget("bg"),
     )
 
@@ -41,7 +43,7 @@ def entry(parent, variable, *, width=24):
     return tk.Entry(parent, textvariable=variable, width=width, font=(FONT, 11),
                     background=RECESS, foreground=TEXT, insertbackground=TEXT, relief="flat",
                     highlightthickness=1, highlightbackground=LINE, highlightcolor=ACCENT,
-                    selectbackground="#3b5940", selectforeground=TEXT)
+                    selectbackground="#3e4c68", selectforeground=TEXT)
 
 
 def theme(parent):

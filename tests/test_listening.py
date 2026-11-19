@@ -20,6 +20,22 @@ class ListeningSessionTest(unittest.TestCase):
         self.assertEqual(listening.route("Less bite on my current QC sound.", has_draft=True)[0], "adjust-live")
         self.assertEqual(listening.route("Match the reference.", has_draft=True)[0], "match")
         self.assertEqual(listening.route("Hear the draft.", has_draft=True)[0], "draft")
+
+    def test_an_observation_or_a_command_never_asks_for_a_new_sound(self):
+        for draft in (True, False):
+            for remark in ("the low end gets muddy when I palm mute", "it sounds harsh on the high strings",
+                           "I like it but the delay is distracting", "needs more sustain for the solo",
+                           "Why is the Quad Cortex so quiet", "like a stone"):
+                self.assertEqual(listening.route(remark, has_draft=draft)[0], "adjust-live", remark)
+            for command in ("undo", "Undo that.", "go back"):
+                self.assertEqual(listening.route(command, has_draft=draft), ("undo", ""))
+            self.assertEqual(listening.route("switch to A", has_draft=draft), ("side", "a"))
+            self.assertEqual(listening.route("play B", has_draft=draft), ("side", "b"))
+            self.assertEqual(listening.route("Save this.", has_draft=draft), ("save", ""))
+            self.assertEqual(listening.route("guitar", has_draft=draft), ("source", "guitar"))
+            self.assertEqual(listening.route("loop the phrase", has_draft=draft), ("source", "phrase"))
+            for sound in ("John Mayer Gravity", "something that sounds like Gravity", "Make it a metal rig"):
+                self.assertEqual(listening.route(sound, has_draft=draft)[0], "create", sound)
         self.assertEqual(listening.route("Keep this, the attack feels right.", has_draft=True),
                          ("keep", "the attack feels right"))
 

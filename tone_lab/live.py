@@ -6,9 +6,7 @@ from pathlib import Path
 from queue import Empty
 import time
 
-from qc_mcp import catalog
-
-from . import audio, device, iterate, styles
+from . import audio, device, iterate, models as catalog, styles
 
 
 def update(qc, base, scene, values, previous, *, position=iterate.SCRATCH):

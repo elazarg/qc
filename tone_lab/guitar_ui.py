@@ -276,7 +276,7 @@ class GuitarInputPanel:
     @staticmethod
     def listbox(parent, *, height):
         return tk.Listbox(parent, height=height, background=RECESS, foreground=TEXT, highlightthickness=1,
-                          highlightbackground=LINE, highlightcolor=ACCENT, selectbackground="#3b5940",
+                          highlightbackground=LINE, highlightcolor=ACCENT, selectbackground="#3e4c68",
                           selectforeground=TEXT, exportselection=False, font=(FONT, 10), relief="flat")
 
     def selection(self):
@@ -425,7 +425,7 @@ class GuitarInputPanel:
         self.instrument_box.configure(state="normal" if editable else "disabled")
         for title, choice in self.control_buttons.items():
             selected = title == self.control.get()
-            choice.configure(state="normal" if editable else "disabled", bg=ACCENT if selected else "#28332d",
+            choice.configure(state="normal" if editable else "disabled", bg=ACCENT if selected else "#2c303c",
                              fg=INK if selected else TEXT)
         self.label_box.configure(state="normal" if editable else "disabled")
         for widget, ready in ((self.use_latest, editable and self.latest_dry is not None),

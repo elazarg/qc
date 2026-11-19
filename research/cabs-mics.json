@@ -1,0 +1,3626 @@
+{
+ "meta": {
+  "generated": "2026-11-18",
+  "scope": "Quad Cortex 'Cabsim Guitar (M)' (87 cabs; stereo ids attached), cab-block mics, POSITION/DISTANCE, miking rules, York Audio MES 212 V30.",
+  "confidence_legend": {
+   "official": "stated by the manufacturer (Neural DSP, Shure, Royer, Celestion, York Audio...)",
+   "community / widely repeated": "multiple independent engineering or forum sources",
+   "single source": "one article or post",
+   "assumption": "inferred or from general knowledge; not confirmed by a fetched source",
+   "synthesis": "derived here by combining sourced rules"
+  },
+  "cab_field_notes": "'real', 'config', 'speaker' come from Neural DSP's 'based on' text. 'back' is not published by Neural DSP: back_confidence = stated (in the name), well-known (standard construction of that cab/combo), or assumption. 'character', 'pairs_with' and 'tags' are editorial summaries combining the speaker maker's description with general community knowledge; they are not Neural DSP statements."
+ },
+ "cabs": [
+  {
+   "id": 12001,
+   "st_id": 32001,
+   "name": "412 CA Stand OS S V30 90s (M)",
+   "based_on_as_listed": "Based on Mesa® Standard OS Straight with Celestion® Vintage 30 drivers",
+   "real": "Mesa Standard Oversized 4x12 straight",
+   "config": "4x12",
+   "back": "closed",
+   "back_confidence": "well-known",
+   "speaker": "Celestion Vintage 30",
+   "character": "Big oversized Mesa 4x12: deep, thumping lows with V30 upper-mid bite. The modern metal reference cab.",
+   "pairs_with": [
+    "mesa_rectifier",
+    "mesa_mark",
+    "5150",
+    "diezel",
+    "soldano_slo"
+   ],
+   "tags": [
+    "metal",
+    "modern",
+    "tight",
+    "big-low-end",
+    "upper-mid",
+    "rhythm"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/vintage-30/"
+   ]
+  },
+  {
+   "id": 12002,
+   "st_id": 32002,
+   "name": "412 D-Cell Front V30 04 (M)",
+   "based_on_as_listed": "Based on Diezel® Front Loaded with Celestion® Vintage 30 drivers",
+   "real": "Diezel front-loaded 4x12",
+   "config": "4x12",
+   "back": "closed",
+   "back_confidence": "well-known",
+   "speaker": "Celestion Vintage 30",
+   "character": "Front-loaded Diezel 4x12: very tight, focused lows and forward V30 mids; dry, modern, percussive.",
+   "pairs_with": [
+    "diezel_vh4",
+    "diezel_herbert",
+    "5150",
+    "mesa_rectifier"
+   ],
+   "tags": [
+    "metal",
+    "modern",
+    "tight",
+    "upper-mid",
+    "rhythm"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/vintage-30/"
+   ]
+  },
+  {
+   "id": 12003,
+   "st_id": 32003,
+   "name": "412 EV Straight G12 00s (M)",
+   "based_on_as_listed": "Based on EVH® Straight with Celestion® G12EVH drivers",
+   "real": "EVH 5150III 4x12 straight",
+   "config": "4x12",
+   "back": "closed",
+   "back_confidence": "well-known",
+   "speaker": "Celestion G12EVH (20 W Greenback type)",
+   "character": "EVH straight 4x12 with 20 W Greenback-type speakers: woody mids, softer top, less upper-mid spike than V30.",
+   "pairs_with": [
+    "5150",
+    "evh_5150iii",
+    "marshall_plexi",
+    "marshall_jcm800"
+   ],
+   "tags": [
+    "hard-rock",
+    "metal",
+    "warm",
+    "mid-forward",
+    "lead"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/g12-evh/"
+   ]
+  },
+  {
+   "id": 12004,
+   "st_id": 32004,
+   "name": "212 US A-type 00s (M)",
+   "based_on_as_listed": "Based on Fender® Cab with Celestion® A-Type 12” drivers",
+   "real": "Fender 2x12 cab (exact cab not stated)",
+   "config": "2x12",
+   "back": "unknown",
+   "back_confidence": "assumption",
+   "speaker": "Celestion A-Type",
+   "character": "American-voiced Celestion 2x12: rounded lows, laid-back mids, clear upper register; clean to light crunch.",
+   "pairs_with": [
+    "fender_hot_rod",
+    "fender_twin",
+    "fender_bassbreaker"
+   ],
+   "tags": [
+    "clean",
+    "edge-of-breakup",
+    "warm",
+    "american"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/a-type/"
+   ]
+  },
+  {
+   "id": 12005,
+   "st_id": 32005,
+   "name": "412 Brit 60B GB 90s (M)",
+   "based_on_as_listed": "Based on Marshall® 1960B® with Celestion® Greenback drivers",
+   "real": "Marshall 1960B 4x12 straight (1990s)",
+   "config": "4x12",
+   "back": "closed",
+   "back_confidence": "well-known",
+   "speaker": "Celestion G12M Greenback",
+   "character": "Marshall 1960B with 90s Greenbacks: woody mid attack, restrained top, compresses when pushed. Classic rock.",
+   "pairs_with": [
+    "marshall_plexi",
+    "marshall_jtm45",
+    "marshall_jcm800",
+    "friedman_be"
+   ],
+   "tags": [
+    "classic-rock",
+    "hard-rock",
+    "warm",
+    "mid-forward",
+    "vintage"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/g12m-greenback/"
+   ]
+  },
+  {
+   "id": 12006,
+   "st_id": 32006,
+   "name": "412 Brit 60B GB 71 (M)",
+   "based_on_as_listed": "Based on Marshall® 1960B® with Celestion® Pulsonic Greenback drivers",
+   "real": "Marshall 1960B 4x12 straight (1971)",
+   "config": "4x12",
+   "back": "closed",
+   "back_confidence": "well-known",
+   "speaker": "Celestion Greenback, Pulsonic cone",
+   "character": "1971 Marshall 1960B with Pulsonic-cone Greenbacks: vintage, sweet, complex mids and a soft top. 70s rock.",
+   "pairs_with": [
+    "marshall_plexi",
+    "marshall_superlead",
+    "marshall_jtm45"
+   ],
+   "tags": [
+    "classic-rock",
+    "vintage",
+    "warm",
+    "mid-forward",
+    "blues"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12007,
+   "st_id": 32007,
+   "name": "412 CA Trad S UKV30 90s (M)",
+   "based_on_as_listed": "Based on Mesa® Traditional Straight with Celestion® Vintage 30 drivers",
+   "real": "Mesa Traditional 4x12 straight",
+   "config": "4x12",
+   "back": "closed",
+   "back_confidence": "well-known",
+   "speaker": "Celestion Vintage 30 (UK)",
+   "character": "Standard-size Mesa 4x12: tighter and less sub-heavy than the Oversized, with UK V30 upper-mid cut.",
+   "pairs_with": [
+    "mesa_rectifier",
+    "mesa_mark",
+    "5150",
+    "soldano_slo"
+   ],
+   "tags": [
+    "metal",
+    "tight",
+    "upper-mid",
+    "rhythm"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/vintage-30/"
+   ]
+  },
+  {
+   "id": 12008,
+   "st_id": 32008,
+   "name": "212 Zila CB 16 (M)",
+   "based_on_as_listed": "Based on Zilla® Cab with Celestion® Creamback G12H- 75 drivers",
+   "real": "Zilla 2x12 (model not stated)",
+   "config": "2x12",
+   "back": "unknown",
+   "back_confidence": "assumption",
+   "speaker": "Celestion Creamback G12H-75",
+   "character": "Zilla 2x12 with Creamback H-75s: Greenback-style vocal mids with more girth and low-end focus; thick leads.",
+   "pairs_with": [
+    "marshall_plexi",
+    "friedman_be",
+    "marshall_jcm800",
+    "bogner"
+   ],
+   "tags": [
+    "hard-rock",
+    "classic-rock",
+    "warm",
+    "mid-forward",
+    "lead"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/g12h-75-creamback/"
+   ]
+  },
+  {
+   "id": 12009,
+   "st_id": 32009,
+   "name": "412 Brit Silver B 70w 87 (M)",
+   "based_on_as_listed": "Based on Marshall® 2551B® with Celestion® drivers",
+   "real": "Marshall 2551B Silver Jubilee 4x12 straight (1987)",
+   "config": "4x12",
+   "back": "closed",
+   "back_confidence": "well-known",
+   "speaker": "Celestion 70 W (model not stated by Neural DSP)",
+   "character": "Silver Jubilee 4x12 with 70 W Celestions: thick low-mids, smooth top, 80s hard-rock Marshall voice.",
+   "pairs_with": [
+    "marshall_jubilee",
+    "marshall_jcm800",
+    "friedman_be"
+   ],
+   "tags": [
+    "hard-rock",
+    "classic-rock",
+    "warm",
+    "lead"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12010,
+   "st_id": 32010,
+   "name": "412 Range PPC V30 03 (M)",
+   "based_on_as_listed": "Based on Orange® PPC412 with Celestion® Vintage 30 drivers",
+   "real": "Orange PPC412 (2003)",
+   "config": "4x12",
+   "back": "closed",
+   "back_confidence": "well-known",
+   "speaker": "Celestion Vintage 30",
+   "character": "Orange PPC412: heavy closed 4x12 with dense low-mids, darker top and V30 bark; big and thick.",
+   "pairs_with": [
+    "orange_rockerverb",
+    "orange_or",
+    "5150",
+    "mesa_rectifier"
+   ],
+   "tags": [
+    "metal",
+    "stoner",
+    "dark",
+    "big-low-end",
+    "mid-forward"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/vintage-30/"
+   ]
+  },
+  {
+   "id": 12011,
+   "st_id": 32011,
+   "name": "412 Bogna Uber T75 00s (M)",
+   "based_on_as_listed": "Based on Bogner® Ubercab® with Celestion® T75 drivers",
+   "real": "Bogner Uberkab 4x12",
+   "config": "4x12",
+   "back": "closed",
+   "back_confidence": "well-known",
+   "speaker": "Celestion G12T-75",
+   "character": "Bogner Uberkab with T75s: big tight lows, scooped mids, crisp highs; blends well with a V30 cab.",
+   "pairs_with": [
+    "bogner_uberschall",
+    "bogner_ecstasy",
+    "5150",
+    "marshall_jcm800"
+   ],
+   "tags": [
+    "metal",
+    "hard-rock",
+    "scooped",
+    "big-low-end",
+    "bright"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/g12t-75/"
+   ]
+  },
+  {
+   "id": 12012,
+   "st_id": 32012,
+   "name": "212 Sur V-type 10 (M)",
+   "based_on_as_listed": "Based on Suhr® Cab with Celestion® V-Type drivers",
+   "real": "Suhr 2x12",
+   "config": "2x12",
+   "back": "unknown",
+   "back_confidence": "assumption",
+   "speaker": "Celestion V-Type",
+   "character": "Suhr 2x12 with V-Types: balanced, sweet, vintage-leaning voice without a V30 spike; clean to rock.",
+   "pairs_with": [
+    "suhr",
+    "marshall_plexi",
+    "fender_deluxe",
+    "friedman_be"
+   ],
+   "tags": [
+    "versatile",
+    "balanced",
+    "classic-rock",
+    "clean"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/v-type/"
+   ]
+  },
+  {
+   "id": 12013,
+   "st_id": 32013,
+   "name": "212 UK C30 GB 69 (M)",
+   "based_on_as_listed": "Based on VOX® AC30® with Celestion® Pre-Rola Greenback Pulsonic drivers",
+   "real": "Vox AC30 2x12 combo (1969)",
+   "config": "2x12",
+   "back": "open",
+   "back_confidence": "well-known",
+   "speaker": "Celestion pre-Rola Greenback, Pulsonic cone",
+   "character": "1969 AC30 with pre-Rola Greenbacks: open-back chime with woodier, warmer mids and softer top than Blues.",
+   "pairs_with": [
+    "vox_ac30",
+    "matchless"
+   ],
+   "tags": [
+    "chime",
+    "vintage",
+    "warm",
+    "edge-of-breakup",
+    "indie",
+    "classic-rock"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12015,
+   "st_id": 32015,
+   "name": "412 Zila Cust V30 12 V2 (M)",
+   "based_on_as_listed": "Based on Zilla® Custom with Celestion® Vintage 30 drivers",
+   "real": "Zilla Custom 4x12 (2012)",
+   "config": "4x12",
+   "back": "closed",
+   "back_confidence": "assumption",
+   "speaker": "Celestion Vintage 30",
+   "character": "Zilla custom 4x12 with V30s: modern UK boutique metal cab, tight lows and clear upper-mid attack.",
+   "pairs_with": [
+    "5150",
+    "mesa_rectifier",
+    "diezel",
+    "engl"
+   ],
+   "tags": [
+    "metal",
+    "modern",
+    "tight",
+    "upper-mid"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/vintage-30/"
+   ]
+  },
+  {
+   "id": 12016,
+   "st_id": 32016,
+   "name": "412 ENG Pro V30 18 (M)",
+   "based_on_as_listed": "Based on ENGL® V30®",
+   "real": "ENGL Pro 4x12 (2018)",
+   "config": "4x12",
+   "back": "closed",
+   "back_confidence": "well-known",
+   "speaker": "Celestion Vintage 30",
+   "character": "ENGL Pro 4x12 V30: tight, aggressive, forward upper-mids; built for ENGL-style high gain.",
+   "pairs_with": [
+    "engl_powerball",
+    "engl_savage",
+    "engl_fireball",
+    "5150"
+   ],
+   "tags": [
+    "metal",
+    "modern",
+    "tight",
+    "upper-mid",
+    "aggressive"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/vintage-30/"
+   ]
+  },
+  {
+   "id": 12017,
+   "st_id": 32017,
+   "name": "112 US DLX Black C12K 00s (M)",
+   "based_on_as_listed": "Based on Fender® Deluxe® “Blackface” with Jensen® C12K drivers",
+   "real": "Fender Deluxe Reverb 'Blackface' 1x12 combo",
+   "config": "1x12",
+   "back": "open",
+   "back_confidence": "well-known",
+   "speaker": "Jensen C12K",
+   "character": "Blackface Deluxe 1x12 with C12K: open-back sparkle, full bass, smooth top, plenty of headroom.",
+   "pairs_with": [
+    "fender_deluxe",
+    "fender_blackface",
+    "fender_princeton"
+   ],
+   "tags": [
+    "clean",
+    "sparkle",
+    "american",
+    "blues",
+    "country",
+    "funk"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://www.jensentone.com/vintage-ceramic/c12k"
+   ]
+  },
+  {
+   "id": 12018,
+   "st_id": 32018,
+   "name": "112 US DLX Tweed WGS-Q 10s (M)",
+   "based_on_as_listed": "Based on Fender® Deluxe® “Tweed” with WGS® G12Q drivers",
+   "real": "Fender Deluxe 'Tweed' 1x12 combo",
+   "config": "1x12",
+   "back": "open",
+   "back_confidence": "well-known",
+   "speaker": "WGS G12Q",
+   "character": "Tweed Deluxe 1x12 open-back: loose lows, raw mid growl, early breakup; small-combo honk and warmth.",
+   "pairs_with": [
+    "fender_tweed",
+    "fender_deluxe"
+   ],
+   "tags": [
+    "blues",
+    "roots",
+    "vintage",
+    "loose",
+    "mid-forward",
+    "edge-of-breakup"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12019,
+   "st_id": 32019,
+   "name": "112 Zila MiniMod RB 17 (M)",
+   "based_on_as_listed": "Based on Zilla® Mini Modern with Celestion® G12H150 Redback drivers",
+   "real": "Zilla Mini Modern 1x12 (2017)",
+   "config": "1x12",
+   "back": "unknown",
+   "back_confidence": "assumption",
+   "speaker": "Celestion G12H-150 Redback",
+   "character": "Compact Zilla 1x12 with 150 W Redback: controlled lows, detailed mids, relaxed treble; stays clean under gain.",
+   "pairs_with": [
+    "5150",
+    "friedman_be",
+    "mesa_mark"
+   ],
+   "tags": [
+    "modern",
+    "tight",
+    "smooth-top",
+    "compact"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/g12h-150-redback/"
+   ]
+  },
+  {
+   "id": 12020,
+   "st_id": 32020,
+   "name": "210 US TRMLX Oxf 63 (M)",
+   "based_on_as_listed": "Based on Fender® Tremolux® with Oxford® Alnico drivers",
+   "real": "Fender Tremolux 2x10 piggyback cab (1963)",
+   "config": "2x10",
+   "back": "closed",
+   "back_confidence": "assumption",
+   "speaker": "Oxford alnico 10\"",
+   "character": "1963 Tremolux 2x10 with Oxford alnicos: bright, snappy, light low end; vintage clean and edge of breakup.",
+   "pairs_with": [
+    "fender_tremolux",
+    "fender_blackface",
+    "fender_brownface"
+   ],
+   "tags": [
+    "clean",
+    "vintage",
+    "bright",
+    "edge-of-breakup",
+    "surf"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12021,
+   "st_id": 32021,
+   "name": "212 CA Recto V30 98 (M)",
+   "based_on_as_listed": "Based on Mesa® Rectifier® with Celestion® Vintage 30 drivers",
+   "real": "Mesa Rectifier 2x12 horizontal (1998)",
+   "config": "2x12",
+   "back": "closed",
+   "back_confidence": "well-known",
+   "speaker": "Celestion Vintage 30",
+   "character": "Mesa Recto horizontal 2x12 V30: punchier and more focused than the 4x12s, deep lows, mid-forward.",
+   "pairs_with": [
+    "mesa_rectifier",
+    "mesa_mark",
+    "5150",
+    "soldano_slo",
+    "friedman_be"
+   ],
+   "tags": [
+    "metal",
+    "hard-rock",
+    "tight",
+    "punchy",
+    "upper-mid",
+    "versatile"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/vintage-30/"
+   ]
+  },
+  {
+   "id": 12022,
+   "st_id": 32022,
+   "name": "212 US TWN C12Q 00s (M)",
+   "based_on_as_listed": "Based on Fender® Twin Reverb® with Jensen® C12Q drivers",
+   "real": "Fender Twin Reverb 2x12 combo",
+   "config": "2x12",
+   "back": "open",
+   "back_confidence": "well-known",
+   "speaker": "Jensen C12Q",
+   "character": "Twin Reverb 2x12 with C12Qs: open-back, warm and balanced with bite; breaks up earlier than C12K.",
+   "pairs_with": [
+    "fender_twin",
+    "fender_blackface",
+    "fender_deluxe"
+   ],
+   "tags": [
+    "clean",
+    "american",
+    "warm",
+    "blues"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://www.jensentone.com/vintage-ceramic/c12q"
+   ]
+  },
+  {
+   "id": 12023,
+   "st_id": 32023,
+   "name": "212 Rols Jazz 87 (M)",
+   "based_on_as_listed": "Based on Roland® JC-120®",
+   "real": "Roland JC-120 2x12 combo (1987)",
+   "config": "2x12",
+   "back": "open",
+   "back_confidence": "well-known",
+   "speaker": "Roland stock 12\" (not stated by Neural DSP)",
+   "character": "Roland JC-120 2x12: very clean solid-state combo voice with glassy highs; chorus cleans.",
+   "pairs_with": [
+    "roland_jc"
+   ],
+   "tags": [
+    "clean",
+    "jazz",
+    "funk",
+    "glassy",
+    "80s",
+    "metal-clean"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12024,
+   "st_id": 32024,
+   "name": "212 UK C30 65 (M)",
+   "based_on_as_listed": "Based on VOX® AC30® Top Boost with Celestion® Alnico “Silver Bell” drivers",
+   "real": "Vox AC30 Top Boost 2x12 combo (1965)",
+   "config": "2x12",
+   "back": "open",
+   "back_confidence": "well-known",
+   "speaker": "Celestion alnico 'Silver Bell' (Blue type)",
+   "character": "1965 AC30 with silver alnicos: bell-like chime, mellow upper-mids, early compression. Jangle.",
+   "pairs_with": [
+    "vox_ac30",
+    "vox_ac15",
+    "matchless"
+   ],
+   "tags": [
+    "chime",
+    "jangle",
+    "vintage",
+    "indie",
+    "edge-of-breakup",
+    "bright"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/celestion-blue/"
+   ]
+  },
+  {
+   "id": 12025,
+   "st_id": 32025,
+   "name": "212 Zila Open Gold 19 (M)",
+   "based_on_as_listed": "Based on Zilla® Open with Celestion® Alnico Gold drivers",
+   "real": "Zilla Open 2x12 (2019)",
+   "config": "2x12",
+   "back": "open",
+   "back_confidence": "stated",
+   "speaker": "Celestion Alnico Gold",
+   "character": "Zilla open-back 2x12 with Alnico Golds: played-in Blue-style chime with more headroom.",
+   "pairs_with": [
+    "vox_ac30",
+    "matchless",
+    "two_rock",
+    "fender_deluxe"
+   ],
+   "tags": [
+    "chime",
+    "clean",
+    "edge-of-breakup",
+    "open",
+    "boutique"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/celestion-gold/"
+   ]
+  },
+  {
+   "id": 12026,
+   "st_id": 32026,
+   "name": "110 US PRN Brown FatJ 10s (M)",
+   "based_on_as_listed": "Based on Fender® Princeton® with FatJimmy® C1060 Drivers",
+   "real": "Fender Princeton 'Brownface' 1x10 combo",
+   "config": "1x10",
+   "back": "open",
+   "back_confidence": "well-known",
+   "speaker": "Fat Jimmy C1060 (10\")",
+   "character": "Brownface Princeton 1x10: small open-back box, sweet mids, limited lows, breaks up early; studio cleans.",
+   "pairs_with": [
+    "fender_princeton",
+    "fender_brownface",
+    "fender_tweed"
+   ],
+   "tags": [
+    "clean",
+    "blues",
+    "small-combo",
+    "edge-of-breakup",
+    "vintage"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12028,
+   "st_id": 32028,
+   "name": "412 Brit 60A GB75Hz 89 (M)",
+   "based_on_as_listed": "Based on Marshall® 1960A® with Celestion® G12M25 drivers",
+   "real": "Marshall 1960A 4x12 angled (1989)",
+   "config": "4x12",
+   "back": "closed",
+   "back_confidence": "well-known",
+   "speaker": "Celestion G12M-25 Greenback (75 Hz cone)",
+   "character": "1989 Marshall 1960A with 25 W Greenbacks: woody mids, soft top, compresses early; classic rock.",
+   "pairs_with": [
+    "marshall_plexi",
+    "marshall_jcm800",
+    "marshall_jtm45",
+    "friedman_be"
+   ],
+   "tags": [
+    "classic-rock",
+    "hard-rock",
+    "warm",
+    "mid-forward"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/g12m-greenback/"
+   ]
+  },
+  {
+   "id": 12029,
+   "st_id": 32029,
+   "name": "412 Brit 60B V30 95 (M)",
+   "based_on_as_listed": "Based on Marshall® 1960B® with Celestion® Marshall® Vintage 30 drivers",
+   "real": "Marshall 1960B 4x12 straight (1995)",
+   "config": "4x12",
+   "back": "closed",
+   "back_confidence": "well-known",
+   "speaker": "Celestion Vintage 30 (Marshall-labelled)",
+   "character": "Marshall 1960B with Marshall Vintage 30s: Marshall cab body with V30 upper-mid cut; rock to metal.",
+   "pairs_with": [
+    "marshall_jcm800",
+    "marshall_jcm900",
+    "friedman_be",
+    "5150",
+    "soldano_slo"
+   ],
+   "tags": [
+    "hard-rock",
+    "metal",
+    "upper-mid",
+    "tight"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/vintage-30/"
+   ]
+  },
+  {
+   "id": 12030,
+   "st_id": 32030,
+   "name": "412 Brit TV GB75Hz 69 (M)",
+   "based_on_as_listed": "Based on Marshall® 1960TV® with Celestion® G12M25 drivers",
+   "real": "Marshall 1960TV tall 4x12 (1969)",
+   "config": "4x12",
+   "back": "closed",
+   "back_confidence": "well-known",
+   "speaker": "Celestion G12M-25 Greenback (75 Hz cone)",
+   "character": "1969 tall 1960TV cab with Greenbacks: the larger box gives bigger lows; vintage woody mids.",
+   "pairs_with": [
+    "marshall_plexi",
+    "marshall_superlead",
+    "marshall_jtm45"
+   ],
+   "tags": [
+    "classic-rock",
+    "vintage",
+    "warm",
+    "big-low-end",
+    "mid-forward"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/g12m-greenback/"
+   ]
+  },
+  {
+   "id": 12031,
+   "st_id": 32031,
+   "name": "412 CA Stand OS A V30 01 (M)",
+   "based_on_as_listed": "Based on Mesa® Standard OS Angled with Celestion® Vintage 30 drivers",
+   "real": "Mesa Standard Oversized 4x12 angled (2001)",
+   "config": "4x12",
+   "back": "closed",
+   "back_confidence": "well-known",
+   "speaker": "Celestion Vintage 30",
+   "character": "Mesa Oversized slant 4x12 V30 (2001): Recto low-end weight and V30 bite; a metal standard.",
+   "pairs_with": [
+    "mesa_rectifier",
+    "mesa_mark",
+    "5150",
+    "diezel"
+   ],
+   "tags": [
+    "metal",
+    "modern",
+    "big-low-end",
+    "upper-mid",
+    "rhythm"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/vintage-30/"
+   ]
+  },
+  {
+   "id": 12032,
+   "st_id": 32032,
+   "name": "412 CA Trad A V30 92 (M)",
+   "based_on_as_listed": "Based on Mesa® Traditional Angled with Celestion® Vintage 30 drivers",
+   "real": "Mesa Traditional 4x12 angled (1992)",
+   "config": "4x12",
+   "back": "closed",
+   "back_confidence": "well-known",
+   "speaker": "Celestion Vintage 30",
+   "character": "Standard-size Mesa slant 4x12 V30 (1992): tighter, less boomy than Oversized; focused metal rhythm.",
+   "pairs_with": [
+    "mesa_rectifier",
+    "mesa_mark",
+    "5150",
+    "soldano_slo"
+   ],
+   "tags": [
+    "metal",
+    "tight",
+    "upper-mid",
+    "rhythm"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/vintage-30/"
+   ]
+  },
+  {
+   "id": 12033,
+   "st_id": 32033,
+   "name": "412 CA Trad S H30 15 (M)",
+   "based_on_as_listed": "Based on Mesa® Traditional Straight with Celestion® G12H30 drivers",
+   "real": "Mesa Traditional 4x12 straight (2015)",
+   "config": "4x12",
+   "back": "closed",
+   "back_confidence": "well-known",
+   "speaker": "Celestion G12H30",
+   "character": "Mesa Traditional straight with G12H30s: strong low-end and low-mids, attacking upper-mids; rawer than V30.",
+   "pairs_with": [
+    "mesa_mark",
+    "marshall_plexi",
+    "mesa_rectifier",
+    "friedman_be"
+   ],
+   "tags": [
+    "hard-rock",
+    "metal",
+    "aggressive",
+    "big-low-end",
+    "upper-mid"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/g12h-anniversary/"
+   ]
+  },
+  {
+   "id": 12034,
+   "st_id": 32034,
+   "name": "412 Range PPC V30 02 (M)",
+   "based_on_as_listed": "Based on Orange® PPC412 with Celestion® Vintage 30 drivers",
+   "real": "Orange PPC412 (2002)",
+   "config": "4x12",
+   "back": "closed",
+   "back_confidence": "well-known",
+   "speaker": "Celestion Vintage 30",
+   "character": "Orange PPC412 V30 (2002 capture): dense low-mids, dark top, V30 bark; alternate to the 2003 cab.",
+   "pairs_with": [
+    "orange_rockerverb",
+    "orange_or",
+    "5150",
+    "mesa_rectifier"
+   ],
+   "tags": [
+    "metal",
+    "stoner",
+    "dark",
+    "big-low-end",
+    "mid-forward"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/vintage-30/"
+   ]
+  },
+  {
+   "id": 12035,
+   "st_id": 32035,
+   "name": "412 Bogna Uber V30 00s (M)",
+   "based_on_as_listed": "Based on Bogner® Ubercab® with Celestion® Vintage 30 drivers",
+   "real": "Bogner Uberkab 4x12",
+   "config": "4x12",
+   "back": "closed",
+   "back_confidence": "well-known",
+   "speaker": "Celestion Vintage 30",
+   "character": "Bogner Uberkab with V30s: huge, deep closed 4x12 with V30 upper-mid cut; thick modern high gain.",
+   "pairs_with": [
+    "bogner_uberschall",
+    "bogner_ecstasy",
+    "5150",
+    "mesa_rectifier"
+   ],
+   "tags": [
+    "metal",
+    "modern",
+    "big-low-end",
+    "upper-mid"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/vintage-30/"
+   ]
+  },
+  {
+   "id": 12036,
+   "st_id": 32036,
+   "name": "412 CA Stand OS A V30 03 (M)",
+   "based_on_as_listed": "Based on Mesa® Oversize Angle 2003 with Celestion® UK Vintage 30",
+   "real": "Mesa Standard Oversized 4x12 angled (2003)",
+   "config": "4x12",
+   "back": "closed",
+   "back_confidence": "well-known",
+   "speaker": "Celestion Vintage 30 (UK)",
+   "character": "Mesa Oversized slant 4x12 with UK V30s (2003): deep lows and strong upper-mids; Recto-era staple.",
+   "pairs_with": [
+    "mesa_rectifier",
+    "mesa_mark",
+    "5150",
+    "diezel"
+   ],
+   "tags": [
+    "metal",
+    "modern",
+    "big-low-end",
+    "upper-mid",
+    "rhythm"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/vintage-30/"
+   ]
+  },
+  {
+   "id": 12037,
+   "st_id": 32037,
+   "name": "112 US DLX SC64 (M)",
+   "based_on_as_listed": "Based on Fender® Deluxe® 1x12 Eminence® GA-SC64",
+   "real": "Fender Deluxe 1x12 combo",
+   "config": "1x12",
+   "back": "open",
+   "back_confidence": "well-known",
+   "speaker": "Eminence GA-SC64",
+   "character": "Deluxe 1x12 with Eminence GA-SC64: vintage American clean voice in an open-back combo.",
+   "pairs_with": [
+    "fender_deluxe",
+    "fender_blackface",
+    "fender_princeton"
+   ],
+   "tags": [
+    "clean",
+    "american",
+    "blues",
+    "edge-of-breakup"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12038,
+   "st_id": 32038,
+   "name": "412 Brit 35B Alnico Cream (M)",
+   "based_on_as_listed": "Based on Marshall® 1935B® Alnico Cream",
+   "real": "Marshall 1935B 4x12",
+   "config": "4x12",
+   "back": "closed",
+   "back_confidence": "well-known",
+   "speaker": "Celestion Alnico Cream",
+   "character": "Marshall 1935B 4x12 with Alnico Creams: laid-back attack, warm lows, bell-like chime, high headroom.",
+   "pairs_with": [
+    "marshall_plexi",
+    "marshall_jtm45",
+    "hiwatt",
+    "two_rock"
+   ],
+   "tags": [
+    "classic-rock",
+    "blues",
+    "warm",
+    "chime",
+    "vintage"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/celestion-cream/"
+   ]
+  },
+  {
+   "id": 12039,
+   "st_id": 32039,
+   "name": "212 CA Recto Legend V12 (M)",
+   "based_on_as_listed": "Based on Mesa® Rectifier® 2x12 Legend V12",
+   "real": "Mesa Rectifier 2x12",
+   "config": "2x12",
+   "back": "closed",
+   "back_confidence": "well-known",
+   "speaker": "Eminence Legend V12",
+   "character": "Mesa Recto 2x12 with Eminence Legend V12s: Recto 2x12 punch with a non-Celestion mid voicing.",
+   "pairs_with": [
+    "mesa_rectifier",
+    "mesa_mark",
+    "5150"
+   ],
+   "tags": [
+    "hard-rock",
+    "metal",
+    "punchy",
+    "tight"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12040,
+   "st_id": 32040,
+   "name": "212 Zila Fatboy V30 02 (M)",
+   "based_on_as_listed": "Based on Zilla® Fatboy 2x12 2002 with Celestion® UK Vintage 30",
+   "real": "Zilla Fatboy 2x12 (2002)",
+   "config": "2x12",
+   "back": "closed",
+   "back_confidence": "assumption",
+   "speaker": "Celestion Vintage 30 (UK)",
+   "character": "Oversized Zilla Fatboy 2x12 with UK V30s: big low end for a 2x12 with V30 cut; modern metal favourite.",
+   "pairs_with": [
+    "5150",
+    "mesa_rectifier",
+    "diezel",
+    "friedman_be"
+   ],
+   "tags": [
+    "metal",
+    "modern",
+    "tight",
+    "upper-mid",
+    "big-low-end"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/vintage-30/"
+   ]
+  },
+  {
+   "id": 12041,
+   "st_id": 32041,
+   "name": "212 US TWN CK2 (M)",
+   "based_on_as_listed": "Based on Fender® Twin Reverb® 2x12 Jensen C12K-2",
+   "real": "Fender Twin Reverb 2x12 combo",
+   "config": "2x12",
+   "back": "open",
+   "back_confidence": "well-known",
+   "speaker": "Jensen C12K-2",
+   "character": "Twin Reverb 2x12 with C12K-2s: open-back, loud and clean, full bass, smooth top; maximum headroom.",
+   "pairs_with": [
+    "fender_twin",
+    "fender_blackface"
+   ],
+   "tags": [
+    "clean",
+    "american",
+    "headroom",
+    "funk",
+    "country",
+    "jazz"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://www.jensentone.com/vintage-ceramic/c12k"
+   ]
+  },
+  {
+   "id": 12042,
+   "st_id": 32042,
+   "name": "412 Watt S4123 (M)",
+   "based_on_as_listed": "Based on Hiwatt® SE4123® 4x12",
+   "real": "Hiwatt SE4123 4x12",
+   "config": "4x12",
+   "back": "closed",
+   "back_confidence": "well-known",
+   "speaker": "Not stated by Neural DSP (Hiwatt cabs are traditionally Fane-loaded)",
+   "character": "Hiwatt SE4123 4x12: loud, clear and firm with strong clean projection; big cleans and crunch.",
+   "pairs_with": [
+    "hiwatt",
+    "marshall_plexi"
+   ],
+   "tags": [
+    "classic-rock",
+    "clean",
+    "crunch",
+    "clear",
+    "vintage"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12043,
+   "st_id": 32043,
+   "name": "112 UK C15 Blue (M)",
+   "based_on_as_listed": "Based on VOX® AC15® with Celestion® Alnico Blue drivers",
+   "real": "Vox AC15 1x12 combo",
+   "config": "1x12",
+   "back": "open",
+   "back_confidence": "well-known",
+   "speaker": "Celestion Alnico Blue",
+   "character": "AC15 1x12 with Alnico Blue: chimey bell-like top, mellow upper-mids, compresses early; small open combo.",
+   "pairs_with": [
+    "vox_ac15",
+    "vox_ac30",
+    "matchless"
+   ],
+   "tags": [
+    "chime",
+    "jangle",
+    "indie",
+    "edge-of-breakup",
+    "small-combo"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/celestion-blue/"
+   ]
+  },
+  {
+   "id": 12044,
+   "st_id": 32044,
+   "name": "410 US Basslad PR10 (M)",
+   "based_on_as_listed": "Based on Fender® Bassman® Tweed with Jensen® P10R drivers",
+   "real": "Fender Bassman 'Tweed' 4x10 combo",
+   "config": "4x10",
+   "back": "open",
+   "back_confidence": "well-known",
+   "speaker": "Jensen P10R",
+   "character": "Tweed Bassman 4x10 with P10Rs: open-back, warm with sparkling highs, loose lows; blues and roots breakup.",
+   "pairs_with": [
+    "fender_bassman",
+    "fender_tweed",
+    "marshall_jtm45"
+   ],
+   "tags": [
+    "blues",
+    "roots",
+    "vintage",
+    "warm",
+    "sparkle",
+    "edge-of-breakup"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://www.jensentone.com/vintage-alnico/p10r"
+   ]
+  },
+  {
+   "id": 12045,
+   "st_id": 32045,
+   "name": "110 US PRN C10R (M)",
+   "based_on_as_listed": "Based on Fender® Princeton® with Jensen® C10R Drivers",
+   "real": "Fender Princeton 1x10 combo",
+   "config": "1x10",
+   "back": "open",
+   "back_confidence": "well-known",
+   "speaker": "Jensen C10R",
+   "character": "Princeton 1x10 with C10R: bell-like chime, loose lows, bright highs; turns gritty with overdrive.",
+   "pairs_with": [
+    "fender_princeton",
+    "fender_blackface",
+    "fender_deluxe"
+   ],
+   "tags": [
+    "clean",
+    "chime",
+    "bright",
+    "small-combo",
+    "blues"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://www.jensentone.com/vintage-ceramic/c10r"
+   ]
+  },
+  {
+   "id": 12046,
+   "st_id": 32046,
+   "name": "212 Match Jefe Sig 02 (M)",
+   "based_on_as_listed": "Based on Matchless(TM) Chieftain® with Signature Drivers",
+   "real": "Matchless Chieftain 2x12 (2002)",
+   "config": "2x12",
+   "back": "open",
+   "back_confidence": "assumption",
+   "speaker": "Matchless 'signature' drivers (not named by Neural DSP)",
+   "character": "Matchless Chieftain 2x12 with signature drivers: rich boutique chime with firm, complex mids.",
+   "pairs_with": [
+    "matchless",
+    "vox_ac30",
+    "two_rock"
+   ],
+   "tags": [
+    "chime",
+    "boutique",
+    "edge-of-breakup",
+    "classic-rock"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12047,
+   "st_id": 32047,
+   "name": "212 Match Jefe V30 02 (M)",
+   "based_on_as_listed": "Based on Matchless(TM) Chieftain with Celestion® Vintage 30 drivers",
+   "real": "Matchless Chieftain 2x12 (2002)",
+   "config": "2x12",
+   "back": "open",
+   "back_confidence": "assumption",
+   "speaker": "Celestion Vintage 30",
+   "character": "Matchless Chieftain 2x12 with V30s: combo-style body with V30 upper-mid push; cuts harder.",
+   "pairs_with": [
+    "matchless",
+    "vox_ac30",
+    "marshall_plexi"
+   ],
+   "tags": [
+    "chime",
+    "upper-mid",
+    "classic-rock",
+    "crunch"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/vintage-30/"
+   ]
+  },
+  {
+   "id": 12048,
+   "st_id": 32048,
+   "name": "212 Match D30 Sig A (M)",
+   "based_on_as_listed": "Based on Matchless(TM) C-30 with Signature drivers",
+   "real": "Matchless DC-30 2x12 combo (capture A)",
+   "config": "2x12",
+   "back": "open",
+   "back_confidence": "well-known",
+   "speaker": "Matchless 'signature' drivers (not named by Neural DSP)",
+   "character": "Matchless DC-30 2x12, signature drivers (version A): boutique AC30-style chime with complex mids.",
+   "pairs_with": [
+    "matchless",
+    "vox_ac30"
+   ],
+   "tags": [
+    "chime",
+    "boutique",
+    "edge-of-breakup",
+    "indie"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12049,
+   "st_id": 32049,
+   "name": "212 Match D30 Sig B (M)",
+   "based_on_as_listed": "Based on Matchless(TM) C-30 with Signature drivers",
+   "real": "Matchless DC-30 2x12 combo (capture B)",
+   "config": "2x12",
+   "back": "open",
+   "back_confidence": "well-known",
+   "speaker": "Matchless 'signature' drivers (not named by Neural DSP)",
+   "character": "Matchless DC-30 2x12, signature drivers (version B): alternate take on the same boutique chime.",
+   "pairs_with": [
+    "matchless",
+    "vox_ac30"
+   ],
+   "tags": [
+    "chime",
+    "boutique",
+    "edge-of-breakup",
+    "indie"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12050,
+   "st_id": 32050,
+   "name": "Gojira Cab 1 (M)",
+   "based_on_as_listed": "",
+   "real": "",
+   "config": "",
+   "back": "unknown",
+   "back_confidence": "assumption",
+   "speaker": "",
+   "character": "Cab named after Neural DSP Archetype: Gojira; underlying cab and speaker are not documented in the catalog.",
+   "pairs_with": [
+    "archetype_gojira"
+   ],
+   "tags": [
+    "plugin",
+    "metal"
+   ],
+   "kind": "plugin",
+   "extra_params": [
+    "DISTANCE[0..1]"
+   ],
+   "notes": "Designed to pair with the matching plugin amp. Extra parameters exposed in the catalog: DISTANCE[0..1].",
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12051,
+   "st_id": 32051,
+   "name": "Gojira Cab 2 (M)",
+   "based_on_as_listed": "",
+   "real": "",
+   "config": "",
+   "back": "unknown",
+   "back_confidence": "assumption",
+   "speaker": "",
+   "character": "Cab named after Neural DSP Archetype: Gojira; underlying cab and speaker are not documented in the catalog.",
+   "pairs_with": [
+    "archetype_gojira"
+   ],
+   "tags": [
+    "plugin",
+    "metal"
+   ],
+   "kind": "plugin",
+   "extra_params": [
+    "DISTANCE[0..1]"
+   ],
+   "notes": "Designed to pair with the matching plugin amp. Extra parameters exposed in the catalog: DISTANCE[0..1].",
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12052,
+   "st_id": 32052,
+   "name": "Gojira Cab 3 (M)",
+   "based_on_as_listed": "",
+   "real": "",
+   "config": "",
+   "back": "unknown",
+   "back_confidence": "assumption",
+   "speaker": "",
+   "character": "Cab named after Neural DSP Archetype: Gojira; underlying cab and speaker are not documented in the catalog.",
+   "pairs_with": [
+    "archetype_gojira"
+   ],
+   "tags": [
+    "plugin",
+    "metal"
+   ],
+   "kind": "plugin",
+   "extra_params": [
+    "DISTANCE[0..1]"
+   ],
+   "notes": "Designed to pair with the matching plugin amp. Extra parameters exposed in the catalog: DISTANCE[0..1].",
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12053,
+   "st_id": 32053,
+   "name": "Plini Cab (M)",
+   "based_on_as_listed": "",
+   "real": "",
+   "config": "",
+   "back": "unknown",
+   "back_confidence": "assumption",
+   "speaker": "",
+   "character": "Cab named after Neural DSP Archetype: Plini; underlying cab and speaker are not documented in the catalog.",
+   "pairs_with": [
+    "archetype_plini"
+   ],
+   "tags": [
+    "plugin",
+    "prog"
+   ],
+   "kind": "plugin",
+   "extra_params": [
+    "POSITION[0..1]",
+    "DISTANCE[0..1]"
+   ],
+   "notes": "Designed to pair with the matching plugin amp. Extra parameters exposed in the catalog: POSITION[0..1], DISTANCE[0..1].",
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12054,
+   "st_id": 32055,
+   "name": "SLO-100® Cab (M)",
+   "based_on_as_listed": "",
+   "real": "",
+   "config": "",
+   "back": "unknown",
+   "back_confidence": "assumption",
+   "speaker": "",
+   "character": "Cab named after Neural DSP Soldano SLO-100 plugin; underlying cab and speaker are not documented in the catalog.",
+   "pairs_with": [
+    "soldano_slo"
+   ],
+   "tags": [
+    "plugin",
+    "hard-rock"
+   ],
+   "kind": "plugin",
+   "extra_params": [
+    "DISTANCE[0..1]"
+   ],
+   "notes": "Designed to pair with the matching plugin amp. Extra parameters exposed in the catalog: DISTANCE[0..1].",
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12055,
+   "st_id": 32054,
+   "name": "Nolly Cab 1 (M)",
+   "based_on_as_listed": "",
+   "real": "",
+   "config": "",
+   "back": "unknown",
+   "back_confidence": "assumption",
+   "speaker": "",
+   "character": "Cab named after Neural DSP Archetype: Nolly; underlying cab and speaker are not documented in the catalog.",
+   "pairs_with": [
+    "archetype_nolly"
+   ],
+   "tags": [
+    "plugin",
+    "metal",
+    "prog"
+   ],
+   "kind": "plugin",
+   "extra_params": [],
+   "notes": "Designed to pair with the matching plugin amp. Extra parameters exposed in the catalog: none beyond the mic selectors.",
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12056,
+   "st_id": 32056,
+   "name": "Nolly Cab 2 (M)",
+   "based_on_as_listed": "",
+   "real": "",
+   "config": "",
+   "back": "unknown",
+   "back_confidence": "assumption",
+   "speaker": "",
+   "character": "Cab named after Neural DSP Archetype: Nolly; underlying cab and speaker are not documented in the catalog.",
+   "pairs_with": [
+    "archetype_nolly"
+   ],
+   "tags": [
+    "plugin",
+    "metal",
+    "prog"
+   ],
+   "kind": "plugin",
+   "extra_params": [],
+   "notes": "Designed to pair with the matching plugin amp. Extra parameters exposed in the catalog: none beyond the mic selectors.",
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12057,
+   "st_id": 32057,
+   "name": "Nameless Cab (M)",
+   "based_on_as_listed": "",
+   "real": "",
+   "config": "",
+   "back": "unknown",
+   "back_confidence": "assumption",
+   "speaker": "",
+   "character": "Cab named after Neural DSP Fortin Nameless plugin; underlying cab and speaker are not documented in the catalog.",
+   "pairs_with": [
+    "fortin_nameless"
+   ],
+   "tags": [
+    "plugin",
+    "metal"
+   ],
+   "kind": "plugin",
+   "extra_params": [],
+   "notes": "Designed to pair with the matching plugin amp. Extra parameters exposed in the catalog: none beyond the mic selectors.",
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12058,
+   "st_id": 32058,
+   "name": "Nolly Cab 3 (M)",
+   "based_on_as_listed": "",
+   "real": "",
+   "config": "",
+   "back": "unknown",
+   "back_confidence": "assumption",
+   "speaker": "",
+   "character": "Cab named after Neural DSP Archetype: Nolly; underlying cab and speaker are not documented in the catalog.",
+   "pairs_with": [
+    "archetype_nolly"
+   ],
+   "tags": [
+    "plugin",
+    "metal",
+    "prog"
+   ],
+   "kind": "plugin",
+   "extra_params": [],
+   "notes": "Designed to pair with the matching plugin amp. Extra parameters exposed in the catalog: none beyond the mic selectors.",
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12059,
+   "st_id": 32059,
+   "name": "Nolly Cab 4 (M)",
+   "based_on_as_listed": "",
+   "real": "",
+   "config": "",
+   "back": "unknown",
+   "back_confidence": "assumption",
+   "speaker": "",
+   "character": "Cab named after Neural DSP Archetype: Nolly; underlying cab and speaker are not documented in the catalog.",
+   "pairs_with": [
+    "archetype_nolly"
+   ],
+   "tags": [
+    "plugin",
+    "metal",
+    "prog"
+   ],
+   "kind": "plugin",
+   "extra_params": [],
+   "notes": "Designed to pair with the matching plugin amp. Extra parameters exposed in the catalog: none beyond the mic selectors.",
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12060,
+   "st_id": 32060,
+   "name": "Cory Wong Cab 1 (M)",
+   "based_on_as_listed": "",
+   "real": "",
+   "config": "",
+   "back": "unknown",
+   "back_confidence": "assumption",
+   "speaker": "",
+   "character": "Cab named after Neural DSP Archetype: Cory Wong; underlying cab and speaker are not documented in the catalog.",
+   "pairs_with": [
+    "archetype_cory_wong"
+   ],
+   "tags": [
+    "plugin",
+    "funk",
+    "clean"
+   ],
+   "kind": "plugin",
+   "extra_params": [],
+   "notes": "Designed to pair with the matching plugin amp. Extra parameters exposed in the catalog: none beyond the mic selectors.",
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12061,
+   "st_id": 32061,
+   "name": "Cory Wong Cab 2 (M)",
+   "based_on_as_listed": "",
+   "real": "",
+   "config": "",
+   "back": "unknown",
+   "back_confidence": "assumption",
+   "speaker": "",
+   "character": "Cab named after Neural DSP Archetype: Cory Wong; underlying cab and speaker are not documented in the catalog.",
+   "pairs_with": [
+    "archetype_cory_wong"
+   ],
+   "tags": [
+    "plugin",
+    "funk",
+    "clean"
+   ],
+   "kind": "plugin",
+   "extra_params": [],
+   "notes": "Designed to pair with the matching plugin amp. Extra parameters exposed in the catalog: none beyond the mic selectors.",
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12062,
+   "st_id": 32062,
+   "name": "Cory Wong Cab 3 (M)",
+   "based_on_as_listed": "",
+   "real": "",
+   "config": "",
+   "back": "unknown",
+   "back_confidence": "assumption",
+   "speaker": "",
+   "character": "Cab named after Neural DSP Archetype: Cory Wong; underlying cab and speaker are not documented in the catalog.",
+   "pairs_with": [
+    "archetype_cory_wong"
+   ],
+   "tags": [
+    "plugin",
+    "funk",
+    "clean"
+   ],
+   "kind": "plugin",
+   "extra_params": [],
+   "notes": "Designed to pair with the matching plugin amp. Extra parameters exposed in the catalog: none beyond the mic selectors.",
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12063,
+   "st_id": 32063,
+   "name": "412 Cornfield V30 (M)",
+   "based_on_as_listed": "Based on Cornford® RK412® with Celestion® Vintage 30 Speakers",
+   "real": "Cornford RK412 4x12",
+   "config": "4x12",
+   "back": "closed",
+   "back_confidence": "well-known",
+   "speaker": "Celestion Vintage 30",
+   "character": "Cornford RK412 with V30s: British boutique closed 4x12, tight and mid-rich; hot-rodded gain.",
+   "pairs_with": [
+    "cornford",
+    "marshall_jcm800",
+    "friedman_be",
+    "5150"
+   ],
+   "tags": [
+    "hard-rock",
+    "metal",
+    "tight",
+    "upper-mid",
+    "mid-forward"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/vintage-30/"
+   ]
+  },
+  {
+   "id": 12064,
+   "st_id": 32064,
+   "name": "110 US PRN Gold G10 (M)",
+   "based_on_as_listed": "Based on Fender® Princeton® “Brownface” with Celestion® G10 Alnico Gold Speakers",
+   "real": "Fender Princeton 'Brownface' 1x10 combo",
+   "config": "1x10",
+   "back": "open",
+   "back_confidence": "well-known",
+   "speaker": "Celestion G10 Gold (alnico)",
+   "character": "Brownface Princeton with a 10-inch Alnico Gold: sweet, chimey small-combo cleans.",
+   "pairs_with": [
+    "fender_princeton",
+    "fender_brownface",
+    "vox_ac15"
+   ],
+   "tags": [
+    "clean",
+    "chime",
+    "small-combo",
+    "edge-of-breakup"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12065,
+   "st_id": 32065,
+   "name": "412 Brit 60A G75 80s (M)",
+   "based_on_as_listed": "Based on Marshall® 1960A® with Celestion® G12T-75® 80s Speakers",
+   "real": "Marshall 1960A 4x12 angled (1980s)",
+   "config": "4x12",
+   "back": "closed",
+   "back_confidence": "well-known",
+   "speaker": "Celestion G12T-75",
+   "character": "1980s Marshall 1960A with G12T-75s: big tight lows, scooped mids, bright top; the JCM800-era sound.",
+   "pairs_with": [
+    "marshall_jcm800",
+    "marshall_jcm900",
+    "5150",
+    "soldano_slo",
+    "mesa_rectifier"
+   ],
+   "tags": [
+    "metal",
+    "hard-rock",
+    "scooped",
+    "bright",
+    "big-low-end",
+    "80s"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/g12t-75/"
+   ]
+  },
+  {
+   "id": 12066,
+   "st_id": 32066,
+   "name": "412 Brit 60A LB50 12 (M)",
+   "based_on_as_listed": "Based on Marshall® 1960A® with Celestion® G12-50GL® Lynchback® Speakers",
+   "real": "Marshall 1960A 4x12 angled (2012)",
+   "config": "4x12",
+   "back": "closed",
+   "back_confidence": "well-known",
+   "speaker": "Celestion G12-50GL Lynchback",
+   "character": "Marshall 1960A with Lynchbacks: vintage warmth with singing lead mids; smoother than T75.",
+   "pairs_with": [
+    "marshall_jcm800",
+    "marshall_plexi",
+    "friedman_be",
+    "soldano_slo"
+   ],
+   "tags": [
+    "hard-rock",
+    "lead",
+    "warm",
+    "mid-forward",
+    "80s"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/g12-50gl-lynchback/"
+   ]
+  },
+  {
+   "id": 12067,
+   "st_id": 32067,
+   "name": "412 VH Fat P50 (M)",
+   "based_on_as_listed": "Based on VHT® FatBottom® with Eminence® P50e® Speakers",
+   "real": "VHT Fat Bottom 4x12",
+   "config": "4x12",
+   "back": "closed",
+   "back_confidence": "well-known",
+   "speaker": "Eminence P50E",
+   "character": "VHT Fat Bottom 4x12 with P50Es: deep, tight low end and clear mids; precise Pittbull-style gain.",
+   "pairs_with": [
+    "vht_fryette",
+    "5150",
+    "mesa_mark"
+   ],
+   "tags": [
+    "metal",
+    "tight",
+    "big-low-end",
+    "clear",
+    "modern"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12068,
+   "st_id": 32068,
+   "name": "212 Zila Open CL80 19 (M)",
+   "based_on_as_listed": "Based on Zilla® Open with Celestion® Classic Lead 80® Speakers",
+   "real": "Zilla Open 2x12 (2019)",
+   "config": "2x12",
+   "back": "open",
+   "back_confidence": "stated",
+   "speaker": "Celestion Classic Lead 80",
+   "character": "Zilla open-back 2x12 with Classic Lead 80s: controlled lows, low-mid punch, aggressive mids, high headroom.",
+   "pairs_with": [
+    "mesa_mark",
+    "two_rock",
+    "fender_twin",
+    "marshall_jcm800"
+   ],
+   "tags": [
+    "lead",
+    "fusion",
+    "punchy",
+    "open",
+    "headroom"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/classic-lead/"
+   ]
+  },
+  {
+   "id": 12069,
+   "st_id": 32069,
+   "name": "212 Zila Open G65 82 (M)",
+   "based_on_as_listed": "Based on Zilla® Open with Celestion® G12-65® Speakers",
+   "real": "Zilla Open 2x12 (speakers from 1982)",
+   "config": "2x12",
+   "back": "open",
+   "back_confidence": "stated",
+   "speaker": "Celestion G12-65",
+   "character": "Zilla open-back 2x12 with 1982 G12-65s: fast attack, controlled lows, crisp top; early-80s rock and fusion.",
+   "pairs_with": [
+    "two_rock",
+    "dumble",
+    "marshall_jcm800",
+    "mesa_mark"
+   ],
+   "tags": [
+    "lead",
+    "fusion",
+    "classic-rock",
+    "open",
+    "tight"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/heritage-series-g12-65/"
+   ]
+  },
+  {
+   "id": 12070,
+   "st_id": 32070,
+   "name": "412 CA Dagger A V30 01 (M)",
+   "based_on_as_listed": "Based on Mesa® Boogie® Stiletto® with Celestion® Vintage 30® Speakers",
+   "real": "Mesa Stiletto 4x12 angled (2001)",
+   "config": "4x12",
+   "back": "closed",
+   "back_confidence": "well-known",
+   "speaker": "Celestion Vintage 30",
+   "character": "Mesa Stiletto slant 4x12 V30: Mesa's British-voiced line; tight lows with V30 cut.",
+   "pairs_with": [
+    "mesa_stiletto",
+    "marshall_jcm800",
+    "mesa_rectifier",
+    "5150"
+   ],
+   "tags": [
+    "hard-rock",
+    "metal",
+    "tight",
+    "upper-mid"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/vintage-30/"
+   ]
+  },
+  {
+   "id": 12071,
+   "st_id": 32071,
+   "name": "212 US Bleached Basslad V30 01 (M)",
+   "based_on_as_listed": "Based on Fender Blonde Bassman® with Celestion® Vintage 30® Speakers",
+   "real": "Fender blonde Bassman 2x12 piggyback cab (2001 capture)",
+   "config": "2x12",
+   "back": "closed",
+   "back_confidence": "assumption",
+   "speaker": "Celestion Vintage 30",
+   "character": "Blonde Bassman 2x12 cab with V30s: vintage Fender box given V30 mids; punchy crunch.",
+   "pairs_with": [
+    "fender_bassman",
+    "fender_brownface",
+    "marshall_jtm45"
+   ],
+   "tags": [
+    "crunch",
+    "classic-rock",
+    "upper-mid",
+    "punchy"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/vintage-30/"
+   ]
+  },
+  {
+   "id": 12072,
+   "st_id": 32072,
+   "name": "212 US TWN Web Classic 08 (M)",
+   "based_on_as_listed": "Based on Fender Tweed Twin® with Weber® Classic Alnico® Speakers",
+   "real": "Fender Tweed Twin 2x12 combo",
+   "config": "2x12",
+   "back": "open",
+   "back_confidence": "well-known",
+   "speaker": "Weber Classic Alnico",
+   "character": "Tweed Twin 2x12 with Weber alnicos: open-back, big warm cleans that growl when pushed.",
+   "pairs_with": [
+    "fender_tweed",
+    "fender_twin",
+    "fender_bassman"
+   ],
+   "tags": [
+    "blues",
+    "roots",
+    "warm",
+    "vintage",
+    "edge-of-breakup"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12073,
+   "st_id": 32073,
+   "name": "412 CA Custom A Shadow 87 (M)",
+   "based_on_as_listed": "Based on Mesa® Boogie® Custom with Celestion® Black Shadow® Speaker",
+   "real": "Mesa/Boogie custom 4x12 angled (1987)",
+   "config": "4x12",
+   "back": "unknown",
+   "back_confidence": "assumption",
+   "speaker": "Celestion-built Mesa Black Shadow",
+   "character": "1987 Mesa custom slant 4x12 with Black Shadows: 80s Mark-era cab, less spiky in the upper-mids than V30.",
+   "pairs_with": [
+    "mesa_mark",
+    "mesa_rectifier",
+    "soldano_slo"
+   ],
+   "tags": [
+    "hard-rock",
+    "metal",
+    "80s",
+    "smooth-top",
+    "lead"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12074,
+   "st_id": 32074,
+   "name": "212 Too Rock EV Vintage 79 (M)",
+   "based_on_as_listed": "Based on Two Rock® Open Back with ElectroVoice® EVM12L® Vintage Speakers",
+   "real": "Two-Rock open-back 2x12",
+   "config": "2x12",
+   "back": "open",
+   "back_confidence": "stated",
+   "speaker": "Electro-Voice EVM12L (vintage, 1979)",
+   "character": "Two-Rock open-back 2x12 with EVM12Ls: huge clean headroom, tight punchy lows, hi-fi clarity.",
+   "pairs_with": [
+    "two_rock",
+    "dumble",
+    "fender_twin",
+    "mesa_mark"
+   ],
+   "tags": [
+    "clean",
+    "fusion",
+    "blues",
+    "headroom",
+    "clear",
+    "lead"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://products.electrovoice.com/download/970039"
+   ]
+  },
+  {
+   "id": 12075,
+   "st_id": 32075,
+   "name": "212 Too Rock G65 (M)",
+   "based_on_as_listed": "Based on Two Rock® Open Back with Celestion® G12-65 Speakers",
+   "real": "Two-Rock open-back 2x12",
+   "config": "2x12",
+   "back": "open",
+   "back_confidence": "stated",
+   "speaker": "Celestion G12-65",
+   "character": "Two-Rock open-back 2x12 with G12-65s: fast, controlled lows and crisp top; D-style lead and clean.",
+   "pairs_with": [
+    "two_rock",
+    "dumble",
+    "fender_deluxe"
+   ],
+   "tags": [
+    "blues",
+    "fusion",
+    "lead",
+    "clean",
+    "open"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list",
+    "https://celestion.com/product/heritage-series-g12-65/"
+   ]
+  },
+  {
+   "id": 12076,
+   "st_id": 32076,
+   "name": "212 Too Rock KM65 (M)",
+   "based_on_as_listed": "Based on Two Rock® Open Back with KM® 65 Speakers",
+   "real": "Two-Rock open-back 2x12",
+   "config": "2x12",
+   "back": "open",
+   "back_confidence": "stated",
+   "speaker": "'KM 65' (maker not identified)",
+   "character": "Two-Rock open-back 2x12 with 'KM 65' speakers; speaker maker and voicing not documented.",
+   "pairs_with": [
+    "two_rock",
+    "dumble"
+   ],
+   "tags": [
+    "blues",
+    "fusion",
+    "clean",
+    "open"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12077,
+   "st_id": 32077,
+   "name": "112 Brit P-Series TX 33 (M)",
+   "based_on_as_listed": "Based on Marshall® 1933 with Eminence® Patriot Series® Texas Heat™ Speakers",
+   "real": "Marshall 1933 1x12 cab",
+   "config": "1x12",
+   "back": "unknown",
+   "back_confidence": "assumption",
+   "speaker": "Eminence Patriot Texas Heat",
+   "character": "Marshall 1933 1x12 with an Eminence Texas Heat: compact single-speaker rock/blues cab.",
+   "pairs_with": [
+    "marshall_jcm800",
+    "marshall_plexi",
+    "fender_deluxe"
+   ],
+   "tags": [
+    "classic-rock",
+    "blues",
+    "compact"
+   ],
+   "kind": "factory",
+   "extra_params": [],
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12078,
+   "st_id": 32089,
+   "name": "Petrucci Cab (M)",
+   "based_on_as_listed": "",
+   "real": "",
+   "config": "",
+   "back": "unknown",
+   "back_confidence": "assumption",
+   "speaker": "",
+   "character": "Cab named after Neural DSP Archetype: Petrucci; underlying cab and speaker are not documented in the catalog.",
+   "pairs_with": [
+    "archetype_petrucci"
+   ],
+   "tags": [
+    "plugin",
+    "prog",
+    "metal"
+   ],
+   "kind": "plugin",
+   "extra_params": [
+    "POSITION[0..1]",
+    "DISTANCE[0..1]"
+   ],
+   "notes": "Designed to pair with the matching plugin amp. Extra parameters exposed in the catalog: POSITION[0..1], DISTANCE[0..1].",
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12079,
+   "st_id": 32078,
+   "name": "John Mayer Smooth Operator Cab (M)",
+   "based_on_as_listed": "",
+   "real": "",
+   "config": "",
+   "back": "unknown",
+   "back_confidence": "assumption",
+   "speaker": "",
+   "character": "Cab named after Neural DSP Archetype: John Mayer; underlying cab and speaker are not documented in the catalog.",
+   "pairs_with": [
+    "archetype_john_mayer"
+   ],
+   "tags": [
+    "plugin",
+    "blues",
+    "clean"
+   ],
+   "kind": "plugin",
+   "extra_params": [
+    "ROOM SIZE<comboBox>",
+    "ROOM L LEVEL[-40..6 dB]",
+    "ROOM R LEVEL[-40..6 dB]"
+   ],
+   "notes": "Designed to pair with the matching plugin amp. Extra parameters exposed in the catalog: ROOM SIZE<comboBox>, ROOM L LEVEL[-40..6 dB], ROOM R LEVEL[-40..6 dB].",
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12080,
+   "st_id": 32079,
+   "name": "John Mayer Signature 83 Cab (M)",
+   "based_on_as_listed": "",
+   "real": "",
+   "config": "",
+   "back": "unknown",
+   "back_confidence": "assumption",
+   "speaker": "",
+   "character": "Cab named after Neural DSP Archetype: John Mayer; underlying cab and speaker are not documented in the catalog.",
+   "pairs_with": [
+    "archetype_john_mayer"
+   ],
+   "tags": [
+    "plugin",
+    "blues",
+    "clean"
+   ],
+   "kind": "plugin",
+   "extra_params": [
+    "ROOM SIZE<comboBox>",
+    "ROOM L LEVEL[-40..6 dB]",
+    "ROOM R LEVEL[-40..6 dB]"
+   ],
+   "notes": "Designed to pair with the matching plugin amp. Extra parameters exposed in the catalog: ROOM SIZE<comboBox>, ROOM L LEVEL[-40..6 dB], ROOM R LEVEL[-40..6 dB].",
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12081,
+   "st_id": 32080,
+   "name": "John Mayer Headroom Hero Cab (M)",
+   "based_on_as_listed": "",
+   "real": "",
+   "config": "",
+   "back": "unknown",
+   "back_confidence": "assumption",
+   "speaker": "",
+   "character": "Cab named after Neural DSP Archetype: John Mayer; underlying cab and speaker are not documented in the catalog.",
+   "pairs_with": [
+    "archetype_john_mayer"
+   ],
+   "tags": [
+    "plugin",
+    "blues",
+    "clean"
+   ],
+   "kind": "plugin",
+   "extra_params": [
+    "ROOM SIZE<comboBox>",
+    "ROOM L LEVEL[-40..6 dB]",
+    "ROOM R LEVEL[-40..6 dB]"
+   ],
+   "notes": "Designed to pair with the matching plugin amp. Extra parameters exposed in the catalog: ROOM SIZE<comboBox>, ROOM L LEVEL[-40..6 dB], ROOM R LEVEL[-40..6 dB].",
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12082,
+   "st_id": 32081,
+   "name": "Rabea Cab 1 (M)",
+   "based_on_as_listed": "",
+   "real": "",
+   "config": "",
+   "back": "unknown",
+   "back_confidence": "assumption",
+   "speaker": "",
+   "character": "Cab named after Neural DSP Archetype: Rabea; underlying cab and speaker are not documented in the catalog.",
+   "pairs_with": [
+    "archetype_rabea"
+   ],
+   "tags": [
+    "plugin",
+    "rock"
+   ],
+   "kind": "plugin",
+   "extra_params": [
+    "DISTANCE[0..1]"
+   ],
+   "notes": "Designed to pair with the matching plugin amp. Extra parameters exposed in the catalog: DISTANCE[0..1].",
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12083,
+   "st_id": 32082,
+   "name": "Rabea Cab 2 (M)",
+   "based_on_as_listed": "",
+   "real": "",
+   "config": "",
+   "back": "unknown",
+   "back_confidence": "assumption",
+   "speaker": "",
+   "character": "Cab named after Neural DSP Archetype: Rabea; underlying cab and speaker are not documented in the catalog.",
+   "pairs_with": [
+    "archetype_rabea"
+   ],
+   "tags": [
+    "plugin",
+    "rock"
+   ],
+   "kind": "plugin",
+   "extra_params": [
+    "DISTANCE[0..1]"
+   ],
+   "notes": "Designed to pair with the matching plugin amp. Extra parameters exposed in the catalog: DISTANCE[0..1].",
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12084,
+   "st_id": 32083,
+   "name": "Rabea Cab 3 (M)",
+   "based_on_as_listed": "",
+   "real": "",
+   "config": "",
+   "back": "unknown",
+   "back_confidence": "assumption",
+   "speaker": "",
+   "character": "Cab named after Neural DSP Archetype: Rabea; underlying cab and speaker are not documented in the catalog.",
+   "pairs_with": [
+    "archetype_rabea"
+   ],
+   "tags": [
+    "plugin",
+    "rock"
+   ],
+   "kind": "plugin",
+   "extra_params": [
+    "DISTANCE[0..1]"
+   ],
+   "notes": "Designed to pair with the matching plugin amp. Extra parameters exposed in the catalog: DISTANCE[0..1].",
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12085,
+   "st_id": 32084,
+   "name": "Misha Cab 1 (M)",
+   "based_on_as_listed": "",
+   "real": "",
+   "config": "",
+   "back": "unknown",
+   "back_confidence": "assumption",
+   "speaker": "",
+   "character": "Cab named after Neural DSP Archetype: Misha Mansoor; underlying cab and speaker are not documented in the catalog.",
+   "pairs_with": [
+    "archetype_misha"
+   ],
+   "tags": [
+    "plugin",
+    "metal",
+    "prog"
+   ],
+   "kind": "plugin",
+   "extra_params": [
+    "DISTANCE[0..1]"
+   ],
+   "notes": "Designed to pair with the matching plugin amp. Extra parameters exposed in the catalog: DISTANCE[0..1].",
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12086,
+   "st_id": 32085,
+   "name": "Misha Cab 2 (M)",
+   "based_on_as_listed": "",
+   "real": "",
+   "config": "",
+   "back": "unknown",
+   "back_confidence": "assumption",
+   "speaker": "",
+   "character": "Cab named after Neural DSP Archetype: Misha Mansoor; underlying cab and speaker are not documented in the catalog.",
+   "pairs_with": [
+    "archetype_misha"
+   ],
+   "tags": [
+    "plugin",
+    "metal",
+    "prog"
+   ],
+   "kind": "plugin",
+   "extra_params": [
+    "DISTANCE[0..1]"
+   ],
+   "notes": "Designed to pair with the matching plugin amp. Extra parameters exposed in the catalog: DISTANCE[0..1].",
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12087,
+   "st_id": 32086,
+   "name": "Misha Cab 3 (M)",
+   "based_on_as_listed": "",
+   "real": "",
+   "config": "",
+   "back": "unknown",
+   "back_confidence": "assumption",
+   "speaker": "",
+   "character": "Cab named after Neural DSP Archetype: Misha Mansoor; underlying cab and speaker are not documented in the catalog.",
+   "pairs_with": [
+    "archetype_misha"
+   ],
+   "tags": [
+    "plugin",
+    "metal",
+    "prog"
+   ],
+   "kind": "plugin",
+   "extra_params": [
+    "DISTANCE[0..1]"
+   ],
+   "notes": "Designed to pair with the matching plugin amp. Extra parameters exposed in the catalog: DISTANCE[0..1].",
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12088,
+   "st_id": 32087,
+   "name": "Tim Henson Cab Crunch (M)",
+   "based_on_as_listed": "",
+   "real": "",
+   "config": "",
+   "back": "unknown",
+   "back_confidence": "assumption",
+   "speaker": "",
+   "character": "Cab named after Neural DSP Archetype: Tim Henson; underlying cab and speaker are not documented in the catalog.",
+   "pairs_with": [
+    "archetype_tim_henson"
+   ],
+   "tags": [
+    "plugin",
+    "prog"
+   ],
+   "kind": "plugin",
+   "extra_params": [
+    "DISTANCE[0..1]"
+   ],
+   "notes": "Designed to pair with the matching plugin amp. Extra parameters exposed in the catalog: DISTANCE[0..1].",
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "id": 12089,
+   "st_id": 32088,
+   "name": "Tim Henson Cab Lead (M)",
+   "based_on_as_listed": "",
+   "real": "",
+   "config": "",
+   "back": "unknown",
+   "back_confidence": "assumption",
+   "speaker": "",
+   "character": "Cab named after Neural DSP Archetype: Tim Henson; underlying cab and speaker are not documented in the catalog.",
+   "pairs_with": [
+    "archetype_tim_henson"
+   ],
+   "tags": [
+    "plugin",
+    "prog"
+   ],
+   "kind": "plugin",
+   "extra_params": [
+    "DISTANCE[0..1]"
+   ],
+   "notes": "Designed to pair with the matching plugin amp. Extra parameters exposed in the catalog: DISTANCE[0..1].",
+   "sources": [
+    "https://neuraldsp.com/device-list"
+   ]
+  }
+ ],
+ "speakers": [
+  {
+   "name": "Celestion Vintage 30",
+   "character": "Celestion: 'enormously detailed and complex overtones' and 'a famously rich vocal mid-range'. Community: pronounced upper-mid spike, tight lows; the default modern rock/metal speaker.",
+   "hz_notes": "60 W, ceramic, Fs 75 Hz, 70-5000 Hz, 100 dB (Celestion). The ~2-3 kHz upper-mid peak is the widely repeated community description, not a figure from Celestion's page.",
+   "confidence": "manufacturer + community",
+   "source": "https://celestion.com/product/vintage-30/"
+  },
+  {
+   "name": "Celestion G12M Greenback (25 W)",
+   "character": "Celestion: 'voiced with additional broad mid-range attack and restrained top-end'. Community: woody mids, soft top, early breakup/compression because of the 25 W rating.",
+   "hz_notes": "25 W, ceramic, Fs 75 Hz, 75-5000 Hz, 98 dB (Celestion). 'GB75Hz' in QC names refers to the 75 Hz-resonance (lead) cone.",
+   "confidence": "manufacturer + community",
+   "source": "https://celestion.com/product/g12m-greenback/"
+  },
+  {
+   "name": "Celestion Greenback, pre-Rola / Pulsonic cone (1960s-early 70s)",
+   "character": "Vintage G12M with Pulsonic cones; community regards them as sweeter and more complex in the mids with a softer top than reissues.",
+   "hz_notes": "",
+   "confidence": "assumption (general knowledge, no page fetched)",
+   "source": ""
+  },
+  {
+   "name": "Celestion G12H Anniversary (G12H30)",
+   "character": "Celestion: 'a strong aggressive low-end and powerful low-mids', 'penetrates any mix with an attacking upper mid-range'.",
+   "hz_notes": "30 W, ceramic, Fs 85 Hz as listed on the fetched page, 100 dB.",
+   "confidence": "manufacturer",
+   "source": "https://celestion.com/product/g12h-anniversary/"
+  },
+  {
+   "name": "Celestion G12T-75",
+   "character": "Celestion: 'a huge, tightly controlled low-end and aggressive mid-range'. Community: scooped mids with extended lows and sizzly highs; the 1980s Marshall 1960A sound.",
+   "hz_notes": "75 W, ceramic, Fs 85 Hz, 80-5000 Hz, 97 dB (Celestion).",
+   "confidence": "manufacturer + community",
+   "source": "https://celestion.com/product/g12t-75/"
+  },
+  {
+   "name": "Celestion Vintage 30 (Marshall-labelled 'Vintage')",
+   "character": "Marshall-spec V30 fitted to 1960AV/BV cabs; community reports a slightly different voicing from stock/Mesa V30s.",
+   "hz_notes": "",
+   "confidence": "assumption (general knowledge, no page fetched)",
+   "source": ""
+  },
+  {
+   "name": "Celestion Creamback G12H-75",
+   "character": "Celestion: 'The H magnet brings additional focus body and girth to the Creamback tone'; 'thickens single notes resulting in a highly articulate vocal character'.",
+   "hz_notes": "75 W, ceramic, Fs 75 Hz, 100 dB.",
+   "confidence": "manufacturer",
+   "source": "https://celestion.com/product/g12h-75-creamback/"
+  },
+  {
+   "name": "Celestion Alnico Blue (incl. 1960s silver 'Silver Bell' alnico)",
+   "character": "Celestion: 'warm lows mellow upper-mids and brilliant bell-like top-end'. Community: chimey, compresses early (15 W). The Vox AC15/AC30 speaker.",
+   "hz_notes": "15 W, alnico, Fs 75 Hz, 75-5000 Hz, 100 dB.",
+   "confidence": "manufacturer + community",
+   "source": "https://celestion.com/product/celestion-blue/"
+  },
+  {
+   "name": "Celestion Alnico Gold (12\")",
+   "character": "Celestion: 'recreates the unmistakable sonic signature of a well played-in original [Blue]'; 'wonderfully expressive and revealing'. Blue-style chime with more power handling.",
+   "hz_notes": "50 W, alnico, Fs 75 Hz, 100 dB.",
+   "confidence": "manufacturer",
+   "source": "https://celestion.com/product/celestion-gold/"
+  },
+  {
+   "name": "Celestion G10 Gold (10\")",
+   "character": "10-inch member of the Alnico Gold family; page not fetched.",
+   "hz_notes": "",
+   "confidence": "assumption",
+   "source": ""
+  },
+  {
+   "name": "Celestion Alnico Cream",
+   "character": "Celestion: 'Delivering a glorious laid-back attack the Cream exudes warm lows and a brilliant bell-like chime'. High-power alnico.",
+   "hz_notes": "90 W, alnico, Fs 75 Hz, 100 dB.",
+   "confidence": "manufacturer",
+   "source": "https://celestion.com/product/celestion-cream/"
+  },
+  {
+   "name": "Celestion A-Type",
+   "character": "Celestion: 'a more laid-back midrange which reveals body and complexity in the upper register' with 'full and rounded low frequencies'. American-leaning voice.",
+   "hz_notes": "50 W, ceramic, Fs 75 Hz, 98 dB.",
+   "confidence": "manufacturer",
+   "source": "https://celestion.com/product/a-type/"
+  },
+  {
+   "name": "Celestion V-Type",
+   "character": "Celestion: 'a sweet sounding speaker with a superbly balanced tonal signature'; vintage musicality, clean sounds stay true.",
+   "hz_notes": "70 W, ceramic, Fs 75 Hz, 98 dB.",
+   "confidence": "manufacturer",
+   "source": "https://celestion.com/product/v-type/"
+  },
+  {
+   "name": "Celestion G12 EVH",
+   "character": "Celestion: 'faithfully reproduces the sonic qualities of the original 60s version Greenback'. 20 W Greenback-type: woody mids, soft top, low headroom.",
+   "hz_notes": "20 W, ceramic, Fs 75 Hz, 96 dB.",
+   "confidence": "manufacturer",
+   "source": "https://celestion.com/product/g12-evh/"
+  },
+  {
+   "name": "Celestion G12H-150 Redback",
+   "character": "Celestion: 'a tight well-controlled low end detailed midrange and more relaxed treble'. Very high power handling, stays clean.",
+   "hz_notes": "150 W, ceramic, Fs 75 Hz, 100 dB.",
+   "confidence": "manufacturer",
+   "source": "https://celestion.com/product/g12h-150-redback/"
+  },
+  {
+   "name": "Celestion Classic Lead 80",
+   "character": "Celestion: 'tightly controlled low-end with strong high bass / low mid punch aggressive mid range attack'.",
+   "hz_notes": "80 W, ceramic, Fs 85 Hz, 99 dB.",
+   "confidence": "manufacturer",
+   "source": "https://celestion.com/product/classic-lead/"
+  },
+  {
+   "name": "Celestion G12-50GL Lynchback",
+   "character": "Celestion: 'an ideal balance between a detailed vintage warmth that makes your lead sound sing'.",
+   "hz_notes": "50 W, ceramic, Fs 75 Hz, 97 dB.",
+   "confidence": "manufacturer",
+   "source": "https://celestion.com/product/g12-50gl-lynchback/"
+  },
+  {
+   "name": "Celestion G12-65",
+   "character": "Celestion: 'fast attack and tightly controlled low end' made it a hard-rock favourite by the early 80s; 'precisely tuned mid-range and crisp, defined top-end'. Retailers place it between G12M and Classic Lead 80.",
+   "hz_notes": "65 W.",
+   "confidence": "manufacturer (via search result of the product page)",
+   "source": "https://celestion.com/product/heritage-series-g12-65/"
+  },
+  {
+   "name": "Mesa 'Black Shadow' (Celestion-built for Mesa)",
+   "character": "Neural DSP gives no model number. Community describes Mesa Black Shadows (C90 family) as bigger and smoother with less upper-mid spike than V30.",
+   "hz_notes": "",
+   "confidence": "assumption (general knowledge, no page fetched)",
+   "source": ""
+  },
+  {
+   "name": "Jensen C12K",
+   "character": "Jensen: 'tonally inspired by the classic vintage ceramic Jensen, but with a substantially stronger voice', 'full bass and smooth top end'. High-headroom American clean.",
+   "hz_notes": "100 W rated, Fs ~102-115 Hz depending on impedance.",
+   "confidence": "manufacturer",
+   "source": "https://www.jensentone.com/vintage-ceramic/c12k"
+  },
+  {
+   "name": "Jensen C12K-2",
+   "character": "Fender-supplied C12K variant used in Twin Reverb reissues; page not fetched - treat as C12K family.",
+   "hz_notes": "",
+   "confidence": "assumption",
+   "source": ""
+  },
+  {
+   "name": "Jensen C12Q",
+   "character": "Jensen: 'Powerful enough for a cranked Deluxe-style amp yet balanced and warm, it surely is not lacking in bite.'",
+   "hz_notes": "35 W rated, Fs ~86-87.5 Hz.",
+   "confidence": "manufacturer",
+   "source": "https://www.jensentone.com/vintage-ceramic/c12q"
+  },
+  {
+   "name": "Jensen P10R (10\" alnico)",
+   "character": "Jensen: 'Rich, warm tone. Accentuates the higher frequencies in sparkling detail.' The tweed Bassman 4x10 speaker.",
+   "hz_notes": "25 W rated, Fs ~97-99 Hz.",
+   "confidence": "manufacturer",
+   "source": "https://www.jensentone.com/vintage-alnico/p10r"
+  },
+  {
+   "name": "Jensen C10R (10\" ceramic)",
+   "character": "Jensen: 'Colorful bell-like chime which transitions into a gritty response when presented with overdrive distortion.' Tone profile: lows loose, mids firm, highs bright.",
+   "hz_notes": "25 W rated, Fs 96.6 Hz.",
+   "confidence": "manufacturer",
+   "source": "https://www.jensentone.com/vintage-ceramic/c10r"
+  },
+  {
+   "name": "Electro-Voice EVM12L",
+   "character": "EV product sheet: 'full, precise overdriven tones and unrivaled clean tones'; in sealed enclosures 'tight and punchy'. Very efficient, very high headroom, hi-fi clarity.",
+   "hz_notes": "200 W (Classic), 100 dB; distributor sheet gives 80 Hz-7 kHz at -10 dB.",
+   "confidence": "manufacturer (via search result of the product sheet)",
+   "source": "https://products.electrovoice.com/download/970039"
+  },
+  {
+   "name": "Eminence GA-SC64",
+   "character": "George Alessandro signature 12\"; Eminence page returned 404, no description fetched.",
+   "hz_notes": "",
+   "confidence": "assumption",
+   "source": ""
+  },
+  {
+   "name": "Eminence Legend V12",
+   "character": "Eminence page returned 404, no description fetched.",
+   "hz_notes": "",
+   "confidence": "assumption",
+   "source": ""
+  },
+  {
+   "name": "Eminence Patriot Texas Heat",
+   "character": "Eminence page returned 404, no description fetched.",
+   "hz_notes": "",
+   "confidence": "assumption",
+   "source": ""
+  },
+  {
+   "name": "Eminence P50E (VHT/Fryette)",
+   "character": "OEM speaker of the VHT/Fryette Fat Bottom cab; no manufacturer description fetched.",
+   "hz_notes": "",
+   "confidence": "assumption",
+   "source": ""
+  },
+  {
+   "name": "Oxford alnico 10\" (1963 Fender)",
+   "character": "No source fetched.",
+   "hz_notes": "",
+   "confidence": "assumption",
+   "source": ""
+  },
+  {
+   "name": "WGS G12Q",
+   "character": "No source fetched.",
+   "hz_notes": "",
+   "confidence": "assumption",
+   "source": ""
+  },
+  {
+   "name": "Fat Jimmy C1060 (10\")",
+   "character": "No source fetched.",
+   "hz_notes": "",
+   "confidence": "assumption",
+   "source": ""
+  },
+  {
+   "name": "Weber Classic Alnico",
+   "character": "No source fetched.",
+   "hz_notes": "",
+   "confidence": "assumption",
+   "source": ""
+  },
+  {
+   "name": "KM 65 (as named by Neural DSP)",
+   "character": "Maker not identified in any source found.",
+   "hz_notes": "",
+   "confidence": "assumption",
+   "source": ""
+  },
+  {
+   "name": "Matchless 'signature' drivers",
+   "character": "Neural DSP does not name them. Community lore: Matchless-modified Celestion G12H30 + G12M pair; not verified.",
+   "hz_notes": "",
+   "confidence": "assumption",
+   "source": ""
+  }
+ ],
+ "mics_note": "Neural DSP publishes no mic list and never names the real microphones (trademark-avoiding names). The current web manual (4.1.1) says only 'Cabinet simulation devices with selectable microphones'. Names below come from a screenshot in the official 1.0.2 manual and from user reports. Neural DSP staff (Aleksi) on the forum: 'Some of the cabs have a slightly different selection, but none of them have that many mics' - users see about 6-7 choices per cab. Code must read each cab's available mic list from the unit instead of assuming a global list. Real-mic mappings follow the naming convention shared with Line 6 Helix and Fractal DynaCab; none is confirmed by Neural DSP.",
+ "mics": [
+  {
+   "qc_name": "Dynamic 57",
+   "real": "Shure SM57",
+   "name_evidence": "official (manual 1.0.2 screenshot)",
+   "character": "Sub-200 Hz roll-off, slight suckout around 300-500 Hz, broad 2-12 kHz presence peak (SOS); peak 2-6 kHz (Recording Magazine); 'aggressive mid-range growl' (Premier Guitar). Tight, cutting, can be fizzy at cap centre.",
+   "blend_with": [
+    "Ribbon 121",
+    "Dynamic 421",
+    "Ribbon 160",
+    "Condenser 414",
+    "Dynamic 57 (second, different position)"
+   ],
+   "confidence": "community",
+   "source": "https://www.soundonsound.com/techniques/guitar-amp-recording",
+   "sources": [
+    "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%201_0_2.pdf",
+    "https://www.soundonsound.com/techniques/guitar-amp-recording",
+    "https://www.recordingmag.com/resources/recording-info/mics-miking/capturing-the-cab/",
+    "https://www.premierguitar.com/diy/recording-tips/best-mic-for-guitar-amp",
+    "https://dshowmusic.com/wp-content/uploads/documents/line-6-helix-microphone-models-dshowmusic.pdf"
+   ]
+  },
+  {
+   "qc_name": "Dynamic 421",
+   "real": "Sennheiser MD 421",
+   "name_evidence": "official (manual 1.0.2 screenshot)",
+   "character": "Wider response than the 57 with no low-mid suckout and extra sensitivity above 1 kHz (SOS); on its own 'warm and full, with slightly rolled off highs' (Premier Guitar). Adds low-mid body and a different upper-mid edge.",
+   "blend_with": [
+    "Dynamic 57",
+    "Ribbon 121"
+   ],
+   "confidence": "community",
+   "source": "https://www.soundonsound.com/techniques/guitar-amp-recording",
+   "sources": [
+    "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%201_0_2.pdf",
+    "https://www.soundonsound.com/techniques/guitar-amp-recording",
+    "https://www.premierguitar.com/diy/recording-tips/best-mic-for-guitar-amp",
+    "https://dshowmusic.com/wp-content/uploads/documents/line-6-helix-microphone-models-dshowmusic.pdf"
+   ]
+  },
+  {
+   "qc_name": "Ribbon 121",
+   "real": "Royer R-121",
+   "name_evidence": "unverified on QC (appears in Neural DSP plugins and in a search-result summary of a GitHub issue that could not be opened)",
+   "character": "'Warm, creamy and natural' (Premier Guitar); provides body while a 57 adds midrange and top-end bite (Royer). Smooth top, big low-mids; darkest common choice.",
+   "blend_with": [
+    "Dynamic 57",
+    "Dynamic 421"
+   ],
+   "confidence": "assumption",
+   "source": "https://royerlabs.com/recording-electric-guitar/",
+   "sources": [
+    "https://royerlabs.com/recording-electric-guitar/",
+    "https://www.premierguitar.com/diy/recording-tips/best-mic-for-guitar-amp",
+    "https://github.com/weitzer-org/sound-profile-builder/issues/258",
+    "https://forum.fractalaudio.com/threads/list-of-mic-choices-using-dyna-cab.203403/"
+   ]
+  },
+  {
+   "qc_name": "Ribbon 160",
+   "real": "Beyerdynamic M 160",
+   "name_evidence": "community (user list, Neural DSP forum 2023)",
+   "character": "'Big, ribbony sound' (Premier Guitar); slightly brighter than the R-121 (Recording Magazine). Smooth top with a tighter, more focused pickup than a figure-8 ribbon.",
+   "blend_with": [
+    "Dynamic 57",
+    "Dynamic 7B",
+    "Condenser 414"
+   ],
+   "confidence": "community",
+   "source": "https://www.premierguitar.com/diy/recording-tips/best-mic-for-guitar-amp",
+   "sources": [
+    "https://unity.neuraldsp.com/t/microphone-choice-with-cabs/12314",
+    "https://www.premierguitar.com/diy/recording-tips/best-mic-for-guitar-amp",
+    "https://www.recordingmag.com/resources/recording-info/mics-miking/capturing-the-cab/",
+    "https://www.soundonsound.com/techniques/guitar-amp-recording",
+    "https://forum.fractalaudio.com/threads/list-of-mic-choices-using-dyna-cab.203403/"
+   ]
+  },
+  {
+   "qc_name": "Ribbon 10",
+   "real": "Royer R-10 (presumed)",
+   "name_evidence": "official (manual 1.0.2 screenshot) + community list",
+   "character": "No mic-specific source found. General ribbon character per Neural DSP: 'warm and full-bodied sound with a smooth high-frequency response'.",
+   "blend_with": [
+    "Dynamic 57",
+    "Dynamic 421"
+   ],
+   "confidence": "assumption",
+   "source": "https://neuraldsp.com/getting-started/how-to-record-electric-guitar",
+   "sources": [
+    "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%201_0_2.pdf",
+    "https://unity.neuraldsp.com/t/microphone-choice-with-cabs/12314",
+    "https://neuraldsp.com/getting-started/how-to-record-electric-guitar"
+   ]
+  },
+  {
+   "qc_name": "Condenser 414",
+   "real": "AKG C414",
+   "name_evidence": "official (manual 1.0.2 screenshot)",
+   "character": "'Cuts through a mix well and has lots of attitude' (Premier Guitar); flat 30 Hz-1 kHz with fuller lows than dynamics (Recording Magazine). Extended lows and highs, more open and detailed than a 57.",
+   "blend_with": [
+    "Dynamic 57",
+    "Ribbon 160"
+   ],
+   "confidence": "community",
+   "source": "https://www.premierguitar.com/diy/recording-tips/best-mic-for-guitar-amp",
+   "sources": [
+    "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%201_0_2.pdf",
+    "https://www.premierguitar.com/diy/recording-tips/best-mic-for-guitar-amp",
+    "https://www.recordingmag.com/resources/recording-info/mics-miking/capturing-the-cab/",
+    "https://dshowmusic.com/wp-content/uploads/documents/line-6-helix-microphone-models-dshowmusic.pdf"
+   ]
+  },
+  {
+   "qc_name": "Condenser 184",
+   "real": "Neumann KM 184 (presumed)",
+   "name_evidence": "official (manual 1.0.2 screenshot) + community list",
+   "character": "No mic-specific source found. SOS describes the related small-diaphragm KM84 as 'flatter and more focused' than large-diaphragm condensers.",
+   "blend_with": [
+    "Dynamic 57"
+   ],
+   "confidence": "assumption",
+   "source": "https://www.soundonsound.com/techniques/guitar-amp-recording",
+   "sources": [
+    "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%201_0_2.pdf",
+    "https://unity.neuraldsp.com/t/microphone-choice-with-cabs/12314",
+    "https://www.soundonsound.com/techniques/guitar-amp-recording"
+   ]
+  },
+  {
+   "qc_name": "Dynamic 7B",
+   "real": "Shure SM7B (presumed)",
+   "name_evidence": "unverified (forum recollection + search-result summary of a GitHub issue that could not be opened)",
+   "character": "'Bottom-heavy and smooth'; 'works great alone or in conjunction with a brighter mic' (Premier Guitar).",
+   "blend_with": [
+    "Ribbon 160",
+    "Ribbon 121",
+    "Dynamic 57"
+   ],
+   "confidence": "assumption",
+   "source": "https://www.premierguitar.com/diy/recording-tips/best-mic-for-guitar-amp",
+   "sources": [
+    "https://unity.neuraldsp.com/t/microphone-choice-with-cabs/12314",
+    "https://github.com/weitzer-org/sound-profile-builder/issues/258",
+    "https://www.premierguitar.com/diy/recording-tips/best-mic-for-guitar-amp"
+   ]
+  },
+  {
+   "qc_name": "Dynamic 906",
+   "real": "Sennheiser e906 (presumed)",
+   "name_evidence": "unverified (search-result summary of a GitHub issue that could not be opened)",
+   "character": "",
+   "blend_with": [],
+   "confidence": "assumption",
+   "source": "",
+   "sources": [
+    "https://github.com/weitzer-org/sound-profile-builder/issues/258"
+   ]
+  },
+  {
+   "qc_name": "Condenser 57",
+   "real": "",
+   "name_evidence": "appears in the text of the manual 1.0.2 screenshot only; possibly a mock-up label",
+   "character": "",
+   "blend_with": [],
+   "confidence": "assumption",
+   "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%201_0_2.pdf",
+   "sources": [
+    "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%201_0_2.pdf"
+   ]
+  }
+ ],
+ "position": {
+  "low_end_means": "unknown",
+  "best_guess_low_end": "cap centre",
+  "official_text": "POSITION: Controls where the microphone is, from the center of the cone to the edge of the cone (automatically disabled when using external IR files).",
+  "effect_of_increasing": "If 0 = centre (unverified): moving toward the cone edge - progressively darker, less fizz/bite, fuller low-mids; at the far edge the sound thins. Decreasing = toward the dust cap: brighter, more attack and fizz.",
+  "audible_effect_by_direction": {
+   "toward_centre": "brightest, most attack/bite/fizz",
+   "toward_edge": "darker, warmer, 'meatier'; extreme edge = thinner, reduced bass (Shure)"
+  },
+  "scale_note": "Catalog range is 0..10 for factory cabs (0..1 for plugin cabs); the unit's screen shows 0.00-1.00 in manual screenshots (e.g. defaults 0.30 and 0.74).",
+  "confidence": "official for the axis (centre-to-edge); assumption for which numeric end is the centre - no manual, forum post or measurement found states it. A feature request on the Neural forum complains the graphic is 'rather abstract' and asks for guides 'relative to the dust cap and speaker edge'.",
+  "how_to_verify": "Render the same DI through one cab/mic at POSITION min and max, DISTANCE fixed; the setting with the higher spectral centroid / more 4-8 kHz energy is the cap centre.",
+  "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.0.0.pdf",
+  "sources": [
+   "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%201_0_2.pdf",
+   "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%202.3.0.pdf",
+   "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.0.0.pdf",
+   "https://unity.neuraldsp.com/t/cab-block-interface-improvement-better-visual-feedback-for-mic-position-and-distance/23928",
+   "https://www.soundonsound.com/techniques/how-record-guitar-cabs-one-mic",
+   "https://www.recordingmag.com/resources/recording-info/mics-miking/capturing-the-cab/",
+   "https://royerlabs.com/recording-electric-guitar/",
+   "https://recordinghacks.com/pdf/shure/us_pro_sm57_ug.pdf"
+  ]
+ },
+ "distance": {
+  "range_means": "Mic distance from the speaker, 'between close to the cab and far towards the room' (manuals 1.0.2-2.3.0); 'distance of the microphone towards the speaker' (manual 3.0.0). No inches/cm are published.",
+  "low_end_means": "unknown",
+  "best_guess_low_end": "closest to the grille (manual screenshots show both mics at DISTANCE 0.00 as the default)",
+  "effect_of_increasing": "If 0 = closest (unverified): less proximity bass, softer attack, less direct high end, more room/air; sounds less 'in your face' and eventually thinner. Decreasing = tighter, more direct, more bass from proximity effect.",
+  "reference_numbers_real_world": {
+   "1 in": "most attack, emphasized bass (Shure)",
+   "6-12 in": "medium attack, full, balanced (Shure)",
+   "18 in-3 ft": "softer attack, thin, reduced bass (Shure)"
+  },
+  "scale_note": "Catalog range 0..10 for factory cabs; several plugin cabs expose only DISTANCE 0..1; John Mayer cabs expose ROOM controls instead.",
+  "confidence": "official for the axis (close-to-far); assumption for numeric direction and for any physical distance mapping",
+  "how_to_verify": "Render at DISTANCE min and max: the closer setting has more energy below ~200 Hz and a shorter/drier impulse; the far setting shows later arrival (delay) and more room decay.",
+  "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%202.3.0.pdf",
+  "sources": [
+   "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%201_0_2.pdf",
+   "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%202.3.0.pdf",
+   "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.0.0.pdf",
+   "https://recordinghacks.com/pdf/shure/us_pro_sm57_ug.pdf",
+   "https://neuraldsp.com/getting-started/how-to-record-electric-guitar"
+  ]
+ },
+ "rules": [
+  {
+   "topic": "fizz",
+   "rule": "Move the mic away from the cap centre toward the cone edge before touching EQ.",
+   "why": "SOS: 'miking the centre of the speaker produces the brightest sound'; moving toward the edge reduces highs and adds depth. A 12-inch driver beams its highest frequencies from the centre.",
+   "numbers": {
+    "start": "on-axis at centre, 1-2 cm from grille, then sweep toward edge"
+   },
+   "confidence": "widely repeated",
+   "source": "https://www.soundonsound.com/techniques/how-record-guitar-cabs-one-mic"
+  },
+  {
+   "topic": "position-before-eq",
+   "rule": "Treat mic position as the first tone control; EQ second.",
+   "why": "SOS: 'Using the mic position as a tone control invariably delivers a better result than relying on adding EQ after recording.' Nail The Mix: if you need to boost more than a few dB, 'the problem might be at the source (amp settings or mic choice)'.",
+   "numbers": {
+    "eq_boost_warning": "> a few dB"
+   },
+   "confidence": "widely repeated",
+   "source": "https://www.soundonsound.com/techniques/how-record-guitar-cabs-one-mic"
+  },
+  {
+   "topic": "brightness",
+   "rule": "For more cut/bite move toward the centre of the cone; for warmth move toward the edge.",
+   "why": "Recording Magazine: 'the closer you are to the center of the speaker cone, the brighter and more direct the sound will be'. Royer: off-centre toward the edge 'the sound will become progressively meatier and less bright'.",
+   "numbers": {},
+   "confidence": "widely repeated",
+   "source": "https://www.recordingmag.com/resources/recording-info/mics-miking/capturing-the-cab/"
+  },
+  {
+   "topic": "extreme-edge",
+   "rule": "Do not go all the way to the cone edge for 'more body' - the outer edge thins out.",
+   "why": "Shure SM57 guide: 'On-axis with the edge of the speaker cone' = 'Thinner, reduced bass sound'. Neural DSP: moving toward the outer edge 'will decrease midrange'. The fullest spot is between cap edge and mid-cone.",
+   "numbers": {},
+   "confidence": "official",
+   "source": "https://recordinghacks.com/pdf/shure/us_pro_sm57_ug.pdf"
+  },
+  {
+   "topic": "off-axis",
+   "rule": "Angle the mic off-axis to soften highs when the tone is too bright.",
+   "why": "SOS: 'rotate the mic to around 45 degrees off-axis'; 'The further you move it off-axis in this way, the more high end you'll lose.' QC stock cabs have no angle control, so use POSITION, a darker mic, or an 'OA' IR file instead.",
+   "numbers": {
+    "angle_deg": 45
+   },
+   "confidence": "widely repeated",
+   "source": "https://www.soundonsound.com/techniques/how-record-guitar-cabs-one-mic"
+  },
+  {
+   "topic": "distance",
+   "rule": "Use distance to trade attack and bass against balance and air.",
+   "why": "Shure SM57 guide table for guitar amps.",
+   "numbers": {
+    "25 mm (1 in), on-axis": "most attack, emphasized bass",
+    "150-300 mm (6-12 in)": "medium attack, full, balanced sound",
+    "0.5-1 m (18 in-3 ft)": "softer attack, thin, reduced bass"
+   },
+   "confidence": "official",
+   "source": "https://recordinghacks.com/pdf/shure/us_pro_sm57_ug.pdf"
+  },
+  {
+   "topic": "proximity",
+   "rule": "For more body/thump move a directional mic closer; for less boom back it off.",
+   "why": "Shure: within 6 mm (1/4 in) a unidirectional mic 'boosts bass frequencies (by 6 to 10 dB at 100 Hz)'. SOS: backing a directional mic off lessens proximity effect. Neural DSP: closer 'captures a more direct and focused sound', increasing bass; farther reduces bass and adds room.",
+   "numbers": {
+    "proximity_boost_db_at_100hz": "6-10 (source within 1/4 in)"
+   },
+   "confidence": "official",
+   "source": "https://recordinghacks.com/pdf/shure/us_pro_sm57_ug.pdf"
+  },
+  {
+   "topic": "ribbon-distance",
+   "rule": "Place ribbons a little farther back and off the dome; they get bass-heavy up close.",
+   "why": "Royer: brightest R-121 sound is 'on the center of the speaker dome, anywhere from 2 to 6 inches from the grille cloth'; backing off develops 'increased tonal complexity and low end at distances over a foot'.",
+   "numbers": {
+    "r121_distance_in": "2-6",
+    "complexity_beyond": "> 12 in"
+   },
+   "confidence": "official",
+   "source": "https://royerlabs.com/recording-electric-guitar/"
+  },
+  {
+   "topic": "mic-type",
+   "rule": "Choose mic type by the complaint: dynamic for cut, ribbon for warmth/less fizz, condenser for open detail.",
+   "why": "Neural DSP: ribbons give 'a warm and full-bodied sound with a smooth high-frequency response'; condensers 'a more transparent and pristine recording'; dynamics handle high SPL and the SM57 is 'a legendary choice'.",
+   "numbers": {},
+   "confidence": "official",
+   "source": "https://neuraldsp.com/getting-started/how-to-record-electric-guitar"
+  },
+  {
+   "topic": "blend-57-ribbon",
+   "rule": "Blend Dynamic 57 with Ribbon 121: ribbon for body, 57 for bite; balance with the two LEVELs.",
+   "why": "Royer: the most popular rock approach is an R-121 with an SM57 or 421 - the R-121 provides body, the SM57 adds midrange and top-end bite. Premier Guitar: the R-121 is 'a perfect blend with an SM57'. More ribbon = warmer/less fizz; more 57 = more cut.",
+   "numbers": {},
+   "confidence": "widely repeated",
+   "source": "https://royerlabs.com/recording-electric-guitar/"
+  },
+  {
+   "topic": "blend-57-421",
+   "rule": "Blend Dynamic 57 with Dynamic 421 for a fuller, harder-edged rhythm tone.",
+   "why": "SOS: SM57 + MD421 is the most popular pair (Joe Barresi's main combination). The 57 has a 300-500 Hz suckout and sub-200 Hz roll-off; the 421 has a wider response with no low-mid suckout. Barresi: edge of the cone for a fuller sound, dead centre for brighter. OwnHammer's 'MDRN' mixes are 57 + 421.",
+   "numbers": {
+    "sm57_suckout_hz": "300-500",
+    "sm57_rolloff_below_hz": 200,
+    "sm57_presence_hz": "2000-12000"
+   },
+   "confidence": "widely repeated",
+   "source": "https://www.soundonsound.com/techniques/guitar-amp-recording"
+  },
+  {
+   "topic": "blend-fredman",
+   "rule": "Fredman: two 57s with capsules together, one on-axis at the cone centre, one angled beside it; blend to tame the on-axis fizz.",
+   "why": "Nail The Mix: on-axis mic within an inch of the grille gives punch and attack; the angled mic 'captures less of the super-direct ice pick highs' and adds body. Angle given as 55 degrees (traditionally cited as 45). Start with both faders equal. Not reproducible with QC POSITION/DISTANCE (no angle) - use IR files labelled OA/Fredman, e.g. York 57 + 57-OA or Mix 10 (57 + 57).",
+   "numbers": {
+    "angle_deg": "55 (often cited as 45)",
+    "distance_in": "<= 1",
+    "start_blend": "50/50"
+   },
+   "confidence": "single source",
+   "source": "https://www.nailthemix.com/fredrik-nordstroms-fredman-technique-for-guitars"
+  },
+  {
+   "topic": "blend-dark-bright",
+   "rule": "Pair a dark mic with a bright one rather than two similar mics.",
+   "why": "SOS (Steve Albini): pair a dark mic with a bright one, e.g. ribbon + condenser; Eddie Kramer: U67 + M160, or SM57 + MD421 + M160 tightly grouped.",
+   "numbers": {},
+   "confidence": "widely repeated",
+   "source": "https://www.soundonsound.com/techniques/guitar-amp-recording"
+  },
+  {
+   "topic": "blend-level",
+   "rule": "Use the second mic's level as a fine tone control; small amounts matter.",
+   "why": "SOS (John Leckie): the second mic can sit 10-15 dB down and blends 20-30 dB down still change the tone noticeably.",
+   "numbers": {
+    "second_mic_db_down": "10-15 (audible even at 20-30)"
+   },
+   "confidence": "single source",
+   "source": "https://www.soundonsound.com/techniques/guitar-amp-recording"
+  },
+  {
+   "topic": "phase",
+   "rule": "Keep both mics at the same DISTANCE when blending; if the blend gets thin or hollow, flip one mic's phase switch.",
+   "why": "SOS (Bill Price): balance the mics and position one 'fractionally' so both are in phase at high frequencies; mics at five and six inches cause phase shift. Recording Magazine: if the combined sound gets smaller you have a phase problem. Cortex Presets: sum to mono and flip polarity if frequencies vanish - 'The Quad Cortex has a polarity flip on cab blocks for exactly this purpose.'",
+   "numbers": {
+    "problem_example": "one mic at 5 in, other at 6 in"
+   },
+   "confidence": "widely repeated",
+   "source": "https://www.soundonsound.com/techniques/guitar-amp-recording"
+  },
+  {
+   "topic": "phase-as-tone",
+   "rule": "Changing one mic's DISTANCE slightly while blending is a comb-filter EQ; use deliberately or avoid.",
+   "why": "SOS (Jack Douglas 'phase EQ'): add each mic while checking that it adds rather than cancels; flipping one mic creates filter-like effects. Shure's general rule for separated mics is 3:1 spacing.",
+   "numbers": {
+    "shure_spacing_rule": "3:1"
+   },
+   "confidence": "widely repeated",
+   "source": "https://www.soundonsound.com/techniques/guitar-amp-recording"
+  },
+  {
+   "topic": "ir-mixing-phase",
+   "rule": "When mixing third-party IRs, use minimum-phase (MPT) files, or align with the IR loader's DELAY and INVERT.",
+   "why": "York Audio manual: 'It is recommended to use the Minimum Phase files'; natural-phase files blended together give 'mellowed top end and varying degrees of shift in the midrange'; 'Minimum Phase files are preferred when blending with factory cabs.' Overdriven.fr: a 0.12-0.20 ms delay typically fixes alignment against non-MPT IRs; try blends of 75/25, 50/50, 25/75, 10/90.",
+   "numbers": {
+    "align_delay_ms": "0.12-0.20",
+    "blend_ratios": [
+     "75/25",
+     "50/50",
+     "25/75",
+     "10/90"
+    ]
+   },
+   "confidence": "official",
+   "source": "https://www.scribd.com/document/732313491/York-Audio-MES-212-V30-Manual"
+  },
+  {
+   "topic": "external-ir-no-position",
+   "rule": "With an external IR loaded, 'move the mic' by switching IR files - POSITION and DISTANCE are disabled.",
+   "why": "QC manual: both parameters are 'automatically disabled when using external IR files'.",
+   "numbers": {},
+   "confidence": "official",
+   "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.0.0.pdf"
+  },
+  {
+   "topic": "ir-length",
+   "rule": "Do not expect room tail or very fine low-frequency detail from user IRs on QC.",
+   "why": "QC manual: uploaded IR files 'will be resized to 1024 samples after being uploaded (21 milliseconds approx)'. York's files are 500 ms and get truncated on import.",
+   "numbers": {
+    "samples": 1024,
+    "ms": 21
+   },
+   "confidence": "official",
+   "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%202.3.0.pdf"
+  },
+  {
+   "topic": "hpf",
+   "rule": "High-pass rhythm guitars at 80-120 Hz in a mix; raise until the guitars lose weight, then back off.",
+   "why": "Nail The Mix: 80-120 Hz starting range, removing sub-bass that competes with kick and bass. Fractal forum consensus for cab low cut: 80-120 Hz, with 80 and 100 Hz the most common. Cortex Presets (QC metal): 'High-pass at 90 Hz'. York Audio (live): low cut around 70-80 Hz.",
+   "numbers": {
+    "metal_rhythm_hz": "80-120",
+    "qc_metal_example_hz": 90,
+    "york_live_hz": "70-80",
+    "frfr_monitoring_hz": "120-150 (Fractal moderator yek)"
+   },
+   "confidence": "widely repeated",
+   "source": "https://www.nailthemix.com/how-to-eq-metal-guitar"
+  },
+  {
+   "topic": "lpf",
+   "rule": "Low-pass high-gain guitars: start at 12 kHz and sweep down to about 8-9 kHz; with FRFR monitoring 6-8 kHz is common.",
+   "why": "Nail The Mix: start around 12 kHz, sometimes down to 8-9 kHz, to 'remove that nasty, ear-fatiguing fizz without making the guitar sound dull'. Fractal forum cab high cut cluster: 6-8 kHz (7.5 kHz often cited); yek: 5-7 kHz for FR monitoring. Cortex Presets: 'Low-pass at 8 to 10 kHz to tame any digital edge'.",
+   "numbers": {
+    "metal_mix_hz": "8000-12000",
+    "frfr_live_hz": "6000-8000",
+    "frfr_monitoring_hz": "5000-7000",
+    "narrow_real_cab_emulation_hz": "180 / 4500 (one poster)"
+   },
+   "confidence": "widely repeated",
+   "source": "https://www.nailthemix.com/how-to-eq-metal-guitar"
+  },
+  {
+   "topic": "lpf-counterpoint",
+   "rule": "With a well-mixed IR, avoid heavy high cuts for live use.",
+   "why": "York Audio's advice relayed on the Fractal forum: for live, 'Just don't use any high cuts or you'll get lost in the mix'; start with a low cut around 70-80 Hz; a single 57 gives a focused sound that cuts through, fuller multi-mic mixes suit studio-style tone.",
+   "numbers": {
+    "low_cut_hz": "70-80"
+   },
+   "confidence": "single source",
+   "source": "https://forum.fractalaudio.com/threads/favorite-york-audio-ir-for-live-foh.206319/"
+  },
+  {
+   "topic": "filters-by-context",
+   "rule": "Use wider filters solo/at home and tighter filters in a band mix; keep separate settings per context.",
+   "why": "Fractal forum: use HPF/LPF 'to help a tone sit in a mix, not to fix a bad tone'; one poster leaves cuts near minimum/maximum and trims later to fit the mix; another changes only the cab block's high and low cuts between practice and gig volume. Single-coil clean example: 80-140 Hz / 6-10 kHz. No source found gives separate published ranges for lead vs clean vs rhythm.",
+   "numbers": {
+    "single_coil_clean_example": "80-140 Hz / 6000-10000 Hz"
+   },
+   "confidence": "widely repeated",
+   "source": "https://forum.fractalaudio.com/threads/cab-block-high-and-low-cut-settings.144066/"
+  },
+  {
+   "topic": "hz-fizz",
+   "rule": "'Fizz' = roughly 5-9 kHz (some place it lower, 3.5-4 kHz). Fix: mic toward edge, ribbon or more ribbon in the blend, lower LPF; notch narrowly rather than a broad treble cut.",
+   "why": "Nail The Mix chart: 5-9 kHz is 'the #1 enemy of DI guitars and amp sims' - 'Don't use a broad treble cut', find and notch the offending frequency. Cortex Presets: 'Slight cut around 4 kHz if the tone is fizzing'. Mic/cab fix is a synthesis of the position and mic-character rules.",
+   "numbers": {
+    "fizz_hz": "5000-9000",
+    "alt_fizz_hz": "~4000"
+   },
+   "confidence": "widely repeated",
+   "source": "https://www.nailthemix.com/eq-frequency-chart"
+  },
+  {
+   "topic": "hz-harsh",
+   "rule": "'Harsh / ice-pick' = 2.5-5 kHz, which is also pick attack. Fix: move off the cap centre, swap V30 for a Greenback/Creamback-type cab, or blend in a ribbon; cut surgically only.",
+   "why": "Nail The Mix: harshness 2.5-5 kHz - 'A surgical cut here can tame the ice pick sound without losing bite'; bite/pick attack lives at 1.5-4 kHz. V30 is the upper-mid-forward speaker (community: ~2-3 kHz spike); Greenback has 'restrained top-end' (Celestion).",
+   "numbers": {
+    "harsh_hz": "2500-5000",
+    "bite_hz": "1500-4000"
+   },
+   "confidence": "widely repeated",
+   "source": "https://www.nailthemix.com/how-to-eq-metal-guitar"
+  },
+  {
+   "topic": "hz-honk",
+   "rule": "'Cab honk / nasal' = 800 Hz-1.5 kHz. Fix: choose a scooped speaker (G12T-75) or blend one in, or cut here; a boost here pushes the guitar forward.",
+   "why": "Nail The Mix: 800 Hz-1.5 kHz honk/nasal - cutting makes guitars 'less like a wah pedal'; the chart notes 'A careful boost here can bring a guitar forward'. Speaker choice is a synthesis from speaker characters.",
+   "numbers": {
+    "honk_hz": "800-1500"
+   },
+   "confidence": "widely repeated",
+   "source": "https://www.nailthemix.com/how-to-eq-metal-guitar"
+  },
+  {
+   "topic": "hz-boxiness",
+   "rule": "'Boxiness' = about 250-500 Hz (centred near 400 Hz). Fix: favour the 57 (it dips 300-500 Hz), reduce a 421/ribbon in the blend, pick a larger closed cab over a small open combo.",
+   "why": "Nail The Mix: mud/boxiness 250-500 Hz, 'cardboard box' at 400 Hz - 'Be careful not to cut too much, or you'll lose all the body'. SOS: SM57 has a slight suckout around 300-500 Hz; MD421 does not. Cab-size advice is a synthesis.",
+   "numbers": {
+    "boxiness_hz": "250-500",
+    "centre_hz": 400
+   },
+   "confidence": "widely repeated",
+   "source": "https://www.nailthemix.com/how-to-eq-metal-guitar"
+  },
+  {
+   "topic": "hz-mud-boom",
+   "rule": "'Mud' = 150-250 Hz; 'boom' = below ~150 Hz. Fix: increase mic distance (less proximity), raise HPF, prefer a 57 over ribbon/condenser, prefer a standard-size 4x12 or 2x12 over an oversized 4x12.",
+   "why": "Nail The Mix chart: 150-250 Hz is a 'major source of mud' - a slight wide cut cleans up. Shure: proximity adds 6-10 dB at 100 Hz up close; SM57 rolls off below 200 Hz (SOS). Royer: a close R-121 gives exaggerated low end. Cortex Presets: 'Slight cut around 250 Hz to clear up muddiness'. Cab-size advice is a synthesis.",
+   "numbers": {
+    "mud_hz": "150-250",
+    "cut_example_hz": 250
+   },
+   "confidence": "widely repeated",
+   "source": "https://www.nailthemix.com/eq-frequency-chart"
+  },
+  {
+   "topic": "more-body",
+   "rule": "For 'more body': move from cap centre toward mid-cone, bring the mic closer, add Dynamic 421 or a ribbon under the 57.",
+   "why": "Combines: edge = 'fuller' (Barresi, SOS), proximity bass (Shure), 421 has no low-mid suckout (SOS), R-121 'provides body' (Royer).",
+   "numbers": {},
+   "confidence": "widely repeated",
+   "source": "https://www.soundonsound.com/techniques/guitar-amp-recording"
+  },
+  {
+   "topic": "more-cut",
+   "rule": "For 'more cut': move toward the cap centre, favour Dynamic 57 (or 414), reduce the ribbon, and consider a V30 cab.",
+   "why": "Centre = brightest (SOS, Recording Magazine); SM57 presence peak 2-12 kHz (SOS); C414 'cuts through a mix well' (Premier Guitar); V30 is the upper-mid-forward speaker (community description). Nail The Mix: a small boost at 1.5-4 kHz adds bite; Cortex Presets: 'Small boost around 2.5 to 3 kHz for note articulation'.",
+   "numbers": {
+    "articulation_boost_hz": "2500-3000"
+   },
+   "confidence": "widely repeated",
+   "source": "https://www.soundonsound.com/techniques/how-record-guitar-cabs-one-mic"
+  },
+  {
+   "topic": "volume",
+   "rule": "Dial presets at the volume they will be played; expect quiet-dialed presets to be boomy and piercing loud.",
+   "why": "Fractal Audio (quoted on its forum): players dial in modelers at low volume and unknowingly compensate for Fletcher-Munson, then at gigs 'the lows are boomy and the highs are piercing'. Line 6 forum: FRFR reproduces far more bass and treble than a guitar speaker, so it sounds 'thin and boomy' turned up. Note the direction: sources say low volume sounds thin/flat (inviting over-boost), not that cab sims are inherently harsher when quiet.",
+   "numbers": {},
+   "confidence": "widely repeated",
+   "source": "https://forum.fractalaudio.com/threads/fletcher-munson-nightmare.211537/page-3"
+  },
+  {
+   "topic": "amp-in-room",
+   "rule": "A cab sim is the close-mic'd recorded sound, not an amp in the room; tame it with cuts, darker mic choice or more distance rather than expecting FRFR to sound like a cab.",
+   "why": "Line 6 forum: in front of an amp 'centered on the cap the sound will be pretty harsh', off-axis it gets darker - a close mic hears the harsh spot; FRFR does not roll off highs and lows like a guitar speaker, so high and low cuts are needed. One Fractal poster narrows to ~180 Hz / ~4.5 kHz to mimic a real cab. No source found on headphone-specific voicing.",
+   "numbers": {
+    "real_cab_emulation": "~180 Hz HPF / ~4.5 kHz LPF"
+   },
+   "confidence": "widely repeated",
+   "source": "https://line6.com/support/topic/56455-help-me-understand-why-frfr-is-so-different/"
+  },
+  {
+   "topic": "open-vs-closed",
+   "rule": "Choose a closed-back 4x12 for high gain, drop tunings and tight lows; an open-back 1x12/2x12 for cleans, edge-of-breakup and a softer, airier tone.",
+   "why": "Thomann: closed cabs - 'The basses are clear, tight, and defined', slightly more pronounced mids, 'a beam of sound to the front'; open cabs - 'somewhat warmer with a slightly reduced treble range', bass 'slightly softer'. 'For the most part, 4x12 cabs are designed with a closed back.' If a closed 4x12 'sounds a little too harsh', try 'a 2x12 cab with an open back'. The difference matters less when close-miked.",
+   "numbers": {},
+   "confidence": "widely repeated",
+   "source": "https://www.thomannmusic.com/blog/gear/guitar-cab-closed-back-vs-open-back/"
+  },
+  {
+   "topic": "cab-size",
+   "rule": "More speakers/bigger box = fuller; a 2x12 is punchier and more focused than a 4x12.",
+   "why": "Thomann: 'the more speakers there are, the fuller the sound'. York Audio on the Mesa 2x12: 'The 2x12 design brings more punch and focus than its 4X12 big brothers'.",
+   "numbers": {},
+   "confidence": "widely repeated",
+   "source": "https://www.yorkaudio.co/product-page/mes-212-v30"
+  },
+  {
+   "topic": "two-cabs",
+   "rule": "Mix two cabs with complementary speakers (e.g. V30 + G12T-75) rather than EQ-ing one; pan slightly apart or blend in mono and check phase.",
+   "why": "Overdriven.fr: speakers complement each other - 'V30 + G12K100, V30 + G12T75'; combining IRs 'has the most important impact on shaping the global tone', finish with EQ; start by mixing two IRs. Cortex Presets: 'load two cab blocks in parallel, each with a different IR, panned slightly off-centre'. Fractal users blend a Mesa 2x12 57 with a 4x12 57 for live.",
+   "numbers": {
+    "blend_ratios": [
+     "75/25",
+     "50/50",
+     "25/75"
+    ]
+   },
+   "confidence": "widely repeated",
+   "source": "https://overdriven.fr/overdriven/index.php/2021/05/30/impulse-responses-part-9-mixing-irs/"
+  },
+  {
+   "topic": "qc-stock-mapping",
+   "rule": "On QC stock cabs map requests to parameters: less fizz/warmer -> POSITION toward edge or swap/raise ribbon; more cut -> POSITION toward centre, more Dynamic 57; more body -> DISTANCE closer, add 421/ribbon; less boom -> DISTANCE farther, HPF up.",
+   "why": "Synthesis of the rules above applied to the QC cab block parameters (two mic slots with LEVEL, POSITION, DISTANCE, phase; HPF 20-500 Hz; LPF 500-20000 Hz). Numeric direction of POSITION/DISTANCE must be verified on the unit first.",
+   "numbers": {
+    "hpf_range_hz": "20-500",
+    "lpf_range_hz": "500-20000"
+   },
+   "confidence": "synthesis",
+   "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.0.0.pdf"
+  },
+  {
+   "topic": "qc-starting-point",
+   "rule": "Start with one Dynamic 57 near the cap edge, close, then add the second mic.",
+   "why": "SOS: start on-axis at the centre 1-2 cm from the grille and sweep toward the edge. A QC preset guide suggests 'An SM57 at 0 degrees on the cap edge is a reliable neutral starting point' and treats the cap edge as the most balanced position (seen in search results; the page blocked direct fetch).",
+   "numbers": {},
+   "confidence": "single source",
+   "source": "https://faderandknob.com/blog/quad-cortex-preset-from-scratch"
+  }
+ ],
+ "york_mes_212_v30": {
+  "description": "York Audio MES 212 V30: 'based on a Mesa horizontal Rectifier 2x12 cabinet loaded with English made 70 watt Celestion Vintage 30 speakers. The 2x12 design brings more punch and focus than its 4X12 big brothers... The low end is deep and powerful, the midrange is balanced and complex, and the top end ranges from seamlessly smooth to biting aggression with tremendous note definition.' Ten mics, 79 single-mic shots ('multiple sweet spot, cap edge, and off-axis files') + 15 multi-mic Mixes = 94 IRs. 24-bit WAV at 96/48/44.1 kHz, 500 ms, Raw (natural phase) and MPT (minimum phase) versions.",
+  "qc_stock_equivalent": {
+   "id": 12021,
+   "name": "212 CA Recto V30 98 (M)",
+   "note": "Same cab type (Mesa Rectifier 2x12, V30) - useful for A/B and for blending with minimum-phase York files."
+  },
+  "naming": "On the unit: 'YA MES 212 V30 <mic>-<n>' and 'YA MES 212 V30 Mix NN'. <n> = 1-5 are different sweet-spot captures: 'Numbers 1-5 DO NOT determine a capture's brightness, darkness, or speaker position. The numbers only determine which capture you're listening to.' 'OA 1-3' = off-axis shots (dynamic mics only), 'also taken from various parts of the speaker'. 'CE' = cap edge and 'CNT' = center: 'Certain mics include cap edge (CE) and center (CNT) captures for brighter options with more attack.' Mixes 'are given a number in order to visually simplify the file names'.",
+  "mic_abbreviations": {
+   "57": "Shure SM57 (dynamic)",
+   "58": "Shure SM58 (dynamic)",
+   "421": "Sennheiser MD421 (dynamic)",
+   "906": "Sennheiser e906 (dynamic)",
+   "SM7": "Shure SM7B (dynamic)",
+   "121": "Royer R-121 (ribbon)",
+   "160": "Beyerdynamic M160 (ribbon)",
+   "313": "Shure KSM313 (ribbon)",
+   "F47": "vintage Neumann FET 47 (condenser)",
+   "414": "AKG C414 (condenser)"
+  },
+  "files_on_unit": {
+   "count": 95,
+   "pattern": {
+    "57, 58, 421, 906, SM7": "-1..-5, -CE 1..2, -OA 1..3",
+    "121, 160, 313, F47": "-1..-5, -CNT",
+    "414": "-1..-5",
+    "Mix": "01..15"
+   },
+   "note": "95 = 94 pack IRs + one extra: '57-1' is present as both 'minimal phase' and 'natural phase'. York: 'Minimum Phase and Natural Phase single mic captures sound identical' - the difference only appears when blending."
+  },
+  "mixes": [
+   {
+    "file": "Mix 01",
+    "description": "57 + 121 (mic recipe only; York gives no tonal description) - also in the $1 Limited version"
+   },
+   {
+    "file": "Mix 02",
+    "description": "57 + 160 (mic recipe only; York gives no tonal description) - also in the $1 Limited version"
+   },
+   {
+    "file": "Mix 03",
+    "description": "421 + 57 (mic recipe only; York gives no tonal description) - also in the $1 Limited version"
+   },
+   {
+    "file": "Mix 04",
+    "description": "SM7 + 160 (mic recipe only; York gives no tonal description)"
+   },
+   {
+    "file": "Mix 05",
+    "description": "58 + 414 (mic recipe only; York gives no tonal description)"
+   },
+   {
+    "file": "Mix 06",
+    "description": "SM7 + F47 (mic recipe only; York gives no tonal description)"
+   },
+   {
+    "file": "Mix 07",
+    "description": "421 + F47 (mic recipe only; York gives no tonal description)"
+   },
+   {
+    "file": "Mix 08",
+    "description": "906 + 58 (mic recipe only; York gives no tonal description)"
+   },
+   {
+    "file": "Mix 09",
+    "description": "SM7 + 160 (mic recipe only; York gives no tonal description)"
+   },
+   {
+    "file": "Mix 10",
+    "description": "57 + 57 (mic recipe only; York gives no tonal description) - also in the $1 Limited version"
+   },
+   {
+    "file": "Mix 11",
+    "description": "SM7 + 121 (mic recipe only; York gives no tonal description)"
+   },
+   {
+    "file": "Mix 12",
+    "description": "421 + 121 (mic recipe only; York gives no tonal description) - also in the $1 Limited version"
+   },
+   {
+    "file": "Mix 13",
+    "description": "58 + 160 (mic recipe only; York gives no tonal description)"
+   },
+   {
+    "file": "Mix 14",
+    "description": "906 + 313 (mic recipe only; York gives no tonal description)"
+   },
+   {
+    "file": "Mix 15",
+    "description": "58 + F47 (mic recipe only; York gives no tonal description)"
+   }
+  ],
+  "mixes_documented": "The manual lists only which mics are in each Mix, not positions, ratios, intended use or tonal character. Mix 04 and Mix 09 are both listed as 'SM7 + 160'. York: 'If you like a particular mix, try exploring more combinations of those mics to fine tune your sound.'",
+  "recommended": [
+   {
+    "use": "any (first audition)",
+    "files": [
+     "YA MES 212 V30 Mix 01"
+    ],
+    "basis": "community: a Fractal forum user reports recording with MIX 01 (single report, seen in search results); York's site and manual recommend no specific file",
+    "source": "https://forum.fractalaudio.com/threads/york-audio-master-thread-newest-cab-pack-mrsh-412-mv30-dual.156603/page-12"
+   },
+   {
+    "use": "live / cut through a band",
+    "files": [
+     "YA MES 212 V30 57-1 minimal phase",
+     "YA MES 212 V30 57-2",
+     "YA MES 212 V30 57-CE 1"
+    ],
+    "basis": "York Audio's general advice (not pack-specific): a single classic dynamic like a 57 for a focused sound that cuts through; other York users land on '57 CE-1' and blend a Mesa 2x12 57 with a 4x12 57 for live",
+    "source": "https://forum.fractalaudio.com/threads/favorite-york-audio-ir-for-live-foh.206319/"
+   },
+   {
+    "use": "rhythm (high gain)",
+    "files": [
+     "YA MES 212 V30 Mix 03",
+     "YA MES 212 V30 Mix 10",
+     "YA MES 212 V30 Mix 01"
+    ],
+    "basis": "inferred from mic recipes (421+57 = classic rhythm pair; 57+57; 57+121) - NOT a York or community recommendation",
+    "source": ""
+   },
+   {
+    "use": "lead",
+    "files": [
+     "YA MES 212 V30 Mix 01",
+     "YA MES 212 V30 Mix 11",
+     "YA MES 212 V30 Mix 12",
+     "YA MES 212 V30 Mix 02"
+    ],
+    "basis": "inferred: mixes containing a ribbon (121/160) for a smoother top - NOT a York or community recommendation",
+    "source": ""
+   },
+   {
+    "use": "clean",
+    "files": [
+     "YA MES 212 V30 Mix 05",
+     "YA MES 212 V30 Mix 15",
+     "YA MES 212 V30 Mix 07",
+     "YA MES 212 V30 Mix 13"
+    ],
+    "basis": "inferred: mixes containing a condenser (414/F47) or 58+ribbon for extended, open response - NOT a York or community recommendation",
+    "source": ""
+   }
+  ],
+  "move_the_mic_with_files": {
+   "less fizz / warmer": "go from CE/CNT or 57 to OA shots, to a ribbon (121, 160, 313), or to a Mix containing a ribbon (01, 02, 04, 09, 11, 12, 13, 14)",
+   "more cut / attack": "CE and CNT captures ('brighter options with more attack'), 57/421/906 singles, Mix 03 or Mix 10",
+   "more body": "SM7, 421, 121 singles or Mix 11 / Mix 12 (inferred from mic characters)",
+   "basis": "CE/CNT/OA meaning is from the York manual; the rest is inference from mic character and needs audition, since numbers 1-5 carry no brightness order"
+  },
+  "notes": "York's documentation does not describe the individual mixes beyond their mic pairs and gives no rhythm/lead/clean starting points. Use minimum-phase files (York: 'It is recommended to use the Minimum Phase files'), especially when blending with QC factory cabs. QC truncates the 500 ms files to 1024 samples (~21 ms). POSITION/DISTANCE are disabled for external IRs. Use 48 kHz files on QC-class modelers per York's list ('48k - ... most modeling units').",
+  "sources": [
+   "https://www.yorkaudio.co/product-page/mes-212-v30",
+   "https://www.scribd.com/document/732313491/York-Audio-MES-212-V30-Manual",
+   "https://www.yorkaudio.co/product-page/mes-212-v30-limited",
+   "https://forum.fractalaudio.com/threads/favorite-york-audio-ir-for-live-foh.206319/",
+   "https://forum.fractalaudio.com/threads/cabinet-block-ir-microphones.165766/"
+  ]
+ },
+ "cab_block": {
+  "default_params": "bypass<switch>, ir selector<string>, LEVEL[MIN_CABSIM_DB..MAX_CABSIM_DB dB], PAN[0..10], DISTANCE[0..10], POSITION[0..10], phi<switch>, GRID MODE<switch>, HPF[20..500 Hz], LPF[500..20000 Hz], OUTPUT VOLUME[-96..12 dB], IR NAME<string>",
+  "structure": "Two mic slots per cab block, each with a mic selector ('ir selector'), LEVEL, PAN (BALANCE in stereo), DISTANCE, POSITION and a phase switch; block-level HPF 20-500 Hz, LPF 500-20000 Hz, OUTPUT VOLUME. Each slot can instead load an external IR ('Load IR'), which disables POSITION and DISTANCE.",
+  "stereo_ids": "Stereo cabs are the same cabs; st_id is given per cab. The offset is +20000 for most ids but NOT for 12054/12055 (swapped) and 12078-12089 (shifted) - always map by name.",
+  "infrastructure_ids_excluded": [
+   12000,
+   12014,
+   12100,
+   12114,
+   12115,
+   12116
+  ],
+  "sources": [
+   "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%201_0_2.pdf",
+   "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.0.0.pdf"
+  ]
+ },
+ "ir_loaders": {
+  "blocks": [
+   {
+    "id": 29001,
+    "name": "Single (M)"
+   },
+   {
+    "id": 29002,
+    "name": "Single (ST)"
+   },
+   {
+    "id": 29003,
+    "name": "Dual (M)"
+   },
+   {
+    "id": 29004,
+    "name": "Dual (ST)"
+   },
+   {
+    "id": 29005,
+    "name": "Single (M) Lite"
+   },
+   {
+    "id": 29006,
+    "name": "Single (ST) Lite"
+   },
+   {
+    "id": 29007,
+    "name": "Dual (M) Lite"
+   },
+   {
+    "id": 29008,
+    "name": "Dual (ST) Lite"
+   }
+  ],
+  "params": "MUTE<switch>, INVERT<switch>, IR PATH<string>, LEVEL[-96..12 dB], HI PASS[20..800 Hz], LOW PASS[1000..20000 Hz], PAN[-1..1], DELAY[0..25.0 ms], ROOM MIX[0..100 %], PRE DELAY[1..100 ms], REV HI PASS[20..800 Hz], REV LOW PASS[800..20000 Hz], SIZE<rotarySwitch>, GLOBAL OUTPUT[-96..12 dB], IR NAME<string>",
+  "notes": "IR Loader blocks add what the cab block lacks for third-party IRs: per-IR DELAY 0-25 ms (phase/time alignment between two IRs), INVERT, HI PASS 20-800 Hz, LOW PASS 1000-20000 Hz and a room reverb section. 'Dual' loads two IRs. Local IR storage is 1024 slots; uploaded IRs are resized to 1024 samples (~21 ms).",
+  "sources": [
+   "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%202.3.0.pdf",
+   "https://neuraldsp.com/manual/quad-cortex"
+  ]
+ },
+ "not_sourced": [
+  "Which numeric end of QC POSITION is the cap centre, and of DISTANCE the closest point; no physical distances for either.",
+  "A complete, official QC mic list and the per-cab mic availability; real-mic identities are convention-based.",
+  "Per-mix tonal descriptions or rhythm/lead/clean picks from York Audio for MES 212 V30.",
+  "Open/closed back for: 212 US A-type, 212 Zila CB, 212 Sur V-type, 112 Zila MiniMod, 412 CA Custom A Shadow, 112 Brit P-Series; several others are marked assumption.",
+  "Underlying cabinets/speakers of the plugin-derived cabs (Gojira, Plini, SLO-100, Nolly, Nameless, Cory Wong, Petrucci, John Mayer, Rabea, Misha, Tim Henson).",
+  "Manufacturer descriptions for Eminence (pages 404), Oxford, WGS, Fat Jimmy, Weber, 'KM 65', Mesa Black Shadow, Matchless signature drivers.",
+  "Separate published HPF/LPF ranges for lead vs clean; headphone-specific cab-sim guidance; r/QuadCortex threads (not reachable via search).",
+  "Fractal Audio wiki pages (HTTP 403) - Fractal forum threads were used instead."
+ ]
+}

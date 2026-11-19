@@ -1,0 +1,2100 @@
+{
+ "meta": {
+  "researched": "2026-11-18",
+  "target": "Quad Cortex (full size), CorOS 4.1.1",
+  "confidence_levels": {
+   "official": "Neural DSP manual, release notes, knowledge base, device list or staff post",
+   "firmware": "read from the ModelRepo.xml catalog snapshot (CorOS 4.1) published in qc-mcp",
+   "community": "repeated by several independent users or moderators",
+   "anecdote": "single post or one project's measurement",
+   "inference": "deduction; verify by measurement"
+  }
+ },
+ "mics": [
+  {
+   "qc_name": "Dynamic 57",
+   "modelled_on": "Shure SM57 (inferred from the mic name only; Neural DSP does not publish the modelled microphone)",
+   "character": "Default slot-A mic on every factory guitar and bass cab except Petrucci (firmware). Real SM57: upper-mid forward, tight lows, the standard close mic.",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "qc_name": "Ribbon 160",
+   "modelled_on": "Beyerdynamic M 160 (inferred from the mic name only; Neural DSP does not publish the modelled microphone)",
+   "character": "Default slot-B mic on 72 guitar cabs (firmware). Real M 160: smooth, rolled-off top, thick mids.",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "qc_name": "Ribbon 121",
+   "modelled_on": "Royer R-121 (inferred from the mic name only; Neural DSP does not publish the modelled microphone)",
+   "character": "Default slot-B mic on Gojira Cab 1/2, SLO-100, Nameless, Rabea, Tim Henson and Parallax cabs (firmware). Real R-121: dark, full low-mids, soft highs.",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "qc_name": "Ribbon 10",
+   "modelled_on": "Royer R-10 (inferred from the mic name only; Neural DSP does not publish the modelled microphone)",
+   "character": "Default slot-B mic on 412 CA Trad S H30 15 and most bass cabs (firmware). Real R-10: ribbon warmth, a little tighter than an R-121.",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "qc_name": "Condenser 414",
+   "modelled_on": "AKG C414 (inferred from the mic name only; Neural DSP does not publish the modelled microphone)",
+   "character": "Default slot-B mic on Gojira Cab 3 and Misha Cab 1-3 (firmware). Real C414: wide, extended highs and lows.",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "qc_name": "Condenser 184",
+   "modelled_on": "Neumann KM 184 (inferred from the mic name only; Neural DSP does not publish the modelled microphone)",
+   "character": "Listed in the cab mic menu (manual 1.0.2 screenshot, forum). Real KM 184: small diaphragm, bright and detailed.",
+   "source": "https://unity.neuraldsp.com/t/12314"
+  },
+  {
+   "qc_name": "Dynamic 421",
+   "modelled_on": "Sennheiser MD 421 (inferred from the mic name only; Neural DSP does not publish the modelled microphone)",
+   "character": "Listed on most guitar cabs; default slot-A mic on the Petrucci cab (firmware). Real MD 421: fuller lows and stronger presence than an SM57.",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "qc_name": "Ribbon 353",
+   "modelled_on": "unknown",
+   "character": "Appears only as the Petrucci cab slot-B default (firmware). Not identified.",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "qc_name": "Dynamic 7B",
+   "modelled_on": "Shure SM7B (inferred from the mic name only; Neural DSP does not publish the modelled microphone)",
+   "character": "Reported by one user on the 212 UK C30 cab; staff confirmed that mic selections vary per cab. Not found in the catalog defaults.",
+   "source": "https://unity.neuraldsp.com/t/12314"
+  }
+ ],
+ "parameter_semantics": [
+  {
+   "category_or_model": "Amp (all)",
+   "parameter": "GAIN",
+   "meaning": "Amount of gain in the preamp section. On amps without MASTER (Plexi, JTM45, Bass 50, Gojira CLN, Tim Henson Crunch) it is the amp's only volume and also drives the power amp.",
+   "brighter_or_more_direction": "higher = more drive",
+   "confidence": "official (manual 3.0.0); no-master remark is inference",
+   "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.0.0.pdf"
+  },
+  {
+   "category_or_model": "Amp (all)",
+   "parameter": "VOLUME",
+   "meaning": "Amount of volume in the preamp section. On Fender, Vox and JC style models it replaces GAIN and MASTER: one knob for whole-amp level and breakup.",
+   "brighter_or_more_direction": "higher = louder into the power amp, more breakup",
+   "confidence": "official (manual 3.0.0); whole-amp remark is inference",
+   "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.0.0.pdf"
+  },
+  {
+   "category_or_model": "Amp (all)",
+   "parameter": "MASTER",
+   "meaning": "Amount of power amp gain; highly interactive with all other amp parameters; the lower it is, the less effect the other controls have. It is modelled power-amp drive, not a clean level. Default 3 on 66 models, 5 on 25.",
+   "brighter_or_more_direction": "higher = more power-amp drive and compression (reported darker on Recto-type models)",
+   "confidence": "official (manual 3.0.0) + firmware defaults",
+   "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.0.0.pdf"
+  },
+  {
+   "category_or_model": "Amp (all)",
+   "parameter": "OUTPUT",
+   "meaning": "Overall volume of the amp block, applied after the model. Range -60..+12 dB, default 0.0 dB, 0 dB at normalized 0.5 (skew 3.8018).",
+   "brighter_or_more_direction": "higher = louder only",
+   "confidence": "official + firmware",
+   "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.0.0.pdf"
+  },
+  {
+   "category_or_model": "Amp (all)",
+   "parameter": "BASS / MID / TREBLE",
+   "meaning": "The amp's tonestack (interactive, model specific), not a generic EQ.",
+   "brighter_or_more_direction": "higher = more of that band",
+   "confidence": "official",
+   "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.0.0.pdf"
+  },
+  {
+   "category_or_model": "Amp (all)",
+   "parameter": "PRESENCE",
+   "meaning": "Boosts the upper midrange and treble frequencies.",
+   "brighter_or_more_direction": "higher = brighter",
+   "confidence": "official",
+   "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.0.0.pdf"
+  },
+  {
+   "category_or_model": "Amp (all)",
+   "parameter": "DEPTH / DEEP",
+   "meaning": "Boosts the lower midrange and bass frequencies. DEEP is the Diezel name for the same kind of control.",
+   "brighter_or_more_direction": "higher = more low end",
+   "confidence": "official (DEPTH); DEEP by analogy",
+   "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.0.0.pdf"
+  },
+  {
+   "category_or_model": "Amp (all)",
+   "parameter": "RESONANCE",
+   "meaning": "Boosts the bass frequencies.",
+   "brighter_or_more_direction": "higher = more low end",
+   "confidence": "official",
+   "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.0.0.pdf"
+  },
+  {
+   "category_or_model": "Amp (all)",
+   "parameter": "BRIGHT",
+   "meaning": "The treble is further enhanced with this switch. Freeman 100 Clean has three steps [Normal, Bright 1, Bright 2]; Dumbbell ODS uses [Off, Boost].",
+   "brighter_or_more_direction": "on / higher step = brighter",
+   "confidence": "official + firmware",
+   "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.0.0.pdf"
+  },
+  {
+   "category_or_model": "UK C30 TopBoost / UK C15 TopBoost",
+   "parameter": "BOOST",
+   "meaning": "Two-step switch with step names [HOT, COOL]; default value 1 = COOL.",
+   "brighter_or_more_direction": "value 0 = HOT (more gain), value 1 = COOL",
+   "confidence": "firmware",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "category_or_model": "Victor Squid Ch1/Ch2",
+   "parameter": "FOCUS",
+   "meaning": "Two-step switch with step names [ON, OFF]; default value 1 = OFF.",
+   "brighter_or_more_direction": "value 0 = ON",
+   "confidence": "firmware",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "category_or_model": "Victor Squid Ch1/Ch2, Rabea Crunch/Lead",
+   "parameter": "TUBE",
+   "meaning": "Power tube type [6L6, EL34]; Squid default 6L6, Rabea default EL34. Changing it causes a brief mute.",
+   "brighter_or_more_direction": "value 0 = 6L6, value 1 = EL34",
+   "confidence": "firmware",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "category_or_model": "Victor Squid Ch2, Petrucci Rhythm, Rabea Lead, Freeman BOD",
+   "parameter": "TIGHT",
+   "meaning": "Continuous 0-10 control; by its name a low-end tightening ahead of the gain stages.",
+   "brighter_or_more_direction": "higher = tighter (assumed)",
+   "confidence": "firmware range; meaning is inference",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "category_or_model": "Freeman 100 Rhythm/Lead",
+   "parameter": "FAT",
+   "meaning": "Real BE-100: fattens the tone, suited to single coils. QC step order is unlabelled.",
+   "brighter_or_more_direction": "on = fuller (real amp)",
+   "confidence": "official for the real amp only",
+   "source": "https://www.manualslib.com/manual/880520/Friedman-Be-100.html"
+  },
+  {
+   "category_or_model": "Freeman 100 Rhythm/Lead",
+   "parameter": "SAT",
+   "meaning": "Real BE-100: adds gain, compression and saturation.",
+   "brighter_or_more_direction": "on = more saturation (real amp)",
+   "confidence": "official for the real amp only",
+   "source": "https://www.manualslib.com/manual/880520/Friedman-Be-100.html"
+  },
+  {
+   "category_or_model": "Freeman 100 Rhythm/Lead",
+   "parameter": "C45",
+   "meaning": "Real BE-100: alternate custom voicing of the BE/HBE channel (described elsewhere as a treble boost at the input or a mid scoop).",
+   "brighter_or_more_direction": "unverified",
+   "confidence": "official for the real amp only; QC behaviour unverified",
+   "source": "https://quadcortex.wiki/Freeman_100"
+  },
+  {
+   "category_or_model": "Freeman 100 Rhythm/Lead",
+   "parameter": "VOICE",
+   "meaning": "Real BE-100: left slightly darker with more mids, right slightly brighter with bigger bass.",
+   "brighter_or_more_direction": "unverified which value is which",
+   "confidence": "official for the real amp only",
+   "source": "https://www.manualslib.com/manual/880520/Friedman-Be-100.html"
+  },
+  {
+   "category_or_model": "Misha Clean / Rhythm / Lead",
+   "parameter": "VOICE",
+   "meaning": "Step names differ per amp: Clean [Normal, Thicker], Rhythm [Low, High], Lead [Off, On].",
+   "brighter_or_more_direction": "see step names",
+   "confidence": "firmware",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "category_or_model": "D-Cell Hisbert Ch2",
+   "parameter": "MODE",
+   "meaning": "Voicing switch with steps [-, +].",
+   "brighter_or_more_direction": "+ = heavier voicing (per the Diezel description quoted on the community wiki)",
+   "confidence": "firmware; direction from community wiki",
+   "source": "https://quadcortex.wiki/D-Cell_Hisbert"
+  },
+  {
+   "category_or_model": "US DLX 64 Vintage / 65 Reissue",
+   "parameter": "MODE",
+   "meaning": "Channel selector [Normal, Vibrato, Vibrato Bright Off]; INPUT is [Low, High]. MODE causes a brief mute.",
+   "brighter_or_more_direction": "see step names",
+   "confidence": "firmware",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "category_or_model": "CA 1Star (all)",
+   "parameter": "EQ",
+   "meaning": "Rotary [Normal, Thick, Thicker].",
+   "brighter_or_more_direction": "higher step = thicker",
+   "confidence": "firmware",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "category_or_model": "Dumbbell ODS",
+   "parameter": "OD CONTENT",
+   "meaning": "Tooltip: 'Adjust the gain of the Overdrive Channel.'",
+   "brighter_or_more_direction": "higher = more overdrive",
+   "confidence": "firmware tooltip",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "category_or_model": "Dumbbell ODS",
+   "parameter": "EQ",
+   "meaning": "Tooltip: two global EQ voicings. Rock: mid-forward and aggressive. Jazz: smoother and more scooped. Steps [Jazz, Rock], default Rock. Brief mute on change.",
+   "brighter_or_more_direction": "value 1 = Rock",
+   "confidence": "firmware tooltip",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "category_or_model": "Soldano SLO-100 (plugin)",
+   "parameter": "GAIN NORMAL / MASTER NORMAL / GAIN OD / MASTER OD",
+   "meaning": "Knobs run 0-11. The NORMAL pair is active when CHANNEL = Normal, the OD pair when CHANNEL = OD; CRUNCH [Clean, Crunch] belongs to the Normal channel.",
+   "brighter_or_more_direction": "higher = more",
+   "confidence": "firmware",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "category_or_model": "Fortin Nameless (plugin)",
+   "parameter": "MVC",
+   "meaning": "The amp's master volume; GAIN I and GAIN II are the gain controls; INPUT [LOW, HIGH]; PULL GAIN [OFF, ON].",
+   "brighter_or_more_direction": "higher = more",
+   "confidence": "firmware; MVC meaning is inference",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "category_or_model": "Brit UBL Lead / Lead Clip",
+   "parameter": "INPUT GAIN / LEAD MASTER / OUTPUT MASTER",
+   "meaning": "Three cascaded level stages of the Silver Jubilee before the block OUTPUT trim.",
+   "brighter_or_more_direction": "higher = more",
+   "confidence": "firmware",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "category_or_model": "CA John's 2C Ch2/Ch3",
+   "parameter": "80 Hz / 240 Hz / 750 Hz / 2200 Hz / 6600 Hz",
+   "meaning": "Five-band graphic EQ, each 0-10, alongside GAIN PULL, SHRED and PRES PULL switches.",
+   "brighter_or_more_direction": "higher = more of that band",
+   "confidence": "firmware",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "category_or_model": "Cab (native)",
+   "parameter": "POSITION",
+   "meaning": "Where the microphone is, from the center of the cone to the edge of the cone. Range 0-10, default 4.0. Disabled with an external IR.",
+   "brighter_or_more_direction": "0 = centre = brighter (inference; the numeric direction is not documented)",
+   "confidence": "official meaning; direction is inference",
+   "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%202_0_0.pdf"
+  },
+  {
+   "category_or_model": "Cab (native)",
+   "parameter": "DISTANCE",
+   "meaning": "Distance of the mic between close to the cab and far towards the room. Range 0-10, default 0.0. Disabled with an external IR.",
+   "brighter_or_more_direction": "0 = closest (inference); higher = further back",
+   "confidence": "official meaning; direction is inference",
+   "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%202_0_0.pdf"
+  },
+  {
+   "category_or_model": "Cab (plugin: Plini, Petrucci, Gojira, SLO-100, Rabea, Misha, Tim Henson, Parallax)",
+   "parameter": "POSITION / DISTANCE",
+   "meaning": "Same meaning as native cabs but declared on a 0-1 range (Plini default 0.5/0.0, Petrucci 0.3/0.0).",
+   "brighter_or_more_direction": "same as native",
+   "confidence": "firmware",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "category_or_model": "Cab (all)",
+   "parameter": "ir selector",
+   "meaning": "String naming the factory mic or loaded IR of one of the two slots, format '<prefix>_<cab>_<mic>'. Per-scene values are possible.",
+   "brighter_or_more_direction": "n/a",
+   "confidence": "firmware; per-scene from one forum post and project notes",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "category_or_model": "Cab (all)",
+   "parameter": "phi",
+   "meaning": "Phase (polarity) invert of that slot.",
+   "brighter_or_more_direction": "n/a",
+   "confidence": "official (PHASE INVERTER) + firmware",
+   "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.0.0.pdf"
+  },
+  {
+   "category_or_model": "Cab (all)",
+   "parameter": "HPF / LPF",
+   "meaning": "Block-level high-pass 20-500 Hz (20 = OFF) and low-pass 500-20000 Hz (20000 = OFF), added in CorOS 2.1.0.",
+   "brighter_or_more_direction": "lower LPF = darker; higher HPF = thinner",
+   "confidence": "official + firmware",
+   "source": "https://neuraldsp.com/quad-cortex-updates/coros-2-1-0-is-now-available"
+  },
+  {
+   "category_or_model": "Cab (all)",
+   "parameter": "GRID MODE",
+   "meaning": "Per-slot switch, default on. Function undocumented.",
+   "brighter_or_more_direction": "unknown",
+   "confidence": "firmware; meaning unverified",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "category_or_model": "Cab (all)",
+   "parameter": "LEVEL / PAN / OUTPUT VOLUME",
+   "meaning": "Slot level and pan (0-10, 5 = centre); OUTPUT VOLUME -96..+12 dB is the block output.",
+   "brighter_or_more_direction": "n/a",
+   "confidence": "firmware",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "category_or_model": "Cab (John Mayer)",
+   "parameter": "ROOM SIZE / ROOM L LEVEL / ROOM R LEVEL",
+   "meaning": "Room mic section: size 0-2, levels -40..+6 dB, default -14 dB.",
+   "brighter_or_more_direction": "higher level = more room",
+   "confidence": "firmware",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "category_or_model": "IR Loader",
+   "parameter": "ROOM MIX / PRE DELAY / REV HI PASS / REV LOW PASS / SIZE",
+   "meaning": "Built-in room reverb of the full IR Loaders; removed in Lite versions to reduce CPU.",
+   "brighter_or_more_direction": "higher ROOM MIX = more room",
+   "confidence": "official",
+   "source": "https://neuraldsp.com/quad-cortex-updates/coros-2-1-0-is-now-available"
+  },
+  {
+   "category_or_model": "IR Loader",
+   "parameter": "DELAY",
+   "meaning": "Delays that IR by 0-25 ms.",
+   "brighter_or_more_direction": "n/a",
+   "confidence": "official + firmware",
+   "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.0.0.pdf"
+  },
+  {
+   "category_or_model": "Neural Capture (V1 14000, V2 14001)",
+   "parameter": "GAIN",
+   "meaning": "Level change of -24..+24 dB; not the captured device's gain control. Neural DSP advises recapturing rather than boosting it; a moderator states it equals a Gain block in front of the capture.",
+   "brighter_or_more_direction": "higher = hotter into the capture = more drive",
+   "confidence": "official (advice) + anecdote (pre-capture gain)",
+   "source": "https://neuraldsp.com/manual/quad-cortex"
+  },
+  {
+   "category_or_model": "Neural Capture (V1 14000, V2 14001)",
+   "parameter": "BASS / MID / TREBLE",
+   "meaning": "Generic fixed 3-band EQ, -6..+6 dB, not the device's tonestack. Pre or post position is undocumented (users infer post); one moderator gives centres 120, 750 and 1000 Hz.",
+   "brighter_or_more_direction": "higher = boost",
+   "confidence": "firmware range; the rest is anecdote",
+   "source": "https://unity.neuraldsp.com/t/20769"
+  },
+  {
+   "category_or_model": "Neural Capture (V1 14000, V2 14001)",
+   "parameter": "VOLUME",
+   "meaning": "Output level of the capture block, -24..+24 dB.",
+   "brighter_or_more_direction": "higher = louder only",
+   "confidence": "firmware; meaning is inference",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "category_or_model": "Input block",
+   "parameter": "NOISE REDUCTION",
+   "meaning": "Input Gate amount, 0-100 %, default 30; adaptive, not a threshold. Still acts at 0 % while enabled.",
+   "brighter_or_more_direction": "higher = more gating",
+   "confidence": "firmware + anecdote",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "category_or_model": "Input block",
+   "parameter": "BYPASS",
+   "meaning": "Input Gate bypass; default 1 = bypassed.",
+   "brighter_or_more_direction": "1 = gate off",
+   "confidence": "firmware + official (bypassed by default)",
+   "source": "https://neuraldsp.com/quad-cortex-updates/coros-1-4-0-is-now-available"
+  },
+  {
+   "category_or_model": "Input block",
+   "parameter": "INPUT GAIN",
+   "meaning": "Per-preset, scene-assignable input trim, -24..+24 dB, default 0.",
+   "brighter_or_more_direction": "higher = hotter into every block",
+   "confidence": "official + firmware",
+   "source": "https://neuraldsp.com/manual/quad-cortex"
+  },
+  {
+   "category_or_model": "Adaptive Gate / Adaptive Gate (S/C)",
+   "parameter": "NOISE REDUCTION",
+   "meaning": "Single amount control 0-100 %, default 30; the (S/C) version adds SOURCE to key the gate from an input or earlier block.",
+   "brighter_or_more_direction": "higher = more gating",
+   "confidence": "firmware + official",
+   "source": "https://neuraldsp.com/quad-cortex-updates/coros-3-0-0-and-cortex-control-1-1-0-are-now-available"
+  },
+  {
+   "category_or_model": "Utility Gate",
+   "parameter": "THRESHOLD / ATTACK / HOLD / RELEASE / RANGE",
+   "meaning": "Conventional gate: threshold -90..0 dB (default -80), attack 0.5-1000 ms (1), hold 1-2000 ms (10), release 2-5000 ms (40), range -90..-6 dB (default -90, labelled OFF).",
+   "brighter_or_more_direction": "higher threshold = more gating",
+   "confidence": "firmware",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "category_or_model": "Simple Gate",
+   "parameter": "THRESHOLD",
+   "meaning": "Threshold-only gate, -90..0 dB, default -60.",
+   "brighter_or_more_direction": "higher = more gating",
+   "confidence": "firmware",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "category_or_model": "Lane output",
+   "parameter": "VOLUME",
+   "meaning": "Preset-level output trim per lane, -40..+12 dB, default 0; stored in the preset; scene-assignable. Feeds the output limiter.",
+   "brighter_or_more_direction": "higher = louder",
+   "confidence": "official + project notes",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/docs/PRESET-ANATOMY.md"
+  },
+  {
+   "category_or_model": "Gain (utility 16005)",
+   "parameter": "LEVEL",
+   "meaning": "-60..+12 dB, 0 dB at normalized 0.5; the block also has PAN and PHASE INVERT.",
+   "brighter_or_more_direction": "higher = louder",
+   "confidence": "firmware + project notes",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/docs/LEVELING.md"
+  },
+  {
+   "category_or_model": "I/O Settings",
+   "parameter": "IN LEVEL",
+   "meaning": "Global analog input gain; 0 dB = unity; display range -12..+60 dB (normalized 0.166667 = 0 dB). Changes the drive of every model.",
+   "brighter_or_more_direction": "higher = hotter",
+   "confidence": "official (global) + anecdote (range)",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/CLAUDE.md"
+  },
+  {
+   "category_or_model": "I/O Settings",
+   "parameter": "IMPEDANCE",
+   "meaning": "Instrument input impedance, 10 kOhm to 10 MOhm, default 1 MOhm; global.",
+   "brighter_or_more_direction": "higher = less pickup loading = brighter (general electronics)",
+   "confidence": "official range and default",
+   "source": "https://neuraldsp.com/manual/quad-cortex"
+  }
+ ],
+ "pcom_models": [
+  {
+   "model_name_or_family": "All catalog models with plugin_id 1 (Fortin Nameless Suite devices)",
+   "required_plugin": "Fortin Nameless Suite X",
+   "added_in_coros": "3.1.0",
+   "catalog_plugin_id": 1,
+   "catalog_models": [
+    {
+     "id": 40,
+     "name": "Fortin Grind®",
+     "category": "Guitar Overdrive"
+    },
+    {
+     "id": 41,
+     "name": "Fortin Hexdrive®",
+     "category": "Guitar Overdrive"
+    },
+    {
+     "id": 1165,
+     "name": "Fortin® Nameless",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 6023,
+     "name": "Nameless Delay",
+     "category": "Delay"
+    },
+    {
+     "id": 8025,
+     "name": "Nameless Reverb",
+     "category": "Reverb"
+    },
+    {
+     "id": 12057,
+     "name": "Nameless Cab (M)",
+     "category": "Cabsim Guitar (M)"
+    },
+    {
+     "id": 16010,
+     "name": "Fortin Zuul®",
+     "category": "Utility"
+    },
+    {
+     "id": 32057,
+     "name": "Nameless Cab (ST)",
+     "category": "Cabsim Guitar (ST)"
+    }
+   ],
+   "source": "https://neuraldsp.com/device-list"
+  },
+  {
+   "model_name_or_family": "All catalog models with plugin_id 3 (Archetype: Plini devices)",
+   "required_plugin": "Archetype: Plini X",
+   "added_in_coros": "3.0.0",
+   "catalog_plugin_id": 3,
+   "catalog_models": [
+    {
+     "id": 30,
+     "name": "Plini Drive",
+     "category": "Guitar Overdrive"
+    },
+    {
+     "id": 1159,
+     "name": "Plini Clean",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 1160,
+     "name": "Plini Crunch",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 1161,
+     "name": "Plini Lead",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 5017,
+     "name": "Plini Comp",
+     "category": "Compressor"
+    },
+    {
+     "id": 6018,
+     "name": "Plini Delay",
+     "category": "Delay"
+    },
+    {
+     "id": 6020,
+     "name": "Plini Pre Delay (M)",
+     "category": "Delay"
+    },
+    {
+     "id": 7035,
+     "name": "Plini Chorus",
+     "category": "Modulation"
+    },
+    {
+     "id": 8017,
+     "name": "Plini Reverb",
+     "category": "Reverb"
+    },
+    {
+     "id": 12053,
+     "name": "Plini Cab (M)",
+     "category": "Cabsim Guitar (M)"
+    },
+    {
+     "id": 12100,
+     "name": "PCOM Default Cabsim",
+     "category": "Cabsim Guitar (M)"
+    },
+    {
+     "id": 12114,
+     "name": "PCOM Core Cabsim",
+     "category": "Cabsim Guitar (M)"
+    },
+    {
+     "id": 18011,
+     "name": "Plini Octaver",
+     "category": "Pitch"
+    },
+    {
+     "id": 32053,
+     "name": "Plini Cab (ST)",
+     "category": "Cabsim Guitar (ST)"
+    }
+   ],
+   "source": "https://neuraldsp.com/device-list"
+  },
+  {
+   "model_name_or_family": "All catalog models with plugin_id 4 (Parallax devices)",
+   "required_plugin": "Parallax X",
+   "added_in_coros": "3.2.0",
+   "catalog_plugin_id": 4,
+   "catalog_models": [
+    {
+     "id": 3008,
+     "name": "Parallax",
+     "category": "Bass Overdrive"
+    },
+    {
+     "id": 21007,
+     "name": "Parallax Cab (M)",
+     "category": "Cabsim Bass (M)"
+    },
+    {
+     "id": 33007,
+     "name": "Parallax Cab (ST)",
+     "category": "Cabsim Bass (ST)"
+    }
+   ],
+   "source": "https://neuraldsp.com/device-list"
+  },
+  {
+   "model_name_or_family": "All catalog models with plugin_id 5 (Archetype: Nolly devices)",
+   "required_plugin": "Archetype: Nolly X",
+   "added_in_coros": "3.2.0",
+   "catalog_plugin_id": 5,
+   "catalog_models": [
+    {
+     "id": 34,
+     "name": "Nolly Overdrive-2",
+     "category": "Guitar Overdrive"
+    },
+    {
+     "id": 35,
+     "name": "Nolly Overdrive-1",
+     "category": "Guitar Overdrive"
+    },
+    {
+     "id": 1171,
+     "name": "Nolly Clean",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 1172,
+     "name": "Nolly Rhythm",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 1173,
+     "name": "Nolly Crunch",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 1174,
+     "name": "Nolly Lead",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 4007,
+     "name": "Nolly Graphic-9",
+     "category": "Equalizer"
+    },
+    {
+     "id": 5023,
+     "name": "Nolly Compressor",
+     "category": "Compressor"
+    },
+    {
+     "id": 6021,
+     "name": "Nolly Delay-1 (M)",
+     "category": "Delay"
+    },
+    {
+     "id": 6024,
+     "name": "Nolly Delay-2",
+     "category": "Delay"
+    },
+    {
+     "id": 8021,
+     "name": "Nolly Reverb",
+     "category": "Reverb"
+    },
+    {
+     "id": 12055,
+     "name": "Nolly Cab 1 (M)",
+     "category": "Cabsim Guitar (M)"
+    },
+    {
+     "id": 12056,
+     "name": "Nolly Cab 2 (M)",
+     "category": "Cabsim Guitar (M)"
+    },
+    {
+     "id": 12058,
+     "name": "Nolly Cab 3 (M)",
+     "category": "Cabsim Guitar (M)"
+    },
+    {
+     "id": 12059,
+     "name": "Nolly Cab 4 (M)",
+     "category": "Cabsim Guitar (M)"
+    },
+    {
+     "id": 32054,
+     "name": "Nolly Cab 1 (ST)",
+     "category": "Cabsim Guitar (ST)"
+    },
+    {
+     "id": 32056,
+     "name": "Nolly Cab 2 (ST)",
+     "category": "Cabsim Guitar (ST)"
+    },
+    {
+     "id": 32058,
+     "name": "Nolly Cab 3 (ST)",
+     "category": "Cabsim Guitar (ST)"
+    },
+    {
+     "id": 32059,
+     "name": "Nolly Cab 4 (ST)",
+     "category": "Cabsim Guitar (ST)"
+    }
+   ],
+   "source": "https://neuraldsp.com/device-list"
+  },
+  {
+   "model_name_or_family": "All catalog models with plugin_id 9 (Archetype: Cory Wong devices)",
+   "required_plugin": "Archetype: Cory Wong X",
+   "added_in_coros": "3.2.0",
+   "catalog_plugin_id": 9,
+   "catalog_models": [
+    {
+     "id": 32,
+     "name": "Cory Wong The Tuber",
+     "category": "Guitar Overdrive"
+    },
+    {
+     "id": 33,
+     "name": "Cory Wong The Big Rig Overdrive",
+     "category": "Guitar Overdrive"
+    },
+    {
+     "id": 1168,
+     "name": "Cory Wong D.I. Funk Console",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 1169,
+     "name": "Cory Wong The Clean Machine",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 1175,
+     "name": "Cory Wong The Amp Snob",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 5024,
+     "name": "Cory Wong The 4th Position Compressor",
+     "category": "Compressor"
+    },
+    {
+     "id": 6025,
+     "name": "Cory Wong Delay-y-y",
+     "category": "Delay"
+    },
+    {
+     "id": 7038,
+     "name": "Cory Wong The 80s",
+     "category": "Modulation"
+    },
+    {
+     "id": 8019,
+     "name": "Cory Wong The Wash",
+     "category": "Reverb"
+    },
+    {
+     "id": 8024,
+     "name": "Cory Wong The Wash Shimmer",
+     "category": "Reverb"
+    },
+    {
+     "id": 9020,
+     "name": "Cory Wong Wah",
+     "category": "Wah"
+    },
+    {
+     "id": 12060,
+     "name": "Cory Wong Cab 1 (M)",
+     "category": "Cabsim Guitar (M)"
+    },
+    {
+     "id": 12061,
+     "name": "Cory Wong Cab 2 (M)",
+     "category": "Cabsim Guitar (M)"
+    },
+    {
+     "id": 12062,
+     "name": "Cory Wong Cab 3 (M)",
+     "category": "Cabsim Guitar (M)"
+    },
+    {
+     "id": 24005,
+     "name": "Cory Wong The Postal Service",
+     "category": "Filter"
+    },
+    {
+     "id": 32060,
+     "name": "Cory Wong Cab 1 (ST)",
+     "category": "Cabsim Guitar (ST)"
+    },
+    {
+     "id": 32061,
+     "name": "Cory Wong Cab 2 (ST)",
+     "category": "Cabsim Guitar (ST)"
+    },
+    {
+     "id": 32062,
+     "name": "Cory Wong Cab 3 (ST)",
+     "category": "Cabsim Guitar (ST)"
+    }
+   ],
+   "source": "https://neuraldsp.com/device-list"
+  },
+  {
+   "model_name_or_family": "All catalog models with plugin_id 10 (Archetype: Gojira devices)",
+   "required_plugin": "Archetype: Gojira X",
+   "added_in_coros": "3.0.0",
+   "catalog_plugin_id": 10,
+   "catalog_models": [
+    {
+     "id": 36,
+     "name": "Gojira DRT",
+     "category": "Guitar Overdrive"
+    },
+    {
+     "id": 37,
+     "name": "Gojira OD",
+     "category": "Guitar Overdrive"
+    },
+    {
+     "id": 1162,
+     "name": "Gojira CLN",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 1163,
+     "name": "Gojira RST",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 1164,
+     "name": "Gojira HOT",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 6019,
+     "name": "Gojira DLY",
+     "category": "Delay"
+    },
+    {
+     "id": 7032,
+     "name": "Gojira CHR",
+     "category": "Modulation"
+    },
+    {
+     "id": 7033,
+     "name": "Gojira PHSR",
+     "category": "Modulation"
+    },
+    {
+     "id": 8016,
+     "name": "Gojira REV",
+     "category": "Reverb"
+    },
+    {
+     "id": 8023,
+     "name": "Gojira REV Shimmer",
+     "category": "Reverb"
+    },
+    {
+     "id": 12050,
+     "name": "Gojira Cab 1 (M)",
+     "category": "Cabsim Guitar (M)"
+    },
+    {
+     "id": 12051,
+     "name": "Gojira Cab 2 (M)",
+     "category": "Cabsim Guitar (M)"
+    },
+    {
+     "id": 12052,
+     "name": "Gojira Cab 3 (M)",
+     "category": "Cabsim Guitar (M)"
+    },
+    {
+     "id": 18008,
+     "name": "Gojira OCT",
+     "category": "Pitch"
+    },
+    {
+     "id": 18009,
+     "name": "Gojira WOW",
+     "category": "Pitch"
+    },
+    {
+     "id": 32050,
+     "name": "Gojira Cab 1 (ST)",
+     "category": "Cabsim Guitar (ST)"
+    },
+    {
+     "id": 32051,
+     "name": "Gojira Cab 2 (ST)",
+     "category": "Cabsim Guitar (ST)"
+    },
+    {
+     "id": 32052,
+     "name": "Gojira Cab 3 (ST)",
+     "category": "Cabsim Guitar (ST)"
+    },
+    {
+     "id": 32100,
+     "name": "PCOM Default Cabsim (ST)",
+     "category": "Cabsim Guitar (ST)"
+    }
+   ],
+   "source": "https://neuraldsp.com/device-list"
+  },
+  {
+   "model_name_or_family": "All catalog models with plugin_id 11 (Soldano SLO-100 devices)",
+   "required_plugin": "Soldano SLO-100 X",
+   "added_in_coros": "3.1.0",
+   "catalog_plugin_id": 11,
+   "catalog_models": [
+    {
+     "id": 38,
+     "name": "SLO-100® Overdrive-2",
+     "category": "Guitar Overdrive"
+    },
+    {
+     "id": 39,
+     "name": "SLO-100® Overdrive-1",
+     "category": "Guitar Overdrive"
+    },
+    {
+     "id": 1170,
+     "name": "Soldano SLO-100®",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 5022,
+     "name": "SLO-100® Compressor",
+     "category": "Compressor"
+    },
+    {
+     "id": 6022,
+     "name": "SLO-100® Delay",
+     "category": "Delay"
+    },
+    {
+     "id": 7037,
+     "name": "SLO-100® Chorus",
+     "category": "Modulation"
+    },
+    {
+     "id": 8018,
+     "name": "SLO-100® Reverb",
+     "category": "Reverb"
+    },
+    {
+     "id": 12054,
+     "name": "SLO-100® Cab (M)",
+     "category": "Cabsim Guitar (M)"
+    },
+    {
+     "id": 32055,
+     "name": "SLO-100® Cab (ST)",
+     "category": "Cabsim Guitar (ST)"
+    }
+   ],
+   "source": "https://neuraldsp.com/device-list"
+  },
+  {
+   "model_name_or_family": "All catalog models with plugin_id 12 (Archetype: Tim Henson devices)",
+   "required_plugin": "Archetype: Tim Henson X",
+   "added_in_coros": "4.1.0",
+   "catalog_plugin_id": 12,
+   "catalog_models": [
+    {
+     "id": 51,
+     "name": "Tim Henson Overdrive",
+     "category": "Guitar Overdrive"
+    },
+    {
+     "id": 52,
+     "name": "Tim Henson Boost",
+     "category": "Guitar Overdrive"
+    },
+    {
+     "id": 1191,
+     "name": "Tim Henson Acoustic",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 1192,
+     "name": "Tim Henson Crunch Ch1",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 1193,
+     "name": "Tim Henson Crunch Ch2",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 1194,
+     "name": "Tim Henson Lead",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 5030,
+     "name": "Tim Henson Compressor",
+     "category": "Compressor"
+    },
+    {
+     "id": 6034,
+     "name": "Tim Henson Delay Modern",
+     "category": "Delay"
+    },
+    {
+     "id": 6035,
+     "name": "Tim Henson Delay V. Digital",
+     "category": "Delay"
+    },
+    {
+     "id": 6036,
+     "name": "Tim Henson Delay Diffusion",
+     "category": "Delay"
+    },
+    {
+     "id": 7047,
+     "name": "Tim Henson Chorus",
+     "category": "Modulation"
+    },
+    {
+     "id": 8040,
+     "name": "Tim Henson Reverb",
+     "category": "Reverb"
+    },
+    {
+     "id": 8041,
+     "name": "Tim Henson Shimmer",
+     "category": "Reverb"
+    },
+    {
+     "id": 12088,
+     "name": "Tim Henson Cab Crunch (M)",
+     "category": "Cabsim Guitar (M)"
+    },
+    {
+     "id": 12089,
+     "name": "Tim Henson Cab Lead (M)",
+     "category": "Cabsim Guitar (M)"
+    },
+    {
+     "id": 32087,
+     "name": "Tim Henson Cab Crunch (ST)",
+     "category": "Cabsim Guitar (ST)"
+    },
+    {
+     "id": 32088,
+     "name": "Tim Henson Cab Lead (ST)",
+     "category": "Cabsim Guitar (ST)"
+    }
+   ],
+   "source": "https://neuraldsp.com/device-list"
+  },
+  {
+   "model_name_or_family": "All catalog models with plugin_id 13 (Archetype: Petrucci devices)",
+   "required_plugin": "Archetype: Petrucci X",
+   "added_in_coros": "4.1.0",
+   "catalog_plugin_id": 13,
+   "catalog_models": [
+    {
+     "id": 43,
+     "name": "Petrucci Overdrive",
+     "category": "Guitar Overdrive"
+    },
+    {
+     "id": 1177,
+     "name": "Petrucci Piezo",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 1178,
+     "name": "Petrucci Clean",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 1179,
+     "name": "Petrucci Rhythm",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 1180,
+     "name": "Petrucci Lead",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 5026,
+     "name": "Petrucci Compressor",
+     "category": "Compressor"
+    },
+    {
+     "id": 6027,
+     "name": "Petrucci Delay",
+     "category": "Delay"
+    },
+    {
+     "id": 7041,
+     "name": "Petrucci Chorus 2",
+     "category": "Modulation"
+    },
+    {
+     "id": 7042,
+     "name": "Petrucci Flanger",
+     "category": "Modulation"
+    },
+    {
+     "id": 7043,
+     "name": "Petrucci Chorus 1",
+     "category": "Modulation"
+    },
+    {
+     "id": 7044,
+     "name": "Petrucci Phaser",
+     "category": "Modulation"
+    },
+    {
+     "id": 8031,
+     "name": "Petrucci Reverb",
+     "category": "Reverb"
+    },
+    {
+     "id": 8032,
+     "name": "Petrucci Reverb Shimmer",
+     "category": "Reverb"
+    },
+    {
+     "id": 9022,
+     "name": "Petrucci Wah",
+     "category": "Wah"
+    },
+    {
+     "id": 12078,
+     "name": "Petrucci Cab (M)",
+     "category": "Cabsim Guitar (M)"
+    },
+    {
+     "id": 12115,
+     "name": "Petrucci Default Cabsim",
+     "category": "Cabsim Guitar (M)"
+    },
+    {
+     "id": 12116,
+     "name": "Petrucci Core Cabsim",
+     "category": "Cabsim Guitar (M)"
+    },
+    {
+     "id": 16014,
+     "name": "Petrucci Volume",
+     "category": "Utility"
+    },
+    {
+     "id": 32089,
+     "name": "Petrucci Cab (ST)",
+     "category": "Cabsim Guitar (ST)"
+    }
+   ],
+   "source": "https://neuraldsp.com/device-list"
+  },
+  {
+   "model_name_or_family": "All catalog models with plugin_id 15 (Archetype: Rabea devices)",
+   "required_plugin": "Archetype: Rabea X",
+   "added_in_coros": "4.1.0",
+   "catalog_plugin_id": 15,
+   "catalog_models": [
+    {
+     "id": 47,
+     "name": "Rabea Colossus Fuzz",
+     "category": "Guitar Overdrive"
+    },
+    {
+     "id": 48,
+     "name": "Rabea Paragon Overdrive",
+     "category": "Guitar Overdrive"
+    },
+    {
+     "id": 1185,
+     "name": "Rabea Crunch",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 1186,
+     "name": "Rabea Lead",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 1187,
+     "name": "Rabea Clean",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 5028,
+     "name": "Rabea Twin Blade Dual Compressor",
+     "category": "Compressor"
+    },
+    {
+     "id": 6030,
+     "name": "Rabea Atlas Delay",
+     "category": "Delay"
+    },
+    {
+     "id": 8036,
+     "name": "Rabea Aeons Reverb",
+     "category": "Reverb"
+    },
+    {
+     "id": 12082,
+     "name": "Rabea Cab 1 (M)",
+     "category": "Cabsim Guitar (M)"
+    },
+    {
+     "id": 12083,
+     "name": "Rabea Cab 2 (M)",
+     "category": "Cabsim Guitar (M)"
+    },
+    {
+     "id": 12084,
+     "name": "Rabea Cab 3 (M)",
+     "category": "Cabsim Guitar (M)"
+    },
+    {
+     "id": 18017,
+     "name": "Rabea Chaos Bed Octaver",
+     "category": "Pitch"
+    },
+    {
+     "id": 32081,
+     "name": "Rabea Cab 1 (ST)",
+     "category": "Cabsim Guitar (ST)"
+    },
+    {
+     "id": 32082,
+     "name": "Rabea Cab 2 (ST)",
+     "category": "Cabsim Guitar (ST)"
+    },
+    {
+     "id": 32083,
+     "name": "Rabea Cab 3 (ST)",
+     "category": "Cabsim Guitar (ST)"
+    }
+   ],
+   "source": "https://neuraldsp.com/device-list"
+  },
+  {
+   "model_name_or_family": "All catalog models with plugin_id 20 (Archetype: Misha Mansoor devices)",
+   "required_plugin": "Archetype: Misha Mansoor X",
+   "added_in_coros": "4.1.0",
+   "catalog_plugin_id": 20,
+   "catalog_models": [
+    {
+     "id": 49,
+     "name": "Misha Chaos",
+     "category": "Guitar Overdrive"
+    },
+    {
+     "id": 50,
+     "name": "Horizon Devices® Precision Drive™",
+     "category": "Guitar Overdrive"
+    },
+    {
+     "id": 1188,
+     "name": "Misha Clean",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 1189,
+     "name": "Misha Rhythm",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 1190,
+     "name": "Misha Lead",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 5029,
+     "name": "Horizon Devices® Compressor",
+     "category": "Compressor"
+    },
+    {
+     "id": 6032,
+     "name": "Misha Stereo Delay",
+     "category": "Delay"
+    },
+    {
+     "id": 6033,
+     "name": "Misha Tape Echo",
+     "category": "Delay"
+    },
+    {
+     "id": 7046,
+     "name": "Misha Modulator",
+     "category": "Modulation"
+    },
+    {
+     "id": 8037,
+     "name": "Misha Shimmer",
+     "category": "Reverb"
+    },
+    {
+     "id": 8038,
+     "name": "Misha Reverb",
+     "category": "Reverb"
+    },
+    {
+     "id": 12085,
+     "name": "Misha Cab 1 (M)",
+     "category": "Cabsim Guitar (M)"
+    },
+    {
+     "id": 12086,
+     "name": "Misha Cab 2 (M)",
+     "category": "Cabsim Guitar (M)"
+    },
+    {
+     "id": 12087,
+     "name": "Misha Cab 3 (M)",
+     "category": "Cabsim Guitar (M)"
+    },
+    {
+     "id": 18018,
+     "name": "Misha Laser",
+     "category": "Pitch"
+    },
+    {
+     "id": 18019,
+     "name": "Misha Dual Octaver",
+     "category": "Pitch"
+    },
+    {
+     "id": 32084,
+     "name": "Misha Cab 1 (ST)",
+     "category": "Cabsim Guitar (ST)"
+    },
+    {
+     "id": 32085,
+     "name": "Misha Cab 2 (ST)",
+     "category": "Cabsim Guitar (ST)"
+    },
+    {
+     "id": 32086,
+     "name": "Misha Cab 3 (ST)",
+     "category": "Cabsim Guitar (ST)"
+    }
+   ],
+   "source": "https://neuraldsp.com/device-list"
+  },
+  {
+   "model_name_or_family": "All catalog models with plugin_id 21 (Archetype: John Mayer devices)",
+   "required_plugin": "Archetype: John Mayer X",
+   "added_in_coros": "4.1.0",
+   "catalog_plugin_id": 21,
+   "catalog_models": [
+    {
+     "id": 44,
+     "name": "John Mayer Halfman OD",
+     "category": "Guitar Overdrive"
+    },
+    {
+     "id": 45,
+     "name": "John Mayer Justa Boost",
+     "category": "Guitar Overdrive"
+    },
+    {
+     "id": 46,
+     "name": "John Mayer Tealbreaker",
+     "category": "Guitar Overdrive"
+    },
+    {
+     "id": 1181,
+     "name": "John Mayer Smooth Operator",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 1182,
+     "name": "John Mayer Signature 83",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 1183,
+     "name": "John Mayer Headroom Hero",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 1184,
+     "name": "John Mayer Three-In-One",
+     "category": "Guitar Amplifier"
+    },
+    {
+     "id": 5027,
+     "name": "John Mayer Compressor (ST)",
+     "category": "Compressor"
+    },
+    {
+     "id": 6028,
+     "name": "John Mayer Dream Delay (ST)",
+     "category": "Delay"
+    },
+    {
+     "id": 6029,
+     "name": "John Mayer Millipede Delay",
+     "category": "Delay"
+    },
+    {
+     "id": 7045,
+     "name": "John Mayer Harmonic Tremolo",
+     "category": "Modulation"
+    },
+    {
+     "id": 8033,
+     "name": "John Mayer Spring Reverb (M)",
+     "category": "Reverb"
+    },
+    {
+     "id": 8034,
+     "name": "John Mayer Studio Verb Hall",
+     "category": "Reverb"
+    },
+    {
+     "id": 8035,
+     "name": "John Mayer Studio Verb Plate",
+     "category": "Reverb"
+    },
+    {
+     "id": 12079,
+     "name": "John Mayer Smooth Operator Cab (M)",
+     "category": "Cabsim Guitar (M)"
+    },
+    {
+     "id": 12080,
+     "name": "John Mayer Signature 83 Cab (M)",
+     "category": "Cabsim Guitar (M)"
+    },
+    {
+     "id": 12081,
+     "name": "John Mayer Headroom Hero Cab (M)",
+     "category": "Cabsim Guitar (M)"
+    },
+    {
+     "id": 24008,
+     "name": "John Mayer Antelope Filter",
+     "category": "Filter"
+    },
+    {
+     "id": 32078,
+     "name": "John Mayer Smooth Operator Cab (ST)",
+     "category": "Cabsim Guitar (ST)"
+    },
+    {
+     "id": 32079,
+     "name": "John Mayer Signature 83 Cab (ST)",
+     "category": "Cabsim Guitar (ST)"
+    },
+    {
+     "id": 32080,
+     "name": "John Mayer Headroom Hero Cab (ST)",
+     "category": "Cabsim Guitar (ST)"
+    }
+   ],
+   "source": "https://neuraldsp.com/device-list"
+  },
+  {
+   "model_name_or_family": "No licence needed (no plugin_id): Multivoicer, Glitch, Overlord Synth, Doubler, Plugin Doubler, Plugin Blend, Transparent Blend, Plugin Gate, Plugin Graphic-9, Plugin Parametric-4, Transpose",
+   "required_plugin": null,
+   "source": "https://neuraldsp.com/device-list"
+  }
+ ],
+ "cpu_heavy": [
+  {
+   "block": "Any block, bypassed",
+   "note": "Bypassing or disabling a block does not reduce CPU; only removing it does (official).",
+   "source": "https://neuraldsp.com/manual/quad-cortex"
+  },
+  {
+   "block": "Reverbs and delays",
+   "note": "Named by the manual as the highest CPU category (official). Stereo spring reverb measured at relative weight 0.38 (one project's telemetry).",
+   "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.0.0.pdf"
+  },
+  {
+   "block": "Amp models",
+   "note": "'Some devices may use more DSP than others in the same category. This is especially true with amp devices' (official). Telemetry weight 0.5-0.6, the dominant cost in most presets (anecdote).",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/docs/CPU.md"
+  },
+  {
+   "block": "Neural Capture V2 (14001)",
+   "note": "'Capture V2 blocks use more CPU power' than V1; V1 is recommended for CPU-tight presets (official).",
+   "source": "https://neuraldsp.com/news/introducing-neural-capture-version-2"
+  },
+  {
+   "block": "Neural Capture V1 (14000)",
+   "note": "About amp-class cost in telemetry (anecdote).",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/docs/CPU.md"
+  },
+  {
+   "block": "Cab block",
+   "note": "'IR Loader blocks use less CPU than Cab blocks' (official). Mono cab telemetry weight about 0.18 (anecdote).",
+   "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.0.0.pdf"
+  },
+  {
+   "block": "IR Loader (full) vs Lite",
+   "note": "Lite versions drop the room reverb 'to reduce CPU consumption' (official).",
+   "source": "https://neuraldsp.com/quad-cortex-updates/coros-2-1-0-is-now-available"
+  },
+  {
+   "block": "Stereo (ST) variants",
+   "note": "Roughly twice the mono (M) cost in telemetry (anecdote).",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/docs/CPU.md"
+  },
+  {
+   "block": "Rows 1-2 vs rows 3-4",
+   "note": "Different processor cores (official); each pair has its own budget, so a preset can fail at 33-48 % total when everything is on rows 1-2 (community).",
+   "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.0.0.pdf"
+  },
+  {
+   "block": "Global EQ and Input Gate",
+   "note": "Disabled automatically when a preset exceeds resources (official); tied to the rows 1-2 budget (community).",
+   "source": "https://neuraldsp.com/manual/quad-cortex"
+  },
+  {
+   "block": "Three plugin amps + one cab",
+   "note": "About 85 % CPU with Global EQ and Input Gate disabled (anecdote).",
+   "source": "https://unity.neuraldsp.com/t/14706"
+  },
+  {
+   "block": "EQ, compressor, wah, FX loop",
+   "note": "Lowest CPU categories per the manual (official). Drive, compressor and EQ telemetry weight 0.08-0.16 (anecdote).",
+   "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.0.0.pdf"
+  },
+  {
+   "block": "Catalog 'Padding cpu' attribute",
+   "note": "Present per model (0.15-3.5) but does not track cost; not usable as a CPU estimate (firmware + inference).",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  }
+ ],
+ "rules": [
+  {
+   "rule": "Trim loudness with amp OUTPUT, a Gain block or lane VOLUME; never with amp MASTER.",
+   "reason": "MASTER is modelled power-amp gain and changes tone and feel; OUTPUT is a level after the model.",
+   "confidence": "official",
+   "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.0.0.pdf"
+  },
+  {
+   "rule": "Treat MASTER as a tone and drive parameter in searches, alongside GAIN.",
+   "reason": "Manual: MASTER is 'highly interactive with all other amp parameters'; a low MASTER reduces the effect of the other controls.",
+   "confidence": "official",
+   "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.0.0.pdf"
+  },
+  {
+   "rule": "For amps without MASTER, treat GAIN or VOLUME as whole-amp drive and re-level with OUTPUT after every change.",
+   "reason": "46 models have no master; their single volume also sets power-amp drive and loudness.",
+   "confidence": "firmware + inference",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "rule": "Do not use capture GAIN as a drive control beyond a few dB; choose a different capture for more or less gain.",
+   "reason": "Neural DSP: recapture rather than boost the block GAIN 'for more authentic results'; the knob is level into a fixed model.",
+   "confidence": "official",
+   "source": "https://neuraldsp.com/manual/quad-cortex"
+  },
+  {
+   "rule": "Use an EQ block for capture tone moves beyond small BASS/MID/TREBLE nudges.",
+   "reason": "The capture EQ is a generic fixed 3-band of +/-6 dB, not the device's tonestack.",
+   "confidence": "firmware + community",
+   "source": "https://unity.neuraldsp.com/t/20769"
+  },
+  {
+   "rule": "Read the capture type before adding a cab; skip the cab for Amp + Cab, Combo Amp and Cab captures.",
+   "reason": "Those types already contain a speaker and microphone.",
+   "confidence": "official",
+   "source": "https://neuraldsp.com/news/introducing-neural-capture-version-2"
+  },
+  {
+   "rule": "Check factory V2 amp captures for baked-in drive pedals before using them as a clean or crunch base.",
+   "reason": "Many 3.3.0 factory V2 captures are very hot and include a pedal noted only in Cortex Cloud.",
+   "confidence": "community",
+   "source": "https://unity.neuraldsp.com/t/20180"
+  },
+  {
+   "rule": "Scale cab POSITION and DISTANCE by the declared range of the model (0-10 native, 0-1 plugin).",
+   "reason": "Plugin cabs declare 0-1; native-scale values would clamp.",
+   "confidence": "firmware",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "rule": "Measure brightness at POSITION 0 and 10 and DISTANCE 0 and 10 once per cab before mapping 'brighter' to a direction.",
+   "reason": "The manual gives the meaning but not which numeric end is centre or close.",
+   "confidence": "inference",
+   "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%202_0_0.pdf"
+  },
+  {
+   "rule": "Skip POSITION and DISTANCE when a cab slot holds a user IR.",
+   "reason": "Both are disabled with external IR files.",
+   "confidence": "official",
+   "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.0.0.pdf"
+  },
+  {
+   "rule": "Select cab mics from the list the specific cab offers; do not assume every mic exists on every cab.",
+   "reason": "Mic selection varies per cab (staff confirmed).",
+   "confidence": "official (staff post)",
+   "source": "https://unity.neuraldsp.com/t/12314"
+  },
+  {
+   "rule": "Prefer an IR Loader Lite over a Cab block or full IR Loader when CPU is tight and no room is needed.",
+   "reason": "IR Loaders cost less than Cab blocks; Lite drops the room reverb.",
+   "confidence": "official",
+   "source": "https://neuraldsp.com/quad-cortex-updates/coros-2-1-0-is-now-available"
+  },
+  {
+   "rule": "Supply user IRs as 48 kHz WAV whose useful response fits in 1024 samples (about 21 ms).",
+   "reason": "IRs are resized to 1024 samples; longer room IRs are truncated and lose low end.",
+   "confidence": "official + community",
+   "source": "https://neuraldsp.com/manual/quad-cortex"
+  },
+  {
+   "rule": "Never assign a 'brief mute' switch to scenes; use two copies of the block and switch bypass instead.",
+   "reason": "Firmware flags 50 such parameters (see brief_mute_parameters); scene changes then lag up to about a second.",
+   "confidence": "firmware + anecdote",
+   "source": "https://unity.neuraldsp.com/t/23332"
+  },
+  {
+   "rule": "Address models by id, not name.",
+   "reason": "Legacy and updated versions share names (1109 vs 1142 D-Cell H4 Ch1 Bright, 1045 vs 1150 Solo 100 Lead).",
+   "confidence": "firmware",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  },
+  {
+   "rule": "Check a model's plugin_id against the user's licences before proposing it.",
+   "reason": "Unlicensed plugin devices are locked and cannot be loaded; a block without its licence stays silent.",
+   "confidence": "official + anecdote",
+   "source": "https://neuraldsp.com/manual/quad-cortex"
+  },
+  {
+   "rule": "Remove unused blocks instead of bypassing them when CPU matters.",
+   "reason": "Bypassed blocks still consume CPU.",
+   "confidence": "official",
+   "source": "https://neuraldsp.com/manual/quad-cortex"
+  },
+  {
+   "rule": "Spread heavy blocks across rows 1-2 and rows 3-4.",
+   "reason": "Row pairs run on different cores with separate budgets.",
+   "confidence": "official + community",
+   "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.0.0.pdf"
+  },
+  {
+   "rule": "Keep total CPU under 90 % and re-check that Input Gate and Global EQ are still active after each build.",
+   "reason": "Above the limit they are disabled without an error.",
+   "confidence": "official",
+   "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.0.0.pdf"
+  },
+  {
+   "rule": "Prefer mono (M) variants and V1 captures unless stereo width or V2 dynamics are required.",
+   "reason": "Stereo roughly doubles cost; V2 captures use more CPU.",
+   "confidence": "official (V2) + anecdote (stereo)",
+   "source": "https://neuraldsp.com/news/introducing-neural-capture-version-2"
+  },
+  {
+   "rule": "Use scenes, not preset changes, for any switch that must happen while playing.",
+   "reason": "Preset recall leaves a 0.2-0.4 s gap and cuts tails; scene changes are gapless.",
+   "confidence": "community",
+   "source": "https://unity.neuraldsp.com/t/7375"
+  },
+  {
+   "rule": "After a preset recall wait at least 0.5 s, then verify by read-back, before starting a measurement.",
+   "reason": "Measured gaps were 0.2-0.4 s, with reports up to about 1 s.",
+   "confidence": "anecdote",
+   "source": "https://unity.neuraldsp.com/t/7375"
+  },
+  {
+   "rule": "Do not expect a scene to change a parameter that is assigned to an expression pedal.",
+   "reason": "Expression-assigned parameters are excluded from scene data.",
+   "confidence": "official",
+   "source": "https://neuraldsp.com/manual/quad-cortex"
+  },
+  {
+   "rule": "Keep bypassed blocks' parameters identical across scenes unless a change is intended.",
+   "reason": "Large hidden parameter jumps are blamed for level spikes on scene change.",
+   "confidence": "anecdote",
+   "source": "https://unity.neuraldsp.com/t/23568"
+  },
+  {
+   "rule": "Leave global IN LEVEL and IMPEDANCE at 0 dB and 1 MOhm; compensate per preset with the input block INPUT GAIN.",
+   "reason": "I/O settings are global and shift the drive of every preset; INPUT GAIN is stored per preset and scene.",
+   "confidence": "official + community",
+   "source": "https://neuraldsp.com/manual/quad-cortex"
+  },
+  {
+   "rule": "For high gain, place Adaptive Gate (S/C) after the amp with SOURCE = Input 1; bypass gates in clean scenes.",
+   "reason": "It keys from the clean input while removing amp hiss; adaptive gates chatter on decays with the guitar volume rolled back.",
+   "confidence": "community",
+   "source": "https://unity.neuraldsp.com/t/18774"
+  },
+  {
+   "rule": "Bypass the Input Gate explicitly when another gate is used.",
+   "reason": "The Input Gate still acts at 0 % while enabled and interacts with other gates.",
+   "confidence": "anecdote",
+   "source": "https://unity.neuraldsp.com/t/16865"
+  },
+  {
+   "rule": "Measure preset loudness on grid USB outputs 5-8, not host inputs 3/4.",
+   "reason": "Inputs 3/4 follow the analog output stage and master volume; 5-8 are dedicated grid outputs.",
+   "confidence": "official channel map + anecdote (project measurement)",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/docs/LEVELING.md"
+  },
+  {
+   "rule": "Send reamp stimulus only to host outputs 5-8 with the grid input set to that USB input.",
+   "reason": "Host outputs 1-4 go straight to the analog jacks, bypassing the grid.",
+   "confidence": "official",
+   "source": "https://neuraldsp.com/manual/quad-cortex"
+  },
+  {
+   "rule": "Keep true peak below about -1 dBTP at the lane output, with about 12 dB headroom for clean tones and 6 dB for distorted ones.",
+   "reason": "The lane output feeds the output limiter; limiting changes tone.",
+   "confidence": "community",
+   "source": "https://quadcortex.wiki/Gain_Staging"
+  },
+  {
+   "rule": "Do not equate equal LUFS with equal loudness between clean and high-gain scenes.",
+   "reason": "High-gain tones sound louder at the same reading, especially at stage volume.",
+   "confidence": "anecdote",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/docs/LEVELING.md"
+  },
+  {
+   "rule": "Reduce each lane when summing N parallel amps (about -20*log10(N) dB as a start).",
+   "reason": "Parallel lanes sum and clip at unity.",
+   "confidence": "anecdote (project note)",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/.claude/skills/review-preset/SKILL.md"
+  },
+  {
+   "rule": "Use TRS on outputs 3/4 or expect 6 dB less.",
+   "reason": "XLR 1/2 max is +9.5 dBu; 3/4 give +15.5 dBu balanced and +9.5 dBu unbalanced.",
+   "confidence": "official specs + community",
+   "source": "https://neuraldsp.com/manual/quad-cortex"
+  },
+  {
+   "rule": "Treat Global EQ and I/O presets as global state: record and restore them around any test.",
+   "reason": "They affect every preset and are not undone by a preset reload.",
+   "confidence": "official + project note",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/docs/COROS-4.1.md"
+  },
+  {
+   "rule": "Read UK C30/C15 TopBoost BOOST and Victor Squid FOCUS by step name, not by value.",
+   "reason": "Step order is [HOT, COOL] and [ON, OFF], the reverse of the usual 0 = off.",
+   "confidence": "firmware",
+   "source": "https://raw.githubusercontent.com/lexasoft123/qc-mcp/HEAD/proto/ModelRepo.xml"
+  }
+ ],
+ "brief_mute_parameters": [
+  {
+   "model_id": 30,
+   "model": "Plini Drive",
+   "parameter": "MODE"
+  },
+  {
+   "model_id": 45,
+   "model": "John Mayer Justa Boost",
+   "parameter": "BOOST"
+  },
+  {
+   "model_id": 46,
+   "model": "John Mayer Tealbreaker",
+   "parameter": "MODEL"
+  },
+  {
+   "model_id": 47,
+   "model": "Rabea Colossus Fuzz",
+   "parameter": "MODE"
+  },
+  {
+   "model_id": 48,
+   "model": "Rabea Paragon Overdrive",
+   "parameter": "MODE"
+  },
+  {
+   "model_id": 1127,
+   "model": "UK C15 Normal",
+   "parameter": "BRIGHT"
+  },
+  {
+   "model_id": 1128,
+   "model": "UK C15 TopBoost",
+   "parameter": "BOOST"
+  },
+  {
+   "model_id": 1140,
+   "model": "CA John's 2C Ch2",
+   "parameter": "GAIN PULL"
+  },
+  {
+   "model_id": 1140,
+   "model": "CA John's 2C Ch2",
+   "parameter": "SHRED"
+  },
+  {
+   "model_id": 1141,
+   "model": "CA John's 2C Ch3",
+   "parameter": "GAIN PULL"
+  },
+  {
+   "model_id": 1141,
+   "model": "CA John's 2C Ch3",
+   "parameter": "SHRED"
+  },
+  {
+   "model_id": 1157,
+   "model": "Victor Squid Ch1",
+   "parameter": "TUBE"
+  },
+  {
+   "model_id": 1158,
+   "model": "Victor Squid Ch2",
+   "parameter": "TUBE"
+  },
+  {
+   "model_id": 1165,
+   "model": "Fortin® Nameless",
+   "parameter": "INPUT"
+  },
+  {
+   "model_id": 1165,
+   "model": "Fortin® Nameless",
+   "parameter": "PULL GAIN"
+  },
+  {
+   "model_id": 1166,
+   "model": "US DLX 64 Vintage",
+   "parameter": "MODE"
+  },
+  {
+   "model_id": 1167,
+   "model": "US DLX 65 Reissue",
+   "parameter": "MODE"
+  },
+  {
+   "model_id": 1170,
+   "model": "Soldano SLO-100®",
+   "parameter": "BRIGHT"
+  },
+  {
+   "model_id": 1170,
+   "model": "Soldano SLO-100®",
+   "parameter": "CHANNEL"
+  },
+  {
+   "model_id": 1170,
+   "model": "Soldano SLO-100®",
+   "parameter": "CRUNCH"
+  },
+  {
+   "model_id": 1175,
+   "model": "Cory Wong The Amp Snob",
+   "parameter": "BRIGHT"
+  },
+  {
+   "model_id": 1175,
+   "model": "Cory Wong The Amp Snob",
+   "parameter": "DRIVE"
+  },
+  {
+   "model_id": 1176,
+   "model": "Dumbbell ODS",
+   "parameter": "CHANNEL"
+  },
+  {
+   "model_id": 1176,
+   "model": "Dumbbell ODS",
+   "parameter": "PREAMP"
+  },
+  {
+   "model_id": 1176,
+   "model": "Dumbbell ODS",
+   "parameter": "BRIGHT"
+  },
+  {
+   "model_id": 1176,
+   "model": "Dumbbell ODS",
+   "parameter": "MID"
+  },
+  {
+   "model_id": 1176,
+   "model": "Dumbbell ODS",
+   "parameter": "EQ"
+  },
+  {
+   "model_id": 1177,
+   "model": "Petrucci Piezo",
+   "parameter": "AIR"
+  },
+  {
+   "model_id": 1179,
+   "model": "Petrucci Rhythm",
+   "parameter": "BITE"
+  },
+  {
+   "model_id": 1179,
+   "model": "Petrucci Rhythm",
+   "parameter": "MID BOOST"
+  },
+  {
+   "model_id": 1181,
+   "model": "John Mayer Smooth Operator",
+   "parameter": "BRIGHT"
+  },
+  {
+   "model_id": 1182,
+   "model": "John Mayer Signature 83",
+   "parameter": "BRIGHT"
+  },
+  {
+   "model_id": 1182,
+   "model": "John Mayer Signature 83",
+   "parameter": "EQ"
+  },
+  {
+   "model_id": 1183,
+   "model": "John Mayer Headroom Hero",
+   "parameter": "INPUT"
+  },
+  {
+   "model_id": 1183,
+   "model": "John Mayer Headroom Hero",
+   "parameter": "BRIGHT"
+  },
+  {
+   "model_id": 1183,
+   "model": "John Mayer Headroom Hero",
+   "parameter": "MID"
+  },
+  {
+   "model_id": 1185,
+   "model": "Rabea Crunch",
+   "parameter": "TUBE"
+  },
+  {
+   "model_id": 1186,
+   "model": "Rabea Lead",
+   "parameter": "TUBE"
+  },
+  {
+   "model_id": 5001,
+   "model": "Legendary 87 (M)",
+   "parameter": "RATIO"
+  },
+  {
+   "model_id": 5012,
+   "model": "Legendary 87 (ST)",
+   "parameter": "RATIO"
+  },
+  {
+   "model_id": 5019,
+   "model": "Legendary 87 (S/C)",
+   "parameter": "RATIO"
+  },
+  {
+   "model_id": 5025,
+   "model": "Douglas Shining Comp (M)",
+   "parameter": "RATIO"
+  },
+  {
+   "model_id": 5029,
+   "model": "Horizon Devices® Compressor",
+   "parameter": "INTENSITY"
+  },
+  {
+   "model_id": 7014,
+   "model": "Flanger Engine",
+   "parameter": "WAVEFORM"
+  },
+  {
+   "model_id": 7015,
+   "model": "Chorus Engine",
+   "parameter": "VOICE MODE"
+  },
+  {
+   "model_id": 7035,
+   "model": "Plini Chorus",
+   "parameter": "MODE"
+  },
+  {
+   "model_id": 7046,
+   "model": "Misha Modulator",
+   "parameter": "MODE"
+  },
+  {
+   "model_id": 8026,
+   "model": "Spring Reverb Engine (M)",
+   "parameter": "TANK TYPE"
+  },
+  {
+   "model_id": 8027,
+   "model": "Spring Reverb Engine (ST)",
+   "parameter": "TANK TYPE"
+  },
+  {
+   "model_id": 9020,
+   "model": "Cory Wong Wah",
+   "parameter": "AUTO-WAH"
+  }
+ ],
+ "replaced_models": [
+  {
+   "new_id": 1142,
+   "old_id": 1109,
+   "name": "D-Cell H4 Ch1 Bright"
+  },
+  {
+   "new_id": 1143,
+   "old_id": 1110,
+   "name": "D-Cell H4 Ch1 Normal"
+  },
+  {
+   "new_id": 1144,
+   "old_id": 1111,
+   "name": "D-Cell H4 Ch2 Bright"
+  },
+  {
+   "new_id": 1145,
+   "old_id": 1112,
+   "name": "D-Cell H4 Ch2 Normal"
+  },
+  {
+   "new_id": 1146,
+   "old_id": 1113,
+   "name": "D-Cell H4 Ch3"
+  },
+  {
+   "new_id": 1147,
+   "old_id": 1114,
+   "name": "D-Cell H4 Ch4"
+  },
+  {
+   "new_id": 1148,
+   "old_id": 1017,
+   "name": "EV101IIIS Red EL34 100W"
+  },
+  {
+   "new_id": 1149,
+   "old_id": 1098,
+   "name": "EV101IIIS Blue EL34 100W"
+  },
+  {
+   "new_id": 1150,
+   "old_id": 1045,
+   "name": "Solo 100 Lead"
+  },
+  {
+   "new_id": 1151,
+   "old_id": 1099,
+   "name": "Solo 100 Crunch Bright"
+  },
+  {
+   "new_id": 1152,
+   "old_id": 1100,
+   "name": "Solo 100 Crunch Normal"
+  },
+  {
+   "new_id": 1167,
+   "old_id": [
+    1094,
+    1095
+   ],
+   "name": "US DLX 65 Reissue (replaces US DLX Normal and US DLX Vibrato)"
+  },
+  {
+   "new_id": 27,
+   "old_id": 5,
+   "name": "Green 808"
+  }
+ ]
+}

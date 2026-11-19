@@ -1,0 +1,825 @@
+{
+  "researched": "2026-11-19",
+  "dual_amp": [
+    {
+      "claim": "Clean Fender plus cranked Vox is a standard pairing: the Vox supplies mids and distortion, the Fender stays tight and scooped.",
+      "detail": "Jens Mosbergvik pairs a Super Reverb (10-inch speakers, cleaner, tighter, scooped) with an AC15/AC30 (12-inch speakers): 'The cranked Vox provides strong mids through 12\" speakers, and is lush, bright, and distorted.' Two amps with different speakers and distortion give layers a series chain cannot.",
+      "numbers": null,
+      "source": "https://www.premierguitar.com/diy/silver-and-black/how-to-use-two-guitar-amps-at-once",
+      "confidence": "published"
+    },
+    {
+      "claim": "A clean, chimey AC30 blended under a high-gain rig restores chord clarity (Dean DeLeo).",
+      "detail": "DeLeo: 'That AC30 is really there to capture that clarity of the chords... You'd be astounded when you turn that AC30 off - it's obvious right away something is really missing.' The dirty VHT/Demeter side 'has got the big bottom and the nice sizzly top'; the AC30 is clean in the mids. No blend ratio given.",
+      "numbers": null,
+      "source": "https://www.musicradar.com/news/rig-tour-stone-temple-pilots",
+      "confidence": "published"
+    },
+    {
+      "claim": "5150 plus JCM800 is the blend attributed to Andy Sneap's rhythm sound.",
+      "detail": "Nail The Mix staff article: the 5150/6505 family is the core amp and 'He often pairs this with a classic Marshall JCM800 for a slightly different flavor to blend.' Secondary source, not Sneap's own words.",
+      "numbers": null,
+      "source": "https://www.nailthemix.com/andy-sneap",
+      "confidence": "published"
+    },
+    {
+      "claim": "Dual Rectifier plus JCM800 or 5150 is a standard hard-rock/metal blend: Rectifier for lows and highs, the Marshall or 5150 for mids.",
+      "detail": "Andy Sneap forum thread (2007): described as a 'pretty standard setup for hard rock & metal'; best blends are amps that 'blend naturally (ala the 5150 and Recto)'. Voice each amp toward its role at the amp, then balance levels; suggested high-passing the 5150 around 100 Hz so the Rectifier holds the bottom.",
+      "numbers": "5150 high-pass about 100 Hz",
+      "source": "https://ultimatemetal.com/threads/heavy-guitars-blending-multiple-amps.310070/",
+      "confidence": "community"
+    },
+    {
+      "claim": "Plexi plus AC30 and pushed Fender plus high-headroom Marshall/Dumble are cited as stock dual-amp recipes.",
+      "detail": "Fractal forum: moderator yek points to factory preset 'Plexis+ACs' as the starting point for a clean/dirty blend; a member cites SRV pairing a pushed Vibroverb with a high-headroom Marshall Major or Dumble; David Grissom-style rigs keep one amp clean while others are pushed.",
+      "numbers": null,
+      "source": "https://forum.fractalaudio.com/threads/clean-amp-and-dirty-amp-together-for-added-clarity.194860/",
+      "confidence": "community"
+    },
+    {
+      "claim": "Blend amps that differ in gain; two amps with similar distortion add little.",
+      "detail": "Fractal forum: 'I don't see as much point in blending amps with similar levels of distortion'; clean plus distorted layering is preferred. Others warn that very different amps and cabs together can sound odd and that one amp is easier to sculpt.",
+      "numbers": null,
+      "source": "https://forum.fractalaudio.com/threads/how-to-correctly-blend-or-use-2-amps-together.222084/",
+      "confidence": "community"
+    },
+    {
+      "claim": "Engineers layer clean, half-driven and heavily driven versions of one guitar part and ride them through the song.",
+      "detail": "Mike Hedges (Sound On Sound, Mike Senior, 2007): 'It's all done on one guitar track, so it doesn't sound like you've done 10 guitar overdubs.' Joe Barresi splits one guitar to several amps with a dedicated splitter.",
+      "numbers": null,
+      "source": "https://www.soundonsound.com/techniques/guitar-amp-recording",
+      "confidence": "published"
+    },
+    {
+      "claim": "Phase test when adding a second source: the sum must get stronger, not thinner; flip polarity if it subtracts.",
+      "detail": "Sound On Sound: Sylvia Massy, 'check it until the signal is the strongest'; Jack Douglas checks that each added mic adds rather than subtracts and reverses polarity if not, calling phase 'the phase EQ'.",
+      "numbers": null,
+      "source": "https://www.soundonsound.com/techniques/guitar-amp-recording",
+      "confidence": "published"
+    },
+    {
+      "claim": "A small time offset between two summed guitar sources removes the top end first.",
+      "detail": "Bill Price nudges mics until 'perfectly in phase at high frequencies'; a mismatch gives phase shift 'that would take the top off the guitar sound'. This matches the Quad Cortex symptom reported when two amps are summed (high end vanishes, boomy).",
+      "numbers": null,
+      "source": "https://www.soundonsound.com/techniques/guitar-amp-recording",
+      "confidence": "published"
+    },
+    {
+      "claim": "A second source far below the main one still changes the tone, so a blend does not need equal levels.",
+      "detail": "John Leckie (Sound On Sound) often runs a U67 10-15 dB below an SM58 on the same cab, and says even 20-30 dB down changes the sound. Stated for mics, not amps; transfers as a level starting point for a colour path.",
+      "numbers": "second source 10-15 dB down; audible even at 20-30 dB down",
+      "source": "https://www.soundonsound.com/techniques/guitar-amp-recording",
+      "confidence": "published"
+    },
+    {
+      "claim": "On the Quad Cortex, a capture and an amp model summed in parallel lost all high end until Path B was phase-inverted.",
+      "detail": "Sovtek capture in parallel with the stock JCM800 (2203) model: 'really boomy and bassy'; a gain block flip did not help, 'Solved! Used the splitter to invert phase!'. Named causes: different gain-stage counts or phase inverters giving opposite polarity, and unknown per-block latency.",
+      "numbers": null,
+      "source": "https://unity.neuraldsp.com/t/high-end-vanishes-when-using-two-amps/9456",
+      "confidence": "community"
+    },
+    {
+      "claim": "Neural Captures are not necessarily phase-preserving, so a capture blended with a model or another capture may need polarity or phase correction.",
+      "detail": "danimaetrix: 'Captures aren't necessarily phase-preserving' and 'Parallel amps in general are much harder to do properly than people give credit for.' Fixes offered: flip phase, change cab, or pan the amps apart.",
+      "numbers": null,
+      "source": "https://unity.neuraldsp.com/t/phase-issues-with-2-amps/7366",
+      "confidence": "community"
+    },
+    {
+      "claim": "The Quad Cortex Mixer has a PHASE switch that inverts Path B.",
+      "detail": "Manual 4.1.1, Mixer parameters: 'PHASE: When enabled, inverts the phase of Path B.' It is a polarity flip (180 degrees), not a time alignment.",
+      "numbers": null,
+      "source": "https://neuraldsp.com/manual/quad-cortex",
+      "confidence": "official"
+    },
+    {
+      "claim": "CorOS 4.0.0 added a Phase Doctor utility device for aligning parallel signals.",
+      "detail": "Release notes and device list: 'Phase Doctor (inspired by the Little Labs IBP Phase Alignment Tool)', Utility category, added in 4.0.0 (21 January 2026). No official parameter description was found.",
+      "numbers": "CorOS 4.0.0",
+      "source": "https://neuraldsp.com/quad-cortex-updates/coros-4-0-0-and-cortex-control-4-0-0-are-now-available",
+      "confidence": "official"
+    },
+    {
+      "claim": "Phase Doctor is not a 0-360 degree knob: it flips one side by 180 degrees and then offers additional shift.",
+      "detail": "DiffractionCircuit (forum user's 'best understanding'): 'Phase Doctor lets you choose if you want to flip one side or the other by 180 degrees, then gives you the option to include additional shift'; reported to work 'really well' on parallel paths. No official tutorial existed as of March 2026.",
+      "numbers": null,
+      "source": "https://unity.neuraldsp.com/t/how-does-the-phase-doctor-work/21580",
+      "confidence": "community"
+    },
+    {
+      "claim": "The Quad Cortex setting is called LATENCY COMPENSATION (Dynamic Latency Compensation), added in CorOS 3.0.0; officially it concerns phasing when bypassing blocks.",
+      "detail": "CorOS 3.0.0 notes: 'A Dynamic Latency Compensation option is available via Settings > Device Options. Disabling this may help if phasing occurs when bypassing a device on the Grid.' Manual 4.1.1: 'LATENCY COMPENSATION: Toggles Dynamic latency Compensation.' Neither states the default or says that parallel rows are time-aligned.",
+      "numbers": "CorOS 3.0.0",
+      "source": "https://neuraldsp.com/quad-cortex-updates/coros-3-0-0-and-cortex-control-1-1-0-are-now-available",
+      "confidence": "official"
+    },
+    {
+      "claim": "A block present in only one of two parallel amp paths adds latency to that path and can cause cancellation at the sum.",
+      "detail": "Fractal moderator yek: 'Adding a DRIVE block in front of only one of two AMP blocks in parallel rows' may cause phase cancellation; fix is to 'add a bypassed Drive block to the other row (at the expense of CPU)'. One user needed an active matching drive instead. Same mechanism is named by Quad Cortex users (per-block latency).",
+      "numbers": null,
+      "source": "https://forum.fractalaudio.com/threads/stange-phase-delay-issue-with-dual-amps-cabs.178597/",
+      "confidence": "community"
+    },
+    {
+      "claim": "Path misalignment between parallel amp rows is sub-millisecond to about a millisecond in scale; Fractal's mixer gives per-row delay for it.",
+      "detail": "Fractal Blocks Guide, Mixer: 'Delay Rows 1-6 ... delay each input by up to 64 samples (about 1.3 ms) to fine-tune the timing and phase alignment between rows, for example when blending parallel paths.' The Quad Cortex mixer has no such delay; users substitute an IR Loader block with 0.01 ms adjustment.",
+      "numbers": "up to 64 samples, about 1.3 ms",
+      "source": "https://www.fractalaudio.com/downloads/manuals/fas-guides/Fractal-Audio-Blocks-Guide.pdf",
+      "confidence": "official"
+    },
+    {
+      "claim": "A reverb or delay on only one amp path smears the blend; rejoin the paths before the first reverb.",
+      "detail": "Greg Ferguson found a 40 ms reverb pre-delay on one path 'enough to be noticable'; routing the lower path to rejoin just before the first Reverb block removed the phasing/delay sound.",
+      "numbers": "40 ms pre-delay audible",
+      "source": "https://forum.fractalaudio.com/threads/stange-phase-delay-issue-with-dual-amps-cabs.178597/",
+      "confidence": "community"
+    },
+    {
+      "claim": "Mud in a dual-amp blend is fixed by a low cut on the cabs and less drive on one amp.",
+      "detail": "Greg Ferguson: boomy low end tightened by setting the cab low-cut to 80 Hz and reducing drive on Amp 1.",
+      "numbers": "cab low-cut 80 Hz",
+      "source": "https://forum.fractalaudio.com/threads/stange-phase-delay-issue-with-dual-amps-cabs.178597/",
+      "confidence": "community"
+    },
+    {
+      "claim": "Do not carve the two amps into crossover-style bands; voice each amp at its own controls first.",
+      "detail": "Asked about low-passing the Mesa near 2 kHz and high-passing the Marshall near 1 kHz, Ermz called it 'overthinking AND over-EQing'; 'Try to focus the amps into their specific voice when actually dialing the tone at the amp', then subtractive EQ on the summed bus (HPF, LPF, fizz, low mids).",
+      "numbers": null,
+      "source": "https://ultimatemetal.com/threads/heavy-guitars-blending-multiple-amps.310070/",
+      "confidence": "community"
+    },
+    {
+      "claim": "Hard-panning two amp paths hides cancellation and gives width; a centre 50/50 blend exposes phase and removes width.",
+      "detail": "Fractal: 'the more I blend towards 50/50 (center pan on both), the less option I have to create stereo width'. Line 6 forum: hard-panning the paths reduces the audible effect of phase problems. The cancellation returns when the output is summed to mono.",
+      "numbers": null,
+      "source": "https://forum.fractalaudio.com/threads/how-to-correctly-blend-or-use-2-amps-together.222084/",
+      "confidence": "community"
+    },
+    {
+      "claim": "Hard left/right amps feel disorienting on headphones; centre both if that is how the player listens.",
+      "detail": "Rex on the Fractal factory preset 'Plexis+ACs': 'Headphones exaggerate the left/right separation'; suggested centring both amps if it bothers you.",
+      "numbers": null,
+      "source": "https://forum.fractalaudio.com/threads/clean-amp-and-dirty-amp-together-for-added-clarity.194860/",
+      "confidence": "community"
+    },
+    {
+      "claim": "Give each amp its own cab when the amps differ, but avoid wildly different cabs in one blend.",
+      "detail": "Fractal users run a separate cab per amp, hard-panned ('different cabs suit different amps'); another advises against very different cabs in a blend; a common fallback is one amp into two IRs panned left and right, reported as clearer with fewer issues than two amps.",
+      "numbers": null,
+      "source": "https://forum.fractalaudio.com/threads/how-to-correctly-blend-or-use-2-amps-together.222084/",
+      "confidence": "community"
+    },
+    {
+      "claim": "Level each amp alone to the same loudness first, then set the blend at the mixer, not at the amp inputs.",
+      "detail": "unix-guy: 'adjust both amps so that individually they are close to the same level' using mixer levels 100%/0%, then blend. Changing level before the amps instead 'affect[s] the tone of the Amp'.",
+      "numbers": null,
+      "source": "https://forum.fractalaudio.com/threads/clean-amp-and-dirty-amp-together-for-added-clarity.194860/",
+      "confidence": "community"
+    },
+    {
+      "claim": "Two equal paths merged are louder than one; pull the merge down to compensate.",
+      "detail": "Helix community: 'Sum of 2 sources of equal volume = +3dB' (stated untested); one user sets both paths to -3 dB at the merge for a doubled effect. Identical in-phase signals would sum by up to 6 dB, so treat 3 dB as a starting trim and check by meter.",
+      "numbers": "about +3 dB at the merge; trim each path -3 dB",
+      "source": "https://line6.com/support/topic/37998-levels-and-different-kinds-of-splits/",
+      "confidence": "community"
+    },
+    {
+      "claim": "Strong cancellation needs near-identical chains; different amps, cabs and mics mostly produce comb filtering of what they share.",
+      "detail": "Line 6 forum (qwerty42): causes are time misalignment between paths, unaligned IRs, and time effects in one path. Polarity flip alone often does not fix it ('it sounds different because it is different'); fine delay on one path (0.1 ms steps) does.",
+      "numbers": "alignment delay in 0.1 ms steps",
+      "source": "https://line6.com/support/topic/58405-phase-issue-with-two-amp-blocks-one-path-each/",
+      "confidence": "community"
+    },
+    {
+      "claim": "A deliberate double-track effect on the Quad Cortex: 30 ms fully wet delay on path B with the paths panned 50 left / 50 right.",
+      "detail": "Splitter before the amps; Simple Delay (mono) after the second cab at 100% wet, no feedback, trails off, 30 ms; mixer Pan A 50L, Pan B 50R. A long offset like this decorrelates the paths instead of comb filtering them.",
+      "numbers": "30 ms, 100% wet, 0 feedback, pans 50L/50R",
+      "source": "https://unity.neuraldsp.com/t/double-tracker-effect-with-parallel-amps-and-cabs-w-mono-delay/7774",
+      "confidence": "community"
+    },
+    {
+      "claim": "With two real amps, put time-based effects on only one of them to keep the core tone intact.",
+      "detail": "Premier Guitar (two Deluxe Reverbs): 'You can compensate for this by using two amps in parallel, where the effects are only applied to one amp.'",
+      "numbers": null,
+      "source": "https://www.premierguitar.com/diy/silver-and-black/how-to-use-two-guitar-amps-at-once",
+      "confidence": "published"
+    }
+  ],
+  "quad_cortex_routing": [
+    {
+      "claim": "The Grid is four rows of eight block slots.",
+      "detail": "Manual 4.1.1: 'The Grid consists of four rows, each containing eight device block slots.'",
+      "numbers": "4 rows x 8 slots",
+      "source": "https://neuraldsp.com/manual/quad-cortex",
+      "confidence": "official"
+    },
+    {
+      "claim": "A splitter sends Row 1 or 3 (Path A) to Row 2 or 4 (Path B); a mixer merges B back into A or sends it to a different output.",
+      "detail": "Manual 4.1.1: 'Splitter Blocks: Route audio from Rows 1 or 3 (Path A) to Rows 2 or 4 (Path B), respectively.' 'Mixer Blocks: Route parallel paths on Rows 2 or 4 (Path B) to different output blocks or merge them back into Rows 1 or 3 (Path A).' So a preset can hold two split pairs: rows 1-2 and rows 3-4.",
+      "numbers": null,
+      "source": "https://neuraldsp.com/manual/quad-cortex",
+      "confidence": "official"
+    },
+    {
+      "claim": "The manual documents three splitter types - Balance, A/B and Crossover - plus a separate STEREO switch.",
+      "detail": "Manual 4.1.1: 'TYPE: Determines the Splitter behavior with respect to how the audio signal is divided (Balance, A/B, or Crossover).' No type named 'LR Crossover' appears in the 4.1.1 or 3.2.0 manual; a stereo split is the STEREO switch applied to any type.",
+      "numbers": null,
+      "source": "https://neuraldsp.com/manual/quad-cortex",
+      "confidence": "official"
+    },
+    {
+      "claim": "Balance splitter: one BALANCE control distributes the signal between Paths A and B.",
+      "detail": "Manual 4.1.1: 'BALANCE: Adjusts the distribution of the signal between Paths A and B (Available in 'Balance' type).' Suited to a single scene-assignable blend control.",
+      "numbers": null,
+      "source": "https://neuraldsp.com/manual/quad-cortex",
+      "confidence": "official"
+    },
+    {
+      "claim": "A/B splitter: independent LEVEL TO A and LEVEL TO B sends.",
+      "detail": "Manual 4.1.1: 'LEVEL TO A: Adjusts the output level sent to Path A', 'LEVEL TO B: Adjusts the output level sent to Path B' (A/B type). Send levels sit before the amps, so they change how hard each amp is driven.",
+      "numbers": null,
+      "source": "https://neuraldsp.com/manual/quad-cortex",
+      "confidence": "official"
+    },
+    {
+      "claim": "Crossover splitter: FREQUENCY sets the split point and MODE swaps which band goes to which path.",
+      "detail": "Manual 4.1.1: 'FREQUENCY: Adjusts the crossover frequency at which the signal is divided', 'MODE: Swaps the crossover band assignments for Paths A and B'. CorOS 3.1.0 fixed a bug where the Crossover Splitter stopped working after the type parameter was changed.",
+      "numbers": null,
+      "source": "https://neuraldsp.com/manual/quad-cortex",
+      "confidence": "official"
+    },
+    {
+      "claim": "The splitter STEREO switch sends the left channel of the preceding block to Path A and the right channel to Path B.",
+      "detail": "Manual 4.1.1: 'STEREO: Enables or disables the stereo split, assigning the left and right channels of the preceding block's output to separate paths A and B, respectively.' Manual 3.2.0 adds: 'The STEREO Switch is available for all the Splitter types.'",
+      "numbers": null,
+      "source": "https://neuraldsp.com/manual/quad-cortex",
+      "confidence": "official"
+    },
+    {
+      "claim": "Mixer controls are LEVEL A, PAN A, LEVEL B, PAN B, PHASE (inverts Path B), MIXER LEVEL and MUTE.",
+      "detail": "Manual 4.1.1 Mixer parameters: 'LEVEL A: Adjusts the volume level of Path A', 'PAN A: Adjusts the stereo panning of Path A', same for B, 'PHASE: When enabled, inverts the phase of Path B', 'MIXER LEVEL: Adjusts the overall volume level of the Mixer block'.",
+      "numbers": null,
+      "source": "https://neuraldsp.com/manual/quad-cortex",
+      "confidence": "official"
+    },
+    {
+      "claim": "Rows 1-2 and rows 3-4 run on different processor cores; a preset confined to rows 1-2 uses half the unit's power.",
+      "detail": "Manual 3.2.0, Optimizing performance: 'Rows 1-2 and Rows 3-4 on The Grid utilise different processor cores. If all of your device blocks are placed in Rows 1 and 2, you're only using half of Quad Cortex's power. For resource-hungry Presets, try splitting your blocks across all four rows.' This passage was not found in the 4.1.1 web manual.",
+      "numbers": null,
+      "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.2.0.pdf",
+      "confidence": "official"
+    },
+    {
+      "claim": "Maximum CPU load is 90%.",
+      "detail": "Manual 3.2.0: 'The maximum load is up to 90%. Beyond that, the audio and operating system performance may be compromised.'",
+      "numbers": "90%",
+      "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.2.0.pdf",
+      "confidence": "official"
+    },
+    {
+      "claim": "Bypassed blocks still cost CPU, so a block that is off in every scene but one is paid for in all of them.",
+      "detail": "Manual 4.1.1, CPU Monitor: 'Notice that bypassing or disabling blocks does not reduce CPU consumption.'",
+      "numbers": null,
+      "source": "https://neuraldsp.com/manual/quad-cortex",
+      "confidence": "official"
+    },
+    {
+      "claim": "Global EQ and Input Gate are switched off automatically when a preset exceeds the processing budget.",
+      "detail": "Manual 4.1.1: 'The GLOBAL EQ and INPUT GATE blocks are automatically disabled when a Preset exceeds available processing resources.' A heavy dual-path preset can therefore silently lose the player's global EQ.",
+      "numbers": null,
+      "source": "https://neuraldsp.com/manual/quad-cortex",
+      "confidence": "official"
+    },
+    {
+      "claim": "Reverbs and delays are the most CPU-expensive blocks; EQ, compressor, wah and FX loop the cheapest; amps vary widely.",
+      "detail": "Manual 3.2.0: 'Time effects like Reverbs or Delays have the highest CPU usage. EQ, Compressor, Wah, and FX Loop blocks have the lowest CPU usage.' 'Some devices may use more DSP than others in the same category. This is especially true with amp devices.'",
+      "numbers": null,
+      "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.2.0.pdf",
+      "confidence": "official"
+    },
+    {
+      "claim": "'Not enough CPU' can appear at a low overall percentage because the limit is per core, not per preset.",
+      "detail": "CorOS 2.0.0 report: two AC30 Top Boost models on rows 1 and 2 read 21% overall but diagnostics showed core 1 about 34.5% and core 2 about 45.2%, cores 3-4 idle; a third amp was refused. Suggested fix: move an amp to row 3 or 4. No staff confirmation.",
+      "numbers": "21% overall; cores at 34.5% and 45.2%",
+      "source": "https://unity.neuraldsp.com/t/cpu-memory-only-21-and-not-possible-to-add-another-amp/10256",
+      "confidence": "community"
+    },
+    {
+      "claim": "To spread a two-amp preset across cores, put the second chain on rows 3-4 with its own output; it cannot be rejoined to row 1.",
+      "detail": "DiffractionCircuit: 'Two out of the four processors handle the top two rows on the grid'; asked whether to rejoin the top row, 'You would need to add the multi-out from the 3rd row.' Such a chain sums at the outputs, with no mixer PHASE switch between the two amps.",
+      "numbers": null,
+      "source": "https://unity.neuraldsp.com/t/how-to-set-up-a-dual-amp-rig-on-qc-to-save-cpu/12769",
+      "confidence": "community"
+    },
+    {
+      "claim": "Using rows 3-4 added about 2.5-2.7 ms of latency in user measurements on CorOS 1.4-2.0.",
+      "detail": "Base latency 1.75 ms (one row, no blocks); a gain block moved from row 1 to row 3 measured 4.42 ms. A 2025 post still says rows 3-4 'have more latency from the additional DSP chip(s)'. Not re-measured on CorOS 3.x/4.x; the thread author marks the early numbers outdated. Implication: two amps meant to be blended are safer inside one row pair.",
+      "numbers": "1.75 ms base; +2.5 to +2.67 ms when rows 3-4 are used",
+      "source": "https://unity.neuraldsp.com/t/qc-numbers-report-latency-send-levels-etc/10291",
+      "confidence": "community"
+    },
+    {
+      "claim": "Bypassing a block does not remove its latency; typical amp-plus-cab presets measured 2.2-6.6 ms.",
+      "detail": "RandomGecko (Dec 2023, RTL Utility): blank patch 1.68 ms; amp + IR 2.20 ms; capture + IR 2.52 ms; Brit 2203 preset 4.43 ms; main rhythm preset about 6.6 ms. DavidRSTV: 'Disabling a block does not reduce latency'.",
+      "numbers": "1.68 ms blank; 2.2-6.6 ms typical presets",
+      "source": "https://unity.neuraldsp.com/t/qc-numbers-report-latency-send-levels-etc/10291?page=8",
+      "confidence": "community"
+    },
+    {
+      "claim": "On a parallel wet path, set the effects to 100% mix; partial mix on the split path causes phasing against the dry path.",
+      "detail": "SelfTitledLP: 'You'll most likely want the effects on Row 2 to be at 100% otherwise you'll have really weird phasing when the two signals combine.' Also: if Row 2 merges back before the reverb and delay on Row 1, those effects process the wet path too.",
+      "numbers": "100% mix on the wet path",
+      "source": "https://unity.neuraldsp.com/t/understanding-splitters-on-quad/20221",
+      "confidence": "community"
+    },
+    {
+      "claim": "Wet/dry/wet principle: the dry tone is never processed; effects run 100% wet and the amount is set by the wet path level, panned hard left and right.",
+      "detail": "Pete Thorn (Premier Guitar, 2011): 'you have a dry guitar signal that stays unmolested by any effects or processing'; 'Set the effects units 100 percent wet and blend in the amount of effect you want into the wet cabs'; he blends 'a significant amount of dry signal into the wet cabs' and uses an expression pedal for wet level.",
+      "numbers": "effects 100% wet",
+      "source": "https://www.premierguitar.com/gear/the-working-guitarist-different-approaches-to-guitar-effects",
+      "confidence": "published"
+    },
+    {
+      "claim": "Series versus parallel delay and reverb: in parallel, the echoes are not reverberated.",
+      "detail": "Fractal Blocks Guide FAQ: 'In series, you hear reverb on the dry (what you play) and the wet (the echo that follows). In parallel, only the dry signal passes into the reverb, so the echoes that follow are dry, with no reverb.'",
+      "numbers": null,
+      "source": "https://www.fractalaudio.com/downloads/manuals/fas-guides/Fractal-Audio-Blocks-Guide.pdf",
+      "confidence": "official"
+    },
+    {
+      "claim": "For parallel time effects the documented practice is mix 100% with the amount set by level, and bypass by muting the input so tails ring out.",
+      "detail": "Fractal Blocks Guide: Kill Dry avoids 'the requirement of running Mix at 100% and adjusting Level'; bypass mode MUTE IN silences the input 'while allowing effect tails to continue. Ideal for time-based effects used in parallel.' The Quad Cortex equivalent is 100% Mix, wet amount on mixer LEVEL B, TRAILS on.",
+      "numbers": "Mix 100%",
+      "source": "https://www.fractalaudio.com/downloads/manuals/fas-guides/Fractal-Audio-Blocks-Guide.pdf",
+      "confidence": "official"
+    },
+    {
+      "claim": "Quad Cortex delay/reverb Mix is not an equal blend at 50%; users find wet equals dry around 75-85%.",
+      "detail": "Forum (March 2025): '50% doesn't actually mean 50%'; equal point estimated 'around 75-80%' and '~75-85%'. No staff statement. Mix percentages quoted for other devices do not transfer directly to Quad Cortex values.",
+      "numbers": "equal wet/dry at about 75-85% Mix",
+      "source": "https://unity.neuraldsp.com/t/reverb-and-delay-mix-level/17469",
+      "confidence": "community"
+    },
+    {
+      "claim": "Parallel compression needs no second path: a compressor Mix below 100% is the same thing.",
+      "detail": "Fractal Blocks Guide, Compressor: Mix 'would normally be set to 100% but lower settings allow parallel compression (aka \"New York\" compression) so notes keep their punch'. Applies to any compressor with a mix control.",
+      "numbers": null,
+      "source": "https://www.fractalaudio.com/downloads/manuals/fas-guides/Fractal-Audio-Blocks-Guide.pdf",
+      "confidence": "official"
+    },
+    {
+      "claim": "Transparent Blend (CorOS 3.0.0) lets a row take another block's output as its source, giving extra parallel paths; phasing reported on 3.0 was reported gone on 3.1.",
+      "detail": "Device list: Transparent Blend, Utility, added 3.0.0. User report Aug 2024: phase problems on other rows; Dec 2024: 'with 3.1 transparent blend is in phase in all rows!'. CorOS 3.1.0 notes list a fix for 'sidechain delay compensation' causing 'phasing, level, and panning issues in certain Presets'.",
+      "numbers": "added 3.0.0; fix in 3.1.0",
+      "source": "https://unity.neuraldsp.com/t/transparent-blend-phase-issue-video-for-creative-parallel-solutions/15069",
+      "confidence": "community"
+    },
+    {
+      "claim": "Amp models are mono; the signal is mono or stereo according to the last block it passed through.",
+      "detail": "jamsden: 'Some blocks, such as amp models are always mono. Some others like reverbs are always stereo.' A mono block after a stereo effect collapses it; stereo width must be created after the amps (mixer pans, stereo cabs, stereo effects).",
+      "numbers": null,
+      "source": "https://unity.neuraldsp.com/t/general-routing-question-mono-stereo/12367",
+      "confidence": "community"
+    },
+    {
+      "claim": "The Quad Cortex does not detect a single cable and auto-sum to mono.",
+      "detail": "jamsden: 'Unlike Helix, QC doesn't sense a single output connection and automatically sum to mono.' A mono chain into an output pair is dual mono (about +3 dB). Users disagree on whether selecting a single output in the Output block sums L+R or takes one side.",
+      "numbers": "dual mono about +3 dB",
+      "source": "https://unity.neuraldsp.com/t/general-routing-question-mono-stereo/12367",
+      "confidence": "community"
+    },
+    {
+      "claim": "Splitting row A into row B replaces row B's own input.",
+      "detail": "derdoe: 'If you split Row A into Row B then the split becomes the new input and you lose input 2.' To share one reverb between two chains, mix one row into the other before the reverb, or use Transparent Blend.",
+      "numbers": null,
+      "source": "https://unity.neuraldsp.com/t/confused-about-the-split-mix-function/20932",
+      "confidence": "community"
+    },
+    {
+      "claim": "A splitter/mixer path is created by tap-and-hold on an empty slot or by dragging a block from Path A to Path B.",
+      "detail": "Manual 4.1.1: 'Tap and hold any empty slot on the Grid to insert a Splitter or Mixer for the corresponding pair of Rows.' 'Alternatively, dragging any device block from Path A to Path B will automatically create a parallel signal path.'",
+      "numbers": null,
+      "source": "https://neuraldsp.com/manual/quad-cortex",
+      "confidence": "official"
+    }
+  ],
+  "scenes": [
+    {
+      "claim": "A preset holds eight scenes, A to H.",
+      "detail": "Manual 3.2.0: 'Eight scenes are available for each Preset.' Manual 4.1.1: footswitches A-H load scenes; MIDI CC#43 values 0-7 recall Scene A-H.",
+      "numbers": "8 scenes; CC#43 values 0-7",
+      "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.2.0.pdf",
+      "confidence": "official"
+    },
+    {
+      "claim": "Only parameters explicitly assigned to scenes vary per scene; unassigned parameters are the same in every scene.",
+      "detail": "Manual 4.1.1: 'tap and hold a parameter to assign or unassign it to Scenes'; 'Once assigned, the parameter's value will be stored independently for each Scene.' 'Scenes allow you to control multiple parameters and device blocks simultaneously within the same Preset.'",
+      "numbers": null,
+      "source": "https://neuraldsp.com/manual/quad-cortex",
+      "confidence": "official"
+    },
+    {
+      "claim": "Block bypass is stored per scene by default.",
+      "detail": "Manual 4.1.1, SCENE BYPASS BEHAVIOR: 'Always overwrite bypass state (default): All block bypass changes are automatically saved per Scene.' Other options: 'Footswitch Presses are not saved' and 'No changes are saved'.",
+      "numbers": null,
+      "source": "https://neuraldsp.com/manual/quad-cortex",
+      "confidence": "official"
+    },
+    {
+      "claim": "A scene cannot change which device sits in a block; it changes only parameters and bypass.",
+      "detail": "The manual defines scenes only as per-scene parameter values and bypass states. Community wording: scenes are parts of a song using the preset's already-loaded effects; per scene you toggle bypass and adjust settings. A different amp needs a second amp block on the grid.",
+      "numbers": null,
+      "source": "https://cortexpresets.com/delay-free-preset-switching-on-the-neural-dsp-quad-cortex/",
+      "confidence": "community"
+    },
+    {
+      "claim": "A parameter assigned to an expression pedal is excluded from scene data.",
+      "detail": "Manual 4.1.1: 'When a parameter is assigned to an expression pedal, its values are excluded from Scene data and will not change when switching Scenes.'",
+      "numbers": null,
+      "source": "https://neuraldsp.com/manual/quad-cortex",
+      "confidence": "official"
+    },
+    {
+      "claim": "The scene active when the preset is saved becomes the one it loads with.",
+      "detail": "Manual 4.1.1: 'By default, every new Preset starts with Scene A.' 'To set another Scene as the default, simply save the Preset while that Scene is active.'",
+      "numbers": null,
+      "source": "https://neuraldsp.com/manual/quad-cortex",
+      "confidence": "official"
+    },
+    {
+      "claim": "Tempo can be set per scene, per preset or globally.",
+      "detail": "Manual 4.1.1 (Cortex Control, TEMPO): 'You can set tempo values per Scene, Preset, or globally.' Another passage says tempo and metronome settings are stored within each preset, so per-scene tempo is an option, not the default.",
+      "numbers": null,
+      "source": "https://neuraldsp.com/manual/quad-cortex",
+      "confidence": "official"
+    },
+    {
+      "claim": "Scene changes do not reload anything; preset changes do and leave a gap.",
+      "detail": "Cortex Presets: 'Switching between scenes has no delay (everything is already loaded).' 'The preset itself is the song; scenes are the parts of the song.' Preset load needs time to buffer effects into memory.",
+      "numbers": null,
+      "source": "https://cortexpresets.com/delay-free-preset-switching-on-the-neural-dsp-quad-cortex/",
+      "confidence": "community"
+    },
+    {
+      "claim": "Switching between two amp blocks or captures by scene bypass causes a brief dropout: Neural DSP crossfades amp switches on purpose.",
+      "detail": "Neural DSP support, quoted by users: 'This isn't a bug. This is how we have handled switching between amp blocks and amp captures via scenes for several CorOS versions.' 'We implemented a split-second crossfade to avoid noises when switching between different amp models.' Reported on CorOS 2.0.3, 2.1.0 and 3.0.0; some users hear no gap.",
+      "numbers": null,
+      "source": "https://unity.neuraldsp.com/t/sound-dropout-when-using-scenes/11723",
+      "confidence": "community"
+    },
+    {
+      "claim": "Gap-free amp change between scenes: keep both amps active and change levels per scene instead of bypassing.",
+      "detail": "rafaelwien: keep all amps active and set the inactive amp's volume to 0 in the scene - worked live without dropouts. DavidRSTV: use a scene-controlled A/B mix at the merge point of two paths. Both amps then always cost CPU, which they do anyway since bypass frees none.",
+      "numbers": null,
+      "source": "https://unity.neuraldsp.com/t/sound-dropout-when-using-scenes/11723",
+      "confidence": "community"
+    },
+    {
+      "claim": "Some amp channel switches and drive toggles inside a scene change also dip.",
+      "detail": "Reports: Kraken channel 2 to 1 causes a volume dropout while 1 to 2 does not (CorOS 2.1.0); enabling an overdrive by scene with the SLO-100 plugin amp dips (Dec 2024); a relayed support remark says the crossfade 'DOES happen on all scene changes'. Cause unconfirmed; one user disputes any audible latency.",
+      "numbers": null,
+      "source": "https://unity.neuraldsp.com/t/scene-switching-latency/13377",
+      "confidence": "community"
+    },
+    {
+      "claim": "Delay and reverb tails survive a scene change only if the block has TRAILS on.",
+      "detail": "Manual 3.2.0, TRAILS SWITCH: 'Trails Off: Any delay or reverb effect is instantly muted when the block is bypassed. Trails On: Any delay or reverb effect decay naturally when the block is bypassed.'",
+      "numbers": null,
+      "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.2.0.pdf",
+      "confidence": "official"
+    },
+    {
+      "claim": "A ringing tail takes on the new scene's parameter values, so per-scene mix or feedback changes make tails jump.",
+      "detail": "Reverb at 8% mix in scene 1, bypassed with mix 35% in scene 2: 'the volume of the tails jumps up to the 35% mix volume'. Delay feedback 11% then a bypassed scene with higher feedback: about 12 repeats instead of 3. Trails 'follow the settings in the scene you switch TO'. Users split on bug versus design; no staff ruling.",
+      "numbers": "8% to 35% mix jump; 3 repeats became about 12",
+      "source": "https://unity.neuraldsp.com/t/reverb-tails-change-volume-during-scene-switch/9872",
+      "confidence": "community"
+    },
+    {
+      "claim": "To keep tails stable, give a bypassed delay/reverb the same mix, feedback and time as the scene it rings out from, or use two separate blocks.",
+      "detail": "Workarounds: match the bypassed block's settings to the previous scene; leave feedback unassigned ('global'); or use two reverb/delay blocks and switch between them (costs CPU). Changing delay time between scenes re-pitches the ringing repeats (300 ms into a bypassed 1016 ms scene gave a dotted-eighth feel).",
+      "numbers": null,
+      "source": "https://unity.neuraldsp.com/t/delay-trails-go-wonky-when-switching-scenes/13929",
+      "confidence": "community"
+    },
+    {
+      "claim": "Typical lead boost is 2-4 dB, with 3 dB the usual starting point.",
+      "detail": "Fractal forum poll-style thread: 'Almost all my presets use a 3 db boost for leads / solos'; '3dB is a good rule of thumb'; 'I'd say 2.5 to 4 db is a great range to focus on'; individual answers 2, 2.5, 3, 4, 4.5 dB. Target: lead about as loud as the vocal in the chorus.",
+      "numbers": "2-4 dB, typically 3 dB",
+      "source": "https://forum.fractalaudio.com/threads/how-many-db-boost-for-lead-solos.184132/",
+      "confidence": "community"
+    },
+    {
+      "claim": "A front-of-house view on the Quad Cortex forum: 1-3 dB is enough and 5 dB is too much.",
+      "detail": "MaxF: '1 to 3 dB is plenty, if a mix is well done the solo barely needs anything'; advised against a 5 dB boost. A Helix levelling guide agrees: lead +1-3 dB; 'a +6 dB lead boost sounds unprofessional; a +2 dB lift sounds intentional'.",
+      "numbers": "1-3 dB; avoid 5-6 dB",
+      "source": "https://unity.neuraldsp.com/t/best-way-to-get-a-solo-boost/7420",
+      "confidence": "community"
+    },
+    {
+      "claim": "Put the lead boost after the amp so it gets louder, not dirtier.",
+      "detail": "Quad Cortex forum: boost after the drive, or after amp and cab when running direct - 'the sound shouldn't get any dirtier but just a tad louder'. Methods used: amp output level, a gain block after the amp, a post-amp EQ, or a drive's volume; a pre-amp gain boost is used separately to add mids and sustain without volume.",
+      "numbers": null,
+      "source": "https://unity.neuraldsp.com/t/best-method-for-guitar-solo-boost/11177",
+      "confidence": "community"
+    },
+    {
+      "claim": "Around 3 dB of clean boost after the amp is the common Quad Cortex lead setting.",
+      "detail": "Ozgun: 'generally around 3 db clean boost is common to use for lead tones'; tomfs: solo scene with a gain block after the amp, expression range 0.5 dB to 3 dB; JimmyM: EQ block adding 3 dB overall; TonePilot uses amp output, a gain block or a drive's level, with two lead scenes (normal and louder) chosen by room.",
+      "numbers": "3 dB; range 0.5-3 dB",
+      "source": "https://unity.neuraldsp.com/t/bro-do-you-even-boost/15296",
+      "confidence": "community"
+    },
+    {
+      "claim": "A mid-focused boost cuts through with fewer dB than a flat one.",
+      "detail": "Quad Cortex forum: 'boost only the mid frequencies (1500, 2000 Hz)' by 1.5 dB. Helix: 'Boost 2db and boost 2K a few, cut 250 a few.' Kemper: '4db usually works about right for me with 1db of mids around 750 Hz'. Fractal: treble-centric tones need less boost than mid-heavy ones.",
+      "numbers": "1.5 dB at 1.5-2 kHz; or 2 dB plus 2 kHz up and 250 Hz down; or 4 dB plus 1 dB at 750 Hz",
+      "source": "https://unity.neuraldsp.com/t/best-method-for-guitar-solo-boost/11177",
+      "confidence": "community"
+    },
+    {
+      "claim": "Fractal users' filter-block lead boosts run 4-6 dB with the lows trimmed; a pure mid peak example is +6 dB at 770 Hz, Q 0.3.",
+      "detail": "'Filter block, null, 4-6db boost, cutting lows and highs'; trimming low end in the boost keeps it clear and means 'you may only need 1 or 2dB more rather than the typical full 4+ dB' when an EQ also lifts mids. Larger than the 2-4 dB level-only figures in the same community.",
+      "numbers": "4-6 dB filter boost; +6 dB at 770 Hz Q 0.3",
+      "source": "https://forum.fractalaudio.com/threads/best-way-to-set-up-a-lead-boost-for-solos.136216/",
+      "confidence": "community"
+    },
+    {
+      "claim": "A full lead scene on a profiler: +4 dB level, a little more mids, a little more gain.",
+      "detail": "Kemper forum: 'add 4 dB on the rig volume plus usually I add 2.0 on the gain also' and 1.0 on the mid control; others use 2 dB in pubs, 2-3 dB with a pure boost after the stack, 5-6 dB at the high end.",
+      "numbers": "+4 dB, +1.0 mid, +2.0 gain (0-10 controls); others 2-6 dB",
+      "source": "https://forum.kemper-amps.com/forum/thread/52813-solo-boost-amount/",
+      "confidence": "community"
+    },
+    {
+      "claim": "Leave headroom for the lead scene: a 5 dB boost clipped the Quad Cortex lane output on a hot preset.",
+      "detail": "A roughly 5 dB jump via amp volume, speaker level, EQ or lane output triggered the clipping warning; fix was to lower the whole preset so the boost no longer clips. Line 6 users do the same by running rhythm at -3 dB and lead at 0 dB.",
+      "numbers": "rhythm -3 dB, lead 0 dB",
+      "source": "https://unity.neuraldsp.com/t/best-way-to-get-a-solo-boost/7420",
+      "confidence": "community"
+    },
+    {
+      "claim": "Level all scenes against each other before adding the lead lift.",
+      "detail": "Fractal forum: 'Make sure your scenes are well leveled before you do the boost.' Solo scenes with more gain, delay or EQ often arrive at a different level than expected.",
+      "numbers": null,
+      "source": "https://forum.fractalaudio.com/threads/how-many-db-boost-for-lead-solos.184132/",
+      "confidence": "community"
+    },
+    {
+      "claim": "Match scene loudness with the amp's output/channel volume, not its gain; reduce output as gain goes up.",
+      "detail": "Helix levelling guide example: clean Drive 2 / Channel Volume 7; crunch Drive 5 / 6.5; lead Drive 6 / 6 with an overdrive on at +2 dB and delay on. Tolerances: about +/-1 dB unnoticeable live, +/-2 dB perceptible, beyond +/-3 dB obvious. Keeping one amp across scenes builds in consistency.",
+      "numbers": "+/-1 dB unnoticeable, +/-2 dB perceptible, >+/-3 dB obvious",
+      "source": "https://www.komposition101.com/blog/volume-matching-presets-on-line6-helix",
+      "confidence": "community"
+    },
+    {
+      "claim": "Distortion hides level differences and meters show peaks, so match by ear at playing volume.",
+      "detail": "Same guide: two distorted sounds can seem equal while one is 3-4 dB hotter; output meters show peak, not perceived loudness; final check at performance volume and in band context, because a sound that gets lost is often a midrange problem, not a level one.",
+      "numbers": "3-4 dB hidden difference",
+      "source": "https://www.komposition101.com/blog/volume-matching-presets-on-line6-helix",
+      "confidence": "community"
+    },
+    {
+      "claim": "Neural DSP's own lead delay starting point: 300-500 ms, feedback 25-35%, mix 40-60%.",
+      "detail": "Neural DSP article 'How to use a delay pedal': slapback 50-200 ms with feedback 0-10%; lead 300-500 ms / 25-35% / 40-60%; ambient 600-1000 ms / 50-75%; dotted-eighth feedback 30-40%, mix about 50%. Delay after drive and modulation, before reverb. Mix figures are high relative to other sources, consistent with the Quad Cortex mix law.",
+      "numbers": "300-500 ms, feedback 25-35%, mix 40-60%",
+      "source": "https://neuraldsp.com/articles/how-to-use-a-delay-pedal",
+      "confidence": "official"
+    },
+    {
+      "claim": "Neural DSP's EQ guide voices leads with a presence lift and rhythms with an upper-mid lift.",
+      "detail": "Metal: lead sections 'a substantial boost at 5kHz (+4 to +6 dB)'; rhythm parts 'a boost around 3kHz (+3 to +5 dB)'; cut 250-500 Hz by 3-5 dB for mud; 500 Hz-1 kHz can sound boxy. These are EQ gains, not overall level lifts.",
+      "numbers": "lead +4 to +6 dB at 5 kHz; rhythm +3 to +5 dB at 3 kHz; mud cut -3 to -5 dB at 250-500 Hz",
+      "source": "https://neuraldsp.com/articles/electric-guitar-eq-guide",
+      "confidence": "official"
+    },
+    {
+      "claim": "A lead scene is a modest level lift plus delay, not simply more distortion.",
+      "detail": "Tone Trove (Nov 2026): 'Lead: a modest level lift plus delay, not simply more distortion.' Rhythm: enough gain to respond without masking vocals or keys. 'Match the bypassed and engaged level of each drive unless the block is intentionally a boost.' Compare scenes at rehearsal volume through the stage output.",
+      "numbers": null,
+      "source": "https://tonetrove.com/guides/quad-cortex-presets-live-performance/",
+      "confidence": "community"
+    },
+    {
+      "claim": "Keep scene roles on the same footswitches in every preset, with the most-used tone first and the lead within easy reach.",
+      "detail": "Tone Trove: 'Keep the same roles in the same footswitch positions across presets so muscle memory carries from song to song.' Cortex Presets: scene 1 verse/most-used tone, scene 2 chorus, scene 3 lead, scene 4 outro effect; avoid long jumps across the board.",
+      "numbers": null,
+      "source": "https://cortexpresets.com/gigging-with-quad-cortex/",
+      "confidence": "community"
+    },
+    {
+      "claim": "Scene names were limited to 16 characters as of 2022; no current limit is documented.",
+      "detail": "Feature request, March 2022: 'Can't always fully describe each setting with the 16 characters available.' The 4.1.1 manual states limits only for Virtual Device Preset names (24 characters) and device names (30), not scenes.",
+      "numbers": "16 characters (2022, user report)",
+      "source": "https://unity.neuraldsp.com/t/scene-name-length/6975",
+      "confidence": "community"
+    },
+    {
+      "claim": "The manual recommends scenes over duplicate blocks to save CPU.",
+      "detail": "Manual 3.2.0, Optimizing performance: 'Use Scene Mode to change parameters in devices instead of copying devices and changing their parameters.' This is in tension with the community workaround of two always-on amp blocks to avoid the amp-switch crossfade.",
+      "numbers": null,
+      "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.2.0.pdf",
+      "confidence": "official"
+    }
+  ],
+  "rules": [
+    {
+      "claim": "Decide mono or stereo before building the preset.",
+      "detail": "xush: 'create your presets for either mono or stereo from the start'; mono summing afterwards is 'mostly intended for emergencies'. Others keep mono gig presets and stereo home presets, or separate setlists per output configuration.",
+      "numbers": null,
+      "source": "https://unity.neuraldsp.com/t/stereo-and-mono-use/20901",
+      "confidence": "community"
+    },
+    {
+      "claim": "Check every scene in mono: doublers, stereo chorus, ping-pong delays and phase-offset paths are what break.",
+      "detail": "Summing 'will most likely cause phase issues' with doubler, stereo chorus and stereo reverb; ping-pong repeats feel twice as fast when summed and half as dense when only one side is used; 'the doubler block in particular, just sound[s] bad in mono'. Taking the left output only is the common alternative to summing.",
+      "numbers": null,
+      "source": "https://unity.neuraldsp.com/t/quickest-way-to-switch-quad-cortex-outputs-from-stereo-to-mono-for-live-gigs/21978",
+      "confidence": "community"
+    },
+    {
+      "claim": "A temporary mono block at the end of the chain is the standard way to audition a dual-path blend in mono.",
+      "detail": "Line 6 forum: add a mono gain block at the end to hear how the blend sums. Quad Cortex users use a mono block such as an IR loader with no IR, or a blank capture, as a 'monoizer'.",
+      "numbers": null,
+      "source": "https://line6.com/support/topic/58405-phase-issue-with-two-amp-blocks-one-path-each/",
+      "confidence": "community"
+    },
+    {
+      "claim": "Send stereo to front of house only when the engineer wants it; small rooms gain little.",
+      "detail": "Cortex Presets: send stereo only if the engineer is comfortable with two channels, mono is fine otherwise; for rooms under 500 capacity stereo width may add little. Set the main output level once at soundcheck and leave it.",
+      "numbers": "under 500 capacity",
+      "source": "https://cortexpresets.com/gigging-with-quad-cortex/",
+      "confidence": "community"
+    },
+    {
+      "claim": "Add a second amp only when it solves a specific problem.",
+      "detail": "Tone Trove: 'Add a second amp only when it solves a specific problem'; extra blocks add processing load and level decisions. Fractal users report one amp into two panned IRs sounded clearer with fewer issues than a two-amp blend.",
+      "numbers": null,
+      "source": "https://tonetrove.com/guides/quad-cortex-presets-live-performance/",
+      "confidence": "community"
+    },
+    {
+      "claim": "Budget CPU per row pair and keep the preset under 90%.",
+      "detail": "Rows 1-2 and 3-4 are separate cores (manual 3.2.0); the limit can be hit per core at a low overall reading (community); bypassed blocks free nothing (manual 4.1.1); reverbs and delays cost most. A dual-amp-plus-ambience preset should place its heaviest blocks across both row pairs.",
+      "numbers": "90% maximum load",
+      "source": "https://downloads.neuraldsp.com/file/quad-cortex/Quad%20Cortex%20User%20Manual%20v3.2.0.pdf",
+      "confidence": "official"
+    },
+    {
+      "claim": "Keep the two parallel paths structurally matched up to the point where they sum.",
+      "detail": "Any block on only one path (drive, reverb pre-delay, time effect, different cab/IR) offsets that path in time. Mirror the block on the other path or move it before the split or after the merge.",
+      "numbers": null,
+      "source": "https://forum.fractalaudio.com/threads/stange-phase-delay-issue-with-dual-amps-cabs.178597/",
+      "confidence": "community"
+    },
+    {
+      "claim": "Filter high-gain guitars at both ends: high-pass 80-120 Hz, low-pass 8-10 kHz, and control 150-400 Hz.",
+      "detail": "Nail The Mix on the Sneap method: 'Cut everything below 80-120Hz'; 'roll off the harsh frequencies above 8-10kHz'; wide cut between 300 and 500 Hz; a multiband compressor band at roughly 150-400 Hz that only works on the loudest palm mutes. Neural DSP's EQ guide: cut below 70 Hz, reduce above 10 kHz.",
+      "numbers": "HPF 80-120 Hz; LPF 8-10 kHz; low-mid band 150-400 Hz",
+      "source": "https://www.nailthemix.com/andy-sneap",
+      "confidence": "published"
+    },
+    {
+      "claim": "At high gain, run the amp's bass lower than seems right; a Tube Screamer-style boost tightens by cutting bass and lifting mids.",
+      "detail": "Pete Thorn (Premier Guitar, 2018): lower bass 'possibly even lower than you think you should'; 'at higher gain levels, things can get flubby if you run the bass too high'; TS-style pedals 'also cut bass and boost mids'. Two blended high-gain amps double the low-end build-up this warns about.",
+      "numbers": null,
+      "source": "https://www.premierguitar.com/pro-advice/tone-tips-ask-doctor-pete-seeking-clarity",
+      "confidence": "published"
+    },
+    {
+      "claim": "Use scenes for the changes that must happen together; leave optional effects on stomp switches.",
+      "detail": "Tone Trove: stomp controls for optional effects that work across scenes, mission-critical changes inside the scene. HYBRID mode assigns different modes to each footswitch row (A-D and E-H) in one preset (manual 4.1.1).",
+      "numbers": null,
+      "source": "https://tonetrove.com/guides/quad-cortex-presets-live-performance/",
+      "confidence": "community"
+    },
+    {
+      "claim": "Judge a two-amp blend the way it will be heard: through two speakers it is forgiving, summed to one it is not.",
+      "detail": "danimaetrix: parallel setups work better through two amps and cabs than as a mono sum on one cab or monitors. Headphones exaggerate left/right separation. Test on the actual monitoring system.",
+      "numbers": null,
+      "source": "https://unity.neuraldsp.com/t/phase-issues-with-2-amps/7366",
+      "confidence": "community"
+    }
+  ],
+  "unverified": [
+    {
+      "claim": "A splitter type called 'LR Crossover' exists on the Quad Cortex.",
+      "detail": "Not found in the 4.1.1 web manual or the 3.2.0 PDF, which list Balance, A/B and Crossover plus a STEREO switch, and not found by search. It may be an internal or app-level name for Crossover with STEREO on; confirm on the device or in Cortex Control.",
+      "numbers": null,
+      "source": "https://neuraldsp.com/manual/quad-cortex",
+      "confidence": "search-summary"
+    },
+    {
+      "claim": "Dynamic Latency Compensation is on by default.",
+      "detail": "Only a Talkbass forum belief seen in a search summary ('I believe the latency compensation is set to on by default'). The manual and the CorOS 3.0.0 notes do not state the default.",
+      "numbers": null,
+      "source": "https://www.talkbass.com/threads/quad-cortex-neural-dsp.1442415/page-177",
+      "confidence": "search-summary"
+    },
+    {
+      "claim": "With latency compensation on, the Quad Cortex time-aligns parallel rows automatically.",
+      "detail": "Users contradict each other: one says compensation gives rows the same latency, another that 'QC does not have automatic effects compensation between its different lines'; a user reported toggling it changed nothing. No official statement that parallel paths are aligned was found; the official text mentions only phasing on bypass.",
+      "numbers": null,
+      "source": "https://unity.neuraldsp.com/t/phase-alignment/6823",
+      "confidence": "community"
+    },
+    {
+      "claim": "Rows 3-4 still add about 2.5 ms of latency on CorOS 4.x.",
+      "detail": "Measurements read are from CorOS 1.4 and 2.0 and marked outdated by their author; a 2025 post repeats the claim without numbers. Not measured on current firmware.",
+      "numbers": "about 2.5-2.7 ms (old firmware)",
+      "source": "https://unity.neuraldsp.com/t/qc-numbers-report-latency-send-levels-etc/10291",
+      "confidence": "community"
+    },
+    {
+      "claim": "For live use, pan dual amps to about 10 o'clock and 2 o'clock; hard panning sounds good on headphones but does not translate live.",
+      "detail": "From a Sweetwater InSync article on modeler presets; the page returned HTTP 403, so this rests on the search summary only.",
+      "numbers": "pans at 10:00 and 2:00",
+      "source": "https://www.sweetwater.com/insync/creating-studio-quality-guitar-modeler-patches-and-presets/",
+      "confidence": "search-summary"
+    },
+    {
+      "claim": "High-pass the clean amp if the blend is boomy, roll highs off the dirty amp if it is harsh, and give each amp a different cab IR.",
+      "detail": "From a Six String Lab blog post; the page returned HTTP 402, so this rests on the search summary only. Also: do not set both amps to the same level by default.",
+      "numbers": null,
+      "source": "https://sixstringlab.com/blogs/news/blend-two-amps-in-your-modeler-for-tones-you-cant-get-any-other-way",
+      "confidence": "search-summary"
+    },
+    {
+      "claim": "Fractal's wiki warns that a Drive block before only one of two parallel amps causes phase cancellation, and that output-level scene changes also change tail levels.",
+      "detail": "The wiki returned HTTP 403. The drive-block point was confirmed on a forum page read (moderator yek); the scene-level/tails point and 'the recommended control to adjust the preset level is Output Level in the Amp block' rest on search summaries only.",
+      "numbers": null,
+      "source": "https://wiki.fractalaudio.com/wiki/index.php?title=Scenes",
+      "confidence": "search-summary"
+    },
+    {
+      "claim": "Helix's merge block has a B Polarity switch, and firmware 2.70 fixed amp models whose polarity was reversed.",
+      "detail": "Search summary of the Helix manual and a community post; the manual PDF exceeded the fetch size limit. Supports the general point that individual amp models can differ in polarity.",
+      "numbers": "Helix firmware 2.70",
+      "source": "https://line6.com/data/6/0a00051afda2673ccc1cc8e68/application/pdf/Helix%203.80%20Owner's%20Manual%20-%20English%20.pdf",
+      "confidence": "search-summary"
+    },
+    {
+      "claim": "Build the most complex scene first, because its block count is the budget for every scene.",
+      "detail": "From a Fader & Knob blog on scenes versus stomp mode; the page returned HTTP 403. Consistent with the official fact that bypassed blocks still use CPU.",
+      "numbers": null,
+      "source": "https://faderandknob.com/blog/quad-cortex-scenes-vs-stomp-mode",
+      "confidence": "search-summary"
+    },
+    {
+      "claim": "CorOS 4.1.0 fixed the Fortin Nameless amp muting its output when switching scenes.",
+      "detail": "Search summary of the 4.1.0 release notes, which were not opened. Suggests scene-change mutes are treated as bugs per device, alongside the intentional amp-switch crossfade.",
+      "numbers": "CorOS 4.1.0",
+      "source": "https://neuraldsp.com/quad-cortex-updates/coros-and-cortex-control-4-1-0-are-now-available",
+      "confidence": "search-summary"
+    },
+    {
+      "claim": "Quad Cortex kill-dry is done by setting each wet-path block to 100% wet, and cab blocks need stereo pass-through so stereo effects are not summed.",
+      "detail": "Search summary of Neural DSP forum threads that were not opened.",
+      "numbers": null,
+      "source": "https://unity.neuraldsp.com/t/does-the-quad-cortex-have-a-kill-dry-mode-for-wet-dry-wet/11703",
+      "confidence": "search-summary"
+    },
+    {
+      "claim": "Parallel clean blend levels: bass split about 70% clean / 30% driven for clean tones, reversed for gritty; compressor mix 70-80% to keep pick attack.",
+      "detail": "Search summaries of a Cortex Presets bass article and a Neural DSP forum post; neither page was opened. The bass figure is for bass guitar, not guitar.",
+      "numbers": "70/30 clean/drive; compressor mix 70-80%",
+      "source": "https://cortexpresets.com/bass-tones-quad-cortex/",
+      "confidence": "search-summary"
+    },
+    {
+      "claim": "Lead delay mix of 20-40% (10% for tight Van Halen-style dual delays) is the common range on other devices.",
+      "detail": "Search summary across blogs and Fractal forum threads not opened. Lower than Neural DSP's 40-60%; the Quad Cortex mix law (equal blend near 75-85%) may explain the gap.",
+      "numbers": "20-40%; about 10% for subtle dual delays",
+      "source": "https://forum.fractalaudio.com/threads/common-delay-settings-for-lead-sounds.107866/",
+      "confidence": "search-summary"
+    },
+    {
+      "claim": "Selecting a single output in a Quad Cortex Output block sums a stereo lane to mono.",
+      "detail": "Asserted by several users and doubted by another in the same thread, who heard only the left side; no official text found.",
+      "numbers": null,
+      "source": "https://unity.neuraldsp.com/t/general-routing-question-mono-stereo/12367",
+      "confidence": "community"
+    },
+    {
+      "claim": "Marshall plus Mesa Rectifier, Mesa Mark plus modified Marshall (Metallica 'Black Album') and Diezel VH4 plus Marshall Super Bass plus Mesa (Adam Jones) are classic layered blends.",
+      "detail": "Search summaries of forums and gear sites with conflicting details (which Mesa, whether the Mesa was an amp or only a cab). No interview or magazine page was read for these.",
+      "numbers": null,
+      "source": "https://www.rig-talk.com/forum/threads/metallica-black-album-tones.82398/",
+      "confidence": "search-summary"
+    },
+    {
+      "claim": "The Quad Cortex mixer's level law and whether a merge of two equal paths adds 3 dB or 6 dB.",
+      "detail": "No Quad Cortex measurement or documentation found. The +3 dB figure comes from untested Helix forum reasoning; identical in-phase signals would add 6 dB. Measure before hard-coding a compensation value.",
+      "numbers": null,
+      "source": "https://line6.com/support/topic/37998-levels-and-different-kinds-of-splits/",
+      "confidence": "community"
+    },
+    {
+      "claim": "The current maximum scene name length.",
+      "detail": "Only a 2022 user post gives 16 characters; the 4.1.1 manual gives no scene-name limit. Confirm on the device or in Cortex Control before enforcing a length.",
+      "numbers": "16 characters (2022)",
+      "source": "https://unity.neuraldsp.com/t/scene-name-length/6975",
+      "confidence": "community"
+    }
+  ]
+}

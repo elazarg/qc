@@ -1,4 +1,4 @@
-"""Transport volume and comparison loudness controls."""
+"""Listening level and comparison loudness controls."""
 
 import math
 import tkinter as tk
@@ -30,36 +30,45 @@ def listening_command(settings, command):
 
 
 class VolumePanel:
-    def __init__(self, deck, transport, settings, change):
+    """The Levels card. It stays closed unless the player opens it or a level needs attention."""
+
+    def __init__(self, parent, settings, change):
         from .listening_room import ACCENT, ACCENT_INK, DARK, LIGHT, SOFT, TILE, control, text
 
         self.change = change
-        self.transport = transport
-        self.button = control(transport, "", self.toggle, dark=True)
-        self.panel = tk.Frame(deck, bg=TILE, padx=8, pady=3)
-        self.level = tk.IntVar(master=deck)
-        self.mute = tk.BooleanVar(master=deck, value=settings["muted"])
-        self.manual = tk.BooleanVar(master=deck, value=not settings["match"])
-        self.summary = tk.StringVar(master=deck)
+        self.panel = tk.Frame(parent, bg=parent["bg"])
+        self.level = tk.IntVar(master=parent)
+        self.mute = tk.BooleanVar(master=parent, value=settings["muted"])
+        self.manual = tk.BooleanVar(master=parent, value=not settings["match"])
+        self.summary = tk.StringVar(master=parent)
+        self.reading = tk.StringVar(master=parent)
         self.settings = settings
         self.syncing = False
+        self.label = ""
 
-        control(self.panel, "Quieter", lambda: self.command("quieter"), dark=True).pack(side="left")
-        self.slider = tk.Scale(self.panel, from_=-40, to=6, orient=tk.HORIZONTAL, length=120, resolution=1,
+        row = tk.Frame(self.panel, bg=self.panel["bg"])
+        row.pack(fill="x")
+        control(row, "Quieter", lambda: self.command("quieter"), dark=True).pack(side="left")
+        self.slider = tk.Scale(row, from_=-40, to=6, orient=tk.HORIZONTAL, length=120, resolution=1,
                                variable=self.level, showvalue=False, command=self.changed,
-                               bg=TILE, fg=LIGHT, activebackground=ACCENT, troughcolor=DARK,
-                               relief="flat", borderwidth=0, highlightthickness=1, highlightbackground=TILE,
-                               highlightcolor=ACCENT, takefocus=True)
-        self.slider.pack(side="left")
-        for caption, action in (("Louder", "louder"), ("Reset", "normal")):
-            control(self.panel, caption, lambda choice=action: self.command(choice), dark=True).pack(side="left")
-        for caption, value in (("Mute", self.mute), ("Manual trim", self.manual)):
-            toggle = tk.Checkbutton(self.panel, text=caption, variable=value, command=self.changed,
-                                    bg=TILE, fg=LIGHT, activebackground=TILE, activeforeground=ACCENT,
-                                    selectcolor=DARK, relief="flat", borderwidth=0, padx=5,
+                               bg=self.panel["bg"], fg=LIGHT, activebackground=ACCENT, troughcolor="#14151a",
+                               relief="flat", borderwidth=0, highlightthickness=1,
+                               highlightbackground=self.panel["bg"], highlightcolor=ACCENT, takefocus=True)
+        self.slider.pack(side="left", fill="x", expand=True, padx=4)
+        control(row, "Louder", lambda: self.command("louder"), dark=True).pack(side="left")
+        options = tk.Frame(self.panel, bg=self.panel["bg"])
+        options.pack(fill="x", pady=(6, 0))
+        text(options, variable=self.reading, color=LIGHT, size=10, bold=True).pack(side="left")
+        control(options, "Reset", lambda: self.command("normal"), dark=True).pack(side="right")
+        for caption, value in (("Manual trim", self.manual), ("Mute", self.mute)):
+            toggle = tk.Checkbutton(options, text=caption, variable=value, command=self.changed,
+                                    bg=self.panel["bg"], fg=LIGHT, activebackground=self.panel["bg"],
+                                    activeforeground=ACCENT, selectcolor=TILE, relief="flat", borderwidth=0, padx=5,
                                     highlightcolor=ACCENT_INK)
-            toggle.pack(side="left", padx=(7, 0))
-        text(self.panel, variable=self.summary, color=SOFT, size=9).pack(side="left", fill="x", expand=True, padx=8)
+            toggle.pack(side="right", padx=(0, 4))
+        note = text(self.panel, variable=self.summary, color=SOFT, size=9)
+        note.pack(fill="x", pady=(6, 0))
+        self.panel.bind("<Configure>", lambda event: note.configure(wraplength=max(160, event.width - 8)))
         self.sync(settings, "")
 
     def changed(self, _=None):
@@ -74,12 +83,6 @@ class VolumePanel:
 
     def command(self, action):
         self.change(listening_command(self.settings, action))
-
-    def toggle(self):
-        if self.panel.winfo_manager():
-            self.panel.pack_forget()
-        else:
-            self.panel.pack(after=self.transport, fill="x", pady=(4, 0))
 
     def sync(self, settings, status):
         self.syncing = True
@@ -96,8 +99,9 @@ class VolumePanel:
         elif not match:
             level = f"{offset} dB"
         elif offset:
-            level = "Quieter" if offset < 0 else "Louder"
+            level = f"{offset:+d} dB from matched"
         else:
-            level = "Normal"
-        self.button.configure(text=f"Volume · {level}")
+            level = "Matched level"
+        self.label = level
+        self.reading.set(level)
         self.summary.set(status)

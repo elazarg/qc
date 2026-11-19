@@ -9,6 +9,16 @@ from . import (audio, device, diagnostics, draft_render, guitar_runtime, iterate
                preset_design, presets, qc_library, session, styles)
 
 
+def draft_scene(qc, config, default=None):
+    """Select the scene of a draft that the desk asked for. Without one, keep `default` or the active scene."""
+    scene = config.get("scene")
+    if scene is None:
+        scene = device.active_scene(qc) if default is None else default
+    if device.active_scene(qc) != scene:
+        device.select_scene(qc, scene)
+    return scene
+
+
 @contextmanager
 def grid(qc, config, events, visited=()):
     device.require_clean(qc)
@@ -26,7 +36,7 @@ def grid(qc, config, events, visited=()):
         chain = draft_render.compile_chain(draft, min(draft_render.PREVIEW_GAIN if gain is None else gain, -6))
         with draft_render.working_grid(qc) as scratch:
             draft_render.build_grid(qc, scratch, chain, draft=draft)
-            scene = device.active_scene(qc)
+            scene = draft_scene(qc, config)
             draft_render.label_preview(qc, scene, draft)
             yield device.read_preset(qc), scene, fixture, draft_render.guitar_routes(physical_input), physical_input
         return
@@ -166,7 +176,7 @@ def observe_guitar(observer, now, available, settings, armed_until, events):
 
 def same_working_grid(before, after):
     if before.get("draft") or after.get("draft"):
-        keys = ("draft", "gain", "physical_input")
+        keys = ("draft", "gain", "physical_input", "scene")
     else:
         keys = ("preset", "scene")
     return all(before.get(key) == after.get(key) for key in keys)
@@ -192,6 +202,8 @@ def resident_grids(qc, events):
         side = config["tone_id"]
         position, name = ((iterate.SCRATCH, iterate.SCRATCH_NAME) if side == "a"
                           else (iterate.LIVE_B, iterate.LIVE_B_NAME))
+        if draft := config.get("draft"):
+            return select_draft(config, draft, mode, side, position, name)
         pick = config.get("preset")
         source_address = pick["position"] if pick else address
         source_name = pick["name"] if pick else original.name
@@ -221,6 +233,65 @@ def resident_grids(qc, events):
             prepared[side] = (identity, base, physical, inlet, default_scene)
         scene = config.get("scene")
         scene = default_scene if scene is None else scene
+        if device.active_scene(qc) != scene:
+            device.select_scene(qc, scene)
+        staging = ()
+        return base, scene, position, physical, inlet
+
+    def select_draft(config, draft, mode, side, position, name):
+        """Build a draft once, keep it in this side's working slot, and recall it from then on.
+
+        Rebuilding a chain block by block takes the unit ten seconds or more.
+        A recall takes about one, so every flip after the first is quick.
+        """
+        nonlocal staging
+        inlet = config["physical_input"]
+        gain = config.get("gain")
+        gain = min(draft_render.PREVIEW_GAIN if gain is None else gain, -6)
+        physical = draft_render.guitar_routes(inlet)
+        identity = ("draft", draft["id"], gain, inlet)
+        staging = (position,)
+        if side in prepared and prepared[side][0] == identity:
+            _, stored, _, _, scene = prepared[side]
+            base = iterate.recall(qc, position, name)
+            if iterate.sound_state(base) != iterate.sound_state(stored) or iterate.routes(base) != iterate.routes(stored):
+                raise RuntimeError("A Tone Lab working preset changed on the Quad Cortex.")
+            scene = draft_scene(qc, config, scene)
+        else:
+            staging = (position, draft_render.WORK_SLOT)
+            # Confirm the slot is ours before spending time on the build.
+            try:
+                holder = iterate.recall(qc, position, None)
+            except RuntimeError as error:
+                raise iterate.FixtureUnavailable("The Quad Cortex could not recall a Tone Lab working slot.") from error
+            blank = (holder.name.strip().casefold() in ("", "unsaved")
+                     and not any(model.hash for row in holder.chains for model in row.models))
+            if not blank and holder.name != name:
+                raise iterate.FixtureUnavailable(f"{iterate.fixture_identity(position)[1]} contains another preset. "
+                                                 "Tone Lab left it untouched.")
+            if blank and position == iterate.LIVE_B:
+                iterate._confirm_empty_live_b(qc)
+            if not blank:
+                presets.archive(holder, position, qc.firmware, reason="Previous Tone Lab working copy")
+            scratch = iterate.recall(qc, draft_render.WORK_SLOT, None)
+            empty = (scratch.name.strip().casefold() in ("", "unsaved")
+                     and not any(model.hash for row in scratch.chains for model in row.models))
+            if scratch.name not in (draft_render.WORK_NAME, draft_render.LEGACY_WORK_NAME) and not empty:
+                raise RuntimeError("My Presets 32H is in use. The draft needs the Tone Lab working slot.")
+            scratch = draft_render.name_preview_slot(qc, scratch)
+            chain = draft_render.compile_chain(draft, gain)
+            draft_render.build_grid(qc, scratch, chain, draft=draft)
+            draft_render.label_preview(qc, device.active_scene(qc), draft)
+            # The chain is complete and still on USB, so nothing reaches the outputs until it is routed.
+            set_input_routes(qc, draft_render.WORK_SLOT, input_routes(physical, inlet, mode))
+            built = device.read_preset(qc)
+            qc.write_preset_file(position["folder_key"], position["position"], name)
+            time.sleep(.55)
+            base = iterate.recall(qc, position, name)
+            if iterate.sound_state(base) != iterate.sound_state(built) or iterate.routes(base) != iterate.routes(built):
+                raise RuntimeError("The Quad Cortex did not confirm the stored copy of the draft.")
+            scene = draft_scene(qc, config)
+            prepared[side] = (identity, base, physical, inlet, scene)
         if device.active_scene(qc) != scene:
             device.select_scene(qc, scene)
         staging = ()
@@ -279,7 +350,7 @@ def run(config, stop, commands, events):
             def open_tone(pick, mode):
                 nonlocal resident, warm_available
                 events({"event": "loading-tone", "tone_id": pick.get("tone_id"), "name": pick.get("name")})
-                use_resident = warm_available and pick.get("tone_id") in ("a", "b") and not pick.get("draft")
+                use_resident = warm_available and pick.get("tone_id") in ("a", "b")
                 if resident is None or not use_resident:
                     close_tone()
                 if use_resident:
@@ -319,7 +390,7 @@ def run(config, stop, commands, events):
             def change_input(message):
                 nonlocal observer, armed_until, active_source, active_take, phrase_take, cursor, level_take
                 new_take = message.get("take") if message["mode"] == "phrase" else None
-                if message["mode"] == "phrase" and new_take != phrase_take:
+                if message["mode"] == "phrase" and (new_take != phrase_take or message.get("reload")):
                     levels.clear_boost(qc, check_active)
                     cursor = audio.PhraseCursor()
                     phrase_take = new_take
@@ -423,7 +494,7 @@ def run(config, stop, commands, events):
                         break
                 if source := pending.get("source"):
                     take = source.get("take") if source["mode"] == "phrase" else None
-                    if (source["mode"], take) != (active_source, active_take):
+                    if (source["mode"], take) != (active_source, active_take) or source.get("reload"):
                         stream, meters = change_input(source)
                         frames = -1
                     else:

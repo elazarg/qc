@@ -1,0 +1,4178 @@
+{
+ "families": [
+  {
+   "key": "marshall_jcm800",
+   "real": "Marshall JCM800 2203 (100 W master-volume head, 1981 on)",
+   "models": [
+    1001
+   ],
+   "plugin": "",
+   "gain_range": "crunch",
+   "drive_control": "GAIN",
+   "voice": "Bright, upper-mid bark with lean tight lows; crunch-to-medium gain that needs volume or a boost for metal",
+   "lineage": "Plexi/JMP 2203 -> JCM800 2203 -> hot-rodded Marshalls (Jubilee, Friedman BE, SLO-era mods)",
+   "power_tubes": "4x EL34 (some US-market amps 6550)",
+   "controls": {
+    "GAIN": {
+     "does": "Preamp volume (High input). Modest gain by modern standards: for more, boost the input rather than maxing it",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "BASS": {
+     "does": "Post-distortion tone stack bass; modest range. Forum starting point is ~3 for tight rhythm",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "MID": {
+     "does": "Mid level; raise for the classic bark and to cut through",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "TREBLE": {
+     "does": "Treble; harsh when MASTER is low, so cut it rather than adding gain",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "PRESENCE": {
+     "does": "Power-amp high boost via negative feedback; low NFB amp so it is already bright",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "MASTER": {
+     "does": "Designed to run loud: brightness DEcreases as MASTER rises; low MASTER = thin and harsh",
+     "brighter": "down",
+     "tighter": "down"
+    }
+   },
+   "model_notes": {
+    "1001": "Single channel, High-sensitivity input. No depth/resonance control on the model"
+   },
+   "starts": [
+    {
+     "name": "tight rhythm tips (Bass 3, Master ~5, raise mid/treble, presence to taste)",
+     "models": [
+      1001
+     ],
+     "settings": {
+      "BASS": 3,
+      "MASTER": 5
+     },
+     "basis": "cited",
+     "source": "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-brit-800-and-brit-800-mod-marshall-jcm-800.111876/"
+    },
+    {
+     "name": "boosted hard-rock/thrash rhythm",
+     "models": [
+      1001
+     ],
+     "settings": {
+      "GAIN": 6,
+      "BASS": 3,
+      "MID": 7,
+      "TREBLE": 6,
+      "PRESENCE": 4.5,
+      "MASTER": 5
+     },
+     "basis": "typical",
+     "source": ""
+    },
+    {
+     "name": "unboosted classic crunch",
+     "models": [
+      1001
+     ],
+     "settings": {
+      "GAIN": 7.5,
+      "BASS": 4,
+      "MID": 6.5,
+      "TREBLE": 5.5,
+      "PRESENCE": 4,
+      "MASTER": 6
+     },
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "boosts": [
+    {
+     "model": "Chief SD1",
+     "settings": {
+      "OVERDRIVE": 1,
+      "TONE": 5.5,
+      "LEVEL": 9
+     },
+     "why": "Same job as a Tube Screamer, slightly brighter/rawer; the classic Marshall partner (typical values)",
+     "basis": "typical",
+     "source": ""
+    },
+    {
+     "model": "Green 808",
+     "settings": {
+      "OVERDRIVE": 1,
+      "TONE": 5.5,
+      "LEVEL": 9
+     },
+     "why": "Yek's guide: Tube Screamer with gain low and level up is the standard way to get more gain and tightness",
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "cabs": [
+    {
+     "model": "412 Brit 60A G75 80s (M)",
+     "why": "1960A with G12T-75: the stock 80s JCM800 cab; scooped mids, bright top (thrash)"
+    },
+    {
+     "model": "412 Brit 60B GB 90s (M)",
+     "why": "Greenbacks: warmer, woodier mids for classic hard rock"
+    },
+    {
+     "model": "412 Brit 60B V30 95 (M)",
+     "why": "V30: more upper-mid push and tighter lows for heavier use"
+    }
+   ],
+   "known_for": [
+    "Slayer",
+    "Iron Maiden",
+    "Zakk Wylde (with SD-1)",
+    "80s hard rock and thrash"
+   ],
+   "poor_at": "Clean tones, saturated modern metal without a boost, smooth tone at low master settings",
+   "watch_out": "Fizz/harshness usually means MASTER too low or TREBLE/PRESENCE too high, not too little gain",
+   "tags": [
+    "marshall",
+    "british",
+    "crunch",
+    "hard-rock",
+    "thrash",
+    "mid-forward",
+    "boost-friendly",
+    "el34"
+   ],
+   "sources": [
+    "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-brit-800-and-brit-800-mod-marshall-jcm-800.111876/",
+    "https://wiki.fractalaudio.com/wiki/index.php?title=Amp_models_list",
+    "https://quadcortex.wiki/Brit_2203"
+   ]
+  },
+  {
+   "key": "marshall_jcm900",
+   "real": "Marshall JCM900 4100 Hi Gain Dual Reverb (100 W, 1990s)",
+   "models": [
+    1041,
+    1042
+   ],
+   "plugin": "",
+   "gain_range": "high",
+   "drive_control": "GAIN",
+   "voice": "Brighter, thinner and fizzier than a JCM800; diode-assisted lead gain, light low end; 90s punk/alt crunch",
+   "lineage": "JCM800 -> JCM900 (two channels, solid-state/diode clipping added to channel B)",
+   "power_tubes": "4x 5881 (per Marshall handbook)",
+   "controls": {
+    "GAIN": {
+     "does": "Ch A: clean to low-gain crunch. Ch B: boosted lead gain (real knob reads 0-20); top third turns fizzy",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "BASS": {
+     "does": "Shared tone stack bass; the lead channel is bass-light so this often goes up, not down",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "MID": {
+     "does": "Mid level; raise to fill out the thin lead channel",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "TREBLE": {
+     "does": "Treble; owners commonly trim it on the lead channel to control fizz",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "PRESENCE": {
+     "does": "Power-amp high-frequency boost",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "MASTER": {
+     "does": "Channel master; Marshall says best sounds come with masters high enough to work the output valves",
+     "brighter": "n/a",
+     "tighter": "down"
+    }
+   },
+   "model_notes": {
+    "1041": "Channel A: voiced for bright cleans at low GAIN, crunch to low-gain lead as GAIN rises",
+    "1042": "Channel B (Lead): boosted gain with diode clipping; classic at low settings, screaming at max"
+   },
+   "starts": [
+    {
+     "name": "lead-channel crunch (owners back gain off from 20 to 14-16 of 20, i.e. ~7-8 here)",
+     "models": [
+      1042
+     ],
+     "settings": {
+      "GAIN": 7.5
+     },
+     "basis": "cited",
+     "source": "https://www.marshallforum.com/threads/post-your-jcm900-settings.20335/"
+    },
+    {
+     "name": "punk/alt rhythm",
+     "models": [
+      1042
+     ],
+     "settings": {
+      "GAIN": 6.5,
+      "BASS": 6,
+      "MID": 6,
+      "TREBLE": 5,
+      "PRESENCE": 4.5,
+      "MASTER": 4.5
+     },
+     "basis": "typical",
+     "source": ""
+    },
+    {
+     "name": "edge-of-breakup channel A",
+     "models": [
+      1041
+     ],
+     "settings": {
+      "GAIN": 5,
+      "BASS": 5,
+      "MID": 5,
+      "TREBLE": 5.5,
+      "PRESENCE": 5,
+      "MASTER": 5
+     },
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "boosts": [
+    {
+     "model": "Chief SD1",
+     "settings": {
+      "OVERDRIVE": 1,
+      "TONE": 5.5,
+      "LEVEL": 9
+     },
+     "why": "Same job as a Tube Screamer, slightly brighter/rawer; the classic Marshall partner (typical values)",
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "cabs": [
+    {
+     "model": "412 Brit 60A G75 80s (M)",
+     "why": "1960A with G12T-75 is the cab these heads were sold with"
+    },
+    {
+     "model": "412 Brit 60B V30 95 (M)",
+     "why": "V30s add the mids the amp lacks"
+    }
+   ],
+   "known_for": [
+    "1990s punk, alternative and hard-rock backlines"
+   ],
+   "poor_at": "Thick low end, tight modern metal, warm cleans",
+   "watch_out": "Lead channel is fizzy and bass-light when GAIN is maxed; lower GAIN and TREBLE before reaching for EQ",
+   "tags": [
+    "marshall",
+    "british",
+    "90s",
+    "punk",
+    "alt-rock",
+    "bright",
+    "fizzy",
+    "diode-clipping"
+   ],
+   "sources": [
+    "https://www.drtube.com/schematics/marshall/jcm900.pdf",
+    "https://www.marshallforum.com/threads/post-your-jcm900-settings.20335/",
+    "https://quadcortex.wiki/Brit_900"
+   ]
+  },
+  {
+   "key": "marshall_jubilee",
+   "real": "Marshall Silver Jubilee 2555 (100 W, 1987; 2555X reissue)",
+   "models": [
+    1121,
+    1122
+   ],
+   "plugin": "",
+   "gain_range": "high",
+   "drive_control": "INPUT GAIN",
+   "voice": "Darker, thicker and smoother than a JCM800 with more gain at low volume (diode clipping); singing lead mids",
+   "lineage": "JCM800 2203 -> Silver Jubilee 2555 (new preamp, diode clipping, pentode/triode switch)",
+   "power_tubes": "4x EL34",
+   "controls": {
+    "INPUT GAIN": {
+     "does": "Preamp gain for rhythm and lead modes alike; on the amp, pulling it engages Rhythm Clip",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "LEAD MASTER": {
+     "does": "Sets the lead mode volume relative to rhythm (handbook). A level control, not the drive control",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "OUTPUT MASTER": {
+     "does": "Overall power-amp volume. Handbook: sounds its best with this quite high; QC wiki tip: at least 7",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "BASS": {
+     "does": "Unusually for a Marshall the bass can be run very high (Bonamassa: 10) without mud",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "MID": {
+     "does": "Mid level; the amp is mid-rich already",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "TREBLE": {
+     "does": "Treble; EQ is sensitive, small moves",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "PRESENCE": {
+     "does": "Power-amp high-frequency boost",
+     "brighter": "up",
+     "tighter": "n/a"
+    }
+   },
+   "model_notes": {
+    "1121": "Lead mode (Lead Master active)",
+    "1122": "'Lead Clip': not documented by Neural DSP; presumably the pull Rhythm Clip diode stage engaged = grittier, more compressed"
+   },
+   "starts": [
+    {
+     "name": "Joe Bonamassa (Presence 5, Bass 10, Mid 7.5, Treble 4.5, Master 10, Gain 5; Master mapped to OUTPUT MASTER)",
+     "models": [
+      1121,
+      1122
+     ],
+     "settings": {
+      "INPUT GAIN": 5,
+      "OUTPUT MASTER": 10,
+      "BASS": 10,
+      "MID": 7.5,
+      "TREBLE": 4.5,
+      "PRESENCE": 5
+     },
+     "basis": "cited",
+     "source": "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-brit-silver-marshall-silver-jubilee.112184/"
+    },
+    {
+     "name": "Slash-style rock lead",
+     "models": [
+      1121
+     ],
+     "settings": {
+      "INPUT GAIN": 7,
+      "LEAD MASTER": 7,
+      "OUTPUT MASTER": 7,
+      "BASS": 6,
+      "MID": 6,
+      "TREBLE": 6,
+      "PRESENCE": 5.5
+     },
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "boosts": [
+    {
+     "model": "Green 808",
+     "settings": {
+      "OVERDRIVE": 1,
+      "TONE": 5,
+      "LEVEL": 8
+     },
+     "why": "QC wiki: with only a clean boost the amp goes from hard rock to heavy metal (values typical)",
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "cabs": [
+    {
+     "model": "412 Brit Silver B 70w 87 (M)",
+     "why": "The matching Jubilee 2551B 4x12 from 1987 (70 W Celestion drivers)"
+    },
+    {
+     "model": "412 Brit 60B V30 95 (M)",
+     "why": "Yek: Jubilee goes with a Marshall 4x12 with Vintage 30s"
+    }
+   ],
+   "known_for": [
+    "Slash (GNR live, Velvet Revolver)",
+    "Joe Bonamassa",
+    "Alex Lifeson",
+    "John Frusciante"
+   ],
+   "poor_at": "Tight percussive metal rhythm, scooped tones, sparkling cleans (clean channel not modeled)",
+   "watch_out": "Three volume-like knobs: use INPUT GAIN for dirt, keep OUTPUT MASTER high, and level with the block OUTPUT",
+   "tags": [
+    "marshall",
+    "british",
+    "classic-rock",
+    "lead",
+    "dark",
+    "smooth",
+    "diode-clipping",
+    "el34"
+   ],
+   "sources": [
+    "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-brit-silver-marshall-silver-jubilee.112184/",
+    "https://www.slashparadise.com/equipment/marshall-jcm2555-slash-handbook.pdf",
+    "https://quadcortex.wiki/Brit_UBL",
+    "https://www.premierguitar.com/gear/marshall-jcm-25-50-2555x-silver-jubilee-review"
+   ]
+  },
+  {
+   "key": "peavey_6505",
+   "real": "Peavey 6505 / block-letter 5150 (120 W, 1992 on)",
+   "models": [
+    1002,
+    1115
+   ],
+   "plugin": "",
+   "gain_range": "extreme",
+   "drive_control": "GAIN",
+   "voice": "Thick, aggressive low-mid grind with a raspy, fizzy top; huge gain on tap; tightens up with a boost",
+   "lineage": "Soldano SLO-100 influence (commonly cited) -> Peavey 5150 (EVH signature) -> 5150 II/6505+ -> EVH 5150 III",
+   "power_tubes": "4x 6L6GC (cold fixed bias)",
+   "controls": {
+    "GAIN": {
+     "does": "Pre gain (High input). Manual: rhythm ch 0-4, lead mid-to-upper; with a boost 3.5-5 is plenty",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "BASS": {
+     "does": "Passive low EQ after the gain stages; safe to run 5-7, tightness comes from the boost and DEPTH",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "MID": {
+     "does": "Mid level; the amp is already mid-forward, 4-6 is the usual zone",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "TREBLE": {
+     "does": "High EQ",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "MASTER": {
+     "does": "Post gain = channel volume into the power amp; high settings add sag and low-end bloom",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "PRESENCE": {
+     "does": "Active power-amp high boost; main control for fizz vs cut",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "DEPTH": {
+     "does": "Peavey RESONANCE: power-amp boost at the cab's low resonance. Lower = tighter, higher = looser/boomier",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "BRIGHT": {
+     "does": "Rhythm channel only: preset treble lift, about +6 dB at 2 kHz",
+     "brighter": "up",
+     "tighter": "n/a"
+    }
+   },
+   "model_notes": {
+    "1002": "Lead channel: the classic metal rhythm sound despite the name",
+    "1115": "Rhythm channel: clean-ish at GAIN 0-4, stiff headroom; BRIGHT switch applies here only"
+   },
+   "starts": [
+    {
+     "name": "forum recollection of Andy Sneap's boosted 5150 (pre gain 11-12 o'clock; unverified)",
+     "models": [
+      1002
+     ],
+     "settings": {
+      "GAIN": 4.5
+     },
+     "basis": "cited",
+     "source": "https://www.harmonycentral.com/forums/topic/1486325-andy-sneap-tube-screamer-5150-settings-for-recording/"
+    },
+    {
+     "name": "boosted metal rhythm",
+     "models": [
+      1002
+     ],
+     "settings": {
+      "GAIN": 4.5,
+      "BASS": 6,
+      "MID": 5,
+      "TREBLE": 6,
+      "PRESENCE": 6,
+      "DEPTH": 5,
+      "MASTER": 3
+     },
+     "basis": "typical",
+     "source": ""
+    },
+    {
+     "name": "rhythm channel clean/edge (manual: pre gain 0-4)",
+     "models": [
+      1115
+     ],
+     "settings": {
+      "GAIN": 3
+     },
+     "basis": "cited",
+     "source": "https://assets.peavey.com/literature/manuals/6505_english.pdf"
+    },
+    {
+     "name": "saturated lead",
+     "models": [
+      1002
+     ],
+     "settings": {
+      "GAIN": 6,
+      "BASS": 5,
+      "MID": 6,
+      "TREBLE": 5.5,
+      "PRESENCE": 5,
+      "DEPTH": 5,
+      "MASTER": 3.5
+     },
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "boosts": [
+    {
+     "model": "Green 808",
+     "settings": {
+      "OVERDRIVE": 2,
+      "TONE": 4,
+      "LEVEL": 9
+     },
+     "why": "Forum recollection of Sneap: drive 9:00, tone 11:00 (level not given; high is typical). Cuts flub before the preamp",
+     "basis": "cited",
+     "source": "https://www.harmonycentral.com/forums/topic/1486325-andy-sneap-tube-screamer-5150-settings-for-recording/"
+    },
+    {
+     "model": "Green 808",
+     "settings": {
+      "OVERDRIVE": 0,
+      "TONE": 5.5,
+      "LEVEL": 9
+     },
+     "why": "Mid-hump clean boost: trims lows before the preamp so palm mutes stay tight; adds drive without amp GAIN",
+     "basis": "typical",
+     "source": ""
+    },
+    {
+     "model": "Horizon Devices® Precision Drive™",
+     "settings": {
+      "DRIVE": 1,
+      "BRIGHT": 5,
+      "VOLUME": 5,
+      "GATE": 5
+     },
+     "why": "Maker's start: DRIVE near 0 then 1-2, VOLUME noon (6 = TS at 10), GATE noon; ATTACK right = tighter, left = thicker",
+     "basis": "cited",
+     "source": "https://horizondevices.com/pages/precision-drive"
+    }
+   ],
+   "cabs": [
+    {
+     "model": "412 CA Stand OS S V30 90s (M)",
+     "why": "5150 into a Mesa oversized V30 cab is the standard 2000s metal recording chain"
+    },
+    {
+     "model": "412 CA Stand OS A V30 01 (M)",
+     "why": "Alternative Mesa OS V30 voicing"
+    },
+    {
+     "model": "412 EV Straight G12 00s (M)",
+     "why": "Greenback-derived G12EVH: rounder, less upper-mid spike"
+    }
+   ],
+   "known_for": [
+    "Eddie Van Halen",
+    "Andy Sneap productions",
+    "Jerry Cantrell",
+    "Machine Head, Trivium, Bullet For My Valentine",
+    "2000s metalcore and death metal"
+   ],
+   "poor_at": "Clean tones, low-gain dynamics, smooth top end",
+   "watch_out": "GAIN above ~6 adds noise and mush, not weight; DEPTH high plus loud MASTER gets boomy",
+   "tags": [
+    "metal",
+    "metalcore",
+    "aggressive",
+    "mid-forward",
+    "fizzy",
+    "needs-boost",
+    "6l6",
+    "american"
+   ],
+   "sources": [
+    "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-pvh-6160-block-%E2%80%9Cblock-letter%E2%80%9D-evh-5150-peavey-6505.114607/",
+    "https://assets.peavey.com/literature/manuals/6505_english.pdf",
+    "https://quadcortex.wiki/PV-505",
+    "https://www.harmonycentral.com/forums/topic/1486325-andy-sneap-tube-screamer-5150-settings-for-recording/"
+   ]
+  },
+  {
+   "key": "evh_5150iii",
+   "real": "EVH 5150 III 100S (Fender-built, 2007 on; EL34 and 6L6 versions)",
+   "models": [
+    1017,
+    1098,
+    1118,
+    1119,
+    1148,
+    1149
+   ],
+   "plugin": "",
+   "gain_range": "extreme",
+   "drive_control": "GAIN",
+   "voice": "Tighter, clearer and more hi-fi than the Peavey 5150; dense saturation with firm lows; modern metal standard",
+   "lineage": "Peavey 5150 -> 5150 II -> EVH 5150 III (3 channels) -> 100S 'Stealth' (more gain on Blue/Red)",
+   "power_tubes": "4x 6L6 (1118, 1119) or 4x EL34 (1017, 1098, 1148, 1149)",
+   "controls": {
+    "GAIN": {
+     "does": "Preamp gain. Red is more saturated/compressed than Blue; the two tapers differ, so compare by ear",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "BASS": {
+     "does": "Low EQ",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "MID": {
+     "does": "Mid EQ",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "TREBLE": {
+     "does": "High EQ",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "MASTER": {
+     "does": "Channel volume into the power amp; distortion is preamp-made but MASTER still shapes feel",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "PRESENCE": {
+     "does": "Power-amp high-frequency boost",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "RESONANCE": {
+     "does": "Power-amp low-frequency boost (same job as Peavey RESONANCE / Fractal Depth). Lower = tighter",
+     "brighter": "n/a",
+     "tighter": "down"
+    }
+   },
+   "model_notes": {
+    "1098": "Blue (crunch) channel, EL34: the favourite tight rhythm channel; forum users rate EL34 Blue above 6L6 Blue",
+    "1017": "Red (lead) channel, EL34: more gain and compression, mid bark, less extreme top and bottom than 6L6",
+    "1118": "Blue (crunch) channel, 6L6: broader low/high response, less mid bark than EL34",
+    "1119": "Red (lead) channel, 6L6: broader low/high response, less mid bark than EL34",
+    "1148": "Second catalog entry for Red EL34 (device list shows the EL34 models were updated in CorOS 2.0.0; likely the newer version)",
+    "1149": "Second catalog entry for Blue EL34 (likely the CorOS 2.0.0 update of 1098)"
+   },
+   "starts": [
+    {
+     "name": "Blue channel modern rhythm (no boost needed)",
+     "models": [
+      1098,
+      1149,
+      1118
+     ],
+     "settings": {
+      "GAIN": 5.5,
+      "BASS": 5,
+      "MID": 5.5,
+      "TREBLE": 5.5,
+      "PRESENCE": 5,
+      "RESONANCE": 5,
+      "MASTER": 4
+     },
+     "basis": "typical",
+     "source": ""
+    },
+    {
+     "name": "Red channel boosted rhythm / lead",
+     "models": [
+      1017,
+      1148,
+      1119
+     ],
+     "settings": {
+      "GAIN": 4.5,
+      "BASS": 4.5,
+      "MID": 6,
+      "TREBLE": 5,
+      "PRESENCE": 5,
+      "RESONANCE": 4.5,
+      "MASTER": 4
+     },
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "boosts": [
+    {
+     "model": "Green 808",
+     "settings": {
+      "OVERDRIVE": 0,
+      "TONE": 5,
+      "LEVEL": 7
+     },
+     "why": "QC wiki suggests a Tube Screamer in front; needs less boost than a Peavey 5150 or Rectifier (values typical)",
+     "basis": "typical",
+     "source": ""
+    },
+    {
+     "model": "Horizon Devices® Precision Drive™",
+     "settings": {
+      "DRIVE": 1,
+      "BRIGHT": 5,
+      "VOLUME": 5,
+      "GATE": 5
+     },
+     "why": "Maker's start: DRIVE near 0 then 1-2, VOLUME noon (6 = TS at 10), GATE noon; ATTACK right = tighter, left = thicker",
+     "basis": "cited",
+     "source": "https://horizondevices.com/pages/precision-drive"
+    }
+   ],
+   "cabs": [
+    {
+     "model": "412 EV Straight G12 00s (M)",
+     "why": "Stock EVH 4x12 with G12EVH (20 W Greenback-derived) drivers"
+    },
+    {
+     "model": "412 CA Stand OS S V30 90s (M)",
+     "why": "Mesa OS V30: the modern-metal default pairing"
+    },
+    {
+     "model": "412 Zila Cust V30 12 V2 (M)",
+     "why": "Tight modern V30 alternative"
+    }
+   ],
+   "known_for": [
+    "Eddie Van Halen",
+    "modern metal, metalcore and djent rhythm tones"
+   ],
+   "poor_at": "Vintage breakup and touch-sensitive low-gain tones (green channel is not modeled)",
+   "watch_out": "Blue and Red gain tapers differ (Fractal wiki: at noon Blue seems to have MORE gain); do not copy GAIN across",
+   "tags": [
+    "metal",
+    "modern",
+    "tight",
+    "saturated",
+    "djent",
+    "metalcore",
+    "american",
+    "6l6",
+    "el34"
+   ],
+   "sources": [
+    "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-5153-evh-5150-iii.111404/",
+    "https://wiki.fractalaudio.com/wiki/index.php?title=Amp_models_list",
+    "https://quadcortex.wiki/EV101IIIS_6L6_100W",
+    "https://neuraldsp.com/device-list",
+    "https://sevenstring.org/threads/evh-5150-iii-50w-6l6-vs-el34.354454/"
+   ]
+  },
+  {
+   "key": "mesa_rectifier",
+   "real": "Mesa/Boogie Dual Rectifier (3-channel Solo Head), channel 3",
+   "models": [
+    1018,
+    1019,
+    1020
+   ],
+   "plugin": "",
+   "gain_range": "extreme",
+   "drive_control": "GAIN",
+   "voice": "Scooped, huge sub lows and a wide fizzy top; loose and saggy until boosted; the 90s/00s wall of sound",
+   "lineage": "Soldano SLO-100 preamp -> 2-channel Dual Rectifier (1992) -> 3-channel (2000) -> Multi-Watt",
+   "power_tubes": "4x 6L6 (tube or silicon-diode rectification)",
+   "controls": {
+    "GAIN": {
+     "does": "Preamp gain. Mesa: do not max it; typical use is around noon, lower when boosted",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "BASS": {
+     "does": "Low EQ after TREBLE in the stack: a high TREBLE setting makes BASS and MID less effective",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "MID": {
+     "does": "Mid EQ; low = classic scoop, 3+ keeps definition",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "TREBLE": {
+     "does": "Dominant tone control and adds gain; keep mid-range. Mesa: not above 2:00 with GAIN maxed (squeal)",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "PRESENCE": {
+     "does": "Raw/Vintage: NFB presence. Modern: NFB is removed and PRESENCE becomes a strong preamp high-cut",
+     "brighter": "up",
+     "tighter": "up"
+    },
+    "MASTER": {
+     "does": "Modern has no NFB: power amp distorts by ~2, gets loud, dark and flubby above; level with OUTPUT",
+     "brighter": "down",
+     "tighter": "down"
+    }
+   },
+   "model_notes": {
+    "1018": "Modern: negative feedback removed -> loudest, most aggressive, biggest speaker-resonance bass, loosest. PRESENCE runs much lower",
+    "1019": "Raw: lowest gain of the three, NFB in; from near-clean to grinding crunch",
+    "1020": "Vintage: NFB in; the fat, liquid, compressed Recto lead/rhythm voice; quieter than Modern at the same MASTER"
+   },
+   "starts": [
+    {
+     "name": "Fractal-forum values for Red Modern (presence ~1.75; master 1.5-2.5)",
+     "models": [
+      1018
+     ],
+     "settings": {
+      "PRESENCE": 1.75,
+      "MASTER": 2
+     },
+     "basis": "cited",
+     "source": "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-recto1-and-recto2-mesa-dual-rectifier-2-ch-and-3-ch.114701/"
+    },
+    {
+     "name": "Yek: Vintage, presence ~6, mids 3 for a tight metal tone",
+     "models": [
+      1020
+     ],
+     "settings": {
+      "PRESENCE": 6,
+      "MID": 3
+     },
+     "basis": "cited",
+     "source": "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-recto1-and-recto2-mesa-dual-rectifier-2-ch-and-3-ch.114701/"
+    },
+    {
+     "name": "boosted modern rhythm",
+     "models": [
+      1018
+     ],
+     "settings": {
+      "GAIN": 4.5,
+      "BASS": 3.5,
+      "MID": 4,
+      "TREBLE": 6,
+      "PRESENCE": 3.5,
+      "MASTER": 2.5
+     },
+     "basis": "typical",
+     "source": ""
+    },
+    {
+     "name": "vintage lead / thick rhythm",
+     "models": [
+      1020
+     ],
+     "settings": {
+      "GAIN": 6,
+      "BASS": 4,
+      "MID": 4.5,
+      "TREBLE": 5.5,
+      "PRESENCE": 5.5,
+      "MASTER": 3.5
+     },
+     "basis": "typical",
+     "source": ""
+    },
+    {
+     "name": "raw crunch",
+     "models": [
+      1019
+     ],
+     "settings": {
+      "GAIN": 6,
+      "BASS": 4.5,
+      "MID": 5,
+      "TREBLE": 6,
+      "PRESENCE": 5,
+      "MASTER": 4
+     },
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "boosts": [
+    {
+     "model": "Green 808",
+     "settings": {
+      "OVERDRIVE": 0.5,
+      "TONE": 5,
+      "LEVEL": 10
+     },
+     "why": "Boogie-forum recipe: gain just past zero, level all the way up, tone halfway; tightens the low end",
+     "basis": "cited",
+     "source": "https://boogieforum.com/threads/mini-rectifier-using-a-tube-screamer.73635/"
+    },
+    {
+     "model": "Horizon Devices® Precision Drive™",
+     "settings": {
+      "DRIVE": 1,
+      "BRIGHT": 5,
+      "VOLUME": 5,
+      "GATE": 5
+     },
+     "why": "Maker's start: DRIVE near 0 then 1-2, VOLUME noon (6 = TS at 10), GATE noon; ATTACK right = tighter, left = thicker",
+     "basis": "cited",
+     "source": "https://horizondevices.com/pages/precision-drive"
+    }
+   ],
+   "cabs": [
+    {
+     "model": "412 CA Stand OS S V30 90s (M)",
+     "why": "Mesa Standard oversized 4x12 with V30s: the cab the Recto sound was made on"
+    },
+    {
+     "model": "412 CA Stand OS A V30 01 (M)",
+     "why": "Angled OS variant"
+    },
+    {
+     "model": "212 CA Recto V30 98 (M)",
+     "why": "Recto 2x12: slightly tighter, less sub"
+    }
+   ],
+   "known_for": [
+    "Foo Fighters",
+    "Tool",
+    "Soundgarden",
+    "Korn, Limp Bizkit, Linkin Park (nu-metal)",
+    "Mark Tremonti",
+    "90s-00s alt-rock and metal"
+   ],
+   "poor_at": "Fast tight palm-muting without a boost, mid-forward cut in a dense mix, clarity at low volume",
+   "watch_out": "GAIN and BASS both high = flub plus fizz. In Modern, do not turn MASTER up for volume; use OUTPUT",
+   "tags": [
+    "metal",
+    "modern",
+    "scooped",
+    "nu-metal",
+    "alt-rock",
+    "loose",
+    "huge-lows",
+    "needs-boost",
+    "6l6",
+    "american"
+   ],
+   "sources": [
+    "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-recto1-and-recto2-mesa-dual-rectifier-2-ch-and-3-ch.114701/",
+    "https://mesa-boogie.imgix.net/media/User%20Manuals/3chRecto_multiWatt.pdf",
+    "https://quadcortex.wiki/CA_Duo_Ch3",
+    "https://boogieforum.com/threads/mini-rectifier-using-a-tube-screamer.73635/",
+    "https://wiki.fractalaudio.com/wiki/index.php?title=Amp_models_list"
+   ]
+  },
+  {
+   "key": "mesa_tremoverb",
+   "real": "Mesa/Boogie Dual Rectifier Trem-O-Verb (2-channel, 1990s)",
+   "models": [
+    1089,
+    1090
+   ],
+   "plugin": "",
+   "gain_range": "high",
+   "drive_control": "GAIN",
+   "voice": "Warmer, sweeter-mid Rectifier; Orange is softer and darker, Red is the aggressive scooped Modern voice",
+   "lineage": "2-channel Dual Rectifier -> Trem-O-Verb (adds reverb/tremolo, Blues and Clean modes)",
+   "power_tubes": "4x 6L6",
+   "controls": {
+    "GAIN": {
+     "does": "Preamp gain; same Rectifier rule: do not max it",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "BASS": {
+     "does": "Low EQ; big, loose lows as on any Rectifier",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "MID": {
+     "does": "Mid EQ",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "TREBLE": {
+     "does": "Dominant tone control; high settings weaken BASS/MID",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "PRESENCE": {
+     "does": "Orange: in the power-amp feedback loop, gentle/darker. Red: preamp presence, far more aggressive",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "MASTER": {
+     "does": "Channel master. Orange is much quieter than Red at the same setting",
+     "brighter": "n/a",
+     "tighter": "down"
+    }
+   },
+   "model_notes": {
+    "1089": "Orange channel (Vintage High Gain on the amp): softer, sweeter, more girth, feedback-loop presence",
+    "1090": "Red channel (Modern High Gain on the amp): brutal, very mid-scooped, behaves like Rectifier Modern"
+   },
+   "starts": [
+    {
+     "name": "orange thick rhythm/lead",
+     "models": [
+      1089
+     ],
+     "settings": {
+      "GAIN": 6,
+      "BASS": 4,
+      "MID": 5,
+      "TREBLE": 5.5,
+      "PRESENCE": 6,
+      "MASTER": 4.5
+     },
+     "basis": "typical",
+     "source": ""
+    },
+    {
+     "name": "red boosted rhythm",
+     "models": [
+      1090
+     ],
+     "settings": {
+      "GAIN": 5,
+      "BASS": 3.5,
+      "MID": 4.5,
+      "TREBLE": 6,
+      "PRESENCE": 3.5,
+      "MASTER": 3
+     },
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "boosts": [
+    {
+     "model": "Green 808",
+     "settings": {
+      "OVERDRIVE": 0,
+      "TONE": 5.5,
+      "LEVEL": 9
+     },
+     "why": "Mid-hump clean boost: trims lows before the preamp so palm mutes stay tight; adds drive without amp GAIN",
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "cabs": [
+    {
+     "model": "412 CA Trad S UKV30 90s (M)",
+     "why": "Period-correct Mesa Traditional 4x12 with V30s"
+    },
+    {
+     "model": "412 CA Stand OS S V30 90s (M)",
+     "why": "Oversized Recto cab for more low end"
+    },
+    {
+     "model": "212 CA Recto V30 98 (M)",
+     "why": "Recto 2x12"
+    }
+   ],
+   "known_for": [
+    "Vernon Reid",
+    "Jim James",
+    "Nick McCabe",
+    "Lindsey Buckingham",
+    "1990s alternative rock"
+   ],
+   "poor_at": "Tight modern metal without a boost; bright jangly cleans",
+   "watch_out": "Presence works differently per channel: a setting copied from Orange to Red will be far too bright",
+   "tags": [
+    "mesa",
+    "rectifier",
+    "warm",
+    "90s",
+    "alt-rock",
+    "loose",
+    "scooped",
+    "6l6",
+    "american"
+   ],
+   "sources": [
+    "https://quadcortex.wiki/CA_Tremo",
+    "https://boogieforum.com/threads/can-someone-explain-the-channel-modes-on-a-2ch-dual-rec.70219/",
+    "https://boogieforum.com/threads/who-uses-the-orange.22930/",
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "key": "mesa_jp2c",
+   "real": "Mesa/Boogie JP-2C John Petrucci (Mark IIC+ circuit, 2016)",
+   "models": [
+    1139,
+    1140,
+    1141
+   ],
+   "plugin": "",
+   "gain_range": "high",
+   "drive_control": "GAIN",
+   "voice": "Tight, focused, mid-forward Mark lead/crunch with fast attack; becomes huge and scooped with the graphic EQ V",
+   "lineage": "Mark I -> Mark IIC+ (mid-1980s) -> Mark IV/V -> JP-2C (IIC+ with fixed pull-shifts, two EQs, Shred)",
+   "power_tubes": "4x 6L6 (100/60 W)",
+   "controls": {
+    "GAIN": {
+     "does": "Most powerful control. Zones: 9-11:30 low, 12-2 saturated, 2:30+ high gain. Mesa: use no more than needed",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "GAIN PULL": {
+     "does": "Raises the fixed internal Volume 1 by about one number (Ch2 ~6 to 7.5, Ch3 ~7.5 to 9): a little more gain",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "SHRED": {
+     "does": "Adds a layer of upper harmonics/aggression; tame by lowering TREBLE and PRESENCE",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "MASTER": {
+     "does": "Channel volume; Mesa suggests the 9:00-12:00 range (~2-5), most settle near 10:30 (~3.5)",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "BASS": {
+     "does": "Tone stack is BEFORE the distortion: bass here = flub. Start ~10:00 (3) on Ch2/3; as GAIN goes up BASS comes down",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "MID": {
+     "does": "Low = wide, creamy, scooped; above ~1:00 forward gut-punch and you must rebalance the rest",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "TREBLE": {
+     "does": "Second most powerful control and a gain source; Mesa: not above 2:00 (7) with high GAIN (squeal)",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "PRESENCE": {
+     "does": "Power-amp NFB highs. Low = warm/compressed, 11:00-2:30 = cut, above = harsh. Value depends on PRES PULL",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "PRES PULL": {
+     "does": "Pulled: classic higher-freq presence, softer feel, set PRESENCE LOW (0-3). Pushed: lower freq, tighter, set ~6",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "80 Hz": {
+     "does": "Graphic EQ after the preamp: add low end HERE instead of with BASS; it does not loosen the attack",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "240 Hz": {
+     "does": "Graphic EQ low-mid body; slight boost in the classic V",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "750 Hz": {
+     "does": "Graphic EQ mid: cutting this is the 'V' that turns the nasal stock voice huge and scooped",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "2200 Hz": {
+     "does": "Graphic EQ upper-mid bite/pick attack",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "6600 Hz": {
+     "does": "Graphic EQ top-end air/fizz",
+     "brighter": "up",
+     "tighter": "n/a"
+    }
+   },
+   "model_notes": {
+    "1139": "Ch1 clean: maximum headroom; MID pot is stronger than usual (11:00 elsewhere = about 8:30 here). No pull switches",
+    "1140": "Ch2 crunch-rhythm: the tight IIC+ lead circuit at lower fixed gain. Petrucci 'Crunch': PRES PULL pulled, Shred as needed",
+    "1141": "Ch3 lead: hotter, fatter, more compressed. Petrucci 'Lead': PRES PULL pulled (so PRESENCE low), Shred as needed"
+   },
+   "starts": [
+    {
+     "name": "Ch2 crunch rhythm, PRES PULL pushed (manual: bass ~10:00, presence ~1:00, master ~10:30)",
+     "models": [
+      1140
+     ],
+     "settings": {
+      "GAIN": 6,
+      "BASS": 3,
+      "PRESENCE": 6,
+      "MASTER": 3.5,
+      "PRES PULL": false
+     },
+     "basis": "cited",
+     "source": "https://mesa-boogie.imgix.net/media/User%20Manuals/070494-JP2C-160317-download.pdf"
+    },
+    {
+     "name": "Ch3 lead, PRES PULL pulled (manual: presence 7:00-10:00, bass ~10:00)",
+     "models": [
+      1141
+     ],
+     "settings": {
+      "BASS": 3,
+      "PRESENCE": 1.5,
+      "MASTER": 3.5,
+      "PRES PULL": true
+     },
+     "basis": "cited",
+     "source": "https://mesa-boogie.imgix.net/media/User%20Manuals/070494-JP2C-160317-download.pdf"
+    },
+    {
+     "name": "Cliff's Mark IIC+ high-gain recipe (bass 1, mid 1.8, treble 8.9, presence 4.5, master 4 + V EQ)",
+     "models": [
+      1140,
+      1141
+     ],
+     "settings": {
+      "BASS": 1,
+      "MID": 1.8,
+      "TREBLE": 8.9,
+      "PRESENCE": 4.5,
+      "MASTER": 4
+     },
+     "basis": "cited",
+     "source": "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-usa-iic-and-iic-mesa-boogie-mark-iic.115442/"
+    },
+    {
+     "name": "classic graphic-EQ V (assumes slider 5 = flat; Cliff's dB: +4.8/+2.6/-4.5/-0.2/0)",
+     "models": [
+      1140,
+      1141
+     ],
+     "settings": {
+      "80 Hz": 7,
+      "240 Hz": 6,
+      "750 Hz": 3,
+      "2200 Hz": 5,
+      "6600 Hz": 5
+     },
+     "basis": "typical",
+     "source": "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-usa-iic-and-iic-mesa-boogie-mark-iic.115442/"
+    },
+    {
+     "name": "full modern rhythm",
+     "models": [
+      1140
+     ],
+     "settings": {
+      "GAIN": 6,
+      "BASS": 2.5,
+      "MID": 4,
+      "TREBLE": 6.5,
+      "PRESENCE": 5.5,
+      "MASTER": 3.5,
+      "80 Hz": 7,
+      "240 Hz": 6,
+      "750 Hz": 3,
+      "2200 Hz": 5.5,
+      "6600 Hz": 5.5
+     },
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "boosts": [
+    {
+     "model": "Green 808",
+     "settings": {
+      "OVERDRIVE": 0,
+      "TONE": 5,
+      "LEVEL": 7
+     },
+     "why": "Optional: the pre-distortion tone stack already keeps lows out of the gain stages; use only for extra lead sustain",
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "cabs": [
+    {
+     "model": "412 CA Trad S UKV30 90s (M)",
+     "why": "Mesa Traditional 4x12 with V30s: the usual Mark/Petrucci pairing"
+    },
+    {
+     "model": "412 CA Trad A V30 92 (M)",
+     "why": "Angled Traditional V30 variant"
+    },
+    {
+     "model": "412 CA Custom A Shadow 87 (M)",
+     "why": "80s Mesa cab with Black Shadow speakers for a period IIC+ sound"
+    }
+   ],
+   "known_for": [
+    "John Petrucci / Dream Theater",
+    "Mark IIC+ heritage: Metallica (Master of Puppets era)",
+    "progressive metal, thrash, fusion leads"
+   ],
+   "poor_at": "Loose, saggy, big-bottomed chug; stock voice (EQ off) is nasal and boxy by modern-metal standards",
+   "watch_out": "Never fix thin lows with BASS when GAIN is high: use the 80 Hz and 240 Hz sliders. Re-set PRESENCE after toggling PRES PULL",
+   "tags": [
+    "mesa",
+    "mark",
+    "tight",
+    "prog",
+    "thrash",
+    "lead",
+    "mid-forward",
+    "graphic-eq",
+    "no-boost-needed",
+    "6l6"
+   ],
+   "sources": [
+    "https://mesa-boogie.imgix.net/media/User%20Manuals/070494-JP2C-160317-download.pdf",
+    "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-usa-iic-and-iic-mesa-boogie-mark-iic.115442/",
+    "https://quadcortex.wiki/CA_John%27s_2C",
+    "https://wiki.fractalaudio.com/wiki/index.php?title=Amp_models_list"
+   ]
+  },
+  {
+   "key": "soldano_slo100",
+   "real": "Soldano SLO-100 Super Lead Overdrive (1987)",
+   "models": [
+    1045,
+    1099,
+    1100,
+    1150,
+    1151,
+    1152
+   ],
+   "plugin": "",
+   "gain_range": "high",
+   "drive_control": "GAIN",
+   "voice": "Bright, cutting, harmonically rich hot-rodded lead; thick singing mids, firm lows; brittle if run quiet",
+   "lineage": "Hot-rodded Marshall/Boogie ideas -> SLO-100 (1987) -> Peavey 5150 and Mesa Rectifier preamps derive from it",
+   "power_tubes": "4x 6L6",
+   "controls": {
+    "GAIN": {
+     "does": "Preamp gain. Runs best with LESS gain and MORE master: Yek uses drive ~2 with master 7 for leads",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "BASS": {
+     "does": "Low EQ (shared by both channels on the real amp)",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "MID": {
+     "does": "Mid EQ; raise for the vocal lead voice",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "TREBLE": {
+     "does": "Treble; pot sweep is offset clockwise, and many find SLOs too bright: start below noon",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "MASTER": {
+     "does": "Run it high: pushing the power amp compresses the trebly preamp and fattens mids; low = shrill",
+     "brighter": "down",
+     "tighter": "n/a"
+    },
+    "PRESENCE": {
+     "does": "Power-amp high-frequency boost",
+     "brighter": "up",
+     "tighter": "n/a"
+    }
+   },
+   "model_notes": {
+    "1045": "Overdrive (lead) channel",
+    "1099": "Normal channel in Crunch mode, Bright switch on",
+    "1100": "Normal channel in Crunch mode, Bright switch off",
+    "1150": "Second catalog entry for the Lead model (same parameters as 1045)",
+    "1151": "Second catalog entry for Crunch Bright (same parameters as 1099)",
+    "1152": "Second catalog entry for Crunch Normal (same parameters as 1100)"
+   },
+   "starts": [
+    {
+     "name": "Yek's lead: master high (7), drive very low (2), mids up",
+     "models": [
+      1045,
+      1150
+     ],
+     "settings": {
+      "GAIN": 2,
+      "MASTER": 7
+     },
+     "basis": "cited",
+     "source": "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-solo-100-soldano-slo-100.114877/"
+    },
+    {
+     "name": "hard-rock rhythm",
+     "models": [
+      1045,
+      1150
+     ],
+     "settings": {
+      "GAIN": 4.5,
+      "BASS": 5,
+      "MID": 5.5,
+      "TREBLE": 4.5,
+      "PRESENCE": 4.5,
+      "MASTER": 6
+     },
+     "basis": "typical",
+     "source": ""
+    },
+    {
+     "name": "crunch",
+     "models": [
+      1099,
+      1100,
+      1151,
+      1152
+     ],
+     "settings": {
+      "GAIN": 5.5,
+      "BASS": 5,
+      "MID": 6,
+      "TREBLE": 5,
+      "PRESENCE": 4.5,
+      "MASTER": 6
+     },
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "boosts": [
+    {
+     "model": "Green 808",
+     "settings": {
+      "OVERDRIVE": 0,
+      "TONE": 5,
+      "LEVEL": 7
+     },
+     "why": "Optional for drop tunings; the SLO is tight enough unboosted for most rock (values typical)",
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "cabs": [
+    {
+     "model": "412 Brit 60B V30 95 (M)",
+     "why": "V30 4x12 is the common substitute for Soldano's own cab"
+    },
+    {
+     "model": "212 CA Recto Legend V12 (M)",
+     "why": "Only stock cab with Eminence Legend V12s, the speaker Soldano fits"
+    },
+    {
+     "model": "412 Brit 60B GB 90s (M)",
+     "why": "Greenbacks soften the bright top for 80s lead tones"
+    }
+   ],
+   "known_for": [
+    "Eric Clapton",
+    "Mark Knopfler",
+    "Warren DeMartini",
+    "Gary Moore",
+    "Steve Lukather",
+    "Warren Haynes",
+    "Mick Mars",
+    "Lou Reed"
+   ],
+   "poor_at": "Scooped modern metal chug, quiet-volume smoothness, sparkling cleans",
+   "watch_out": "Too bright/brittle? Raise MASTER and lower TREBLE/PRESENCE before touching GAIN. Legacy models have no DEPTH",
+   "tags": [
+    "soldano",
+    "hot-rodded",
+    "lead",
+    "hard-rock",
+    "bright",
+    "smooth",
+    "80s",
+    "6l6",
+    "american"
+   ],
+   "sources": [
+    "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-solo-100-soldano-slo-100.114877/",
+    "https://quadcortex.wiki/Solo_100",
+    "https://wiki.fractalaudio.com/wiki/index.php?title=Amp_models_list"
+   ]
+  },
+  {
+   "key": "soldano_slo100_plugin",
+   "real": "Soldano SLO-100 (Rev D) - Neural DSP plugin model, both channels in one block",
+   "models": [
+    1170
+   ],
+   "plugin": "Soldano SLO-100 X",
+   "gain_range": "high",
+   "drive_control": "GAIN OD",
+   "voice": "Same SLO voice as the legacy models: bright, rich, singing lead; adds the DEPTH control and channel switching",
+   "lineage": "SLO-100 (1987) -> 5150 / Rectifier; plugin released 2021, X version 2024",
+   "power_tubes": "4x 6L6",
+   "controls": {
+    "CHANNEL": {
+     "does": "Selects NORMAL or OVERDRIVE; the other channel's gain/master knobs are then inactive",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "GAIN NORMAL": {
+     "does": "Preamp gain of the NORMAL channel (0-11). Active only on NORMAL",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "MASTER NORMAL": {
+     "does": "Output level of the NORMAL channel (0-11)",
+     "brighter": "down",
+     "tighter": "n/a"
+    },
+    "CRUNCH": {
+     "does": "NORMAL channel mode: Clean or Crunch (more gain, 'tough metal-edged crunch'). Disabled on OVERDRIVE",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "BRIGHT": {
+     "does": "Treble boost on the NORMAL channel only (disabled on OVERDRIVE)",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "GAIN OD": {
+     "does": "Preamp gain of the OVERDRIVE channel (0-11). Less gain + more master is the SLO recipe",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "MASTER OD": {
+     "does": "Output level of the OVERDRIVE channel (0-11); higher pushes the power amp and smooths the top",
+     "brighter": "down",
+     "tighter": "n/a"
+    },
+    "BASS": {
+     "does": "Tone stack bass, shared by both channels (0-11)",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "MID": {
+     "does": "Tone stack mid, shared (0-11)",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "TREBLE": {
+     "does": "Tone stack treble, shared (0-11)",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "PRESENCE": {
+     "does": "High frequencies in the power-amp stage, both channels (0-11)",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "DEPTH": {
+     "does": "Low frequencies in the power-amp stage (the SLO 'depth mod', for low tunings). Lower = tighter (0-11)",
+     "brighter": "n/a",
+     "tighter": "down"
+    }
+   },
+   "model_notes": {
+    "1170": "Scales run 0-11, not 0-10. Requires the Soldano SLO-100 X plugin licence on the unit"
+   },
+   "starts": [
+    {
+     "name": "overdrive-channel rhythm (0-11 scale)",
+     "models": [
+      1170
+     ],
+     "settings": {
+      "GAIN OD": 5,
+      "BASS": 5.5,
+      "MID": 6,
+      "TREBLE": 5,
+      "PRESENCE": 5,
+      "DEPTH": 4,
+      "MASTER OD": 7
+     },
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "boosts": [
+    {
+     "model": "SLO-100® Overdrive-1",
+     "settings": {
+      "DRIVE": 0,
+      "TONE": 5,
+      "LEVEL": 7
+     },
+     "why": "The suite's own boost designed to complement the amp (needs the plugin; values typical)",
+     "basis": "typical",
+     "source": ""
+    },
+    {
+     "model": "Green 808",
+     "settings": {
+      "OVERDRIVE": 0,
+      "TONE": 5,
+      "LEVEL": 7
+     },
+     "why": "Stock alternative that needs no plugin licence",
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "cabs": [
+    {
+     "model": "SLO-100® Cab (M)",
+     "why": "Matched cab from the same plugin (IRs by Adam 'Nolly' Getgood)"
+    },
+    {
+     "model": "412 Brit 60B V30 95 (M)",
+     "why": "Stock V30 4x12 if the plugin cab is unavailable"
+    }
+   ],
+   "known_for": [
+    "Eric Clapton",
+    "Mark Knopfler",
+    "Warren DeMartini",
+    "Gary Moore",
+    "Steve Lukather",
+    "Warren Haynes",
+    "Mick Mars",
+    "Lou Reed"
+   ],
+   "poor_at": "Scooped modern metal chug; quiet-volume smoothness",
+   "watch_out": "Only the selected CHANNEL's gain/master pair does anything; adjusting GAIN NORMAL on OVERDRIVE is a no-op",
+   "tags": [
+    "soldano",
+    "plugin",
+    "hot-rodded",
+    "lead",
+    "hard-rock",
+    "bright",
+    "depth-control",
+    "6l6"
+   ],
+   "sources": [
+    "https://downloads.neuraldsp.com/file/soldano-slo-x/v_1.0.0/Soldano%20SLO-100%20X%20v1.0.0.pdf",
+    "https://neuraldsp.com/plugins/soldano-slo-100",
+    "https://neuraldsp.com/device-list",
+    "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-solo-100-soldano-slo-100.114877/"
+   ]
+  },
+  {
+   "key": "diezel_vh4",
+   "real": "Diezel VH4 (4-channel 100 W head, 1994)",
+   "models": [
+    1109,
+    1110,
+    1111,
+    1112,
+    1113,
+    1114,
+    1142,
+    1143,
+    1144,
+    1145,
+    1146,
+    1147
+   ],
+   "plugin": "",
+   "gain_range": "high",
+   "drive_control": "GAIN",
+   "voice": "Dense, dark, compressed low-mid growl with hi-fi tight attack; less gain than its reputation (a 'mid-gain amp')",
+   "lineage": "Original German boutique design (Peter Diezel, 1994) -> Herbert, Hagen, VH2, VHX",
+   "power_tubes": "4x KT77 on current amps (sources also cite 6550 and EL34 fittings)",
+   "controls": {
+    "GAIN": {
+     "does": "Channel gain. Diezel: start Ch3 at 12:00, Ch4 ~1:00; with hot/active pickups REDUCE it or Ch3 turns to mush",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "BASS": {
+     "does": "Low EQ; very wide range, small moves ('less is often more')",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "MID": {
+     "does": "Mid EQ; wide range",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "TREBLE": {
+     "does": "High EQ; wide range",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "MASTER": {
+     "does": "Full clean power at ~1:00 (6); beyond that the power amp overdrives. Keep at or below 6",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "PRESENCE": {
+     "does": "Power-amp highs centred ~4 kHz. First fix for a dark tone (blue-face amps: 'crank Presence')",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "DEEP": {
+     "does": "Active power-amp bass centred ~80 Hz: restores the weight Ch3's compression removes. Lower = tighter",
+     "brighter": "n/a",
+     "tighter": "down"
+    }
+   },
+   "model_notes": {
+    "1109": "Ch1 clean, Bright on: Diezel 'hi-fi' clean",
+    "1110": "Ch1 clean, Bright off",
+    "1111": "Ch2 crunch, Bright on: Bright adds a strong high-end distortion kick here",
+    "1112": "Ch2 crunch, Bright off (catalog text says 'Ch1 Normal', a catalog typo). Strong low-mids, bluesy to heavy crunch",
+    "1113": "Ch3 'Mega': the famous tight heavy rhythm channel",
+    "1114": "Ch4 lead: a little more mids and compression than Ch3; cuts better for solos",
+    "1142": "Second catalog entry for Ch1 Bright (device list: VH4 updated in CorOS 2.0.0; likely the newer model)",
+    "1143": "Second catalog entry for Ch1 Normal",
+    "1144": "Second catalog entry for Ch2 Bright",
+    "1145": "Second catalog entry for Ch2 Normal",
+    "1146": "Second catalog entry for Ch3",
+    "1147": "Second catalog entry for Ch4"
+   },
+   "starts": [
+    {
+     "name": "Ch3 rhythm, Diezel manual start: everything at 12:00, master below 1:00",
+     "models": [
+      1113,
+      1146
+     ],
+     "settings": {
+      "GAIN": 5,
+      "BASS": 5,
+      "MID": 5,
+      "TREBLE": 5,
+      "PRESENCE": 5,
+      "DEEP": 5,
+      "MASTER": 4
+     },
+     "basis": "cited",
+     "source": "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-das-metall-and-dizzy-v4-diezel-vh4.112971/"
+    },
+    {
+     "name": "Ch4 lead: gain near 1:00 is enough for full high gain",
+     "models": [
+      1114,
+      1147
+     ],
+     "settings": {
+      "GAIN": 6
+     },
+     "basis": "cited",
+     "source": "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-das-metall-and-dizzy-v4-diezel-vh4.112971/"
+    },
+    {
+     "name": "Ch2 crunch: gain 2:00-3:00",
+     "models": [
+      1111,
+      1112,
+      1144,
+      1145
+     ],
+     "settings": {
+      "GAIN": 7.5
+     },
+     "basis": "cited",
+     "source": "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-das-metall-and-dizzy-v4-diezel-vh4.112971/"
+    },
+    {
+     "name": "Ch3 modern tight rhythm",
+     "models": [
+      1113,
+      1146
+     ],
+     "settings": {
+      "GAIN": 4.5,
+      "BASS": 4.5,
+      "MID": 5.5,
+      "TREBLE": 5.5,
+      "PRESENCE": 6,
+      "DEEP": 4,
+      "MASTER": 4
+     },
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "boosts": [
+    {
+     "model": "Green 808",
+     "settings": {
+      "OVERDRIVE": 0,
+      "TONE": 5,
+      "LEVEL": 6
+     },
+     "why": "Rarely needed: Ch3 is already tight and compressed; a light boost only for low tunings (values typical)",
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "cabs": [
+    {
+     "model": "412 D-Cell Front V30 04 (M)",
+     "why": "Diezel front-loaded 4x12 with V30s: the matching cab"
+    },
+    {
+     "model": "412 CA Stand OS S V30 90s (M)",
+     "why": "Mesa OS V30 for more low-end size"
+    }
+   ],
+   "known_for": [
+    "Adam Jones / Tool",
+    "Metallica (James Hetfield)",
+    "Matthew Bellamy / Muse",
+    "Billy Corgan",
+    "Mark Tremonti"
+   ],
+   "poor_at": "Loose vintage breakup, bright scooped thrash, raw open-sounding crunch (it always sounds controlled)",
+   "watch_out": "Sounds dark? raise PRESENCE, not GAIN. On the real amp the clean channel ignores PRESENCE and DEEP",
+   "tags": [
+    "diezel",
+    "german",
+    "tight",
+    "dark",
+    "compressed",
+    "alt-metal",
+    "prog",
+    "no-boost-needed",
+    "kt77"
+   ],
+   "sources": [
+    "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-das-metall-and-dizzy-v4-diezel-vh4.112971/",
+    "https://quadcortex.wiki/D-Cell_H4",
+    "https://wiki.fractalaudio.com/wiki/index.php?title=Amp_models_list",
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "key": "diezel_herbert",
+   "real": "Diezel Herbert (3-channel 180 W head)",
+   "models": [
+    1136,
+    1137,
+    1138
+   ],
+   "plugin": "",
+   "gain_range": "extreme",
+   "drive_control": "GAIN",
+   "voice": "Enormous, punchy, tight low end with massive headroom; more aggressive and scoopable than the VH4",
+   "lineage": "VH4 -> Herbert (three independent preamps, 180 W, switchable Mid Cut)",
+   "power_tubes": "6x KT77 (180 W)",
+   "controls": {
+    "GAIN": {
+     "does": "Channel gain (Ch2, Ch3). Yek: Ch3 ~30% for metal rhythm, ~50% for leads; Ch2+ ~40% crunch",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "MODE": {
+     "does": "Ch2 voicing: (-) blues/classic-rock to Plexi/800 territory; (+) much more gain with bite",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "VOLUME": {
+     "does": "Channel volume into the power amp (on Ch1 it is the only level/drive control)",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "BASS": {
+     "does": "Low EQ; unusually wide range, a little goes a long way",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "MID": {
+     "does": "Mid EQ; Ch3 has a slight mid accent",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "TREBLE": {
+     "does": "High EQ; wide range",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "MIDCUT": {
+     "does": "Engages the Mid Cut section (INTENSITY + LEVEL). Off = both knobs do nothing",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "INTENSITY": {
+     "does": "Depth of the low-mid cut at ~400 Hz (nu-metal scoop). 0 = no cut",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "LEVEL": {
+     "does": "Make-up volume for the Mid Cut; with INTENSITY 0 it is simply a second volume. Not a tone control",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "MASTER": {
+     "does": "Global master; 180 W means lots of clean headroom, keep low",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "PRESENCE": {
+     "does": "Power-amp highs above ~3 kHz",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "DEEP": {
+     "does": "Active power-amp bass around 120 Hz; does not eat headroom. Lower = tighter",
+     "brighter": "n/a",
+     "tighter": "down"
+    }
+   },
+   "model_notes": {
+    "1136": "Ch1 clean: has VOLUME but no GAIN parameter",
+    "1137": "Ch2 crunch/heavy with MODE (-/+) switch: (-) ~35% gain = cranked Plexi, ~60% = JCM800; (+) ~40% tight crunch, ~60% lead",
+    "1138": "Ch3 lead: very high gain, slight mid accent; with MIDCUT it does Rectifier-style scooped rhythm but tighter"
+   },
+   "starts": [
+    {
+     "name": "Ch3 metal rhythm (Yek: gain ~30%, Mid Cut engaged for a Recto-like tone)",
+     "models": [
+      1138
+     ],
+     "settings": {
+      "GAIN": 3,
+      "MIDCUT": true
+     },
+     "basis": "cited",
+     "source": "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-herbie-diezel-herbert.113745/"
+    },
+    {
+     "name": "Ch3 lead (Yek: gain ~50%, no Mid Cut, mids up a bit)",
+     "models": [
+      1138
+     ],
+     "settings": {
+      "GAIN": 5,
+      "MIDCUT": false,
+      "MID": 6
+     },
+     "basis": "cited",
+     "source": "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-herbie-diezel-herbert.113745/"
+    },
+    {
+     "name": "Ch2 (+) tight punchy crunch (Yek: gain ~40%)",
+     "models": [
+      1137
+     ],
+     "settings": {
+      "GAIN": 4
+     },
+     "basis": "cited",
+     "source": "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-herbie-diezel-herbert.113745/"
+    },
+    {
+     "name": "Diezel manual start: all controls 12:00, master just cracked open",
+     "models": [
+      1137,
+      1138
+     ],
+     "settings": {
+      "GAIN": 5,
+      "BASS": 5,
+      "MID": 5,
+      "TREBLE": 5,
+      "PRESENCE": 5,
+      "DEEP": 5,
+      "MASTER": 2
+     },
+     "basis": "cited",
+     "source": "https://www.diezelamplification.com/manuals/en/Herbert_Manual_25102016.pdf"
+    },
+    {
+     "name": "Ch3 scooped rhythm with mid cut",
+     "models": [
+      1138
+     ],
+     "settings": {
+      "GAIN": 3.5,
+      "BASS": 4.5,
+      "MID": 5,
+      "TREBLE": 5.5,
+      "PRESENCE": 5.5,
+      "DEEP": 4.5,
+      "MIDCUT": true,
+      "INTENSITY": 5,
+      "LEVEL": 5.5,
+      "VOLUME": 5,
+      "MASTER": 3
+     },
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "boosts": [
+    {
+     "model": "Green 808",
+     "settings": {
+      "OVERDRIVE": 0,
+      "TONE": 5,
+      "LEVEL": 6
+     },
+     "why": "Seldom needed; the amp is tight unboosted. Use lightly for extra attack on low tunings (values typical)",
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "cabs": [
+    {
+     "model": "412 D-Cell Front V30 04 (M)",
+     "why": "Matching Diezel V30 4x12 (Yek: V30 or G12K-100 speakers)"
+    },
+    {
+     "model": "412 CA Stand OS S V30 90s (M)",
+     "why": "Mesa OS V30 alternative"
+    }
+   ],
+   "known_for": [
+    "Jim Root and Mick Thomson (Slipknot)",
+    "Brian 'Head' Welch (Korn)",
+    "Billy Corgan",
+    "Joe Duplantier",
+    "nu-metal and modern heavy rock"
+   ],
+   "poor_at": "Loose vintage sag, small-amp breakup; cleans are stiff and very loud",
+   "watch_out": "LEVEL and INTENSITY only work with MIDCUT on; LEVEL then changes volume, so re-match levels after toggling MIDCUT",
+   "tags": [
+    "diezel",
+    "german",
+    "tight",
+    "huge",
+    "scoopable",
+    "nu-metal",
+    "modern",
+    "mid-cut",
+    "kt77"
+   ],
+   "sources": [
+    "https://www.diezelamplification.com/manuals/en/Herbert_Manual_25102016.pdf",
+    "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-herbie-diezel-herbert.113745/",
+    "https://quadcortex.wiki/D-Cell_Hisbert",
+    "https://wiki.fractalaudio.com/wiki/index.php?title=Amp_models_list"
+   ]
+  },
+  {
+   "key": "friedman_be100",
+   "real": "Friedman BE-100 (Brown Eye; BE and HBE channels)",
+   "models": [
+    1028,
+    1082
+   ],
+   "plugin": "",
+   "gain_range": "high",
+   "drive_control": "GAIN",
+   "voice": "The 'ultimate modded Plexi': fat, tight, harmonically rich Marshall roar with firm lows and smooth highs",
+   "lineage": "Modded Marshall Plexi/JCM800 (Dave Friedman's LA mods) -> Marsha -> BE-100 -> BE-OD, JJ, SS",
+   "power_tubes": "4x EL34",
+   "controls": {
+    "GAIN": {
+     "does": "Preamp gain; Friedman suggests ~8 on BE. Cleans up with the guitar volume; cannot go fully clean",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "FAT": {
+     "does": "Fattens the low-mids (Fractal models it inside the Middle control); intended for single coils",
+     "brighter": "down",
+     "tighter": "down"
+    },
+    "C45": {
+     "does": "Custom voicing: treble boost at the input (about +4.5 dB tilt at 700 Hz), heard as a more scooped sound",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "SAT": {
+     "does": "Adds gain, compression and saturation; heavier but softer attack, and the volume drops (make up with MASTER)",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "VOICE": {
+     "does": "Subtle: one side darker with more mids, other brighter with bigger bass. QC switch polarity not documented",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "BASS": {
+     "does": "Friedman's own start is BASS 10: the low end stays tight, so this is rarely what causes mud",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "MID": {
+     "does": "Mid EQ; start 5-6",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "TREBLE": {
+     "does": "Treble EQ; start 5",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "MASTER": {
+     "does": "Channel volume; distortion is preamp-made but one Fractal user finds 3 less dark/congested than 5",
+     "brighter": "down",
+     "tighter": "down"
+    },
+    "PRESENCE": {
+     "does": "Power-amp upper mids/highs; also adds girth, perceived gain and volume, not just shimmer",
+     "brighter": "up",
+     "tighter": "n/a"
+    }
+   },
+   "model_notes": {
+    "1028": "QC 'Rhythm' = BE channel: crunch to high gain",
+    "1082": "QC 'Lead' = HBE channel: alternate voicing with an extra preamp triode gain boost; more feel/saturation than tone change"
+   },
+   "starts": [
+    {
+     "name": "Friedman manual start, BE channel (Bass 10, Mids ~5, Treble 5, Presence 5, Gain ~8, master to taste)",
+     "models": [
+      1028
+     ],
+     "settings": {
+      "GAIN": 8,
+      "BASS": 10,
+      "MID": 5,
+      "TREBLE": 5,
+      "PRESENCE": 5
+     },
+     "basis": "cited",
+     "source": "https://friedmanamplification.com/wp-content/uploads/2022/10/BE-100Deluxe_INSTRUCTION_MANUAL_6-4-19_FINAL.pdf"
+    },
+    {
+     "name": "tight modern rhythm on BE",
+     "models": [
+      1028
+     ],
+     "settings": {
+      "GAIN": 6,
+      "BASS": 6.5,
+      "MID": 6,
+      "TREBLE": 5.5,
+      "PRESENCE": 5.5,
+      "MASTER": 4,
+      "FAT": false,
+      "SAT": false
+     },
+     "basis": "typical",
+     "source": ""
+    },
+    {
+     "name": "saturated lead on HBE",
+     "models": [
+      1082
+     ],
+     "settings": {
+      "GAIN": 6.5,
+      "BASS": 6,
+      "MID": 6.5,
+      "TREBLE": 5,
+      "PRESENCE": 5,
+      "MASTER": 4,
+      "SAT": true
+     },
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "boosts": [
+    {
+     "model": "Green 808",
+     "settings": {
+      "OVERDRIVE": 0,
+      "TONE": 5,
+      "LEVEL": 6
+     },
+     "why": "Optional: the amp has ample gain and a tight bottom on its own; boost only for extra attack (values typical)",
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "cabs": [
+    {
+     "model": "412 Brit 60B GB 90s (M)",
+     "why": "Greenbacks: the classic hot-rodded Marshall voice (Yek: works with G12M, G12H and V30)"
+    },
+    {
+     "model": "412 Brit 60B V30 95 (M)",
+     "why": "V30 for more cut; V30+Greenback blends are the usual Friedman recipe"
+    }
+   ],
+   "known_for": [
+    "Jerry Cantrell",
+    "Steve Stevens",
+    "Bill Kelliher (Mastodon)",
+    "Phil X",
+    "80s LA 'brown' rock to modern hard rock"
+   ],
+   "poor_at": "Scooped sub-heavy extreme metal; pristine cleans (use the separate Clean channel model, id 1027)",
+   "watch_out": "SAT lowers volume and softens attack: for 'tighter' turn SAT and FAT off rather than cutting BASS",
+   "tags": [
+    "friedman",
+    "modded-marshall",
+    "british",
+    "hard-rock",
+    "tight",
+    "fat",
+    "el34",
+    "no-boost-needed"
+   ],
+   "sources": [
+    "https://friedmanamplification.com/wp-content/uploads/2022/10/BE-100Deluxe_INSTRUCTION_MANUAL_6-4-19_FINAL.pdf",
+    "https://media.uaudio.com/support/manuals/dd/Friedman%20BE100%20Manual.pdf",
+    "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-friedman-be-and-hbe-friedman-marsha-and-be-100.113559/",
+    "https://quadcortex.wiki/Freeman_100"
+   ]
+  },
+  {
+   "key": "bogner_uberschall",
+   "real": "Bogner Uberschall Rev. Blue",
+   "models": [
+    1130,
+    1131
+   ],
+   "plugin": "",
+   "gain_range": "extreme",
+   "drive_control": "GAIN",
+   "voice": "'Armageddon in a box': massive thick lows and dense low-mids with a dark, smooth top; huge drop-tuned wall",
+   "lineage": "Uberschall (original/Rev 2) -> Rev Blue (reported a bit tighter and brighter) -> Twin Jet",
+   "power_tubes": "4x EL34 on the standard Rev Blue (a 6L6 option existed; sources conflict on the modeled unit)",
+   "controls": {
+    "GAIN": {
+     "does": "Preamp gain of the ultra-high-gain channel",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "MASTER": {
+     "does": "Channel master volume",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "BASS": {
+     "does": "The amp has an enormous amount of bass that can overpower: this is the first knob to lower",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "MID": {
+     "does": "Very interactive with the other tone controls: scooped to aggressive",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "TREBLE": {
+     "does": "Bogner pots have unusual tapers: noon sounds darker than it looks, set by ear",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "PRESENCE": {
+     "does": "Key to opening the dark voice; users run it high (around 2 o'clock or more) and it also lifts mids",
+     "brighter": "up",
+     "tighter": "n/a"
+    }
+   },
+   "model_notes": {
+    "1130": "Clean channel: has its own EQ on the real amp",
+    "1131": "Lead (high-gain) channel: the reason this amp exists; fixed depth circuit, no depth knob"
+   },
+   "starts": [
+    {
+     "name": "Fractal-forum user: treble ~2, presence ~6 (dark-but-open variant)",
+     "models": [
+      1131
+     ],
+     "settings": {
+      "TREBLE": 2,
+      "PRESENCE": 6
+     },
+     "basis": "cited",
+     "source": "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-euro-uber-bogner-uberschall.113311/"
+    },
+    {
+     "name": "drop-tuned heavy rhythm",
+     "models": [
+      1131
+     ],
+     "settings": {
+      "GAIN": 5,
+      "BASS": 3.5,
+      "MID": 5.5,
+      "TREBLE": 5,
+      "PRESENCE": 7,
+      "MASTER": 4
+     },
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "boosts": [
+    {
+     "model": "Green 808",
+     "settings": {
+      "OVERDRIVE": 0,
+      "TONE": 5.5,
+      "LEVEL": 8
+     },
+     "why": "Fractal-forum users put a TS808 in front to tighten the chugs (values typical)",
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "cabs": [
+    {
+     "model": "412 Bogna Uber T75 00s (M)",
+     "why": "Bogner Ubercab, G12T-75 side: scooped and bright, offsets the dark amp"
+    },
+    {
+     "model": "412 Bogna Uber V30 00s (M)",
+     "why": "Bogner Ubercab, V30 side: more mids; the real cab mixes both speakers"
+    }
+   ],
+   "known_for": [
+    "drop-tuned modern rock and metal rhythm"
+   ],
+   "poor_at": "Bright articulate tones, fast tight thrash, anything needing a lean low end",
+   "watch_out": "Bass-heavy by design: cut BASS (and add a cab/EQ low cut) and raise PRESENCE before judging the amp",
+   "tags": [
+    "bogner",
+    "thick",
+    "dark",
+    "huge-lows",
+    "drop-tuned",
+    "modern-rock",
+    "metal",
+    "el34"
+   ],
+   "sources": [
+    "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-euro-uber-bogner-uberschall.113311/",
+    "https://quadcortex.wiki/Bogna_Uber",
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "key": "victory_kraken",
+   "real": "Victory VX The Kraken (50 W, designed by Martin Kidd with Rabea Massaad)",
+   "models": [
+    1157,
+    1158
+   ],
+   "plugin": "",
+   "gain_range": "extreme",
+   "drive_control": "GAIN",
+   "voice": "Gain I: hairy British crunch with friendly mids. Gain II: tighter, more aggressive modern American-style high gain",
+   "lineage": "British modded-Marshall school (Gain I) plus American high gain (Gain II) in one compact head",
+   "power_tubes": "2x 6L6 stock, EL34 optional (QC TUBE switch selects)",
+   "controls": {
+    "GAIN": {
+     "does": "Ch1 = Kraken GAIN I (British crunch), Ch2 = GAIN II (modern high gain); balance against MASTER",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "BASS": {
+     "does": "Low EQ; Victory: fine high at low volume, reduce when loud",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "MID": {
+     "does": "Higher = cuts and fattens; lower = lighter, less in-your-face",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "TREBLE": {
+     "does": "High EQ and a strong shaper of the overdrive character",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "MASTER": {
+     "does": "Pre-phase-inverter master; at max the amp behaves like a non-master-volume design",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "FOCUS": {
+     "does": "Bass Focus: changes low-frequency NFB (tighter vs looser). QC polarity disputed/reported reversed: check by ear",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "TUBE": {
+     "does": "Power-tube type, EL34 or 6L6. Which switch state is which is not documented",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "TIGHT": {
+     "does": "Ch2 only. Not on the real amp; by analogy with Archetype Rabea's Lead it is a high-pass filter (up = fewer lows)",
+     "brighter": "n/a",
+     "tighter": "up"
+    },
+    "PRESENCE": {
+     "does": "Ch2 only: power-amp high-frequency control",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "MOD": {
+     "does": "Undocumented QC-only switch (also on the Archetype Rabea amps); effect not published",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "H": {
+     "does": "Ch1 only, undocumented; Archetype Rabea's Crunch amp has HIGH BOOST in the same slot",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "B": {
+     "does": "Ch1 only, undocumented; Archetype Rabea's Crunch amp has MID BOOST in the same slot",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    }
+   },
+   "model_notes": {
+    "1157": "Ch1 = Gain I: British-inspired crunch to classic-rock/hard-rock drive",
+    "1158": "Ch2 = Gain II: tighter, more aggressive modern high gain with TIGHT and PRESENCE controls"
+   },
+   "starts": [
+    {
+     "name": "Ch2 modern rhythm",
+     "models": [
+      1158
+     ],
+     "settings": {
+      "GAIN": 5,
+      "BASS": 4.5,
+      "MID": 5.5,
+      "TREBLE": 5.5,
+      "PRESENCE": 5,
+      "TIGHT": 5,
+      "MASTER": 4.5
+     },
+     "basis": "typical",
+     "source": ""
+    },
+    {
+     "name": "Ch1 British crunch",
+     "models": [
+      1157
+     ],
+     "settings": {
+      "GAIN": 6,
+      "BASS": 5,
+      "MID": 6,
+      "TREBLE": 5.5,
+      "MASTER": 5
+     },
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "boosts": [
+    {
+     "model": "Green 808",
+     "settings": {
+      "OVERDRIVE": 0,
+      "TONE": 5,
+      "LEVEL": 7
+     },
+     "why": "Optional on Gain II, which is already tight; useful on Gain I to reach heavier rhythm (values typical)",
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "cabs": [
+    {
+     "model": "212 Zila Fatboy V30 02 (M)",
+     "why": "Zilla 2x12 V30: modern British V30 cab (typical pairing, not sourced)"
+    },
+    {
+     "model": "412 Zila Cust V30 12 V2 (M)",
+     "why": "Zilla 4x12 V30 for a bigger rhythm sound (typical)"
+    }
+   ],
+   "known_for": [
+    "Rabea Massaad",
+    "modern British high gain, progressive metal"
+   ],
+   "poor_at": "Cleans (no clean channel on the modeled amp), vintage low-gain touch",
+   "watch_out": "FOCUS was reported to work backwards on CorOS 2.1.0 (on = more bass); never assume its direction",
+   "tags": [
+    "victory",
+    "british",
+    "modern",
+    "tight",
+    "prog-metal",
+    "two-voices",
+    "6l6",
+    "el34"
+   ],
+   "sources": [
+    "https://images.thomann.de/pics/atg/atgdata/document/manual/victory_vx_manual_issue_1.pdf",
+    "https://quadcortex.wiki/Victor_Squid",
+    "https://unity.neuraldsp.com/t/victory-kraken-model/11740",
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "key": "fortin_nameless",
+   "real": "Fortin Nameless (Meshuggah signature 50 W single-channel head) - Neural DSP plugin model",
+   "models": [
+    1165
+   ],
+   "plugin": "Fortin Nameless Suite X",
+   "gain_range": "extreme",
+   "drive_control": "GAIN II",
+   "voice": "Brutal, very tight and aggressive: hard upper-mid attack, dry controlled lows, built for Meshuggah's low tunings",
+   "lineage": "Heavily modified Marshall-type circuit (per community) -> Fortin Meshuggah / Blackout 50 W",
+   "power_tubes": "2x EL34",
+   "controls": {
+    "INPUT": {
+     "does": "HIGH I: signal passes both gain stages. LOW I: skips the first stage (GAIN I disabled) for cleaner tones",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "PULL GAIN": {
+     "does": "Pulled: adds an extra clipping stage = more distortion AND lower output level",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "GAIN I": {
+     "does": "Gain of the first stage; only works on the HIGH I input",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "GAIN II": {
+     "does": "Gain of the second stage; always active",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "MVC": {
+     "does": "Master volume; high settings add power-amp saturation",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "PRESENCE": {
+     "does": "High frequencies of the power amp",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "BASS": {
+     "does": "Tone stack bass",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "MIDDLE": {
+     "does": "Tone stack mid",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "TREBLE": {
+     "does": "Tone stack treble",
+     "brighter": "up",
+     "tighter": "n/a"
+    }
+   },
+   "model_notes": {
+    "1165": "Requires the Fortin Nameless Suite X licence. GAIN I greys out on the LOW I input"
+   },
+   "starts": [
+    {
+     "name": "Jason Stallworth's Nameless rhythm settings",
+     "models": [
+      1165
+     ],
+     "settings": {
+      "GAIN I": 7.8,
+      "GAIN II": 8,
+      "MVC": 6.2,
+      "PRESENCE": 3.8,
+      "BASS": 3.8,
+      "MIDDLE": 6,
+      "TREBLE": 6.5
+     },
+     "basis": "cited",
+     "source": "https://www.jasonstallworth.com/fortin-nts-and-nameless/"
+    },
+    {
+     "name": "Fractal-forum user's plugin settings (with Hexdrive drive 0 and Grind ~2 o'clock)",
+     "models": [
+      1165
+     ],
+     "settings": {
+      "GAIN I": 7,
+      "GAIN II": 10,
+      "PRESENCE": 5.5,
+      "BASS": 7,
+      "MIDDLE": 4,
+      "TREBLE": 5.5
+     },
+     "basis": "cited",
+     "source": "https://forum.fractalaudio.com/threads/fortin-nameless-recreation.222265/"
+    }
+   ],
+   "boosts": [
+    {
+     "model": "Fortin Grind®",
+     "settings": {
+      "BOOST": 7
+     },
+     "why": "The suite's own booster: adds gain plus clarity/articulation; ~2 o'clock per a forum user (needs the plugin)",
+     "basis": "cited",
+     "source": "https://forum.fractalaudio.com/threads/fortin-nameless-recreation.222265/"
+    },
+    {
+     "model": "Fortin Hexdrive®",
+     "settings": {
+      "DRIVE": 0
+     },
+     "why": "High-headroom overdrive used as a boost with DRIVE at 0 (needs the plugin)",
+     "basis": "cited",
+     "source": "https://forum.fractalaudio.com/threads/fortin-nameless-recreation.222265/"
+    },
+    {
+     "model": "Green 808",
+     "settings": {
+      "OVERDRIVE": 0,
+      "TONE": 5,
+      "LEVEL": 7
+     },
+     "why": "Some users prefer a Tube Screamer over Grind; stock block, no licence needed (values typical)",
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "cabs": [
+    {
+     "model": "Nameless Cab (M)",
+     "why": "Matched cab from the same plugin"
+    },
+    {
+     "model": "412 CA Stand OS S V30 90s (M)",
+     "why": "Stock Mesa OS V30 fallback"
+    }
+   ],
+   "known_for": [
+    "Meshuggah (Fredrik Thordendal, Marten Hagstrom)",
+    "djent and extreme metal rhythm"
+   ],
+   "poor_at": "Cleans, warm vintage crunch, anything loose or saggy",
+   "watch_out": "PULL GAIN lowers the output level as it adds distortion: re-match loudness or it will be judged 'worse'",
+   "tags": [
+    "fortin",
+    "plugin",
+    "djent",
+    "extreme-metal",
+    "tight",
+    "aggressive",
+    "bright",
+    "el34"
+   ],
+   "sources": [
+    "https://downloads.neuraldsp.com/file/fortin-nameless-x/Fortin%20Nameless%20Suite%20X%20v1.0.0.pdf",
+    "https://neuraldsp.com/plugins/fortin-nameless-suite",
+    "https://www.jasonstallworth.com/fortin-nts-and-nameless/",
+    "https://forum.fractalaudio.com/threads/fortin-nameless-recreation.222265/",
+    "https://fortinamps.com/blogs/news/fortin-nameless-vs-fortin-nts-which-neural-dsp-suite-is-right-for-you",
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "key": "archetype_plini",
+   "real": "Archetype: Plini custom-designed amps (no real amp named by Neural DSP)",
+   "models": [
+    1159,
+    1160,
+    1161
+   ],
+   "plugin": "Archetype: Plini X",
+   "gain_range": "high",
+   "drive_control": "GAIN",
+   "voice": "Clear, articulate mid-gain prog tones: boutique clean, new-wave British crunch, hot-rodded lead that suits ERGs",
+   "lineage": "Designed from scratch with Plini; forum guesses (EVH 5150 III blue, JC-120) are unconfirmed",
+   "power_tubes": "",
+   "controls": {
+    "GAIN": {
+     "does": "Input gain",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "BRIGHT": {
+     "does": "High-frequency booster",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "BASS": {
+     "does": "Tone stack bass",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "MID": {
+     "does": "Tone stack mid",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "TREBLE": {
+     "does": "Tone stack treble",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "BLEND": {
+     "does": "Clean amp only: mixes in a compressed DI signal that bypasses the amp and cab",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "MASTER": {
+     "does": "Power-amp gain",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "PRESENCE": {
+     "does": "Shelving boost applied to the high frequencies",
+     "brighter": "up",
+     "tighter": "n/a"
+    }
+   },
+   "model_notes": {
+    "1159": "Clean: transparent, punchy 'boutique' clean with DI BLEND",
+    "1160": "Crunch: midpoint between clean and high gain; 'new-wave British tones with a twist'",
+    "1161": "Lead: the Crunch amp plus one more triode gain stage; for leads and heavy riffs, works with extended-range guitars"
+   },
+   "starts": [
+    {
+     "name": "neutral lead start (no published settings)",
+     "models": [
+      1161
+     ],
+     "settings": {
+      "GAIN": 5,
+      "BASS": 5,
+      "MID": 5.5,
+      "TREBLE": 5,
+      "PRESENCE": 5,
+      "MASTER": 5
+     },
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "boosts": [
+    {
+     "model": "Plini Drive",
+     "settings": {
+      "DRIVE": 1,
+      "TONE": 5,
+      "LEVEL": 7
+     },
+     "why": "The suite's boost/overdrive 'for tighter rhythms and saturated leads'; MODE switches to fuzz (values typical)",
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "cabs": [
+    {
+     "model": "Plini Cab (M)",
+     "why": "Matched cab from the same plugin"
+    }
+   ],
+   "known_for": [
+    "Plini",
+    "instrumental prog and fusion"
+   ],
+   "poor_at": "Extreme metal saturation, vintage amp character",
+   "watch_out": "Whole family needs the Archetype: Plini X licence; BLEND adds DI signal that ignores the cab block",
+   "tags": [
+    "plugin",
+    "prog",
+    "fusion",
+    "clean",
+    "articulate",
+    "lead",
+    "extended-range"
+   ],
+   "sources": [
+    "https://downloads.neuraldsp.com/file/archetype-plini-x-installers/v_1.0.0/Archetype-Plini-X-v1.0.0.pdf",
+    "https://neuraldsp.com/plugins/archetype-plini",
+    "https://neuraldsp.com/device-list",
+    "https://www.kvraudio.com/forum/viewtopic.php?t=585884"
+   ]
+  },
+  {
+   "key": "archetype_gojira",
+   "real": "Archetype: Gojira amps (Joe Duplantier's rig; real amps not named by Neural DSP)",
+   "models": [
+    1162,
+    1163,
+    1164
+   ],
+   "plugin": "Archetype: Gojira X",
+   "gain_range": "extreme",
+   "drive_control": "GAIN",
+   "voice": "Clear, defined, percussive ultra-high gain (HOT), a wide-range crunch (RST) and a vintage-tube clean (CLN)",
+   "lineage": "Community reports: RST/HOT follow EVH 5150 III blue/red, CLN a Fender-type clean; unconfirmed",
+   "power_tubes": "",
+   "controls": {
+    "GAIN": {
+     "does": "Input gain; RST has one of the widest gain sweeps Neural DSP has modeled",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "BRIGHT": {
+     "does": "CLN only: high-frequency booster",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "BASS": {
+     "does": "Tone stack bass",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "MID": {
+     "does": "Tone stack mid",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "TREBLE": {
+     "does": "Tone stack treble",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "MASTER": {
+     "does": "Power-amp gain (RST, HOT)",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "PRESENCE": {
+     "does": "Shelving boost applied to the high frequencies (RST, HOT)",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "DEPTH": {
+     "does": "Amount of low frequencies in the power-amp section (RST, HOT). Lower = tighter",
+     "brighter": "n/a",
+     "tighter": "down"
+    }
+   },
+   "model_notes": {
+    "1162": "CLN: 'pristine model of a vintage tube amplifier'; saturates naturally at high GAIN",
+    "1163": "RST (Rust): crunch amp with a huge gain sweep, reaches heavy rhythm",
+    "1164": "HOT: 'clear, defined, ultra high-gain tone Gojira is known for'"
+   },
+   "starts": [
+    {
+     "name": "HOT rhythm, neutral start (no published settings; less gain than you think)",
+     "models": [
+      1164
+     ],
+     "settings": {
+      "GAIN": 4.5,
+      "BASS": 5,
+      "MID": 5,
+      "TREBLE": 5.5,
+      "PRESENCE": 5,
+      "DEPTH": 4.5,
+      "MASTER": 5
+     },
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "boosts": [
+    {
+     "model": "Gojira OD",
+     "settings": {
+      "DIST": 0,
+      "TONE": 5,
+      "LEVEL": 8
+     },
+     "why": "The suite's overdrive used as a boost (values typical)",
+     "basis": "typical",
+     "source": ""
+    },
+    {
+     "model": "Gojira DRT",
+     "settings": {
+      "DIST": 3,
+      "FILTER": 4,
+      "VOL": 6
+     },
+     "why": "Distortion pedal; FILTER is a low-pass that gets DARKER as it rises (values typical)",
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "cabs": [
+    {
+     "model": "Gojira Cab 1 (M)",
+     "why": "Matched cabs from the same plugin (IRs by Adam 'Nolly' Getgood)"
+    },
+    {
+     "model": "Gojira Cab 2 (M)",
+     "why": "Alternative matched cab"
+    },
+    {
+     "model": "Gojira Cab 3 (M)",
+     "why": "Alternative matched cab"
+    }
+   ],
+   "known_for": [
+    "Gojira / Joe Duplantier",
+    "modern progressive death metal"
+   ],
+   "poor_at": "Vintage rock crunch, blues",
+   "watch_out": "Gojira DRT's FILTER runs backwards (up = darker). Family needs the Archetype: Gojira X licence",
+   "tags": [
+    "plugin",
+    "metal",
+    "modern",
+    "tight",
+    "percussive",
+    "death-metal",
+    "extreme"
+   ],
+   "sources": [
+    "https://downloads.neuraldsp.com/file/archetype-gojira-x/Archetype%20Gojira%20X%20v1.0.0.pdf",
+    "https://neuraldsp.com/plugins/archetype-gojira",
+    "https://neuraldsp.com/device-list",
+    "https://www.kvraudio.com/forum/viewtopic.php?t=619782",
+    "https://www.nailthemix.com/bilmuri-massive-tone-amps-layers-eq"
+   ]
+  },
+  {
+   "key": "archetype_cory_wong",
+   "real": "Archetype: Cory Wong (console DI strip, custom clean amp, rare boutique amp)",
+   "models": [
+    1168,
+    1169,
+    1175
+   ],
+   "plugin": "Archetype: Cory Wong X",
+   "gain_range": "clean",
+   "drive_control": "VOLUME",
+   "voice": "Sparkling, compressed funk cleans: console-DI 'bubble tone', a hi-fi clean amp and a touch-sensitive D-style amp",
+   "lineage": "DI Funk Console: analog channel strip. Clean Machine: amalgam of clean amps. Amp Snob: press says Dumble (unnamed)",
+   "power_tubes": "",
+   "controls": {
+    "COMP": {
+     "does": "Funk Console: amount of compression",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "ATTACK": {
+     "does": "Funk Console: compressor attack speed, slow or fast",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "TUBE SAT": {
+     "does": "Funk Console: amount of tube-style distortion",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "HIGH PASS": {
+     "does": "Funk Console: high-pass cutoff 20-250 Hz; raise to remove lows",
+     "brighter": "n/a",
+     "tighter": "up"
+    },
+    "LOW PASS": {
+     "does": "Funk Console: low-pass cutoff 2-17 kHz; lower to remove highs",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "LOWS": {
+     "does": "Funk Console: low band, +/-12 dB (LOWS FREQ switch picks the frequency)",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "MIDS": {
+     "does": "Funk Console: mid band, +/-12 dB (MIDS FREQ switch picks the frequency)",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "HIGHS": {
+     "does": "Funk Console: high band, +/-12 dB (HIGHS FREQ switch picks the frequency)",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "VOLUME": {
+     "does": "Input gain: Clean Machine (catalog name; manual calls it GAIN) and Amp Snob",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "BRIGHT": {
+     "does": "High-frequency boost (on = up position)",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "DRIVE": {
+     "does": "Amp Snob: switches in an additional tube stage (clean -> crunch)",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "BASS": {
+     "does": "Tone stack bass",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "MIDDLE": {
+     "does": "Tone stack mid",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "TREBLE": {
+     "does": "Tone stack treble",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "MASTER": {
+     "does": "Amp Snob: power-amp gain",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "PRESENCE": {
+     "does": "Amount of high frequencies in the power-amp stage",
+     "brighter": "up",
+     "tighter": "n/a"
+    }
+   },
+   "model_notes": {
+    "1168": "D.I. Funk Console (drive = TUBE SAT): analog channel-strip model (comp, tube sat, filters, 3-band EQ) for direct 'bubble tone'; not an amp",
+    "1169": "The Clean Machine: 'amalgamation of the best clean amps', customised for Cory; sources disagree (Twin vs JC-120)",
+    "1175": "The Amp Snob: clean/crunch 'model of one of the rarest amplifiers in history' (reported as a Dumble); DRIVE adds a tube stage"
+   },
+   "starts": [],
+   "boosts": [
+    {
+     "model": "Cory Wong The Tuber",
+     "settings": {
+      "DRIVE": 3,
+      "TONE": 5,
+      "LEVEL": 6
+     },
+     "why": "'A modded classic; a booster loved by tube amp fanatics' (values typical)",
+     "basis": "typical",
+     "source": ""
+    },
+    {
+     "model": "Cory Wong The Big Rig Overdrive",
+     "settings": {
+      "DRIVE": 4,
+      "TONE": 5,
+      "LEVEL": 5
+     },
+     "why": "Heavier overdrive that pushes toward fuzz (values typical)",
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "cabs": [
+    {
+     "model": "Cory Wong Cab 1 (M)",
+     "why": "Matched cabs from the same plugin (108 IRs per cab, by Nolly)"
+    },
+    {
+     "model": "Cory Wong Cab 2 (M)",
+     "why": "Alternative matched cab"
+    },
+    {
+     "model": "Cory Wong Cab 3 (M)",
+     "why": "Alternative matched cab"
+    }
+   ],
+   "known_for": [
+    "Cory Wong / Vulfpeck",
+    "funk rhythm guitar, pop and R&B cleans"
+   ],
+   "poor_at": "Any high-gain sound",
+   "watch_out": "The Funk Console is a DI strip: do not put a cab after it expecting an amp; its EQ knobs are in dB, not 0-10",
+   "tags": [
+    "plugin",
+    "clean",
+    "funk",
+    "compressed",
+    "di",
+    "pop",
+    "d-style"
+   ],
+   "sources": [
+    "https://downloads.neuraldsp.com/file/archetype-cory-wong-x/Archetype%20Cory%20Wong%20X%20v1.0.0.pdf",
+    "https://neuraldsp.com/plugins/archetype-cory-wong",
+    "https://neuraldsp.com/device-list",
+    "https://www.guitarplayer.com/news/neural-dsp-debuts-new-archetype-cory-wong-plugin"
+   ]
+  },
+  {
+   "key": "archetype_nolly",
+   "real": "Archetype: Nolly - four of Adam 'Nolly' Getgood's own modified amplifiers",
+   "models": [
+    1171,
+    1172,
+    1173,
+    1174
+   ],
+   "plugin": "Archetype: Nolly X",
+   "gain_range": "extreme",
+   "drive_control": "GAIN",
+   "voice": "Mix-ready modern metal set: full clean, twisted British crunch, massive 5150-style rhythm and a distinct high-gain lead",
+   "lineage": "Community-reported (unconfirmed): Clean = Bogner Shiva, Crunch = JCM800 2203, Rhythm = block-letter 5150, Lead = modded Victory V30",
+   "power_tubes": "",
+   "controls": {
+    "GAIN": {
+     "does": "Input gain",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "BRIGHT": {
+     "does": "High-frequency boost (Clean and Crunch amps)",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "BASS": {
+     "does": "Tone stack bass",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "MID": {
+     "does": "Tone stack mid (named MID on Rhythm and Crunch)",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "MIDDLE": {
+     "does": "Tone stack mid (named MIDDLE on Clean and Lead)",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "TREBLE": {
+     "does": "Tone stack treble",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "MASTER": {
+     "does": "Power-amp gain",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "PRESENCE": {
+     "does": "Shelving boost applied to the high frequencies (Crunch, Rhythm)",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "RESONANCE": {
+     "does": "Rhythm amp: low frequencies in the power-amp section, as on a 5150. Lower = tighter",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "DEPTH": {
+     "does": "Crunch amp: low frequencies in the power-amp section. Lower = tighter",
+     "brighter": "n/a",
+     "tighter": "down"
+    }
+   },
+   "model_notes": {
+    "1171": "Clean: 'crystal clear, full and defined'",
+    "1172": "Rhythm: 'full and massive'; RESONANCE + PRESENCE layout matches a 5150; main rhythm amp",
+    "1173": "Crunch: 'classic British crunch with a twist'; clear attack, rich harmonics",
+    "1174": "Lead: 'an entirely different high-gain flavor', useful for rhythm too; no presence control"
+   },
+   "starts": [
+    {
+     "name": "Rhythm amp boosted, treated like a 5150 (no published settings)",
+     "models": [
+      1172
+     ],
+     "settings": {
+      "GAIN": 4.5,
+      "BASS": 5.5,
+      "MID": 5,
+      "TREBLE": 6,
+      "PRESENCE": 5.5,
+      "RESONANCE": 5,
+      "MASTER": 4
+     },
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "boosts": [
+    {
+     "model": "Nolly Overdrive-1",
+     "settings": {
+      "DRIVE": 0,
+      "TONE": 5,
+      "LEVEL": 8,
+      "BRIGHT": true
+     },
+     "why": "Nolly recommends leaving BRIGHT on unless you want a particularly smooth character (knob values typical)",
+     "basis": "typical",
+     "source": ""
+    },
+    {
+     "model": "Nolly Overdrive-2",
+     "settings": {
+      "GAIN": 1,
+      "BASS": 4,
+      "TREBLE": 5.5,
+      "LEVEL": 7
+     },
+     "why": "Second boost with BASS/TREBLE: cut BASS to tighten (values typical)",
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "cabs": [
+    {
+     "model": "Nolly Cab 1 (M)",
+     "why": "Matched cabs from the same plugin, IRs captured by Nolly"
+    },
+    {
+     "model": "Nolly Cab 2 (M)",
+     "why": "Alternative matched cab"
+    },
+    {
+     "model": "Nolly Cab 3 (M)",
+     "why": "Alternative matched cab"
+    },
+    {
+     "model": "Nolly Cab 4 (M)",
+     "why": "Alternative matched cab"
+    }
+   ],
+   "known_for": [
+    "Adam 'Nolly' Getgood (Periphery, producer)",
+    "modern progressive metal / djent production"
+   ],
+   "poor_at": "Vintage low-gain character",
+   "watch_out": "Low-end control is named differently per amp (RESONANCE on Rhythm, DEPTH on Crunch, none on Lead/Clean)",
+   "tags": [
+    "plugin",
+    "metal",
+    "modern",
+    "djent",
+    "prog-metal",
+    "mix-ready",
+    "tight"
+   ],
+   "sources": [
+    "https://downloads.neuraldsp.com/file/archetype-nolly-x-installers/Archetype%20Nolly%20X%20v1.0.0.pdf",
+    "https://neuraldsp.com/plugins/archetype-nolly",
+    "https://www.soundonsound.com/reviews/neural-dsp-archetype-nolly",
+    "https://neuraldsp.com/device-list"
+   ]
+  },
+  {
+   "key": "archetype_petrucci",
+   "real": "Archetype: Petrucci amps (John Petrucci's Mesa Mark-style rig; real amps not named)",
+   "models": [
+    1177,
+    1178,
+    1179,
+    1180
+   ],
+   "plugin": "Archetype: Petrucci X",
+   "gain_range": "high",
+   "drive_control": "GAIN",
+   "voice": "Polished Dream Theater set: piezo/acoustic channel, glassy clean, tight focused rhythm, long-sustain liquid lead",
+   "lineage": "Petrucci's signature amps are Mesa Mark IIC+/JP-2C; Neural DSP does not state the modeled circuits",
+   "power_tubes": "",
+   "controls": {
+    "GAIN": {
+     "does": "Input gain (Clean, Rhythm, Lead)",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "BITE": {
+     "does": "Rhythm: enhances the harmonic response of the distortion (more aggressive edge)",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "TIGHT": {
+     "does": "Rhythm: high-pass filter before the gain; increase to remove low frequencies",
+     "brighter": "n/a",
+     "tighter": "up"
+    },
+    "MID BOOST": {
+     "does": "Rhythm: mid-frequency boost",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "SOAR": {
+     "does": "Lead: scoops the mids and boosts the highs",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "BRIGHT": {
+     "does": "Clean: high-frequency boost",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "BODY": {
+     "does": "Piezo: sets the resonance frequency of the acoustic body simulation",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "AIR": {
+     "does": "Piezo: turns the acoustic simulation on or off",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "BASS": {
+     "does": "Tone stack bass; on Rhythm it interacts with the gain structure, so keep it moderate",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "MIDDLE": {
+     "does": "Tone stack mid",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "TREBLE": {
+     "does": "Tone stack treble",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "PRESENCE": {
+     "does": "High-frequency shelving",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "MASTER": {
+     "does": "Power-amp gain",
+     "brighter": "n/a",
+     "tighter": "down"
+    }
+   },
+   "model_notes": {
+    "1177": "Piezo: for piezo pickups/acoustic-like cleans; not connected to any cab or EQ",
+    "1178": "Clean",
+    "1179": "Rhythm: TIGHT knob, BITE and MID BOOST switches",
+    "1180": "Lead: sustain-oriented; SOAR switch scoops mids and lifts highs"
+   },
+   "starts": [
+    {
+     "name": "Rhythm, neutral start with TIGHT at noon (no published settings)",
+     "models": [
+      1179
+     ],
+     "settings": {
+      "GAIN": 5,
+      "TIGHT": 5,
+      "BASS": 4,
+      "MIDDLE": 5,
+      "TREBLE": 5.5,
+      "PRESENCE": 5,
+      "MASTER": 5
+     },
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "boosts": [
+    {
+     "model": "Petrucci Overdrive",
+     "settings": {
+      "DRIVE": 1,
+      "TONE": 5,
+      "LEVEL": 7
+     },
+     "why": "The suite's overdrive used as a boost; its MODE switch is not documented (values typical)",
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "cabs": [
+    {
+     "model": "Petrucci Cab (M)",
+     "why": "Matched cab from the same plugin"
+    },
+    {
+     "model": "412 CA Trad S UKV30 90s (M)",
+     "why": "Stock Mesa Traditional V30 4x12 fallback"
+    }
+   ],
+   "known_for": [
+    "John Petrucci / Dream Theater",
+    "progressive metal"
+   ],
+   "poor_at": "Loose vintage or sludgy tones",
+   "watch_out": "Do not put a cab after the Piezo amp. For 'tighter' on Rhythm use TIGHT, not BASS",
+   "tags": [
+    "plugin",
+    "prog-metal",
+    "tight",
+    "lead",
+    "polished",
+    "piezo",
+    "mark-style"
+   ],
+   "sources": [
+    "https://downloads.neuraldsp.com/file/archetype-petrucci-x/Archetype%20Petrucci%20X%20v1.0.0.pdf",
+    "https://neuraldsp.com/device-list",
+    "https://neuraldsp.com/quad-cortex-updates/coros-and-cortex-control-4-1-0-are-now-available",
+    "https://www.musicradar.com/news/neural-dsp-archetype-john-petrucci"
+   ]
+  },
+  {
+   "key": "archetype_john_mayer",
+   "real": "Archetype: John Mayer - 1964 Fender Vibroverb, Dumble Steel String Singer #002, Two-Rock prototype #83",
+   "models": [
+    1181,
+    1182,
+    1183,
+    1184
+   ],
+   "plugin": "Archetype: John Mayer X",
+   "gain_range": "clean",
+   "drive_control": "GAIN",
+   "voice": "Big, hi-fi blues cleans to edge-of-breakup: Texas-blues 1x15 combo, huge-headroom SSS, and a mid-rich 50 W Two-Rock",
+   "lineage": "Blackface Fender -> Dumble Steel String Singer -> Two-Rock (Dumble-inspired) John Mayer Signature",
+   "power_tubes": "",
+   "controls": {
+    "VOLUME": {
+     "does": "Smooth Operator: preamp gain; breaks up into natural overdrive above about 3 (range starts at 1)",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "GAIN": {
+     "does": "Signature 83 / Headroom Hero: preamp gain. Three-In-One: input level in dB",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "BRIGHT": {
+     "does": "Boosts upper frequencies",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "EQ": {
+     "does": "Signature 83: EQ-1/EQ-2 voicing; EQ-2 emphasises mids and adds bite and gain",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "INPUT": {
+     "does": "Headroom Hero: FET or NORmal input; FET adds a front-end boost for more distortion",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "MID": {
+     "does": "Signature 83: mid knob. Headroom Hero: a mid-BOOST switch with the same name (more aggressive)",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "MIDDLE": {
+     "does": "Headroom Hero: tone stack mid knob",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "BASS": {
+     "does": "Tone stack bass",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "TREBLE": {
+     "does": "Tone stack treble",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "MASTER": {
+     "does": "Master level; higher adds power-amp saturation and sag",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "PRESENCE": {
+     "does": "Signature 83: high-end response in the power-amp section",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "SMOOTH OPERATOR": {
+     "does": "Three-In-One: level of the Vibroverb-type amp in the blend (0-100 %)",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "HEADROOM HERO": {
+     "does": "Three-In-One: level of the Steel String Singer-type amp in the blend (0-100 %)",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "SIGNATURE 83": {
+     "does": "Three-In-One: level of the Two-Rock-type amp in the blend (0-100 %)",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "ROOM SEND": {
+     "does": "Three-In-One: level of the built-in room ambience (dB)",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    }
+   },
+   "model_notes": {
+    "1181": "Smooth Operator (drive control is VOLUME): '40 W US combo from 1964 with a 15-inch speaker' (reported: Fender Vibroverb); Texas blues tone",
+    "1182": "Signature 83: '50 W prototype' for hi-def clean to edge of breakup (reported: Two-Rock John Mayer Signature #83)",
+    "1183": "Headroom Hero: 'rare 100 W amp with massive clean headroom' (reported: Dumble Steel String Singer #002)",
+    "1184": "Three-In-One: all three blended with John's settings, matched cabs/mics built in; no separate cab needed"
+   },
+   "starts": [
+    {
+     "name": "Smooth Operator edge of breakup (manual: breaks up above 3)",
+     "models": [
+      1181
+     ],
+     "settings": {
+      "VOLUME": 3.5
+     },
+     "basis": "cited",
+     "source": "https://neuraldsp.com/manual/archetype-john-mayer-x"
+    }
+   ],
+   "boosts": [
+    {
+     "model": "John Mayer Halfman OD",
+     "settings": {
+      "GAIN": 3,
+      "TREBLE": 5,
+      "LEVEL": 6
+     },
+     "why": "Mid-gain overdrive 'modeled on John's favorite unit' (values typical)",
+     "basis": "typical",
+     "source": ""
+    },
+    {
+     "model": "John Mayer Tealbreaker",
+     "settings": {
+      "GAIN": 3,
+      "TONE": 5,
+      "LEVEL": 6
+     },
+     "why": "TS/BB switchable: TS = smooth mid-focused with rolled-off lows, BB = balanced and clear (values typical)",
+     "basis": "typical",
+     "source": ""
+    },
+    {
+     "model": "John Mayer Justa Boost",
+     "settings": {
+      "VOLUME": 5
+     },
+     "why": "Clean boost, or overdrive-style boost with the BOOST switch (value typical)",
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "cabs": [
+    {
+     "model": "John Mayer Smooth Operator Cab (M)",
+     "why": "Matched 1x15 cab for the Smooth Operator"
+    },
+    {
+     "model": "John Mayer Signature 83 Cab (M)",
+     "why": "Matched cab for the Signature 83"
+    },
+    {
+     "model": "John Mayer Headroom Hero Cab (M)",
+     "why": "Matched cab for the Headroom Hero"
+    }
+   ],
+   "known_for": [
+    "John Mayer",
+    "blues, pop and Americana cleans, edge-of-breakup lead"
+   ],
+   "poor_at": "High gain of any kind",
+   "watch_out": "Three-In-One has its cabs and room built in (do not add a cab); its GAIN is in dB and the blend knobs are in %",
+   "tags": [
+    "plugin",
+    "clean",
+    "blues",
+    "edge-of-breakup",
+    "d-style",
+    "fender",
+    "hi-fi"
+   ],
+   "sources": [
+    "https://neuraldsp.com/manual/archetype-john-mayer-x",
+    "https://www.musicradar.com/guitars/guitar-plugins/neural-dsp-archetype-john-mayer-x-review",
+    "https://neuraldsp.com/device-list",
+    "https://neuraldsp.com/quad-cortex-updates/coros-and-cortex-control-4-1-0-are-now-available"
+   ]
+  },
+  {
+   "key": "archetype_rabea",
+   "real": "Archetype: Rabea amps (classic American clean; Crunch and Lead 'based on Rabea's favorite amplifier')",
+   "models": [
+    1185,
+    1186,
+    1187
+   ],
+   "plugin": "Archetype: Rabea X",
+   "gain_range": "extreme",
+   "drive_control": "GAIN",
+   "voice": "Bright dynamic 'Cali' clean, articulate British-style crunch, and a massive tight high-gain lead with switchable tubes",
+   "lineage": "Reviewers link Crunch/Lead to Rabea's Victory Kraken (unconfirmed); QC 'Victor Squid' shares the same switch layout",
+   "power_tubes": "Switchable EL34 / 6L6 (TUBE) on Crunch and Lead",
+   "controls": {
+    "GAIN": {
+     "does": "Preamp gain (Crunch, Lead)",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "VOLUME": {
+     "does": "Clean amp level/drive",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "BASS": {
+     "does": "Bass response",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "MIDDLE": {
+     "does": "Mid response",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "TREBLE": {
+     "does": "High response",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "MASTER": {
+     "does": "Master level; higher adds power-amp saturation and sag",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "DEPTH": {
+     "does": "Low frequencies in the power-amp stage (boosts low-mids and bass). Lower = tighter",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "HIGH BOOST": {
+     "does": "Clean and Crunch: high-frequency boost",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "MID BOOST": {
+     "does": "Clean and Crunch: mid-frequency boost",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "TUBE": {
+     "does": "Toggles EL34 / 6L6 power tubes (Crunch, Lead). Which state is which is not documented for the QC",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "TIGHT": {
+     "does": "Lead: high-pass filter; increase to remove low frequencies",
+     "brighter": "n/a",
+     "tighter": "up"
+    },
+    "PRESENCE": {
+     "does": "Lead: high-end response (upper mids and treble)",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "MOD": {
+     "does": "Present on the QC Crunch/Lead blocks but absent from both plugin manuals; effect not published",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    }
+   },
+   "model_notes": {
+    "1185": "Crunch: dynamic rhythm amp from articulate crunch to rich overdrive; HIGH/MID BOOST switches",
+    "1186": "Lead: 'massive gain, tight response'; TIGHT knob lets it behave tighter or looser 'like a Mesa or Soldano' (Rabea)",
+    "1187": "Clean (level/drive control is VOLUME): 'bright, dynamic character of classic American clean amps'"
+   },
+   "starts": [
+    {
+     "name": "Lead rhythm, neutral start with TIGHT at noon (no published settings)",
+     "models": [
+      1186
+     ],
+     "settings": {
+      "GAIN": 5,
+      "BASS": 5,
+      "MIDDLE": 5.5,
+      "TREBLE": 5.5,
+      "PRESENCE": 5,
+      "DEPTH": 4.5,
+      "TIGHT": 5,
+      "MASTER": 5
+     },
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "boosts": [
+    {
+     "model": "Rabea Paragon Overdrive",
+     "settings": {
+      "DRIVE": 1,
+      "BASS": 4,
+      "TREBLE": 5.5,
+      "LEVEL": 7
+     },
+     "why": "MODE: Vintage = mid-focused (TS-like boost), Modern = more transparent/dynamic (knob values typical)",
+     "basis": "typical",
+     "source": ""
+    },
+    {
+     "model": "Rabea Colossus Fuzz",
+     "settings": {
+      "FUZZ": 6,
+      "BASS": 5,
+      "TREBLE": 5,
+      "LEVEL": 5
+     },
+     "why": "Fuzz with Vintage/Modern MODE for doom and wall-of-sound parts (values typical)",
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "cabs": [
+    {
+     "model": "Rabea Cab 1 (M)",
+     "why": "Matched cabs from the same plugin"
+    },
+    {
+     "model": "Rabea Cab 2 (M)",
+     "why": "Alternative matched cab"
+    },
+    {
+     "model": "Rabea Cab 3 (M)",
+     "why": "Alternative matched cab"
+    }
+   ],
+   "known_for": [
+    "Rabea Massaad",
+    "ambient-to-heavy modern rock, doom, prog metal"
+   ],
+   "poor_at": "Vintage amp authenticity",
+   "watch_out": "Two low-end controls on Lead pull in opposite directions: TIGHT up = tighter, DEPTH up = looser",
+   "tags": [
+    "plugin",
+    "modern",
+    "british",
+    "tight",
+    "ambient",
+    "doom",
+    "prog-metal",
+    "el34",
+    "6l6"
+   ],
+   "sources": [
+    "https://neuraldsp.com/manual/archetype-rabea-x",
+    "https://downloads.neuraldsp.com/file/archetype-rabea/Archetype%20Rabea%20v1.0.0.pdf",
+    "https://www.soundonsound.com/reviews/neural-dsp-archetype-rabea",
+    "https://www.guitarworld.com/features/rabea-massaad-neural-dsp-archetype-plugin",
+    "https://neuraldsp.com/device-list",
+    "https://neuraldsp.com/quad-cortex-updates/coros-and-cortex-control-4-1-0-are-now-available"
+   ]
+  },
+  {
+   "key": "archetype_misha",
+   "real": "Archetype: Misha Mansoor amps (custom designs; real amps not named)",
+   "models": [
+    1188,
+    1189,
+    1190
+   ],
+   "plugin": "Archetype: Misha Mansoor X",
+   "gain_range": "extreme",
+   "drive_control": "GAIN",
+   "voice": "Periphery toolkit: full high-headroom American clean, an aggressive hybrid metal rhythm amp, a British-voiced lead",
+   "lineage": "Clean: 'modern American classic'. Rhythm: 'blend of legendary high-gain metal circuits'. Lead: 'custom-modded British classics'",
+   "power_tubes": "",
+   "controls": {
+    "GAIN": {
+     "does": "Preamp gain",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "BOOST": {
+     "does": "Clean amp: boost at the amp's input, giving more distortion",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "VOICE": {
+     "does": "Switches between two tone stacks with different EQ voicings; which is brighter is not documented",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "TREBLE SHIFT": {
+     "does": "Lead amp switch on the QC; not described in the plugin manual",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "BASS": {
+     "does": "Tone stack bass",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "MIDDLE": {
+     "does": "Tone stack mid (Clean, Rhythm)",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "MID": {
+     "does": "Tone stack mid (Lead)",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "TREBLE": {
+     "does": "Tone stack treble",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "MASTER": {
+     "does": "Master level; higher adds power-amp saturation and sag",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "PRESENCE": {
+     "does": "High-end response",
+     "brighter": "up",
+     "tighter": "n/a"
+    }
+   },
+   "model_notes": {
+    "1188": "Clean: 'rich, full-bodied cleans and massive headroom'; BOOST and VOICE switches",
+    "1189": "Rhythm: 'fierce blend of some of the most legendary high-gain metal circuits'",
+    "1190": "Lead: 'inspired by custom-modded British classics' with a redesigned tone stack for lead playing"
+   },
+   "starts": [
+    {
+     "name": "Rhythm with Precision Drive, neutral start (no published settings)",
+     "models": [
+      1189
+     ],
+     "settings": {
+      "GAIN": 4.5,
+      "BASS": 5,
+      "MIDDLE": 5,
+      "TREBLE": 5.5,
+      "PRESENCE": 5,
+      "MASTER": 5
+     },
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "boosts": [
+    {
+     "model": "Horizon Devices® Precision Drive™",
+     "settings": {
+      "DRIVE": 1,
+      "BRIGHT": 5,
+      "VOLUME": 5,
+      "GATE": 5
+     },
+     "why": "Misha's own boost. Maker: DRIVE near 0 then 1-2, VOLUME noon (6 = TS at 10), GATE noon; ATTACK right = tighter",
+     "basis": "cited",
+     "source": "https://horizondevices.com/pages/precision-drive"
+    },
+    {
+     "model": "Misha Chaos",
+     "settings": {
+      "MIX": 3
+     },
+     "why": "DIY pedal inspired by a classic Swedish-metal distortion; single MIX knob blends it in (value typical)",
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "cabs": [
+    {
+     "model": "Misha Cab 1 (M)",
+     "why": "Matched cabs from the same plugin"
+    },
+    {
+     "model": "Misha Cab 2 (M)",
+     "why": "Alternative matched cab"
+    },
+    {
+     "model": "Misha Cab 3 (M)",
+     "why": "Alternative matched cab"
+    }
+   ],
+   "known_for": [
+    "Misha Mansoor / Periphery",
+    "djent, progressive metal"
+   ],
+   "poor_at": "Vintage low-gain tones",
+   "watch_out": "VOICE and TREBLE SHIFT directions are undocumented: A/B by ear instead of assuming 'on = brighter'",
+   "tags": [
+    "plugin",
+    "djent",
+    "prog-metal",
+    "modern",
+    "tight",
+    "aggressive"
+   ],
+   "sources": [
+    "https://neuraldsp.com/manual/archetype-misha-mansoor-x",
+    "https://www.musicradar.com/artists/neural-dsp-archetype-misha-mansoor-x-signature-plugin-suite",
+    "https://horizondevices.com/pages/precision-drive",
+    "https://neuraldsp.com/device-list",
+    "https://neuraldsp.com/quad-cortex-updates/coros-and-cortex-control-4-1-0-are-now-available"
+   ]
+  },
+  {
+   "key": "archetype_tim_henson",
+   "real": "Archetype: Tim Henson amps (Roses acoustic, Cherubs vintage rhythm, Pink British lead; real amps not named)",
+   "models": [
+    1191,
+    1192,
+    1193,
+    1194
+   ],
+   "plugin": "Archetype: Tim Henson X",
+   "gain_range": "high",
+   "drive_control": "GAIN",
+   "voice": "Polyphia palette: ultra-clean amp with acoustic-style DI blend, vintage edge-of-breakup crunch, mid-forward British lead",
+   "lineage": "Acoustic from Tim's studio chain; reviewers liken the crunch to a vintage Vox and the lead to a modded Marshall (unconfirmed)",
+   "power_tubes": "",
+   "controls": {
+    "GAIN": {
+     "does": "Acoustic: input gain. Crunch/Lead: preamp gain",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "BASS": {
+     "does": "Bass response",
+     "brighter": "n/a",
+     "tighter": "down"
+    },
+    "MID": {
+     "does": "Mid response",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "TREBLE": {
+     "does": "High response",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "PRESENCE": {
+     "does": "High-end response",
+     "brighter": "up",
+     "tighter": "n/a"
+    },
+    "BLEND": {
+     "does": "Acoustic only: mix of the compressed/EQ'd DI 'acoustic effect' signal; scale is -28..0, not 0-10",
+     "brighter": "n/a",
+     "tighter": "n/a"
+    },
+    "MASTER": {
+     "does": "Lead only: master level; higher adds power-amp saturation and sag",
+     "brighter": "n/a",
+     "tighter": "down"
+    }
+   },
+   "model_notes": {
+    "1191": "Acoustic ('Roses'): ultra-clean amp plus parallel DI for semi-acoustic to American-style cleans; has no cab",
+    "1192": "Crunch Ch1 ('Cherubs' channel 1): classic vintage-amp character, edge of breakup to driven crunch",
+    "1193": "Crunch Ch2 ('Cherubs' channel 2): second channel of the same amp; how it differs from Ch1 is not documented",
+    "1194": "Lead ('Pink'): aggressive British midrange and rich distortion; tight rhythm and mid-forward leads"
+   },
+   "starts": [
+    {
+     "name": "Lead, neutral start (no published settings)",
+     "models": [
+      1194
+     ],
+     "settings": {
+      "GAIN": 5,
+      "BASS": 5,
+      "MID": 5.5,
+      "TREBLE": 5,
+      "PRESENCE": 5,
+      "MASTER": 5
+     },
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "boosts": [
+    {
+     "model": "Tim Henson Overdrive",
+     "settings": {
+      "DRIVE": 1,
+      "TONE": 5,
+      "LEVEL": 7,
+      "BASS": 5
+     },
+     "why": "'Classic overdrive circuit with a pronounced midrange': use as a boost on a distorted amp (values typical)",
+     "basis": "typical",
+     "source": ""
+    },
+    {
+     "model": "Tim Henson Boost",
+     "settings": {
+      "GAIN": 2,
+      "LEVEL": 6,
+      "BASS": 5,
+      "TREBLE": 5
+     },
+     "why": "Clean boost / light overdrive with 2-band EQ (values typical)",
+     "basis": "typical",
+     "source": ""
+    }
+   ],
+   "cabs": [
+    {
+     "model": "Tim Henson Cab Crunch (M)",
+     "why": "Matched cab for the Crunch amp"
+    },
+    {
+     "model": "Tim Henson Cab Lead (M)",
+     "why": "Matched cab for the Lead amp"
+    }
+   ],
+   "known_for": [
+    "Tim Henson / Polyphia",
+    "modern instrumental guitar, hybrid acoustic-electric cleans"
+   ],
+   "poor_at": "Extreme metal rhythm",
+   "watch_out": "Do not put a cab after the Acoustic amp. Crunch Ch1/Ch2 have no MASTER parameter",
+   "tags": [
+    "plugin",
+    "clean",
+    "acoustic-sim",
+    "crunch",
+    "british",
+    "lead",
+    "modern-instrumental"
+   ],
+   "sources": [
+    "https://neuraldsp.com/manual/archetype-tim-henson-x",
+    "https://neuraldsp.com/device-list",
+    "https://neuraldsp.com/quad-cortex-updates/coros-and-cortex-control-4-1-0-are-now-available"
+   ]
+  }
+ ],
+ "conventions": {
+  "scale_note": "Clock positions from manuals were converted linearly: 7:00 = 0, 12:00 = 5, 5:00 = 10 (one hour = 1.0). Fractal-derived numbers are Fractal knob values; treat every start as a starting point, not a calibrated match.",
+  "direction_note": "'brighter'/'tighter' give the direction to move that control for a brighter tone / tighter low end. For switches 'up' = on/engaged, 'down' = off. 'n/a' = no reliable effect or direction not documented.",
+  "output_note": "OUTPUT (dB) on every amp block is a clean level trim with no tonal effect; use it to re-match loudness after changing MASTER, SAT, PULL GAIN or MIDCUT.",
+  "gain_advice": [
+   {
+    "text": "Mesa (JP-2C manual): players have applied too much gain ever since it was invented; 'use enough gain to get the job done and no more'. As GAIN goes up, BASS should come down.",
+    "source": "https://mesa-boogie.imgix.net/media/User%20Manuals/070494-JP2C-160317-download.pdf"
+   },
+   {
+    "text": "Mesa (Rectifier manual): 'Don't turn the Gain all the way up'; the amp is designed to give its gain at less than extreme settings.",
+    "source": "https://mesa-boogie.imgix.net/media/User%20Manuals/3chRecto_multiWatt.pdf"
+   },
+   {
+    "text": "Diezel (Herbert/VH4 manuals): 'less is often more'; start every control at 12:00; reduce gain with high-output pickups.",
+    "source": "https://www.diezelamplification.com/manuals/en/Herbert_Manual_25102016.pdf"
+   },
+   {
+    "text": "Peavey (6505 manual): rhythm channel pre gain 0-4; set pre gain for the overdrive you want, then post gain for volume.",
+    "source": "https://assets.peavey.com/literature/manuals/6505_english.pdf"
+   },
+   {
+    "text": "Nail The Mix (Gojira/Nolly amp-sim tones): use less gain than you think you need to keep articulation; boost the DI before the amp instead.",
+    "source": "https://www.nailthemix.com/bilmuri-massive-tone-amps-layers-eq"
+   },
+   {
+    "text": "Typical boosted-amp numbers: amp GAIN 3.5-5 on 5150/Rectifier-type amps with a boost at drive 0 and level 8-10; 5-6.5 unboosted.",
+    "source": ""
+   }
+  ],
+  "boost_recipe": {
+   "text": "Classic tightening boost: Tube Screamer-type pedal with drive at or just above 0, tone around noon, level near max. It cuts lows before the preamp (tighter palm mutes), adds a mid hump and hits the first stage harder.",
+   "tube_screamer": {
+    "model": "Green 808",
+    "settings": {
+     "OVERDRIVE": 0,
+     "TONE": 5.5,
+     "LEVEL": 9
+    },
+    "basis": "typical"
+   },
+   "precision_drive": {
+    "model": "Horizon Devices® Precision Drive™",
+    "settings": {
+     "DRIVE": 1,
+     "VOLUME": 5,
+     "GATE": 5
+    },
+    "basis": "cited",
+    "source": "https://horizondevices.com/pages/precision-drive"
+   },
+   "needs_boost_most": [
+    "mesa_rectifier",
+    "mesa_tremoverb",
+    "peavey_6505",
+    "bogner_uberschall",
+    "marshall_jcm800"
+   ],
+   "needs_boost_least": [
+    "mesa_jp2c",
+    "diezel_vh4",
+    "diezel_herbert",
+    "friedman_be100",
+    "fortin_nameless",
+    "evh_5150iii"
+   ]
+  },
+  "cab_conventions": [
+   {
+    "speaker": "Celestion Vintage 30",
+    "text": "Upper-mid forward with tight lows; the modern-metal default, especially in Mesa oversized 4x12s. Mesa-made V30s are voiced differently from regular ones.",
+    "qc_examples": [
+     "412 CA Stand OS S V30 90s (M)",
+     "412 D-Cell Front V30 04 (M)",
+     "412 Zila Cust V30 12 V2 (M)"
+    ]
+   },
+   {
+    "speaker": "Celestion G12T-75",
+    "text": "Scooped mids, bright top, extended lows; the stock 1980s Marshall 1960A speaker, associated with thrash and JCM800/900 tones; can sound thin or harsh alone.",
+    "qc_examples": [
+     "412 Brit 60A G75 80s (M)",
+     "412 Bogna Uber T75 00s (M)"
+    ]
+   },
+   {
+    "speaker": "Celestion Greenback (G12M)",
+    "text": "Warm, woody mid-heavy voice with softer lows and early breakup (25 W); classic rock and hot-rodded Marshall tones, less suited to tight low-tuned metal.",
+    "qc_examples": [
+     "412 Brit 60B GB 90s (M)",
+     "412 Brit 60A GB75Hz 89 (M)"
+    ]
+   },
+   {
+    "speaker": "Mixes",
+    "text": "V30 + G12T-75 (Bogner Ubercab) or V30 + Greenback (Friedman-style) blends are common to balance mid push against scoop/warmth.",
+    "qc_examples": [
+     "412 Bogna Uber V30 00s (M)",
+     "412 Bogna Uber T75 00s (M)"
+    ]
+   }
+  ],
+  "cab_sources": [
+   "https://forum.seymourduncan.com/threads/celestion-vintage-30-vs-greenback-vs-g12-t75.102416/",
+   "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-recto1-and-recto2-mesa-dual-rectifier-2-ch-and-3-ch.114701/",
+   "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-euro-uber-bogner-uberschall.113311/",
+   "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-friedman-be-and-hbe-friedman-marsha-and-be-100.113559/"
+  ],
+  "special_cases_for_software": [
+   "mesa_rectifier 1018 (Modern): no power-amp negative feedback. PRESENCE is a preamp high-cut with a much lower useful range; MASTER above ~2-3 makes it darker and flubbier, not just louder.",
+   "mesa_tremoverb: PRESENCE circuit differs per channel (Orange = feedback loop, Red = preamp); do not copy values between 1089 and 1090.",
+   "mesa_jp2c: BASS is pre-distortion (lower it to tighten; add lows with '80 Hz'/'240 Hz'). PRES PULL changes the correct PRESENCE range (pulled 0-3, pushed ~6).",
+   "peavey_6505 DEPTH, evh_5150iii RESONANCE, archetype_nolly RESONANCE/DEPTH, gojira DEPTH, rabea DEPTH, diezel DEEP, slo plugin DEPTH: power-amp low boost; lower = tighter.",
+   "TIGHT knobs (victory_kraken Ch2, archetype_petrucci Rhythm, archetype_rabea Lead) are high-pass filters: higher = tighter, the opposite sense to DEPTH/RESONANCE.",
+   "diezel_herbert: INTENSITY and LEVEL do nothing unless MIDCUT is on; LEVEL is make-up volume only.",
+   "friedman_be100: SAT and FAT loosen/thicken (turn off to tighten); SAT also drops volume; BASS is meant to run very high.",
+   "marshall_jubilee: INPUT GAIN, LEAD MASTER and OUTPUT MASTER all change loudness; only INPUT GAIN is the drive control.",
+   "marshall_jcm800 / soldano_slo100: raising MASTER makes the tone darker and smoother; low MASTER is the usual cause of harshness.",
+   "fortin_nameless: GAIN I is inactive on INPUT = LOW I; PULL GAIN adds distortion but lowers output.",
+   "soldano_slo100_plugin (1170): scales are 0-11 and only the selected CHANNEL's gain/master pair is active.",
+   "victory_kraken FOCUS, friedman VOICE, misha VOICE/TREBLE SHIFT, TUBE switches, MOD switches: polarity or effect undocumented; A/B by measurement.",
+   "Gojira DRT FILTER is a low-pass that darkens as it rises.",
+   "Non-0-10 scales: Tim Henson Acoustic BLEND (-28..0), John Mayer Three-In-One (% and dB), Cory Wong Funk Console (Hz and dB), SLO plugin (0-11), John Mayer Smooth Operator (1-10)."
+  ]
+ }
+}

@@ -177,14 +177,15 @@ def record_inputs(seconds, channels, *, stop=None, ready=None):
     return samples[:cursor]
 
 
-def reamp(dry):
+def reamp(dry, *, tail=2.):
+    """Play a dry take through USB 5 and return what comes back. `tail` is the seconds kept after it."""
     if dry.shape[1] != 1:
         raise ValueError("Use a mono dry guitar recording to reamp.")
     if np.max(np.abs(dry)) >= 0.999:
         raise ValueError("The dry recording clips. Capture a new DI with more headroom.")
     sd, device_id, _ = asio_device()
     # A mono guitar goes to USB 5 only. Keep USB 6 silent and collect a stereo return.
-    padding, tail = RATE // 4, RATE * 2
+    padding, tail = RATE // 4, round(RATE * tail)
     playback = np.zeros((len(dry) + padding + tail, 2), dtype=np.float32)
     playback[padding:padding + len(dry), 0] = dry[:, 0]
     result = np.empty_like(playback)

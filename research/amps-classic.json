@@ -1,0 +1,1000 @@
+{
+  "meta": {
+    "scope": "Quad Cortex 'Guitar Amplifier' models: clean, edge-of-breakup and classic-crunch families (48 model ids, 20 families).",
+    "researched": "2026-11-18",
+    "conventions": {
+      "settings_values": "Knobs are numbers on the QC range from the catalog (0..10 unless stated). Switches are true/false (true = on/engaged). Selectors are lowercase strings.",
+      "direction_fields": "brighter / tighter / warmer say which way to move the control for that result: 'up', 'down' or 'n/a'. For switches 'up' means ON.",
+      "gain_range": "Highest drive class the amp reaches by itself (no pedal): clean | edge | crunch | high. 'sweet_spot' is the class it is best known for.",
+      "basis": "'cited' = numbers taken from the source URL (converted to 0..10 where the note says so). 'typical' = synthesis of several sources; treat as a starting point.",
+      "OUTPUT": "Every amp has OUTPUT[-60..12 dB]: a post-amp level trim (assumed tonally neutral). Use it for level-matching after VOLUME/GAIN has been set for feel; never as a tone or drive control."
+    },
+    "scale_conversion": {
+      "clock_to_0_10": "7 o'clock = 0, 12 o'clock = 5, 5 o'clock = 10 (one hour = 1.0).",
+      "blackface_fender_1_to_10": "Real blackface knobs read 1..10: qc = (n - 1) * 10 / 9. Example: real '6' = 5.6.",
+      "tweed_fender_1_to_12": "Real tweed knobs read 1..12: qc = (n - 1) * 10 / 11. Example: real '8' = 6.4.",
+      "caveat": "Several QC users report the models break up earlier than the real amps at the same knob number; use the numbers as ratios and aim by ear for 'just breaking up when I dig in'."
+    },
+    "special_cases": [
+      {"rule": "inverted_cut", "applies_to": [1009, 1011, 1127, 1128], "param": "TONE CUT", "text": "Vox TONE CUT is a power-amp treble CUT: up = darker, down = brighter (Vox manual: 'the opposite of what you may think')."},
+      {"rule": "inverted_cut", "applies_to": [1155, 1156], "param": "CUT", "text": "Matchless DC-30 CUT behaves like the Vox cut: up = darker; subtle below half, strong from half to full; most effective with MASTER high."},
+      {"rule": "thickness_selector", "applies_to": [1156], "param": "TONE", "text": "DC-30 Ch2 TONE is a 6-position thickness switch on the real amp: low = thin/bright, each step up = thicker. 'Brighter' = down."},
+      {"rule": "volume_is_gain", "applies_to": [1083, 1084, 1094, 1095, 1166, 1167, 1096, 1097, 1120, 1123, 1124, 1125, 1126, 1132, 1133, 1134, 1135, 1009, 1011, 1127, 1128, 1038, 1039, 1040, 1079, 1080, 1081, 1091, 1092, 1093, 1027], "text": "Non-master-volume amps: VOLUME / GAIN is the only drive control and it drives preamp and power amp together. Change loudness with OUTPUT, not VOLUME."},
+      {"rule": "tighter_means_less_bass_into_the_amp", "applies_to": "all tube families here", "text": "On these circuits 'tighter' is mostly: lower BASS first, lower the Normal-channel volume on jumpered models, then a low-cut or mid-hump boost before the amp. More gain makes the low end looser, not tighter."},
+      {"rule": "bright_cap_fades_with_volume", "applies_to": [1083, 1084, 1096, 1097, 1095, 1167, 1166, 1117, 1176, 1039, 1079, 1091, 1124, 1134], "text": "Bright switches/caps sit across the volume control: big effect at low VOLUME/GAIN, little or none near maximum. At low volume turn BRIGHT off before cutting TREBLE."},
+      {"rule": "interactive_passive_stack", "applies_to": "Fender, Marshall, Vox Top Boost, Matchless, Lone Star", "text": "Passive stacks only cut and interact. Fender/Marshall: the scoop sits around 500 Hz; MID up fills it AND raises level/drive; Bass 0 / Mid 10 / Treble 0 is the flattest setting. Vox Top Boost: TREBLE up also cuts BASS; BASS up deepens the mid notch."},
+      {"rule": "presence_is_power_amp", "applies_to": [1123, 1124, 1125, 1126, 1132, 1133, 1134, 1135, 1038, 1039, 1040, 1079, 1080, 1081, 1091, 1092, 1093, 1063, 1064], "text": "PRESENCE on tweed Fender / Marshall / Hiwatt circuits is a treble boost made by reducing high-frequency negative feedback in the power amp: it adds cut and edge after the preamp distortion, most audible when the amp is driven."},
+      {"rule": "presence_is_preamp_high_cut", "applies_to": [1101, 1102, 1103, 1104, 1105, 1106, 1107, 1108], "param": "PRESENCE", "text": "Mesa Lone Star PRESENCE is a high-frequency attenuator at the end of each channel's preamp: lower = darker AND more compressed/fatter (good for leads)."},
+      {"rule": "gain_changes_tone", "applies_to": [1101, 1102, 1103, 1104, 1105, 1106, 1107, 1108, 1176], "text": "Lone Star GAIN and Dumble VOLUME shift the voicing as they rise: low = brighter, more upper harmonics; high = thicker, bassier, softer attack. As gain goes up, turn BASS down."},
+      {"rule": "jumpered_two_volumes", "applies_to": [1040, 1080, 1092, 1123, 1125, 1133, 1135], "text": "Patch/jumpered models blend a bright channel and a dark, bassy Normal channel. Brighter/tighter = less Normal volume; warmer/fatter = more Normal volume. Common advice: keep Normal at or below the bright volume."},
+      {"rule": "master_is_the_drive", "applies_to": [1116], "param": "MASTER", "text": "Morgan SW50: the real amp's 'Level' (QC MASTER, assumed mapping) is power-section gain; past about 3 o'clock (8) it adds power-amp overdrive."},
+      {"rule": "no_amp_drive", "applies_to": [1008], "text": "JC-120 is solid state and stays clean: requests for 'more drive/bite/compression' must be served by pedals or a compressor, not the amp."},
+      {"rule": "dark_at_noon_taper", "applies_to": [1117], "param": "TREBLE", "text": "Bogner pot tapers: treble at noon is roughly a Marshall's treble at 1. Running TREBLE at 7-9 is normal, not extreme."},
+      {"rule": "legacy_ids", "applies_to": [1094, 1095], "text": "CorOS 3.1.0 replaced US DLX Normal / US DLX Vibrato with US DLX 65 Reissue (1167) using MODE = Normal / Vibrato. Prefer 1167 for new presets."},
+      {"rule": "mid_hump_pedal_fit", "applies_to": "pedal pairing", "text": "Scooped, uncompressed amps (blackface Fender, Vox, JC-120) like mid-hump/compressed drives (Green 808, Rodent Drive). Mid-rich compressed amps (Marshall, Hiwatt) prefer flat boosts and fuzz (Fuzz Pi, Facial Fuzz); mid-hump drives can sound dark and boxy there."}
+    ],
+    "unverified": [
+      "Neural DSP publishes no per-parameter documentation: INPUT and MODE (1166/1167), BOOST (1011/1128), PREAMP and EQ (1176), EQ (1101-1108) and the 3 BRIGHT positions (1027) are interpreted from the real amps' panels and community posts.",
+      "Which of GAIN 1 / GAIN 2 is the bright channel on Patch models is inferred from Marshall panel convention (Volume I = High Treble, Volume II = Normal).",
+      "Whether the unused VOLUME NORMAL / VOLUME BRIGHT does anything on the non-Patch tweed models is not documented.",
+      "Matchless Chieftain BRILLIANCE direction rests on one forum post (up = brighter).",
+      "Morgan SW50: QC GAIN = amp Volume and QC MASTER = amp Level is an assumed mapping.",
+      "Very few QC-specific knob settings are published for these models; most 'cited' starts come from Yek's Fractal guide, manufacturer manuals and artist-settings pages."
+    ],
+    "general_sources": [
+      "https://neuraldsp.com/device-list",
+      "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf",
+      "https://quadcortex.wiki/Category:Amps",
+      "https://unity.neuraldsp.com/t/need-advice-from-experienced-clean-tone-players/14886",
+      "https://www.gilmourish.com/?p=7115"
+    ]
+  },
+  "families": [
+    {
+      "key": "fender_blackface_deluxe",
+      "real": "Fender Deluxe Reverb (blackface AB763, 1963–67; '65 Reissue and hand-wired '64 Custom), 22 W, 2×6V6, 1×12",
+      "models": [1094, 1095, 1166, 1167],
+      "gain_range": "crunch",
+      "sweet_spot": "edge",
+      "drive_control": "VOLUME",
+      "voice": "Scooped mids, glassy sparkling top, soft 6V6 lows; chimey clean that sags and compresses into smooth breakup early.",
+      "controls": {
+        "VOLUME": {"kind": "knob", "does": "Non-master: VOLUME is the gain. Breakup starts ~3-4 with single coils; 6+ is the classic 6V6 overdrive. Louder = looser lows.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "TREBLE": {"kind": "knob", "does": "Strongest tone control of the scooped stack; adds sparkle and deepens the scoop. No MID knob (fixed 6.8k mid resistor).", "brighter": "up", "tighter": "n/a", "warmer": "down"},
+        "BASS": {"kind": "knob", "does": "Feeds lows into a small 6V6 power amp: gets flabby once VOLUME is up. Lower BASS as VOLUME rises.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "INPUT": {"kind": "switch", "does": "1166/1167 only. Assumed input-jack select (real amp: jack 2 is about 6 dB quieter = more headroom). Not documented.", "brighter": "n/a", "tighter": "n/a", "warmer": "n/a"},
+        "MODE": {"kind": "selector", "does": "1166/1167 only. Channel select: 1167 = Normal / Vibrato. 1166 presumably the '64 Custom's Normal / Bright.", "brighter": "n/a", "tighter": "n/a", "warmer": "n/a"}
+      },
+      "model_notes": {
+        "1094": "Normal channel: no bright cap, one gain stage fewer; darker and cleaner, good for jazz lines and humbuckers. Legacy id (now 1167 MODE=Normal).",
+        "1095": "Vibrato channel: fixed 47 pF bright cap plus an extra gain stage; the one most people use; breaks up earlier. Legacy id (now 1167 MODE=Vibrato).",
+        "1166": "'64 Custom Deluxe Reverb: hand-wired modified AB763 with Bright and Normal channels. Added in CorOS 3.1.0.",
+        "1167": "'65 Deluxe Reverb reissue. MODE Normal/Vibrato reproduces 1094/1095. Preferred id for new presets."
+      },
+      "starts": [
+        {"name": "sparkling clean (Vibrato channel)", "settings": {"VOLUME": 3, "TREBLE": 6, "BASS": 3}, "basis": "typical", "source": ""},
+        {"name": "edge of breakup", "settings": {"VOLUME": 4.5, "TREBLE": 6, "BASS": 3}, "basis": "typical", "source": ""},
+        {"name": "cranked 6V6 overdrive", "settings": {"VOLUME": 5.5}, "basis": "cited", "source": "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-deluxe-verb-65-fender-deluxe-reverb-ab763.113046/", "note": "ToneQuest via Yek: run it at '6' or above (1-10 dial = 5.6 here); guitar volume 10 for leads, back to ~7 to clean up. Keep BASS low."}
+      ],
+      "boosts": [
+        {"model": "Myth Drive", "why": "Klon-style low-gain push adds the mids the scooped stack lacks without changing the amp's character; QC users run it at very low level."},
+        {"model": "Green 808", "why": "Mid hump and compression fill the blackface scoop and trim the bass that makes the 6V6s flub."},
+        {"model": "Rodent Drive", "why": "Rat-type mids and compression suit scooped, uncompressed Fender-style amps."},
+        {"model": "No-Bell OD1", "why": "QC forum users favour it (with Red Drive) for non-fizzy overdrive into the clean models."}
+      ],
+      "cabs": [
+        {"model": "112 US DLX Black C12K 00s (M)", "why": "The reissue's own 1×12 with Jensen C12K: glassy sparkle and attack."},
+        {"model": "112 US DLX SC64 (M)", "why": "Deluxe 1×12 with Eminence GA-SC64: alternative Deluxe speaker voicing."}
+      ],
+      "known_for": ["Studio and club staple - 'on more recordings than any other Fender'", "Country, blues, roots rock, soul, indie", "Players listed for it: Duane Allman, Nile Rodgers, Dan Auerbach, John Scofield, Bill Frisell"],
+      "poor_at": "Loud clean headroom, tight low end and high gain: 22 W of 6V6 flubs on the low E when pushed; scooped mids vanish in a dense mix.",
+      "watch_out": "The low E distorts first (lots of bass reaches the power amp; speaker resonance 50-100 Hz). Cut BASS to 2-3 or high-pass 75-100 Hz before the amp once VOLUME is above ~4.",
+      "tags": ["clean", "edge", "blues", "country", "indie", "funk", "studio", "pedal platform"],
+      "sources": [
+        "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf",
+        "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-deluxe-verb-65-fender-deluxe-reverb-ab763.113046/",
+        "https://fenderguru.com/amp-models/deluxe-reverb/",
+        "https://quadcortex.wiki/US_DLX",
+        "https://neuraldsp.com/news/coros-3-1-0-and-cortex-control-1-2-0-are-now-available",
+        "https://www.fender.com/products/64-custom-deluxe-reverb",
+        "https://unity.neuraldsp.com/t/need-advice-from-experienced-clean-tone-players/14886",
+        "https://www.gilmourish.com/?p=7115"
+      ]
+    },
+    {
+      "key": "fender_blackface_twin",
+      "real": "Fender Twin Reverb (blackface AB763, 1963–67), 85 W, 4×6L6, 2×12",
+      "models": [1083, 1084],
+      "gain_range": "clean",
+      "sweet_spot": "clean",
+      "drive_control": "VOLUME",
+      "voice": "Loud, piano-like clean: scooped mids, glassy to icy top, big firm lows; huge headroom and very little sag.",
+      "controls": {
+        "VOLUME": {"kind": "knob", "does": "Non-master gain. The real amp stays clean to almost 6 where smaller Fenders break up at ~4; sounds thin when set very low.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "BRIGHT": {"kind": "switch", "does": "Bright cap across VOLUME: strong at low VOLUME, fades as VOLUME rises. Turn off if harsh or for squeaky-clean tones.", "brighter": "up", "tighter": "n/a", "warmer": "down"},
+        "BASS": {"kind": "knob", "does": "Plenty of lows on tap; turning it down keeps the amp tight and out of the bass guitar's range.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "MID": {"kind": "knob", "does": "Fills the mid scoop and raises level/drive. About 7 equals the fixed 6.8k mid of the smaller blackface amps.", "brighter": "n/a", "tighter": "n/a", "warmer": "up"},
+        "TREBLE": {"kind": "knob", "does": "Dominant control of the passive stack; adds glass and deepens the scoop.", "brighter": "up", "tighter": "n/a", "warmer": "down"}
+      },
+      "model_notes": {
+        "1083": "Normal channel: no reverb-recovery stage, so it stays clean longest - the cleanest tube Fender here.",
+        "1084": "Vibrato channel: the extra stage of the reverb circuit makes it break up earlier than Normal."
+      },
+      "starts": [
+        {"name": "big clean pedal platform", "settings": {"VOLUME": 3.5, "BRIGHT": false, "BASS": 3, "MID": 6, "TREBLE": 5.5}, "basis": "typical", "source": ""},
+        {"name": "funk / country sparkle", "settings": {"VOLUME": 3, "BRIGHT": true, "BASS": 3, "MID": 4, "TREBLE": 6.5}, "basis": "typical", "source": ""},
+        {"name": "pushed (Vibrato channel)", "settings": {"VOLUME": 6.5, "BRIGHT": false, "BASS": 2, "MID": 7, "TREBLE": 5}, "basis": "typical", "source": ""}
+      ],
+      "boosts": [
+        {"model": "Green 808", "why": "Adds the midrange and compression this scooped, uncompressed amp lacks; the standard way to get lead tones from a Twin."},
+        {"model": "Rodent Drive", "why": "Rat-type distortion works on Fender-style scooped amps; the amp's headroom keeps it clear."},
+        {"model": "Myth Drive", "why": "Low-gain mid push for edge-of-breakup without losing the Twin's clean punch."},
+        {"model": "Obsessive Drive", "why": "Fat low end and strong mids suit mid-scooped amps."}
+      ],
+      "cabs": [
+        {"model": "212 US TWN C12Q 00s (M)", "why": "The Twin Reverb's own open-back 2×12 with Jensens."},
+        {"model": "212 US TWN CK2 (M)", "why": "Twin 2×12 with Jensen C12K-2: efficient, glassy, big lows."},
+        {"model": "212 US A-type 00s (M)", "why": "Fender cab with Celestion A-Type: rounder alternative if the Jensens are too icy."}
+      ],
+      "known_for": ["The reference loud clean: country, jazz, funk, gospel, surf", "Players listed for it: B.B. King, Johnny Marr, Eric Johnson (cleans), Steve Howe", "Classic clean base for pedals"],
+      "poor_at": "Natural breakup at sane volume and mid-forward lead tones without a pedal; thin and icy when VOLUME is very low.",
+      "watch_out": "Painfully bright and bass-heavy by default: turn BRIGHT off and BASS down before touching TREBLE, and get overdrive from a pedal, not from VOLUME.",
+      "tags": ["clean", "country", "jazz", "funk", "surf", "pedal platform", "headroom"],
+      "sources": [
+        "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf",
+        "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-double-verb-fender-twin-reverb.113177/",
+        "https://fenderguru.com/amp-models/twin-reverb/",
+        "https://quadcortex.wiki/US_TWN",
+        "https://www.gilmourish.com/?p=7115"
+      ]
+    },
+    {
+      "key": "fender_blackface_super",
+      "real": "Fender Super Reverb (blackface AB763, 1963–67; QC: '65), 40–45 W, 2×6L6, tube rectifier, 4×10",
+      "models": [1096, 1097],
+      "gain_range": "crunch",
+      "sweet_spot": "edge",
+      "drive_control": "VOLUME",
+      "voice": "Big scooped Fender with punchy 4×10 attack: deep lows, screaming treble, low mids; comes alive past ~4.",
+      "controls": {
+        "VOLUME": {"kind": "knob", "does": "Non-master gain; the amp 'comes alive' beyond 4. More VOLUME also means more bass and sharper treble.", "brighter": "n/a", "tighter": "down", "warmer": "n/a"},
+        "BRIGHT": {"kind": "switch", "does": "Bright cap across VOLUME; effect fades as VOLUME rises. Often off for the SRV-style 'magic six'.", "brighter": "up", "tighter": "n/a", "warmer": "down"},
+        "BASS": {"kind": "knob", "does": "The big cabinet makes lots of deep bass; keep around 2-3 when VOLUME is up.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "MID": {"kind": "knob", "does": "Vibrato model only (Normal has a fixed mid). Fills the scoop and adds push; the cure for 'lost in the mix'.", "brighter": "n/a", "tighter": "n/a", "warmer": "up"},
+        "TREBLE": {"kind": "knob", "does": "Dominant control of the passive stack; 4×10s are beamy, so high settings get piercing fast.", "brighter": "up", "tighter": "n/a", "warmer": "down"}
+      },
+      "model_notes": {
+        "1096": "Normal channel: no MID knob, no reverb-recovery stage; cleaner.",
+        "1097": "Vibrato channel: adds MID and an extra gain stage; the usual choice."
+      },
+      "starts": [
+        {"name": "magic six (SRV-style edge)", "settings": {"VOLUME": 6, "BRIGHT": false, "BASS": 2, "MID": 3, "TREBLE": 6}, "basis": "cited", "source": "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf", "note": "Fenderguru's 'magic six' (6, 6, 2x3). Yek runs Bright off; the QC wiki copy lists Bright on. Model 1096 has no MID."},
+        {"name": "clean with body", "settings": {"VOLUME": 3.5, "BRIGHT": false, "BASS": 3, "MID": 5, "TREBLE": 5.5}, "basis": "typical", "source": ""}
+      ],
+      "boosts": [
+        {"model": "Green 808", "why": "The classic Texas-blues pairing: mid hump fills the scoop, trims bass and pushes the 6L6s."},
+        {"model": "Exotic Z Boost", "why": "Transparent boost for more sustain and harmonics at the amp's sweet spot (fenderguru's suggestion)."},
+        {"model": "Myth Drive", "why": "Low-gain mid lift that keeps the Super's punch."}
+      ],
+      "cabs": [
+        {"model": "410 US Basslad PR10 (M)", "why": "4×10 Jensen P10R - the same speaker type Fender fits to the Super Reverb reissue."},
+        {"model": "210 US TRMLX Oxf 63 (M)", "why": "Oxford alnico 10s: softer, earlier-breaking vintage Fender 10-inch voice."}
+      ],
+      "known_for": ["Stevie Ray Vaughan-style Texas blues", "Blues players: Muddy Waters, Mike Bloomfield, Robert Cray, Derek Trucks", "Loud, warm 4×10 club tone"],
+      "poor_at": "Mid-rich or tight high-gain tones; beamy, scooped and bass-heavy, so it gets lost or boomy if you just add VOLUME.",
+      "watch_out": "The scooped mids tempt you to turn up, which only adds more bass and sharp treble. Raise MID or add a mid-hump drive instead.",
+      "tags": ["clean", "edge", "blues", "texas blues", "strat", "crunch"],
+      "sources": [
+        "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf",
+        "https://fenderguru.com/amp-models/super-reverb/",
+        "https://quadcortex.wiki/US_SPR"
+      ]
+    },
+    {
+      "key": "fender_blackface_princeton",
+      "real": "Fender Princeton Reverb (blackface AA1164, 1964–67), 12–15 W, 2×6V6, 1×10",
+      "models": [1120],
+      "gain_range": "crunch",
+      "sweet_spot": "edge",
+      "drive_control": "VOLUME",
+      "voice": "Small-box blackface: sweet chimey highs, punchy but soft lows; 'browner', mid-focused breakup that arrives early.",
+      "controls": {
+        "VOLUME": {"kind": "knob", "does": "Non-master gain. With a Strat: 3-4 fairly clean, ~5 clean with balls, 7-8 trademark Fender overdrive.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "TREBLE": {"kind": "knob", "does": "Treble of a two-knob scooped stack (fixed 6.8k mid, no bright switch).", "brighter": "up", "tighter": "n/a", "warmer": "down"},
+        "BASS": {"kind": "knob", "does": "Dial it back: the small output section and 10-inch speaker fart out in the lows when pushed.", "brighter": "n/a", "tighter": "down", "warmer": "up"}
+      },
+      "model_notes": {
+        "1120": "Reverb version: the reverb-recovery stage adds a gain stage, so it has more gain than a non-reverb Princeton."
+      },
+      "starts": [
+        {"name": "fairly clean (Strat)", "settings": {"VOLUME": 3.5}, "basis": "cited", "source": "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf", "note": "Yek: 'you only need to dial back Bass and adjust Input Drive... between 3 and 4 for a fairly clean tone'."},
+        {"name": "clean with balls", "settings": {"VOLUME": 5}, "basis": "cited", "source": "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf", "note": "Fenderguru also plays the real amp at 5-6: single notes clean, chords crunchy."},
+        {"name": "trademark Fender overdrive", "settings": {"VOLUME": 7.5}, "basis": "cited", "source": "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf", "note": "Yek: 'up to 7-8'. With humbuckers halve the input level first."},
+        {"name": "edge of breakup, full settings", "settings": {"VOLUME": 4.5, "TREBLE": 6, "BASS": 3}, "basis": "typical", "source": ""}
+      ],
+      "boosts": [
+        {"model": "Myth Drive", "why": "Small mid push into an amp already on the edge; keeps the recording-amp sweetness."},
+        {"model": "Green 808", "why": "Cuts the lows that make the Princeton fart out and adds mids for leads."},
+        {"model": "Exotic Z Boost", "why": "Clean boost with bass/treble shaping to tip the amp over without adding pedal distortion."}
+      ],
+      "cabs": [
+        {"model": "110 US PRN C10R (M)", "why": "Princeton 1×10 with Jensen C10R, an original speaker type."},
+        {"model": "110 US PRN Brown FatJ 10s (M)", "why": "Princeton 1×10 with a Fat Jimmy C1060: fuller alternative 10."},
+        {"model": "112 US DLX Black C12K 00s (M)", "why": "A 12 gives wider, deeper lows when the 10 sounds boxy."}
+      ],
+      "known_for": ["Studio/recording amp played on the verge of breakup", "Ryan Adams; players listed for it: Bill Frisell, St. Vincent, Mac DeMarco, Gary Clark Jr.", "Ancestor of the Mesa/Boogie Mark I"],
+      "poor_at": "Clean headroom, tight bass and band-volume punch; the lows give up under heavy drive.",
+      "watch_out": "With humbuckers it overdrives very early and muddy: cut the level into the amp (Yek halves the input) and lower BASS before judging it.",
+      "tags": ["clean", "edge", "studio", "blues", "indie", "small amp", "crunch"],
+      "sources": [
+        "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf",
+        "https://fenderguru.com/amp-models/princeton-reverb/",
+        "https://quadcortex.wiki/US_Prince"
+      ]
+    },
+    {
+      "key": "fender_tweed_bassman",
+      "real": "Fender Bassman 5F6-A (narrow-panel tweed, 1958–60; '59), 40–50 W, 2×6L6/5881, tube rectifier, 4×10",
+      "models": [1123, 1124, 1125, 1126],
+      "gain_range": "crunch",
+      "sweet_spot": "edge",
+      "drive_control": "VOLUME BRIGHT / VOLUME NORMAL",
+      "voice": "Raw, fat, warm tweed: big loose lows, thick mids, bright bite on the Bright channel; touch-sensitive breakup - the Marshall template.",
+      "controls": {
+        "VOLUME NORMAL": {"kind": "knob", "does": "Gain of the darker, fatter Normal channel. In Patch models it blends in body and lows.", "brighter": "down", "tighter": "down", "warmer": "up"},
+        "VOLUME BRIGHT": {"kind": "knob", "does": "Gain of the Bright channel (more treble, most at low settings). In Patch models it supplies the bite.", "brighter": "up", "tighter": "n/a", "warmer": "n/a"},
+        "TREBLE": {"kind": "knob", "does": "Interactive tweed stack after the gain stages. Reissue owners call it very bright; Bass 0 / Mid 10 / Treble 0 is the flat point.", "brighter": "up", "tighter": "n/a", "warmer": "down"},
+        "BASS": {"kind": "knob", "does": "It generates a lot of bass and flubs when driven: run 0-3. First control to cut for 'tighter'.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "MID": {"kind": "knob", "does": "Fills the ~500 Hz scoop and raises level/drive into the power amp; crank it for a thicker, pushier tone.", "brighter": "n/a", "tighter": "n/a", "warmer": "up"},
+        "PRESENCE": {"kind": "knob", "does": "Power-amp negative-feedback treble boost: adds cut and edge after the preamp, most audible when the amp is loud.", "brighter": "up", "tighter": "n/a", "warmer": "down"}
+      },
+      "model_notes": {
+        "1123": "Jumpered, plugged into the Bright channel: both volumes are live.",
+        "1124": "Bright channel alone. Whether VOLUME NORMAL still does anything is not documented.",
+        "1125": "Jumpered, plugged into the Normal channel: both volumes are live.",
+        "1126": "Normal channel alone: darker and fatter. Whether VOLUME BRIGHT still does anything is not documented."
+      },
+      "starts": [
+        {"name": "forum 'secret' tone-stack setting", "settings": {"TREBLE": 0, "BASS": 0, "MID": 5, "PRESENCE": 5}, "basis": "cited", "source": "https://www.thegearpage.net/board/index.php?threads/nad-tweed-bassman-ltd.2019884/", "note": "Bass and Treble fully down, Mid and Presence at noon; volumes not given. Seen via search summary, not read in full."},
+        {"name": "edge of breakup (Patch models)", "settings": {"VOLUME BRIGHT": 5, "VOLUME NORMAL": 3, "TREBLE": 5, "BASS": 2, "MID": 7, "PRESENCE": 5}, "basis": "typical", "source": ""},
+        {"name": "tweed crunch (Patch models)", "settings": {"VOLUME BRIGHT": 7.5, "VOLUME NORMAL": 5, "TREBLE": 5, "BASS": 1, "MID": 8, "PRESENCE": 6}, "basis": "typical", "source": "", "note": "Follows Yek / QC wiki advice: crank mids, bass (almost) all the way down."}
+      ],
+      "boosts": [
+        {"model": "Facial Fuzz", "why": "Yek: 'for some vintage fun, put the Face Fuzz before the amp' - the amp's compression smooths it."},
+        {"model": "Rage Booster", "why": "A treble booster controls the amp's heavy low end while pushing it into drive."},
+        {"model": "Green 808", "why": "Bass cut plus mid hump tightens the loose tweed lows for leads."},
+        {"model": "Myth Drive", "why": "Low-gain push for edge-of-breakup without thinning the tweed mids."}
+      ],
+      "cabs": [
+        {"model": "410 US Basslad PR10 (M)", "why": "The Bassman's own open-back 4×10 with Jensen P10R alnicos."},
+        {"model": "212 US Bleached Basslad V30 01 (M)", "why": "Blonde Bassman cab with Vintage 30s: tighter, more mid-forward for rock."}
+      ],
+      "known_for": ["'Grandfather of rock and roll' amps; the circuit Marshall copied for the JTM45", "Blues, rock'n'roll, rockabilly, roots: Buddy Guy, Brian Setzer, Eric Clapton, Jimi Hendrix", "Clean, funk, soul through to raw overdrive"],
+      "poor_at": "Tight palm-muted low end, glassy scooped cleans at volume, high gain.",
+      "watch_out": "With BASS near noon it farts out as soon as the volume goes up: start with BASS at 0-2 and add MID instead.",
+      "tags": ["edge", "crunch", "blues", "rock'n'roll", "rockabilly", "tweed", "roots"],
+      "sources": [
+        "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf",
+        "https://quadcortex.wiki/US_Tweed_Basslad",
+        "https://www.fender.com/articles/parts-and-accessories/normal-and-bright-unite-jumpering-your-59-bassman",
+        "https://www.thegearpage.net/board/index.php?threads/nad-tweed-bassman-ltd.2019884/",
+        "https://robrobinette.com/How_The_TMB_Tone_Stack_Works.htm"
+      ]
+    },
+    {
+      "key": "fender_tweed_twin_high_power",
+      "real": "Fender Twin 5F8-A 'high-powered' tweed Twin (1958–60), 80 W, 4×5881/6L6, 2×12",
+      "models": [1132, 1133, 1134, 1135],
+      "gain_range": "edge",
+      "sweet_spot": "clean",
+      "drive_control": "VOLUME BRIGHT / VOLUME NORMAL",
+      "voice": "Bassman-like but warmer, bigger and louder: dark, fat tweed clean with lots of headroom; compresses and fattens more than it distorts.",
+      "controls": {
+        "VOLUME NORMAL": {"kind": "knob", "does": "Gain of the darker Normal channel; in Patch models it adds body. Keith Urban plugs into Normal.", "brighter": "down", "tighter": "down", "warmer": "up"},
+        "VOLUME BRIGHT": {"kind": "knob", "does": "Gain of the Bright channel. With single coils you must crank it to reach overdrive, and even then it mostly gets fatter.", "brighter": "up", "tighter": "n/a", "warmer": "n/a"},
+        "TREBLE": {"kind": "knob", "does": "Dark amp with its stock-style cab: run TREBLE higher than you would on a Bassman.", "brighter": "up", "tighter": "n/a", "warmer": "down"},
+        "BASS": {"kind": "knob", "does": "Turn it down; lots of lows from the tweed stack and 2×12 cabinet.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "MID": {"kind": "knob", "does": "Fills the scoop and adds push; Bonamassa-style settings run it nearly full.", "brighter": "n/a", "tighter": "n/a", "warmer": "up"},
+        "PRESENCE": {"kind": "knob", "does": "Power-amp feedback treble; turn it up along with TREBLE to open the dark voicing.", "brighter": "up", "tighter": "n/a", "warmer": "down"}
+      },
+      "model_notes": {
+        "1132": "Normal channel alone.",
+        "1133": "Jumpered, plugged into Normal: both volumes live.",
+        "1134": "Bright channel alone.",
+        "1135": "Jumpered, plugged into Bright: both volumes live."
+      },
+      "starts": [
+        {"name": "Joe Bonamassa settings (converted from the 1-12 dials)", "settings": {"VOLUME BRIGHT": 8.2, "VOLUME NORMAL": 0, "TREBLE": 6.4, "BASS": 0, "MID": 9.1, "PRESENCE": 4.5}, "basis": "cited", "source": "https://quadcortex.wiki/US_HP_Tweed_TWIN", "note": "Wiki lists Presence 6, Middle 11, Bass 1, Treble 8, Vol bright 10, Vol normal 1 on 1-12 dials (labelled 'Normal channel' there)."},
+        {"name": "fat clean (Patch models)", "settings": {"VOLUME BRIGHT": 4.5, "VOLUME NORMAL": 2.5, "TREBLE": 6.5, "BASS": 2.5, "MID": 6, "PRESENCE": 6.5}, "basis": "typical", "source": "", "note": "Follows Yek: 'turn up Treble and Presence. And turn down Bass.'"},
+        {"name": "pushed and compressed", "settings": {"VOLUME BRIGHT": 8, "VOLUME NORMAL": 5, "TREBLE": 6.5, "BASS": 1, "MID": 8, "PRESENCE": 6}, "basis": "typical", "source": ""}
+      ],
+      "boosts": [
+        {"model": "Green 808", "why": "The amp barely overdrives on its own with single coils; a mid-hump drive supplies gain and tightens the lows."},
+        {"model": "Myth Drive", "why": "Its TREBLE control lifts the dark voicing while adding a little grit."},
+        {"model": "Exotic", "why": "Bass and treble controls let you brighten and tighten a dark, fat amp while adding gain."}
+      ],
+      "cabs": [
+        {"model": "212 US TWN Web Classic 08 (M)", "why": "Tweed Twin 2×12 with Weber Classic alnicos - the matching cab in the catalog."},
+        {"model": "212 Too Rock G65 (M)", "why": "Keith Urban's Twin cab had Two-Rock speakers that sound close to G12-65s (Yek)."}
+      ],
+      "known_for": ["Keith Richards, Eric Clapton, Rory Gallagher, Joe Bonamassa, Keith Urban", "Loud fat tweed clean for blues, roots rock and country"],
+      "poor_at": "Bright sparkle or real distortion by itself; with single coils it barely overdrives.",
+      "watch_out": "It sounds dark with its matching cab: do not judge it at noon - raise TREBLE and PRESENCE and cut BASS first.",
+      "tags": ["clean", "edge", "blues", "roots", "country", "tweed", "headroom"],
+      "sources": [
+        "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf",
+        "https://quadcortex.wiki/US_HP_Tweed_TWIN"
+      ]
+    },
+    {
+      "key": "vox_ac30",
+      "real": "Vox AC30 (1959→; Top Boost early 1960s; QC panel matches the AC30 Hand-Wired), 30 W, 4×EL84 cathode-biased, no negative feedback, 2×12",
+      "models": [1009, 1011],
+      "gain_range": "crunch",
+      "sweet_spot": "edge",
+      "drive_control": "VOLUME",
+      "voice": "Chime and jangle with a forward upper-mid bite; compressed, harmonically rich EL84 breakup; lows go loose when cranked.",
+      "controls": {
+        "VOLUME": {"kind": "knob", "does": "Non-master preamp gain. Real amp: jangly clean around 11-12 o'clock (4-5), light crunch from 2-3 o'clock (7-8).", "brighter": "n/a", "tighter": "down", "warmer": "n/a"},
+        "TONE CUT": {"kind": "knob", "does": "INVERTED. Power-amp treble cut: up = darker/smoother, 0 = brightest. Use it to tame fizz instead of TREBLE.", "brighter": "down", "tighter": "n/a", "warmer": "up"},
+        "TREBLE": {"kind": "knob", "does": "Top Boost model. Very interactive: raising TREBLE also cuts BASS. Start both at 5.", "brighter": "up", "tighter": "up", "warmer": "down"},
+        "BASS": {"kind": "knob", "does": "Top Boost model. More lows but also a deeper mid notch as it rises; low BASS = tighter and more midrange.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "BOOST": {"kind": "switch", "does": "Top Boost model. Assumed = Hand-Wired HOT mode: partly bypasses TREBLE/BASS for much more gain and mids.", "brighter": "n/a", "tighter": "n/a", "warmer": "up"},
+        "BRIGHT": {"kind": "switch", "does": "Normal model. Adds high-end sparkle to the darker, EQ-less Normal channel.", "brighter": "up", "tighter": "n/a", "warmer": "down"}
+      },
+      "model_notes": {
+        "1009": "Normal channel: no tone stack, darker with fuller mids - the 'Brian May' sound, made for a treble booster. Only BRIGHT and TONE CUT shape it.",
+        "1011": "Top Boost channel: Bass/Treble stack with a midrange cut - the classic chimey AC30."
+      },
+      "starts": [
+        {"name": "chime clean (Top Boost)", "settings": {"VOLUME": 3.5, "BOOST": false, "BASS": 4, "TREBLE": 6, "TONE CUT": 3}, "basis": "typical", "source": ""},
+        {"name": "edge-of-breakup jangle (Top Boost)", "settings": {"VOLUME": 5.5, "BOOST": false, "BASS": 3.5, "TREBLE": 6, "TONE CUT": 4}, "basis": "typical", "source": ""},
+        {"name": "light crunch (Top Boost), real-amp volume", "settings": {"VOLUME": 7.5}, "basis": "cited", "source": "https://faderandknob.com/blog/vox-ac30-settings-guide", "note": "Top Boost volume ~2-3 o'clock where breakup begins; jangle clean 11 o'clock to noon. Via search summary; QC may break up earlier."},
+        {"name": "Normal channel + treble booster lead", "settings": {"VOLUME": 8, "BRIGHT": false, "TONE CUT": 4}, "basis": "typical", "source": "", "note": "Put Rage Booster in front."}
+      ],
+      "boosts": [
+        {"model": "Rage Booster", "why": "The historic pairing: a treble booster adds gain and bite to the dark Normal channel and tightens the loose lows."},
+        {"model": "Myth Drive", "why": "Boosting the input is the standard way to get more gain from a Vox; low-gain, keeps the chime."},
+        {"model": "Green 808", "why": "Mid-hump drives suit the AC30's fixed-mid voicing and firm up the low end."}
+      ],
+      "cabs": [
+        {"model": "212 UK C30 65 (M)", "why": "AC30 2×12 with Celestion alnico 'Silver Bell' drivers: the bright, chimey original voice."},
+        {"model": "212 UK C30 GB 69 (M)", "why": "AC30 with Greenbacks: warmer, woodier, less top - good when driven."},
+        {"model": "212 Zila Open Gold 19 (M)", "why": "Open-back 2×12 with Alnico Golds: modern take on the alnico Vox voice with more headroom."}
+      ],
+      "known_for": ["The Beatles and the British Invasion", "Brian May (Queen), The Edge (U2), Rory Gallagher, Radiohead, Kings of Leon", "Indie jangle and praise & worship edge-of-breakup tones"],
+      "poor_at": "Tight low end and big clean headroom; scooped modern or high-gain tones. No feedback loop, so the lows loosen when cranked.",
+      "watch_out": "TONE CUT works backwards (up = darker). The scratchy top when driven is real: raise TONE CUT rather than killing TREBLE, which also shifts the bass and mids.",
+      "tags": ["clean", "edge", "crunch", "chime", "jangle", "british", "indie", "worship", "classic rock"],
+      "sources": [
+        "https://voxamps.com/wp-content/uploads/2018/01/AC_C1_C2_V212C_OM_EFGSJ10e.pdf",
+        "https://voxamps.com/wp-content/uploads/2019/12/AC15_30HW_V212HWX_OM_EFGSJ3.pdf",
+        "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf",
+        "https://quadcortex.wiki/UK_C30",
+        "https://faderandknob.com/blog/vox-ac30-settings-guide",
+        "https://www.gilmourish.com/?p=7115"
+      ]
+    },
+    {
+      "key": "vox_ac15",
+      "real": "Vox AC15 (1958→; Top Boost), 15 W, 2×EL84 cathode-biased, no negative feedback, 1×12",
+      "models": [1127, 1128],
+      "gain_range": "crunch",
+      "sweet_spot": "edge",
+      "drive_control": "VOLUME",
+      "voice": "The AC30's little brother: same chime and upper-mid bite, but breaks up sooner with a softer, more compressed, smaller low end.",
+      "controls": {
+        "VOLUME": {"kind": "knob", "does": "Non-master preamp gain; half the output tubes of an AC30, so the power amp gives up sooner.", "brighter": "n/a", "tighter": "down", "warmer": "n/a"},
+        "TONE CUT": {"kind": "knob", "does": "INVERTED. Power-amp treble cut: up = darker/smoother, 0 = brightest.", "brighter": "down", "tighter": "n/a", "warmer": "up"},
+        "TREBLE": {"kind": "knob", "does": "Top Boost model. Interactive: raising TREBLE also cuts BASS. Start both at 5.", "brighter": "up", "tighter": "up", "warmer": "down"},
+        "BASS": {"kind": "knob", "does": "Top Boost model. Adds lows and deepens the mid notch; keep low when driven.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "BOOST": {"kind": "switch", "does": "Top Boost model. Assumed = Hand-Wired HOT mode: partly bypasses the tone controls for more gain.", "brighter": "n/a", "tighter": "n/a", "warmer": "up"},
+        "BRIGHT": {"kind": "switch", "does": "Normal model. Adds top-end sparkle to the dark Normal channel.", "brighter": "up", "tighter": "n/a", "warmer": "down"}
+      },
+      "model_notes": {
+        "1127": "Normal channel: no tone stack, darker and thicker; shape with BRIGHT, TONE CUT and a booster.",
+        "1128": "Top Boost channel: Bass/Treble stack and the classic chime."
+      },
+      "starts": [
+        {"name": "chime clean (Top Boost)", "settings": {"VOLUME": 3, "BOOST": false, "BASS": 4, "TREBLE": 6, "TONE CUT": 3}, "basis": "typical", "source": ""},
+        {"name": "edge of breakup (Top Boost)", "settings": {"VOLUME": 5, "BOOST": false, "BASS": 3.5, "TREBLE": 6, "TONE CUT": 4}, "basis": "typical", "source": ""},
+        {"name": "small-amp crunch (Top Boost)", "settings": {"VOLUME": 7, "BOOST": false, "BASS": 3, "TREBLE": 5.5, "TONE CUT": 5}, "basis": "typical", "source": ""}
+      ],
+      "boosts": [
+        {"model": "Rage Booster", "why": "Treble booster into an EL84 Vox: more gain and bite, less flub."},
+        {"model": "Myth Drive", "why": "Input boost is the standard way to add gain to a Vox while keeping the chime."},
+        {"model": "Green 808", "why": "Mid hump and bass cut firm up the small amp's loose low end."}
+      ],
+      "cabs": [
+        {"model": "112 UK C15 Blue (M)", "why": "The AC15's own 1×12 with a Celestion Alnico Blue."},
+        {"model": "212 UK C30 65 (M)", "why": "Bigger 2×12 alnico Vox voice when the 1×12 sounds boxy."}
+      ],
+      "known_for": ["The James Bond theme was recorded on an AC15", "Studio-size Vox chime: British rock, indie, worship", "Players listed for it: Brian May, The Edge, Rory Gallagher"],
+      "poor_at": "Headroom and low-end authority; tight or scooped high-gain tones.",
+      "watch_out": "TONE CUT works backwards (up = darker), and it compresses early: for a cleaner sound lower VOLUME, do not just cut TREBLE.",
+      "tags": ["clean", "edge", "crunch", "chime", "british", "indie", "worship", "small amp"],
+      "sources": [
+        "https://voxamps.com/wp-content/uploads/2018/01/AC_C1_C2_V212C_OM_EFGSJ10e.pdf",
+        "https://voxamps.com/wp-content/uploads/2019/12/AC15_30HW_V212HWX_OM_EFGSJ3.pdf",
+        "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf",
+        "https://quadcortex.wiki/UK_C15"
+      ]
+    },
+    {
+      "key": "marshall_jtm45",
+      "real": "Marshall JTM45 (model 2245, 1962–66), 30–45 W, KT66/5881, GZ34 rectifier; derived from the 5F6-A Bassman",
+      "models": [1038, 1039, 1040],
+      "gain_range": "crunch",
+      "sweet_spot": "crunch",
+      "drive_control": "GAIN (the amp's volume; GAIN 1 / GAIN 2 on Patch)",
+      "voice": "Tweed-like Marshall: warm, saggy, round crunch with thick mids and soft attack; less bite and tightness than a Plexi.",
+      "controls": {
+        "GAIN": {"kind": "knob", "does": "The channel volume (no master): drives preamp and power amp together. High settings turn low notes muddy and fuzzy.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "GAIN 1": {"kind": "knob", "does": "Patch model. By Marshall convention channel I = High Treble: brighter and gainier. Verify by ear.", "brighter": "up", "tighter": "n/a", "warmer": "n/a"},
+        "GAIN 2": {"kind": "knob", "does": "Patch model. By Marshall convention channel II = Normal: dark and bassy; adds body. Keep at or below GAIN 1.", "brighter": "down", "tighter": "down", "warmer": "up"},
+        "BASS": {"kind": "knob", "does": "Bass-heavy circuit: players run it at 0-3, often fully off, to stop flub and fuzz.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "MID": {"kind": "knob", "does": "Stack sits after the gain stages: MID up fills the scoop and pushes the power amp harder.", "brighter": "n/a", "tighter": "n/a", "warmer": "up"},
+        "TREBLE": {"kind": "knob", "does": "Dominant control of the interactive stack; crank the tone controls for a warm overdriven blues tone.", "brighter": "up", "tighter": "n/a", "warmer": "down"},
+        "PRESENCE": {"kind": "knob", "does": "Power-amp negative-feedback treble: adds cut and a rawer edge, most audible when the amp is driven.", "brighter": "up", "tighter": "n/a", "warmer": "down"}
+      },
+      "model_notes": {
+        "1038": "Normal channel: dark, bassy, no bright cap; fat blues tones - turn BASS way down.",
+        "1039": "High Treble channel: very bright and also bass-heavy; closest to a Super Lead.",
+        "1040": "Jumpered channels with two gains; the Bluesbreaker-style blend."
+      },
+      "starts": [
+        {"name": "Gary Moore-style (boosted)", "settings": {"GAIN": 3, "PRESENCE": 3}, "basis": "cited", "source": "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf", "note": "Fractal forum member Simeon via Yek: Input Drive 3, Presence 3, plus a TS808 with Drive 0, Tone 6, Level 7 (use Green 808)."},
+        {"name": "Bluesbreaker edge (Patch)", "settings": {"GAIN 1": 5, "GAIN 2": 3, "BASS": 2, "MID": 7, "TREBLE": 6, "PRESENCE": 5}, "basis": "typical", "source": ""},
+        {"name": "cranked blues crunch (Patch)", "settings": {"GAIN 1": 7.5, "GAIN 2": 4.5, "BASS": 1, "MID": 8, "TREBLE": 6.5, "PRESENCE": 5}, "basis": "typical", "source": ""}
+      ],
+      "boosts": [
+        {"model": "Green 808", "why": "Drive 0 / Level up trims the amp's heavy bass and pushes it into singing sustain (Gary Moore-style setting above)."},
+        {"model": "Rage Booster", "why": "1960s British pairing: a treble booster removes the flub and adds bite."},
+        {"model": "Facial Fuzz", "why": "Mid-rich compressed Marshall-type amps smooth out fuzz pedals."},
+        {"model": "Myth Drive", "why": "Clean-ish level push when you want the amp's own crunch at lower GAIN."}
+      ],
+      "cabs": [
+        {"model": "412 Brit TV GB75Hz 69 (M)", "why": "Late-60s Marshall 4×12 with G12M Greenbacks: the cab the amp was designed for."},
+        {"model": "412 Brit 60B GB 71 (M)", "why": "Marshall 4×12 with Pulsonic Greenbacks: sweet mids, soft top."},
+        {"model": "212 UK C30 GB 69 (M)", "why": "Open-back 2×12 with pre-Rola Greenbacks: the closest thing here to a Bluesbreaker combo."},
+        {"model": "412 Brit 35B Alnico Cream (M)", "why": "Marshall 4×12 with Alnico Creams: smoother, more touch-compressed vintage voice."}
+      ],
+      "known_for": ["Eric Clapton on John Mayall's 'Beano' album (1966, Bluesbreaker combo)", "British blues and blues-rock; Gary Moore-style leads", "Marshall's first amp"],
+      "poor_at": "Tight, aggressive hard-rock crunch or metal: it has more sag and less crunch than later Marshalls and turns to mud with gain and bass up.",
+      "watch_out": "In the real world nobody ran the volume high; with GAIN way up low notes go muddy and almost synth-like. Stay moderate, BASS near 0, and boost from the front.",
+      "tags": ["edge", "crunch", "blues", "blues rock", "british", "classic rock", "sag"],
+      "sources": [
+        "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf",
+        "https://quadcortex.wiki/Brit_TM45",
+        "https://www.sweetwater.com/insync/jumpering-marshall-amp-channels/",
+        "https://www.gilmourish.com/?p=7115"
+      ]
+    },
+    {
+      "key": "marshall_plexi_50",
+      "real": "Marshall Lead 50, model 1987 (plexi panel 1966–69, then JMP; '50-watt Plexi'), 50 W, 2×EL34",
+      "models": [1079, 1080, 1081],
+      "gain_range": "crunch",
+      "sweet_spot": "crunch",
+      "drive_control": "GAIN (the amp's volume; GAIN 1 / GAIN 2 on Patch)",
+      "voice": "Plexi roar that gives up sooner: a little more aggressive and compressed than the 100, with easier power-amp crunch.",
+      "controls": {
+        "GAIN": {"kind": "knob", "does": "The channel volume (no master): the amp relies on power-amp distortion, so real crunch needs it well up.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "GAIN 1": {"kind": "knob", "does": "Patch model. By Marshall convention channel I = High Treble (bright cap, more gain). Verify by ear.", "brighter": "up", "tighter": "n/a", "warmer": "n/a"},
+        "GAIN 2": {"kind": "knob", "does": "Patch model. By Marshall convention channel II = Normal: dark, loads of bass. Keep at or below GAIN 1.", "brighter": "down", "tighter": "down", "warmer": "up"},
+        "BASS": {"kind": "knob", "does": "Run it very low, even 0 - especially on Normal and Patch models - or the low end flubs.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "MID": {"kind": "knob", "does": "Post-gain stack: MID up fills the scoop and adds push; 7-10 is normal for a Plexi.", "brighter": "n/a", "tighter": "n/a", "warmer": "up"},
+        "TREBLE": {"kind": "knob", "does": "Do not be afraid to run it very high, as on the real amp; dominant control of the stack.", "brighter": "up", "tighter": "n/a", "warmer": "down"},
+        "PRESENCE": {"kind": "knob", "does": "Treble boost from reduced negative feedback in the power amp: cut, rasp and looser feel; set to taste.", "brighter": "up", "tighter": "n/a", "warmer": "down"}
+      },
+      "model_notes": {
+        "1079": "High Treble (Bright) channel: bright cap makes it borderline painful at low GAIN, mellowing as GAIN rises; the gainiest single channel.",
+        "1080": "Jumpered channels with two gains.",
+        "1081": "Normal channel: flat, dark, loads of bass; turn BASS way down."
+      },
+      "starts": [
+        {"name": "typical Plexi EQ", "settings": {"BASS": 2, "MID": 8, "TREBLE": 7.5}, "basis": "cited", "source": "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf", "note": "Fractal's Cliff Chase: 'Bass 2, Mid 8, Treble 7.5. Adjust Presence to taste.' Gain not specified."},
+        {"name": "classic rock crunch (Patch)", "settings": {"GAIN 1": 6, "GAIN 2": 4, "BASS": 2, "MID": 8, "TREBLE": 7, "PRESENCE": 5}, "basis": "typical", "source": ""},
+        {"name": "edge / cleans up with guitar volume (Bright)", "settings": {"GAIN": 3.5, "BASS": 3, "MID": 7, "TREBLE": 6, "PRESENCE": 4}, "basis": "typical", "source": ""}
+      ],
+      "boosts": [
+        {"model": "Rage Booster", "why": "Treble booster into a cranked Marshall: tightens the lows and adds singing gain."},
+        {"model": "Facial Fuzz", "why": "The amp's compression smooths a Fuzz Face into the creamy 60s lead sound."},
+        {"model": "Chief SD1", "why": "Level-up, gain-low boost trims bass and adds saturation for tighter leads; can turn boxy since the amp is already mid-rich."},
+        {"model": "Fuzz Pi", "why": "Scooped Big Muff-type fuzz suits mid-rich, compressed British amps."}
+      ],
+      "cabs": [
+        {"model": "412 Brit 60B GB 71 (M)", "why": "Marshall 4×12 with Pulsonic G12M Greenbacks: sweet mids, the period-correct pairing."},
+        {"model": "412 Brit TV GB75Hz 69 (M)", "why": "1969 tall 4×12 with G12M-25s: bigger low end, vintage top."},
+        {"model": "412 CA Trad S H30 15 (M)", "why": "G12H30s: compress less than Greenbacks and are flatter - the 'Hendrix speaker' type."}
+      ],
+      "known_for": ["Classic rock and hard rock crunch; the smaller sibling of the Super Lead", "AC/DC- and early-70s-style rhythm tones", "Players of Plexis generally: Hendrix, Page, Angus Young, Van Halen"],
+      "poor_at": "Clean headroom, tight modern low end and smooth highs: raspy by design and non-master, so it only sings when driven.",
+      "watch_out": "Do not dial it like a master-volume amp: BASS at noon = flub. Run BASS 0-3 with MID and TREBLE high; the fizz on top is how a Plexi sounds.",
+      "tags": ["crunch", "classic rock", "hard rock", "british", "edge", "blues rock"],
+      "sources": [
+        "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf",
+        "https://quadcortex.wiki/Brit_Plexi_50",
+        "https://www.sweetwater.com/insync/jumpering-marshall-amp-channels/",
+        "https://www.softube.com/user-manuals/marshall-plexi-super-lead-1959",
+        "https://www.gilmourish.com/?p=7115"
+      ]
+    },
+    {
+      "key": "marshall_plexi_100",
+      "real": "Marshall Super Lead 100, model 1959 (1965→; plexi panel to 1969), 100 W, 4×EL34",
+      "models": [1091, 1092, 1093],
+      "gain_range": "crunch",
+      "sweet_spot": "crunch",
+      "drive_control": "GAIN (the amp's volume; GAIN 1 / GAIN 2 on Patch)",
+      "voice": "The classic-rock roar: bright, raspy, open and huge with upper-mid 'kerrang'; more headroom and punch than the 50.",
+      "controls": {
+        "GAIN": {"kind": "knob", "does": "The channel volume (no master): power-amp distortion does the work; back the guitar volume off for a warm clean.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "GAIN 1": {"kind": "knob", "does": "Patch model. By Marshall convention channel I = High Treble (bright cap, more gain). Verify by ear.", "brighter": "up", "tighter": "n/a", "warmer": "n/a"},
+        "GAIN 2": {"kind": "knob", "does": "Patch model. By Marshall convention channel II = Normal: dark, loads of bass. Keep at or below GAIN 1.", "brighter": "down", "tighter": "down", "warmer": "up"},
+        "BASS": {"kind": "knob", "does": "Run it very low, even 0, or it gets flubby - most of all on the Normal channel.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "MID": {"kind": "knob", "does": "Post-gain stack: MID up fills the scoop and adds push; 8-10 is normal.", "brighter": "n/a", "tighter": "n/a", "warmer": "up"},
+        "TREBLE": {"kind": "knob", "does": "Run it high without fear, as on the real amp; dominant control of the stack.", "brighter": "up", "tighter": "n/a", "warmer": "down"},
+        "PRESENCE": {"kind": "knob", "does": "Treble boost from reduced negative feedback in the power amp; set to taste (JD Simo: 5-6).", "brighter": "up", "tighter": "n/a", "warmer": "down"}
+      },
+      "model_notes": {
+        "1091": "High Treble (Bright) channel: boosted bright tone bordering on painful; its bright cap is also part of its gain.",
+        "1092": "Jumpered channels with two gains.",
+        "1093": "Normal channel: flat response, dark, loads of bass."
+      },
+      "starts": [
+        {"name": "typical Plexi EQ", "settings": {"BASS": 2, "MID": 8, "TREBLE": 7.5}, "basis": "cited", "source": "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf", "note": "Fractal's Cliff Chase: 'Bass 2, Mid 8, Treble 7.5. Adjust Presence to taste.' Gain not specified."},
+        {"name": "JD Simo, Bright channel dimed", "settings": {"GAIN": 10, "BASS": 0, "MID": 10, "TREBLE": 10, "PRESENCE": 5.5}, "basis": "cited", "source": "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf", "note": "From a Premier Guitar rig rundown as quoted by Yek: Bass 0, Mid 10, Treble 10, Volume 10, Presence 5-6."},
+        {"name": "classic rock crunch (Patch)", "settings": {"GAIN 1": 6.5, "GAIN 2": 4, "BASS": 2, "MID": 8, "TREBLE": 7, "PRESENCE": 5}, "basis": "typical", "source": ""},
+        {"name": "edge / cleans up with guitar volume (Bright)", "settings": {"GAIN": 4, "BASS": 3, "MID": 7, "TREBLE": 6, "PRESENCE": 4}, "basis": "typical", "source": ""}
+      ],
+      "boosts": [
+        {"model": "Facial Fuzz", "why": "The Hendrix recipe: the Plexi's compression smooths a Fuzz Face into a creamy lead."},
+        {"model": "Rage Booster", "why": "Treble booster into a loud Marshall: tighter lows and more singing gain."},
+        {"model": "Chief SD1", "why": "Level-up, gain-low boost trims bass and adds saturation for tighter leads; can turn boxy since the amp is already mid-rich."},
+        {"model": "Fuzz Pi", "why": "Scooped Big Muff-type fuzz suits mid-rich, compressed British amps."}
+      ],
+      "cabs": [
+        {"model": "412 Brit 60B GB 71 (M)", "why": "Marshall 4×12 with Pulsonic G12M Greenbacks: the stack sound."},
+        {"model": "412 Brit TV GB75Hz 69 (M)", "why": "1969 tall cab with G12M-25s: big lows, sweet vintage top."},
+        {"model": "412 CA Trad S H30 15 (M)", "why": "G12H30s compress less and are flatter than Greenbacks - the 'Hendrix speaker' type."},
+        {"model": "412 Brit 60A GB75Hz 89 (M)", "why": "Angled 1960A with G12M-25s: slightly more modern Greenback voice."}
+      ],
+      "known_for": ["Jimi Hendrix, Jimmy Page, Pete Townshend, Angus Young, Eddie Van Halen (everything on 10, variac), Yngwie Malmsteen", "The sound of classic and hard rock; the Marshall stack"],
+      "poor_at": "Clean headroom at the settings where it sounds best, tight modern low end, smooth highs; raspy and fizzy by design.",
+      "watch_out": "Do not dial it like a master-volume amp: BASS at noon = flub. Run BASS 0-3 with MID/TREBLE high. Turning the bright channel down in gain also makes it thinner and harsher.",
+      "tags": ["crunch", "classic rock", "hard rock", "british", "blues rock", "stack"],
+      "sources": [
+        "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf",
+        "https://quadcortex.wiki/Brit_Plexi_100",
+        "https://www.sweetwater.com/insync/jumpering-marshall-amp-channels/",
+        "https://www.softube.com/user-manuals/marshall-plexi-super-lead-1959",
+        "https://www.gilmourish.com/?p=7115"
+      ]
+    },
+    {
+      "key": "hiwatt_dr103",
+      "real": "Hiwatt Custom 100 DR103 (late 1960s→; Harry Joyce-era 1970s), 100 W, 4×EL34",
+      "models": [1063, 1064],
+      "gain_range": "crunch",
+      "sweet_spot": "clean",
+      "drive_control": "GAIN (channel volume) with MASTER",
+      "voice": "Loud, hi-fi British clean: tight punchy lows, strong forward mids, glassy slightly hollow top; stiff, with crunch only when cranked.",
+      "controls": {
+        "GAIN": {"kind": "knob", "does": "Channel volume. Gilmour keeps it around 2 o'clock (7) with a low master for a thick clean on the edge.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "MASTER": {"kind": "knob", "does": "Real master volume. Low = clean, tight pedal platform; crank it with GAIN for raw power-amp roar.", "brighter": "n/a", "tighter": "down", "warmer": "n/a"},
+        "BASS": {"kind": "knob", "does": "Wide-range and effective (unlike a Plexi's). Gilmour settings range from 2.5 to 8 depending on cab and era.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "MID": {"kind": "knob", "does": "Adds strong punch; the amp is already mid-forward. Gilmour settings span roughly 3 to 8.", "brighter": "n/a", "tighter": "n/a", "warmer": "up"},
+        "TREBLE": {"kind": "knob", "does": "Wide-range; Gilmour usually keeps it low (2-4) and gets clarity from PRESENCE.", "brighter": "up", "tighter": "n/a", "warmer": "down"},
+        "PRESENCE": {"kind": "knob", "does": "Subtle power-amp control: 'doesn't do a lot but it opens up the amp a little'.", "brighter": "up", "tighter": "n/a", "warmer": "down"}
+      },
+      "model_notes": {
+        "1063": "Normal channel: voiced to stay clean and powerful at all levels; fuller and darker.",
+        "1064": "Brilliant channel: higher gain and brighter; the one that overdrives when pushed."
+      },
+      "starts": [
+        {"name": "Gilmour 2006 'On an Island' tour (clock positions converted)", "settings": {"GAIN": 7, "BASS": 4, "MID": 6.5, "TREBLE": 3, "PRESENCE": 8, "MASTER": 2}, "basis": "cited", "source": "https://www.kitrae.net/music/David_Gilmour_Hiwatt_Settings.html", "note": "Real amp had linked inputs: Normal 2:00, Brilliant 1:00, Bass 11:00, Treble 10:00, Middle 1:30, Presence 3:00, Master 9:00. On the Bright model use GAIN 6."},
+        {"name": "Gilmour 1994 tour (clock positions converted)", "settings": {"GAIN": 7, "BASS": 2.5, "MID": 5, "TREBLE": 3.5, "PRESENCE": 8, "MASTER": 6.5}, "basis": "cited", "source": "https://www.kitrae.net/music/David_Gilmour_Hiwatt_Settings.html", "note": "Normal 2:00, Brilliant 1:00, Bass 9:30, Treble 10:30, Middle 12:00, Presence 3:00, Master 1:30. Starting point only; cab and tubes change everything."},
+        {"name": "Yek's roar (Fractal model)", "settings": {"MASTER": 10, "PRESENCE": 3.5, "BASS": 3}, "basis": "cited", "source": "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf", "note": "'Crank the Master. Bass is turned down and Presence between 3-4'; gain to taste. 'Bass 3' is my reading of 'turned down'."},
+        {"name": "Townshend-style crunch (Bright)", "settings": {"GAIN": 8, "BASS": 4, "MID": 6, "TREBLE": 6, "PRESENCE": 5, "MASTER": 8}, "basis": "typical", "source": ""}
+      ],
+      "boosts": [
+        {"model": "Fuzz Pi", "why": "Gilmour's Big Muff sound depends on a mid-rich, compressed Hiwatt to fill in and smooth the scooped fuzz."},
+        {"model": "Facial Fuzz", "why": "Fuzz Face-type pedals turn smooth and creamy into darker British amps like a Hiwatt."},
+        {"model": "Exotic Z Boost", "why": "Flat/transparent boosts suit an amp that already has plenty of mids (the Powerboost role)."}
+      ],
+      "cabs": [
+        {"model": "412 Watt S4123 (M)", "why": "Hiwatt's own SE4123 4×12 - Hiwatt and Fane speakers go hand in hand."},
+        {"model": "412 Brit 60B GB 71 (M)", "why": "Gilmour has also run a Marshall 4×12 alongside his WEM cab."}
+      ],
+      "known_for": ["David Gilmour / Pink Floyd clean platform for fuzz and delay", "Pete Townshend / The Who - 'Live at Leeds'", "Players listed for it: Kevin Shields, Robert Fripp"],
+      "poor_at": "Easy low-volume breakup or saggy vintage feel: it is stiff and clean. Mid-hump drives (Green 808, Rodent Drive, Obsessive Drive) can sound dark and boxy into it.",
+      "watch_out": "Do not expect a Plexi: at normal settings it stays clean. Use it as a loud clean base (GAIN ~7, MASTER low) and get the drive from a fuzz or flat overdrive in front.",
+      "tags": ["clean", "edge", "crunch", "british", "pedal platform", "prog", "classic rock", "headroom"],
+      "sources": [
+        "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf",
+        "https://www.kitrae.net/music/David_Gilmour_Hiwatt_Settings.html",
+        "https://www.gilmourish.com/?p=7115",
+        "https://quadcortex.wiki/Watt_D103"
+      ]
+    },
+    {
+      "key": "roland_jc120",
+      "real": "Roland JC-120 Jazz Chorus (1975→), solid-state, 2×60 W stereo, 2×12",
+      "models": [1008],
+      "gain_range": "clean",
+      "sweet_spot": "clean",
+      "drive_control": "none (VOLUME is level; the amp stays clean)",
+      "voice": "Pristine, open, fast solid-state clean: tight lows, glassy bright top, no sag or compression; the 80s chorus clean.",
+      "controls": {
+        "VOLUME": {"kind": "knob", "does": "Level only - no tube-style breakup to dial in. The real amp's built-in distortion is not modeled.", "brighter": "n/a", "tighter": "n/a", "warmer": "n/a"},
+        "BRIGHT": {"kind": "switch", "does": "Roland manual: ON gives 'a bright, clear sound'. Yek always engages it; switch off if the top is harsh.", "brighter": "up", "tighter": "n/a", "warmer": "down"},
+        "BASS": {"kind": "knob", "does": "Conventional bass control; the amp is already tight, so cut only to make room in a mix.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "MID": {"kind": "knob", "does": "Conventional mid control; dip slightly for the glassy 80s clean, raise for body with pedals.", "brighter": "n/a", "tighter": "n/a", "warmer": "up"},
+        "TREBLE": {"kind": "knob", "does": "Conventional treble control on a naturally bright amp; back it off before blaming a drive pedal for harshness.", "brighter": "up", "tighter": "n/a", "warmer": "down"}
+      },
+      "model_notes": {
+        "1008": "Amp section only: the famous stereo chorus is not in the amp block - put Chief CE2W (ST) after the amp/cab to recreate it in stereo."
+      },
+      "starts": [
+        {"name": "flat clean", "settings": {"VOLUME": 3, "BRIGHT": false, "BASS": 5, "MID": 5, "TREBLE": 5}, "basis": "typical", "source": "", "note": "Reported as the Roland manual's clean suggestion (volume 2-4, tone controls at noon); not verified in the manual itself."},
+        {"name": "80s chorus clean", "settings": {"VOLUME": 4, "BRIGHT": true, "BASS": 4.5, "MID": 4, "TREBLE": 5.5}, "basis": "typical", "source": "", "note": "Add Chief CE2W (ST) after the amp and a compressor before it."},
+        {"name": "clean base for drive pedals", "settings": {"VOLUME": 4, "BRIGHT": false, "BASS": 5, "MID": 6, "TREBLE": 4.5}, "basis": "typical", "source": ""}
+      ],
+      "boosts": [
+        {"model": "Green 808", "why": "Yek: great overdriven tones from a JC-120 with a Tube Screamer; it adds the mids and compression the amp never will."},
+        {"model": "Rodent Drive", "why": "Full distortion pedals supply all the dirt; Rat-type mids and compression suit a flat, uncompressed clean amp."},
+        {"model": "Obsessive Drive", "why": "Amp-like overdrive with fat lows and strong mids for a clean amp with no breakup of its own."}
+      ],
+      "cabs": [
+        {"model": "212 Rols Jazz 87 (M)", "why": "The JC-120's own 2×12."}
+      ],
+      "known_for": ["Andy Summers (The Police), Robert Smith, Johnny Marr - 80s chorus cleans", "Metallica clean parts ('Fade to Black', 'Welcome Home (Sanitarium)', 'Nothing Else Matters')", "Jazz and jazz-rock; 'king of clean'"],
+      "poor_at": "Any amp breakup, warmth, sag or touch compression; cannot do 'edge of breakup' by itself.",
+      "watch_out": "It never 'gives': with no compression, pick attack and harsh pedal top-end come through raw. Add a compressor and take all dirt from pedals with their tone rolled back.",
+      "tags": ["clean", "solid state", "chorus", "80s", "jazz", "funk", "metal cleans", "pedal platform"],
+      "sources": [
+        "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf",
+        "https://quadcortex.wiki/Rols_Jazz_CH120",
+        "https://www.manualslib.com/manual/141954/Roland-Jazz-Chorus-Jc-120.html?page=5",
+        "https://en.wikipedia.org/wiki/Roland_Jazz_Chorus",
+        "https://www.gilmourish.com/?p=7115"
+      ]
+    },
+    {
+      "key": "matchless_chieftain",
+      "real": "Matchless Chieftain (1990s→), 40 W, 2×EL34 cathode-biased class A, no negative feedback, tube rectifier",
+      "models": [1154],
+      "gain_range": "crunch",
+      "sweet_spot": "edge",
+      "drive_control": "VOLUME (with MASTER)",
+      "voice": "Thick yet crisp boutique EL34 tone: fat lows, rich complex mids, shimmering top; fair power-amp breakup, very touch-sensitive.",
+      "controls": {
+        "VOLUME": {"kind": "knob", "does": "First-stage gain: sensitivity and drive. Cleans up well from the guitar's volume when set for overdrive.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "BASS": {"kind": "knob", "does": "Very wide range; too much causes floppiness and loss of definition at high volume (manual). Keep it low.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "MID": {"kind": "knob", "does": "Interactive with BASS and TREBLE; adds body and push.", "brighter": "n/a", "tighter": "n/a", "warmer": "up"},
+        "TREBLE": {"kind": "knob", "does": "Per the manual it regulates the mid-band and upper mids (the instrument's 'voice'), not just the extreme top.", "brighter": "up", "tighter": "n/a", "warmer": "down"},
+        "BRILLIANCE": {"kind": "knob", "does": "Power-amp high-frequency control: smooths or brings forward the top edge. Reported as up = brighter (unverified).", "brighter": "up", "tighter": "n/a", "warmer": "down"},
+        "MASTER": {"kind": "knob", "does": "Output-amp gain. Maximum = most clean headroom and power-amp feel; lower it and raise VOLUME for dirtier preamp tone.", "brighter": "n/a", "tighter": "n/a", "warmer": "n/a"}
+      },
+      "model_notes": {
+        "1154": "Single-channel amp; no channel variants."
+      },
+      "starts": [
+        {"name": "Yek's Boutique 1 setting (Fractal model)", "settings": {"VOLUME": 4, "BASS": 2.5, "BRILLIANCE": 5, "MASTER": 10}, "basis": "cited", "source": "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf", "note": "'Master cranked, Hi-Cut around 12 o'clock, low Bass and Input Drive anywhere between 2 and 6.' 4 and 2.5 are mid-points of his ranges."},
+        {"name": "chimey clean", "settings": {"VOLUME": 3, "BASS": 3, "MID": 5, "TREBLE": 6, "BRILLIANCE": 5, "MASTER": 10}, "basis": "typical", "source": ""},
+        {"name": "pushed crunch", "settings": {"VOLUME": 6.5, "BASS": 2, "MID": 6, "TREBLE": 5.5, "BRILLIANCE": 4.5, "MASTER": 8}, "basis": "typical", "source": ""}
+      ],
+      "boosts": [
+        {"model": "Myth Drive", "why": "Low-gain push into an amp that already has rich mids and its own power-amp breakup."},
+        {"model": "Exotic Z Boost", "why": "Clean boost with bass/treble trim: more drive without adding the bass the amp punishes."},
+        {"model": "Green 808", "why": "Bass cut and mid focus tighten the wide, soft low end for leads."}
+      ],
+      "cabs": [
+        {"model": "212 Match Jefe Sig 02 (M)", "why": "The Chieftain's own 2×12 with Matchless signature drivers."},
+        {"model": "212 Match Jefe V30 02 (M)", "why": "Chieftain cab with Vintage 30s: more upper-mid cut, tighter."}
+      ],
+      "known_for": ["Nashville country and session work", "Roots and alternative rock; Matchless players such as David Grissom and Kings of Leon", "Boutique-amp boom of the early 1990s"],
+      "poor_at": "Tight high-gain or scooped tones; the low end flops if BASS is up at volume.",
+      "watch_out": "The BASS knob has far more range than usual: 'more bass' quickly becomes floppy and undefined. Also check BRILLIANCE direction by ear before automating it.",
+      "tags": ["clean", "edge", "crunch", "boutique", "country", "roots", "class A"],
+      "sources": [
+        "https://uploads-ssl.webflow.com/5e4f4ddcf45e4c7d053435f5/5fbdc47f721fc14776f30a16_Clubman-Chieftain-manual.pdf",
+        "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf",
+        "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-boutique-matchless-chieftain.111832/",
+        "https://ampgarage.com/forum/viewtopic.php?t=26013",
+        "https://quadcortex.wiki/Matchmore_Jefe"
+      ]
+    },
+    {
+      "key": "matchless_dc30",
+      "real": "Matchless DC-30 (C-30 series; Matchless's first design, c. 1989–91→), 30 W, 4×EL84 cathode-biased class A, no negative feedback; Ch1 12AX7, Ch2 EF86",
+      "models": [1155, 1156],
+      "gain_range": "crunch",
+      "sweet_spot": "edge",
+      "drive_control": "VOLUME (with MASTER)",
+      "voice": "A sturdier, hi-fi AC30: chime, shimmer and crunch with more clarity and firmer lows; Ch2 (EF86) is thicker and gainier.",
+      "controls": {
+        "VOLUME": {"kind": "knob", "does": "Preamp gain; very input-sensitive - dig in and it compresses and gets juicy.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "BASS": {"kind": "knob", "does": "Ch1. Top-Boost-style active stack: BASS and TREBLE are highly interactive.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "TREBLE": {"kind": "knob", "does": "Ch1. Interactive with BASS; the classic chime control.", "brighter": "up", "tighter": "n/a", "warmer": "down"},
+        "CUT": {"kind": "knob", "does": "INVERTED like a Vox cut: power-amp treble cut, up = darker. Subtle below half, strong above; works best with MASTER high.", "brighter": "down", "tighter": "n/a", "warmer": "up"},
+        "MASTER": {"kind": "knob", "does": "Bypassable on the real amp; full up is the open, power-amp-driven tone. Lower it for preamp drive at less level.", "brighter": "n/a", "tighter": "n/a", "warmer": "n/a"},
+        "TONE": {"kind": "knob", "does": "Ch2. Six-position switch on the real amp: lowest = thinnest, each step up = thicker. Not a treble knob.", "brighter": "down", "tighter": "down", "warmer": "up"}
+      },
+      "model_notes": {
+        "1155": "Channel 1: two 12AX7s, AC30 Top Boost-type voice; chime and jangle to crunch. The favourite for clean-with-chime.",
+        "1156": "Channel 2: EF86 pentode, more gain and overdrives harder; the 'heavier' channel, shaped by the thickness TONE switch."
+      },
+      "starts": [
+        {"name": "Yek's Ch1 setting (Fractal model)", "settings": {"VOLUME": 5, "BASS": 5, "TREBLE": 5, "CUT": 3, "MASTER": 10}, "basis": "cited", "source": "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf", "note": "'Bass and Treble pretty much at default, Cut to about 3, vary Input Drive between 2 and 8.' Model was made with the master bypassed."},
+        {"name": "Ch1 chime clean", "settings": {"VOLUME": 3, "BASS": 4.5, "TREBLE": 6, "CUT": 3, "MASTER": 10}, "basis": "typical", "source": ""},
+        {"name": "Ch2 thick crunch", "settings": {"VOLUME": 6, "TONE": 4, "CUT": 4, "MASTER": 8}, "basis": "typical", "source": ""}
+      ],
+      "boosts": [
+        {"model": "Myth Drive", "why": "Input boost keeps the chime while adding grit - the usual way to push AC-style amps."},
+        {"model": "Rage Booster", "why": "Treble booster into EL84 class-A: more bite and gain, firmer lows."},
+        {"model": "Green 808", "why": "Mid hump and bass cut for tighter leads from a loose, chimey amp."}
+      ],
+      "cabs": [
+        {"model": "212 Match D30 Sig A (M)", "why": "The DC-30's own 2×12 (the real combo pairs a modified G12H30 with a Greenback)."},
+        {"model": "212 Match D30 Sig B (M)", "why": "Second capture of the same cabinet; pick the one that sits better."}
+      ],
+      "known_for": ["'An AC30 that wouldn't break down' - studio and touring workhorse", "Nashville session players; country, roots, indie", "The amp that started the boutique craze"],
+      "poor_at": "Scooped or high-gain tones and big clean headroom at volume.",
+      "watch_out": "Two backwards controls: CUT (up = darker) and Ch2 TONE (up = thicker, not brighter). 'Brighter' here means CUT down or TONE down.",
+      "tags": ["clean", "edge", "crunch", "chime", "boutique", "country", "indie", "class A"],
+      "sources": [
+        "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf",
+        "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-matchbox-d-30-matchless-dc-30.114129/",
+        "https://quadcortex.wiki/Matchmore_DC30",
+        "https://ampgarage.com/forum/viewtopic.php?t=26013"
+      ]
+    },
+    {
+      "key": "morgan_sw50",
+      "real": "Morgan SW50 (2010s; built around a ~40-year-old Dumble-style clean amp, widely linked to the Steel String Singer), 50 W, 2×6L6",
+      "models": [1116],
+      "gain_range": "edge",
+      "sweet_spot": "clean",
+      "drive_control": "MASTER (the amp's Level = power-section gain) with GAIN",
+      "voice": "Mid-60s blackface idea with more clarity and string-to-string definition: loud, big clean with sweet singing sustain.",
+      "controls": {
+        "BRIGHT": {"kind": "switch", "does": "Brings in top end for dark guitars 'without adding any ice picky highs'.", "brighter": "up", "tighter": "n/a", "warmer": "down"},
+        "LOW BOOST": {"kind": "switch", "does": "Morgan's bass-emphasis switch: moves the mid centre point so more bass comes through. Off for tighter.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "GAIN": {"kind": "knob", "does": "Preamp volume (assumed mapping). Keep moderate for maximum clean headroom.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "BASS": {"kind": "knob", "does": "Interacts with TREBLE for a wide tonal range.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "MID": {"kind": "knob", "does": "Midrange body; more mid than a blackface stack offers.", "brighter": "n/a", "tighter": "n/a", "warmer": "up"},
+        "TREBLE": {"kind": "knob", "does": "Interacts with BASS for a wide tonal range.", "brighter": "up", "tighter": "n/a", "warmer": "down"},
+        "MASTER": {"kind": "knob", "does": "The amp's Level: power-section gain. Past ~3 o'clock (8) it adds warm, compressed power-amp overdrive.", "brighter": "n/a", "tighter": "down", "warmer": "up"}
+      },
+      "model_notes": {
+        "1116": "Single channel. QC names differ from the panel: LOW BOOST = bass emphasis; GAIN/MASTER = Volume/Level (assumed)."
+      },
+      "starts": [
+        {"name": "clean pedal platform", "settings": {"BRIGHT": false, "LOW BOOST": false, "GAIN": 4, "BASS": 4, "MID": 5, "TREBLE": 5.5, "MASTER": 5}, "basis": "typical", "source": ""},
+        {"name": "power-amp grit", "settings": {"BRIGHT": false, "LOW BOOST": false, "GAIN": 5.5, "BASS": 3.5, "MID": 6, "TREBLE": 5.5, "MASTER": 8.5}, "basis": "typical", "source": "", "note": "Based on Morgan's description that overdrive arrives past about 3 o'clock on Level."}
+      ],
+      "boosts": [
+        {"model": "Myth Drive", "why": "QC forum: the Morgan is 'such a great pedal platform'; a low-level Klon-type keeps its clarity."},
+        {"model": "Green 808", "why": "Adds mids and compression to a big, clear, uncompressed clean."},
+        {"model": "Vemural Ray", "why": "Low-gain Fender-voiced overdrive stacks naturally on a blackface-derived clean."},
+        {"model": "Obsessive Drive", "why": "Fat amp-like drive for when the platform has to cover crunch."}
+      ],
+      "cabs": [
+        {"model": "212 Zila CB 16 (M)", "why": "Creambacks: the SW50 combo ships with a Celestion Creamback."},
+        {"model": "212 Too Rock G65 (M)", "why": "Open-back G12-65s: the Dumble-style clean-amp speaker voice."},
+        {"model": "212 Too Rock EV Vintage 79 (M)", "why": "EVM12L: maximum headroom, firm lows and clarity for a clean platform."}
+      ],
+      "known_for": ["Modern clean pedal platform", "Players listed for it: Josh Smith, Tosin Abasi, Aaron Marshall"],
+      "poor_at": "Amp distortion: only mild power-amp grit at high MASTER; needs pedals for crunch and lead.",
+      "watch_out": "Roles are swapped compared with most amps: the overdrive comes from MASTER (Level), not GAIN. Re-check loudness with OUTPUT after moving MASTER.",
+      "tags": ["clean", "pedal platform", "headroom", "boutique", "edge", "modern clean"],
+      "sources": [
+        "https://quadcortex.wiki/Captain_50",
+        "https://www.thegearpage.net/board/index.php?threads/morgan-sw50-an-affordable-steel-string-singer-oh-my-goodness.965266/",
+        "https://reverb.com/item/3523694-morgan-sw50-boutique-tube-guitar-amplifier-1x12-combo-dumble-inspired-celestion-creamback",
+        "https://unity.neuraldsp.com/t/need-advice-from-experienced-clean-tone-players/14886"
+      ]
+    },
+    {
+      "key": "dumble_ods",
+      "real": "Dumble Overdrive Special (QC: a 1992 'low-plate Skyliner, non-HRM' amp), 6L6; OD channel cascades from the clean preamp",
+      "models": [1176],
+      "gain_range": "crunch",
+      "sweet_spot": "edge",
+      "drive_control": "VOLUME (clean gain, also feeds the OD) and OD CONTENT on the OD channel",
+      "voice": "Fenderish fat clean with strong low-mids; OD channel is thick, mid-heavy, smooth and vocal - sings on single notes, very touch-sensitive.",
+      "controls": {
+        "CHANNEL": {"kind": "switch", "does": "Clean / OD. The OD stages come after the clean preamp, so VOLUME and the tone stack still shape the OD.", "brighter": "n/a", "tighter": "n/a", "warmer": "n/a"},
+        "VOLUME": {"kind": "knob", "does": "Clean-preamp gain. As it rises the tone moves from sparkly upper-mid emphasis to thick, bassy and meaty.", "brighter": "down", "tighter": "down", "warmer": "up"},
+        "TREBLE": {"kind": "knob", "does": "Shared stack placed before the OD stages: on the OD channel it works as pre-distortion EQ.", "brighter": "up", "tighter": "n/a", "warmer": "down"},
+        "MIDDLE": {"kind": "knob", "does": "Shared pre-OD stack; more MIDDLE = more signal and thicker drive.", "brighter": "n/a", "tighter": "n/a", "warmer": "up"},
+        "BASS": {"kind": "knob", "does": "Shared pre-OD stack: bass here goes into the overdrive, so high settings make the OD muddy.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "OD CONTENT": {"kind": "knob", "does": "Amount of OD-channel saturation (forum: 'controls the preamp saturation'); barely changes the tonal balance.", "brighter": "n/a", "tighter": "down", "warmer": "n/a"},
+        "OD VOLUME": {"kind": "knob", "does": "OD-channel level: balances OD against clean at the same MASTER setting.", "brighter": "n/a", "tighter": "n/a", "warmer": "n/a"},
+        "MASTER": {"kind": "knob", "does": "Power-amp level and feel. Users report clean much quieter than OD (MASTER 8-9 to match OD VOLUME 5).", "brighter": "n/a", "tighter": "n/a", "warmer": "n/a"},
+        "PRESENCE": {"kind": "knob", "does": "Power-amp top end.", "brighter": "up", "tighter": "n/a", "warmer": "down"},
+        "PREAMP": {"kind": "switch", "does": "Assumed = preamp boost (PAB): bypasses the tone stack for more gain and mids; the EQ knobs then do little.", "brighter": "n/a", "tighter": "n/a", "warmer": "up"},
+        "BRIGHT": {"kind": "switch", "does": "Adds sparkle; less noticeable as VOLUME goes up. Forum tip: off for single coils, on for humbuckers.", "brighter": "up", "tighter": "n/a", "warmer": "down"},
+        "MID": {"kind": "switch", "does": "Mid boost (a.k.a. Deep): more mids and gain, fatter. Forum tip: on for single coils, off for humbuckers.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "EQ": {"kind": "switch", "does": "Rock / Jazz. Rock is brighter, stronger, more dynamic; Jazz adds low-pass filtering: softer, rounder, lower gain.", "brighter": "n/a", "tighter": "n/a", "warmer": "n/a"}
+      },
+      "model_notes": {
+        "1176": "Non-HRM: no extra Marshall-style tone stack after the OD, so the OD is thicker and more mid-forward. Added in CorOS 3.3.0; 3.3.1 fixed channel-switching bugs."
+      },
+      "starts": [
+        {"name": "switch set for single coils", "settings": {"BRIGHT": false, "MID": true}, "basis": "cited", "source": "https://unity.neuraldsp.com/t/dumbbell-ods/20190", "note": "Forum user jamsden: 'bright off, mid on for single coils, the opposite for double'."},
+        {"name": "switch set for humbuckers", "settings": {"BRIGHT": true, "MID": false}, "basis": "cited", "source": "https://unity.neuraldsp.com/t/dumbbell-ods/20190"},
+        {"name": "fat clean", "settings": {"VOLUME": 4, "TREBLE": 5.5, "MIDDLE": 5, "BASS": 3.5, "MASTER": 6.5, "PRESENCE": 5}, "basis": "typical", "source": "", "note": "CHANNEL = clean, EQ = Rock, PREAMP off."},
+        {"name": "smooth singing lead", "settings": {"VOLUME": 5, "TREBLE": 5.5, "MIDDLE": 6, "BASS": 3, "OD CONTENT": 5.5, "OD VOLUME": 5, "MASTER": 5, "PRESENCE": 4.5}, "basis": "typical", "source": "", "note": "CHANNEL = OD, EQ = Rock. Raise OD CONTENT for gain, not BASS or VOLUME."}
+      ],
+      "boosts": [
+        {"model": "Green 808", "why": "Into the clean channel: mid focus and bass cut keep the cascaded OD from getting woolly."},
+        {"model": "Myth Drive", "why": "Low-gain push on the clean channel for edge-of-breakup while leaving the OD channel for leads."},
+        {"model": "Exotic", "why": "Bass and treble controls let you trim what goes into an amp whose EQ sits before its overdrive."}
+      ],
+      "cabs": [
+        {"model": "212 Too Rock G65 (M)", "why": "G12-65s are the speaker for the Robben Ford tone; Neural DSP says the Two Rock cabs pair well with this model."},
+        {"model": "212 Too Rock EV Vintage 79 (M)", "why": "EVM12L: the other classic Dumble speaker - loud, clear, firm lows."},
+        {"model": "412 CA Dagger A V30 01 (M)", "why": "A QC forum user's preferred cab for this model (with 412 Cornfield V30)."}
+      ],
+      "known_for": ["Robben Ford, Larry Carlton, Carlos Santana, Eric Johnson, John Mayer, Joe Bonamassa, Keith Urban", "Smooth, vocal blues/fusion lead tone and fat clean"],
+      "poor_at": "Power chords and tight riffing (the thick mids smear), scooped or aggressive tones, metal.",
+      "watch_out": "The OD is cascaded: clean VOLUME and BASS decide how muddy it gets. Keep BASS low and VOLUME moderate, and expect a big clean/OD level gap to fix with OD VOLUME.",
+      "tags": ["clean", "edge", "crunch", "lead", "blues", "fusion", "boutique", "smooth"],
+      "sources": [
+        "https://neuraldsp.com/quad-cortex-updates/coros-3-3-0-and-cortex-control-1-4-0-are-now-available",
+        "https://unity.neuraldsp.com/t/dumbbell-ods/20190",
+        "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf",
+        "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-ods-100-dumble-overdrive-special.114390/",
+        "https://quadcortex.wiki/Dumbbell_ODS",
+        "https://en.wikipedia.org/wiki/Dumble_Overdrive_Special"
+      ]
+    },
+    {
+      "key": "mesa_lone_star",
+      "real": "Mesa/Boogie Lone Star (original 'Classic', introduced mid-2000s), 100/50 W switchable, 4×6L6, built-in variac 'Tweed' power mode",
+      "models": [1101, 1102, 1103, 1104, 1105, 1106, 1107, 1108],
+      "gain_range": "crunch",
+      "sweet_spot": "clean",
+      "drive_control": "GAIN (clean models); DRIVE with GAIN (drive models)",
+      "voice": "Polished blackface-style clean with rounder, fatter low-mids and big headroom; Drive channel is smooth, thick and singing.",
+      "controls": {
+        "GAIN": {"kind": "knob", "does": "Gain AND tone: low (0-4) bright and 3-D, middle (4-7) warmer and fuller - the sweet spot, high = saturated lows, soft attack.", "brighter": "down", "tighter": "down", "warmer": "up"},
+        "DRIVE": {"kind": "knob", "does": "Drive models. Extra cascaded gain; balance it against GAIN (GAIN below DRIVE = brighter, thinner).", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "TREBLE": {"kind": "knob", "does": "Dominant control, first in the stack: high TREBLE starves MID and BASS and adds gain. Sweet spot about 4-6.5.", "brighter": "up", "tighter": "up", "warmer": "down"},
+        "MID": {"kind": "knob", "does": "Low (0-4) = scooped, girthy, softer feel; 4.5-6.5 fills in with focused attack; higher = stiffer, more forward, more gain.", "brighter": "n/a", "tighter": "up", "warmer": "n/a"},
+        "BASS": {"kind": "knob", "does": "Very powerful. Mesa's rule: as GAIN goes up, turn BASS down to keep the attack tight and dynamic.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "PRESENCE": {"kind": "knob", "does": "High-cut at the END OF THE PREAMP (not power-amp feedback): lower = darker and more compressed, fat for leads.", "brighter": "up", "tighter": "n/a", "warmer": "down"},
+        "MASTER": {"kind": "knob", "does": "Channel master; Mesa suggests staying in its sensible range (about 2-7).", "brighter": "n/a", "tighter": "n/a", "warmer": "n/a"},
+        "EQ": {"kind": "selector", "does": "Assumed = voicing switch Normal / Thick / Thicker: lowers the treble frequency and adds gain there; Normal = blackface.", "brighter": "n/a", "tighter": "n/a", "warmer": "n/a"}
+      },
+      "model_notes": {
+        "1101": "Clean, 50 W, normal power: earlier power-amp give than 100 W.",
+        "1102": "Clean, 50 W, Tweed (variac ~93 V): spongier, scoopier, clips earliest - 'old school clip' sounds.",
+        "1103": "Clean, 100 W, normal power: maximum headroom and firmest lows; the pedal-platform choice.",
+        "1104": "Clean, 100 W, Tweed: big but softer and scoopier.",
+        "1105": "Drive, 50 W, normal power: singing lead with more power-amp compression.",
+        "1106": "Drive, 50 W, Tweed: loosest, most vintage-feeling lead.",
+        "1107": "Drive, 100 W, normal power: tightest, boldest lead of the four.",
+        "1108": "Drive, 100 W, Tweed: big lead with a spongier attack."
+      },
+      "starts": [
+        {"name": "blackface-style clean", "settings": {"GAIN": 4, "BASS": 4, "MID": 3.5, "TREBLE": 6, "PRESENCE": 5.5, "MASTER": 5}, "basis": "typical", "source": "", "note": "EQ on the Normal voicing. Follows the manual's regions: GAIN low-to-middle, TREBLE in its 4-6.5 sweet spot, MID scooped."},
+        {"name": "roots clean / old-school clip (50 W Tweed models)", "settings": {"GAIN": 7, "BASS": 3, "MID": 5, "TREBLE": 5.5, "PRESENCE": 4, "MASTER": 6}, "basis": "typical", "source": ""},
+        {"name": "singing lead (Drive models)", "settings": {"DRIVE": 6, "GAIN": 5, "BASS": 2.5, "MID": 4, "TREBLE": 5.5, "PRESENCE": 3.5, "MASTER": 5}, "basis": "typical", "source": "", "note": "Manual: best lead sounds have PRESENCE low; reduce BASS as gain rises. QC wiki: add rock edge with TREBLE, then cut MID and BASS."}
+      ],
+      "boosts": [
+        {"model": "Exotic", "why": "BB Preamp-type boost with bass/treble: trims the big low end and adds mid gain for the singing lead this amp is known for."},
+        {"model": "Green 808", "why": "Bass cut before the amp fixes the low-end bloom that arrives with gain."},
+        {"model": "Myth Drive", "why": "On the clean models it behaves like a blackface: a low-gain mid push for edge of breakup."}
+      ],
+      "cabs": [
+        {"model": "412 CA Custom A Shadow 87 (M)", "why": "Mesa cab with Celestion Black Shadows - the family of the C90s Mesa fits to the Lone Star."},
+        {"model": "212 CA Recto V30 98 (M)", "why": "Mesa 2×12 with Vintage 30s: tighter, more upper-mid cut for the Drive models."},
+        {"model": "212 US TWN C12Q 00s (M)", "why": "Open-back Fender 2×12 pushes the clean models further toward blackface sparkle."}
+      ],
+      "known_for": ["Andy Timmons' clean and lead tones", "QC forum favourite for 'a great Fender Blackface tone' (100 W clean)", "Blues, country, fusion, instrumental rock"],
+      "poor_at": "Tight high-gain rhythm: gain brings in a lot of bass that the BASS knob barely removes. Not a metal amp.",
+      "watch_out": "More GAIN makes it darker and bassier, not just dirtier, and at high GAIN the tone knobs stop working. Keep GAIN in the middle, lower BASS as gain rises, and use PRESENCE as a smoothing control.",
+      "tags": ["clean", "edge", "crunch", "lead", "blues", "fusion", "country", "pedal platform", "smooth"],
+      "sources": [
+        "https://mesa-boogie.imgix.net/media/User%20Manuals/Lonestar.pdf",
+        "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf",
+        "https://quadcortex.wiki/CA_1Star_(100W/50W)",
+        "https://unity.neuraldsp.com/t/need-advice-from-experienced-clean-tone-players/14886"
+      ]
+    },
+    {
+      "key": "bogner_shiva_clean",
+      "real": "Bogner Shiva 20th Anniversary (KT88, 90 W) - clean channel",
+      "models": [1117],
+      "gain_range": "edge",
+      "sweet_spot": "clean",
+      "drive_control": "GAIN (the channel's volume) with MASTER",
+      "voice": "Beefy, warm, slightly dark clean with big KT88 headroom; shimmers once Treble, Bright and Presence come up; crunch only near the top.",
+      "controls": {
+        "BRIGHT": {"kind": "switch", "does": "Bright switch; less effective the higher GAIN is set.", "brighter": "up", "tighter": "n/a", "warmer": "down"},
+        "GAIN": {"kind": "knob", "does": "Channel volume: stays clean until very high; 7+ with MASTER at 7 gives a crunchy overdrive.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "BASS": {"kind": "knob", "does": "Bass of the clean stack; the tone controls stay in circuit on the 20th Anniversary.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "MID": {"kind": "knob", "does": "Midrange body of the clean channel.", "brighter": "n/a", "tighter": "n/a", "warmer": "up"},
+        "TREBLE": {"kind": "knob", "does": "Bogner taper: noon is dark (about a Marshall's treble at 1). Run it 7-9 without fear.", "brighter": "up", "tighter": "n/a", "warmer": "down"},
+        "MASTER": {"kind": "knob", "does": "Higher = beefier clean with more power-amp body (Yek always raises it, around 7).", "brighter": "n/a", "tighter": "n/a", "warmer": "up"},
+        "PRESENCE": {"kind": "knob", "does": "Power-amp top end; raise it with TREBLE for bite and clarity.", "brighter": "up", "tighter": "n/a", "warmer": "down"},
+        "DEPTH": {"kind": "knob", "does": "The amp's 'Excursion' (power-amp damping): up = bigger, looser bottom. Keep low at high volume.", "brighter": "n/a", "tighter": "down", "warmer": "up"}
+      },
+      "model_notes": {
+        "1117": "KT88 version has less gain and more headroom than EL34 Shivas. The real amp's clean Boost is not exposed as a parameter."
+      },
+      "starts": [
+        {"name": "Yek's beefy clean (Fractal model)", "settings": {"GAIN": 7, "MASTER": 7}, "basis": "cited", "source": "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf", "note": "'Turn up Input Drive and Master to 7. Also turn up Treble and Presence to add bite and clarity.' On the real amp this is also where crunch begins."},
+        {"name": "shimmering clean", "settings": {"BRIGHT": true, "GAIN": 4.5, "BASS": 4, "MID": 5, "TREBLE": 7.5, "MASTER": 6, "PRESENCE": 6.5, "DEPTH": 3}, "basis": "typical", "source": ""},
+        {"name": "pushed clean-channel crunch", "settings": {"BRIGHT": false, "GAIN": 8, "BASS": 3.5, "MID": 6, "TREBLE": 7, "MASTER": 7, "PRESENCE": 6, "DEPTH": 2}, "basis": "typical", "source": ""}
+      ],
+      "boosts": [
+        {"model": "Myth Drive", "why": "High-headroom clean takes a low-gain mid push well; its TREBLE control offsets the dark voicing."},
+        {"model": "Green 808", "why": "Mid hump and bass cut focus the beefy low end for leads."},
+        {"model": "Obsessive Drive", "why": "Amp-like crunch on top of a clean that will not break up until nearly full."}
+      ],
+      "cabs": [
+        {"model": "212 Zila Open CL80 19 (M)", "why": "Celestion Classic Lead 80s - one of the two speakers Bogner fits to Shiva cabs."},
+        {"model": "412 Bogna Uber V30 00s (M)", "why": "Bogner cabinet with Vintage 30s, the Shiva's other stock speaker."},
+        {"model": "212 Zila Fatboy V30 02 (M)", "why": "2×12 Vintage 30 alternative in a combo-like size."}
+      ],
+      "known_for": ["Warm, beefy boutique clean from a two-channel rock amp", "Rock, alternative and blues players who want one amp for clean and thick gain"],
+      "poor_at": "Glassy scooped Fender sparkle at default settings; early breakup (it stays clean almost to the top).",
+      "watch_out": "It only seems dark because of the pot tapers. Set TREBLE and PRESENCE by ear, well past noon, before reaching for EQ.",
+      "tags": ["clean", "edge", "boutique", "warm", "headroom", "rock", "pedal platform"],
+      "sources": [
+        "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf",
+        "https://forum.fractalaudio.com/threads/fractal-audio-amp-models-shiver-bogner-shiva-20th-ann.114764/",
+        "https://quadcortex.wiki/Bogna_Vishnu_20th_Clean"
+      ]
+    },
+    {
+      "key": "friedman_be100_clean",
+      "real": "Friedman BE-100 (HBE100) - clean channel; 100 W, 4×EL34, modded-Plexi lineage",
+      "models": [1027],
+      "gain_range": "edge",
+      "sweet_spot": "clean",
+      "drive_control": "VOLUME",
+      "voice": "Chimey Plexi-style clean: brighter, firmer and more mid-present than a blackface Fender, with EL34 snap and little scoop.",
+      "controls": {
+        "BRIGHT": {"kind": "selector", "does": "Three-position switch that varies the overall brightness of the clean channel only; choose by ear.", "brighter": "n/a", "tighter": "n/a", "warmer": "n/a"},
+        "BASS": {"kind": "knob", "does": "Clean-channel bass (there is no mid control). Manual start: 5.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "TREBLE": {"kind": "knob", "does": "Clean-channel treble. Manual start: 5.", "brighter": "up", "tighter": "n/a", "warmer": "down"},
+        "VOLUME": {"kind": "knob", "does": "The clean channel's only level control (no separate master): turn up to taste; high settings add grit.", "brighter": "n/a", "tighter": "down", "warmer": "up"},
+        "PRESENCE": {"kind": "knob", "does": "Global: adds or removes brightness in the upper mids and lower highs; 5 is the neutral start.", "brighter": "up", "tighter": "n/a", "warmer": "down"}
+      },
+      "model_notes": {
+        "1027": "The utility clean of a high-gain rock amp; the BE and HBE channels (1028, 1082) belong to the high-gain research set."
+      },
+      "starts": [
+        {"name": "manual starting point", "settings": {"BASS": 5, "TREBLE": 5, "PRESENCE": 5}, "basis": "cited", "source": "https://quadcortex.wiki/Freeman_100", "note": "Friedman manual as quoted: 'set the Treble and Bass at 5 and turn the Volume up to taste', then experiment with the Bright switch; presence start '5'."},
+        {"name": "bright rock clean", "settings": {"BASS": 4.5, "TREBLE": 6, "VOLUME": 4, "PRESENCE": 5.5}, "basis": "typical", "source": ""},
+        {"name": "pushed clean", "settings": {"BASS": 4, "TREBLE": 6, "VOLUME": 7.5, "PRESENCE": 5}, "basis": "typical", "source": ""}
+      ],
+      "boosts": [
+        {"model": "Freeman BOD", "why": "The BE-OD is this amp's dirty channel as a pedal: turns the clean channel into BE-style crunch."},
+        {"model": "Myth Drive", "why": "The BE100 'was designed to take pedals and loves boosts'; low-gain push for edge of breakup."},
+        {"model": "Green 808", "why": "Mid-focused overdrive on a firm, bright clean for classic-rock leads."}
+      ],
+      "cabs": [
+        {"model": "412 Brit 60B GB 90s (M)", "why": "Friedman 4×12s use G12M, G12H or V30s; Greenbacks give the warmer Plexi-clean voice."},
+        {"model": "412 Brit 60B V30 95 (M)", "why": "Vintage 30 4×12: more upper-mid cut and tightness."},
+        {"model": "212 Zila CB 16 (M)", "why": "G12H-type Creambacks in a 2×12: firmer lows, less compression."}
+      ],
+      "known_for": ["Clean channel of the BE-100 used by Jerry Cantrell, Steve Stevens, Phil X and other rock players", "Rock rigs that need one bright, firm clean next to high gain"],
+      "poor_at": "Lush scooped Fender cleans or a big soft low end; only bass and treble to shape it.",
+      "watch_out": "No mid knob and no master on this channel: VOLUME changes loudness and breakup together, so set the feel with VOLUME and level-match with OUTPUT.",
+      "tags": ["clean", "edge", "rock", "british", "bright", "pedal platform"],
+      "sources": [
+        "https://media.uaudio.com/support/manuals/dd/Friedman%20BE100%20Manual.pdf",
+        "https://www.manualslib.com/manual/880520/Friedman-Be-100.html",
+        "https://archive.axefx.fr/AxeFX%20II/Docs%20&%20Manuals/Yeks_Guide_to_the_Fractal_Audio_Amp_Models.pdf",
+        "https://quadcortex.wiki/Freeman_100"
+      ]
+    }
+  ]
+}

@@ -192,5 +192,49 @@ class PresetDraftTest(unittest.TestCase):
         qc.write_preset_file.assert_called_once_with("2_q", 3, "Goldtop Bite")
 
 
+class DesignKnowledgeTest(unittest.TestCase):
+    def test_a_request_widens_the_models_offered_beyond_the_everyday_set(self):
+        everyday = {model_id for ids in preset_design.MODELS.values() for model_id in ids}
+        self.assertEqual(set(preset_design.palette("a bit of everything")), everyday)
+        offered = set(preset_design.palette("rectifier wall of sound"))
+        self.assertTrue(everyday < offered)
+        self.assertTrue({1018, 1019, 1020} <= offered)  # The three Dual Rectifier channel modes.
+        self.assertIn(1176, preset_design.palette("warmer", {"chain": [{"model_id": 1176, "settings": []}]}))
+
+    def test_an_amp_or_drive_offers_its_own_knobs_and_a_drive_offers_its_level(self):
+        models = preset_design.choices()
+        self.assertEqual(set(models[1011]["controls"]), {"VOLUME", "BASS", "TREBLE", "TONE CUT", "BOOST"})
+        # A switch is offered too, and only in whole positions.
+        self.assertEqual(models[1011]["switches"], {"BOOST"})
+        recipe = raw_draft()
+        recipe["chain"][1] = {"model_id": 1011, "settings": [{"name": "BOOST", "value": .5}]}
+        with self.assertRaisesRegex(ValueError, "BOOST"):
+            preset_design.validate(recipe)
+        recipe["chain"][1]["settings"][0]["value"] = 1
+        self.assertEqual(preset_design.validate(recipe)["chain"][0]["settings"], [{"name": "BOOST", "value": 1}])
+        self.assertEqual(set(models[5]["controls"]), {"OVERDRIVE", "TONE", "LEVEL"})
+        self.assertNotIn("OUTPUT", models[1018]["controls"])
+        self.assertEqual(set(models[12006]["controls"]), {"DISTANCE", "POSITION", "HPF", "LPF"})
+
+    def test_a_card_tells_the_planner_what_a_model_is_and_how_players_set_it(self):
+        card = preset_design._card(5)
+        self.assertIn("TS808", card["about"])
+        # The community's tightening boost: drive off, level high.
+        self.assertEqual(card["named_settings"]["tight boost"], {"OVERDRIVE": 0, "TONE": 5.5, "LEVEL": 9})
+        self.assertIn("backwards", preset_design._card(1011)["watch_out"])
+
+    def test_a_named_setting_becomes_a_new_version_of_the_draft(self):
+        with TemporaryDirectory() as temporary, patch.object(session, "SESSIONS", Path(temporary)):
+            recipe = {"name": "Chime", "target": "Jangle", "explanation": "A start.", "guitar": "Charvel", "id": "a1",
+                      "chain": [{"model_id": 1011, "settings": [{"name": "VOLUME", "value": 4}]},
+                                {"model_id": 12013, "settings": []}]}
+            voiced = preset_design.variant_with_settings(recipe, "Amp", "edge", {"VOLUME": 5.5, "TONE CUT": 4, "NOPE": 1})
+            amp = voiced["chain"][0]
+            self.assertEqual({item["name"]: item["value"] for item in amp["settings"]}, {"VOLUME": 5.5, "TONE CUT": 4})
+            self.assertEqual((voiced["parent"], voiced["request"]), ("a1", "UK C30 TopBoost: edge"))
+            with self.assertRaises(ValueError):
+                preset_design.variant_with_settings(recipe, "Drive", "boost", {"LEVEL": 9})
+
+
 if __name__ == "__main__":
     unittest.main()

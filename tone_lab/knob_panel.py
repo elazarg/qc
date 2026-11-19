@@ -2,67 +2,91 @@
 
 import tkinter as tk
 
-from . import styles
+from . import styles, theme
 from .live_ui import Knob
 
 
 COLORS = ("#20232c", "#f7b889", "#f0ede9", "#a5a6b5", "#383c4a", "#484d60", "#2c303c")
 UNAVAILABLE = (COLORS[0], "#888394", "#9291a0", "#84839a", COLORS[4], COLORS[5], COLORS[6])
+ESSENTIALS = (*styles.PRIMARY_KNOBS, "tightness", "attack", "sustain", "bloom", "band_fit")
+RESTING = "Drag, scroll or use the arrow keys. Double-click resets a knob."
 
 
 class KnobPanel(tk.Frame):
+    """A few controls that work on the selected chain, with the rest one step away."""
+
+    COLUMNS = 3
+    SHORT = 6
+
     def __init__(self, parent, desk):
         super().__init__(parent, bg=parent["bg"])
         self.desk = desk
         self.available = None
-        self.active = "Essentials"
-        essentials = (*styles.PRIMARY_KNOBS, "tightness", "attack", "sustain", "bloom", "band_fit")
-        self.groups = {"Essentials": essentials, **styles.KNOB_GROUPS}
+        self.moves = {}
+        self.expanded = False
+        self.active = "Response"
+        self.shown = ()
         self.current = tk.StringVar(master=self)
-        self.hint = tk.StringVar(master=self, value="Drag, scroll or use the arrow keys. Double-click to reset a knob.")
+        self.hint = tk.StringVar(master=self, value=RESTING)
         surface, accent, light, muted, line, *_ = COLORS
-        heading = tk.Frame(self, bg=self["bg"])
-        heading.pack(fill="x", pady=(2, 7))
-        tk.Label(heading, textvariable=self.current, bg=self["bg"], fg=light, font=("Segoe UI", 13, "bold"),
-                 anchor="w").pack(side="left")
+        tk.Label(self, textvariable=self.current, bg=self["bg"], fg=muted, font=(theme.FONT, 9),
+                 anchor="w").pack(fill="x", pady=(0, 5))
+        self.group_row = tk.Frame(self, bg=self["bg"])
         self.tabs = {}
-        for group in reversed(self.groups):
-            button = tk.Button(heading, text=group, command=lambda mode=group: self.show(mode),
+        for group in styles.KNOB_GROUPS:
+            button = tk.Button(self.group_row, text=group, command=lambda mode=group: self.show(mode),
                                bg=surface, fg=light, activebackground=line, activeforeground=light, relief="flat",
-                               font=("Segoe UI", 9), borderwidth=0, padx=8, pady=4, takefocus=True)
-            button.pack(side="right", padx=2)
+                               font=(theme.FONT, 9), borderwidth=0, padx=8, pady=4, takefocus=True)
+            button.pack(side="left", padx=(0, 3))
             self.tabs[group] = button
         self.region = tk.Frame(self, bg=self["bg"])
         self.region.pack(fill="x")
+        for index in range(self.COLUMNS):
+            self.region.columnconfigure(index, weight=1, uniform="controls")
+        self.empty = tk.Label(self.region, bg=self["bg"], fg=muted, font=(theme.FONT, 10), justify="left",
+                              anchor="w", wraplength=380)
         self.tiles = {}
         self.knobs = {}
         for key, (title, floor, _) in styles.KNOBS.items():
             tile = tk.Frame(self.region, bg=surface, padx=4, pady=4, highlightbackground=line, highlightthickness=1)
-            tk.Label(tile, text=title, bg=surface, fg=light, font=("Segoe UI", 10, "bold")).pack()
+            tk.Label(tile, text=title, bg=surface, fg=light, font=(theme.FONT, 10, "bold")).pack()
             knob = Knob(tile, key, floor, self.change, colors=COLORS)
             knob.pack()
             for event in ("<Enter>", "<FocusIn>"):
                 knob.bind(event, lambda _, name=key: self.describe(name))
+            knob.bind("<Leave>", lambda _: self.hint.set(RESTING))
             knob.bind("<Double-Button-1>", lambda _, dial=knob: dial.turn(0))
             self.tiles[key], self.knobs[key] = tile, knob
+        hint = tk.Label(self, textvariable=self.hint, bg=self["bg"], fg=muted, font=(theme.FONT, 9), anchor="w",
+                        justify="left", wraplength=400, height=3)
+        hint.pack(fill="x", pady=(4, 2))
+        self.bind("<Configure>", lambda event: hint.configure(wraplength=max(200, event.width - 12)))
         footer = tk.Frame(self, bg=self["bg"])
-        footer.pack(fill="x", pady=(4, 0))
-        tk.Label(footer, textvariable=self.hint, bg=self["bg"], fg=muted, font=("Segoe UI", 9), anchor="w").pack(side="left")
-        tk.Button(footer, text="Reset shape", command=lambda: desk.set_shape({}), bg=surface, fg=light,
-                  activebackground=line, relief="flat", borderwidth=0, padx=8, pady=3).pack(side="right")
-        self.compare = tk.Button(footer, text="Hear base", command=desk.toggle_base, bg=surface, fg=light,
-                                 disabledforeground=muted, activebackground=line, relief="flat",
-                                 borderwidth=0, padx=8, pady=3)
+        footer.pack(fill="x")
+
+        def small(title, action):
+            return tk.Button(footer, text=title, command=action, bg=surface, fg=light, disabledforeground=muted,
+                             activebackground=line, activeforeground=light, relief="flat", borderwidth=0,
+                             padx=8, pady=3, font=(theme.FONT, 9))
+
+        self.more = small("", self.toggle_more)
+        self.more.pack(side="left")
+        small("Reset", lambda: desk.set_shape({})).pack(side="right")
+        self.compare = small("Hear base", desk.toggle_base)
         self.compare.pack(side="right", padx=4)
-        self.expand = tk.Button(footer, text="Add shaping controls", command=desk.expand_tone, bg=surface, fg=accent,
-                                activebackground=line, relief="flat", borderwidth=0, padx=8, pady=3)
-        self.show(self.active)
+        self.expand = small("Add shaping controls", desk.expand_tone)
+        self.expand.configure(fg=accent)
+        self.show()
 
     def describe(self, key):
         if self.available is not None and key not in self.available:
             self.hint.set("This direction needs a compatible block in the current tone.")
-        else:
-            self.hint.set(styles.KNOB_HINTS.get(key, "Drag or use the arrow keys to shape the sound."))
+            return
+        blocks = {}
+        for model, parameter in self.moves.get(key, ()):
+            blocks.setdefault(model, []).append(parameter)
+        detail = "\nMoves " + " · ".join(f"{model} {', '.join(names)}" for model, names in blocks.items()) if blocks else ""
+        self.hint.set(styles.KNOB_HINTS.get(key, "Drag or use the arrow keys to shape the sound.") + detail)
 
     def change(self, key):
         dial = self.knobs[key]
@@ -72,23 +96,53 @@ class KnobPanel(tk.Frame):
             return
         values = dict(self.desk.values)
         values[key] = dial.value
+        self.desk.touch(key)
         self.desk.set_shape(values)
 
-    def show(self, group):
-        self.active = group
-        for tile in self.tiles.values():
-            tile.grid_remove()
-        for index in range(5):
-            self.region.columnconfigure(index, weight=1, uniform="controls")
-        for index, key in enumerate(self.groups[group]):
-            row, column = divmod(index, 5)
-            self.tiles[key].grid(row=row, column=column, sticky="ew", padx=(0, 6), pady=(0, 4))
-        _, accent, light, _, _, _, _ = COLORS
-        for name, button in self.tabs.items():
-            button.configure(bg=accent if name == group else COLORS[0], fg="#16151a" if name == group else light)
+    def usable(self, keys):
+        return [key for key in keys if self.available is None or key in self.available]
 
-    def sync(self, name, values, available, *, expandable=False):
-        self.current.set(f"Shape  ·  {name}")
+    def relevant(self):
+        """The controls this player reaches for first on this chain."""
+        recent = [key for key in getattr(self.desk, "touched", ()) if key in styles.KNOBS]
+        moved = [key for key, value in self.desk.values.items() if value]
+        return self.usable(dict.fromkeys((*moved, *recent, *ESSENTIALS, *styles.KNOBS)))[:self.SHORT]
+
+    def toggle_more(self):
+        self.expanded = not self.expanded
+        self.show()
+
+    def show(self, group=None):
+        if group:
+            self.active = group
+        keys = self.usable(styles.KNOB_GROUPS[self.active]) if self.expanded else self.relevant()
+        if self.expanded and not self.group_row.winfo_manager():
+            self.group_row.pack(fill="x", pady=(0, 5), before=self.region)
+        elif not self.expanded and self.group_row.winfo_manager():
+            self.group_row.pack_forget()
+        if tuple(keys) != self.shown:
+            for tile in self.tiles.values():
+                tile.grid_remove()
+            self.empty.grid_remove()
+            for index, key in enumerate(keys):
+                row, column = divmod(index, self.COLUMNS)
+                self.tiles[key].grid(row=row, column=column, sticky="ew", padx=(0, 5), pady=(0, 5))
+            if not keys:
+                self.empty.configure(text=f"This chain has nothing to move for {self.active.lower()}."
+                                     if self.expanded else "This tone has no controls Tone Lab can move.")
+                self.empty.grid(row=0, column=0, columnspan=self.COLUMNS, sticky="ew", pady=8)
+            self.shown = tuple(keys)
+        _, accent, light, *_ = COLORS
+        for name, button in self.tabs.items():
+            button.configure(bg=accent if name == self.active else COLORS[0],
+                             fg="#16151a" if name == self.active else light)
+        total = len(self.usable(styles.KNOBS))
+        rest = total - len(self.shown)
+        self.more.configure(text="Fewer" if self.expanded else f"{rest} more" if rest > 0 else "All shown",
+                            state="normal" if self.expanded or rest > 0 else "disabled")
+
+    def sync(self, name, values, available, *, expandable=False, moves=None):
+        self.current.set(name)
         can_compare = values and self.desk.active_source and self.desk.active_side == self.desk.side
         self.compare.configure(text="Hear shape" if self.desk.base_bypassed else "Hear base",
                                state="normal" if can_compare else "disabled")
@@ -97,9 +151,17 @@ class KnobPanel(tk.Frame):
         elif not expandable and self.expand.winfo_manager():
             self.expand.pack_forget()
         self.available = available
+        self.moves = moves or {}
         for key, knob in self.knobs.items():
             colors = COLORS if available is None or key in available else UNAVAILABLE
             value = values.get(key, 0)
             if knob.colors != colors or knob.value != value:
                 knob.colors = colors
                 knob.set(value)
+        # A knob stays put while it is being turned. The order settles when the panel is next opened.
+        if self.expanded or not self.shown or any(key not in self.usable(self.shown) for key in self.shown):
+            self.show()
+
+    def refresh(self):
+        self.shown = ()
+        self.show()

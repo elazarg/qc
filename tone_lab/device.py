@@ -9,9 +9,11 @@ import subprocess
 import sys
 import time
 
-from qc_mcp import catalog, protocol
+from qc_mcp import protocol
 from qc_mcp.autolevel import IN_PORT_USB_5_6, OUT_PORT_USB_5_6
 from qc_mcp.transport import QuadCortex
+
+from . import models as catalog
 
 SCENES = "ABCDEFGH"
 LAB_PREFIX = "Tone Lab"

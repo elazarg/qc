@@ -192,7 +192,7 @@ class SetupPanel(tk.Frame):
         self.views[name].pack(fill="both", expand=True)
         for title, tab in self.tabs.items():
             selected = title == name
-            tab.configure(background=ACCENT if selected else "#28332d", foreground=INK if selected else TEXT)
+            tab.configure(background=ACCENT if selected else "#2c303c", foreground=INK if selected else TEXT)
         self.sync()
 
     def sync(self):

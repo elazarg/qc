@@ -5,9 +5,9 @@ from pathlib import Path
 import time
 
 import numpy as np
-from qc_mcp import catalog, preset as wire
+from qc_mcp import preset as wire
 
-from . import audio, capture, device, presets, session, styles
+from . import audio, capture, device, models as catalog, presets, session, styles
 
 SCRATCH_NAME = "Tone Lab Style"
 SCRATCH = {"folder_key": "/media/p4/Presets/My Presets", "position": 254, "is_factory": False}

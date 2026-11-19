@@ -215,6 +215,20 @@ def keep(sound, take, target, baseline, *, note=""):
     return path
 
 
+def keep_tone(tone, shape, take, *, source, reference="", note=""):
+    """Store a preference for the tone heard live, identified by its recipe and shape."""
+    root = session.SESSIONS / "listening-decisions"
+    root.mkdir(parents=True, exist_ok=True)
+    now = datetime.now(timezone.utc)
+    path = root / f"{now:%Y%m%d-%H%M%S}-{uuid4().hex[:6]}.json"
+    session.write_json(path, {"created_utc": now.isoformat(), "kind": "live", "tone": tone, "name": tone.get("name"),
+                             "draft_id": tone.get("draft_id"), "shape": dict(shape), "heard_with": source,
+                             "take": take.folder.name if take else None,
+                             "take_guitar": take.info.get("guitar") if take else None,
+                             "target": reference, "note": note})
+    return path
+
+
 def route(text, *, has_draft):
     """Resolve explicit session commands and pass open-ended musical language to the planner."""
     request = text.strip().rstrip(".?!")
@@ -233,6 +247,19 @@ def route(text, *, has_draft):
             return "volume", command
     if lowered in {"stop", "stop playback", "go back to playing", "stop preview"}:
         return "stop", ""
+    if lowered in {"undo", "undo that", "undo this", "go back", "revert", "revert that", "put it back",
+                   "undo the last change", "change it back"}:
+        return "undo", ""
+    side = re.fullmatch(r"(?:(?:switch|go|change|flip)(?: back)? to|play|hear|select|use)?\s*(?:tone )?([ab])", lowered)
+    if side:
+        return "side", side[1]
+    if lowered in {"save", "save this", "save it", "save this sound", "save this tone", "save to qc",
+                   "save to the quad cortex", "save this to the quad cortex"}:
+        return "save", ""
+    if lowered in {"guitar", "live guitar", "play guitar", "let me play", "guitar input"}:
+        return "source", "guitar"
+    if lowered in {"phrase", "play the phrase", "play phrase", "loop", "loop the phrase", "loop phrase"}:
+        return "source", "phrase"
     if lowered in {"listen", "compare", "compare sounds"}:
         return "compare", ""
     if lowered in {"hear the draft", "hear draft", "compare the draft"}:
@@ -258,10 +285,21 @@ def route(text, *, has_draft):
         return ("refine" if has_draft else "adjust-live"), text
     if re.match(r"(?i)^(?:why|what|how|which|can i|does|is)\b", request):
         return "adjust-live", text
-    if (has_draft or re.match(r"(?i)^(?:make|give me|build|create|design|i want|i need)\b", request)
-            or re.search(r"(?i)\b(?:style|inspired|in the vein of)\b", request)):
+    # A new sound needs a sign that one was asked for. An observation about the
+    # current sound must never replace it, whether or not a draft is loaded.
+    if (re.match(r"(?i)^(?:make|give me|build|create|design|i want|i need)\b", request)
+            or re.search(r"(?i)\b(?:style|inspired|in the vein of|sounds? like|tone like)\b", request)
+            or names_something(request)):
         return "create", text
     return "adjust-live", text
+
+
+PRODUCT_NAMES = re.compile(r"\b(?:Quad Cortex|Cortex Control|Tone Lab|Neural DSP|Guitar Learner)\b")
+
+
+def names_something(text):
+    """Notice an artist, song or rig written as a proper name, such as “Andy Timmons”."""
+    return bool(re.search(r"\b[A-Z][\w'’]+(?:\s+(?:of|the|and|&|for|a))?\s+[A-Z][\w'’]+", PRODUCT_NAMES.sub("", text)))
 
 
 def samples(sound):

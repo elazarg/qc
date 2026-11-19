@@ -1,0 +1,383 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{margin:0}img{max-width:100%;height:auto}</style>
+<title>Tone Lab Desk Concept</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one studio-dark world. Four small frames of the same quiet desk in four moments lead; short rules and evidence follow. */
+:root {
+  color-scheme: dark;
+  --bg: #0f1015;
+  --desk: #161820;
+  --panel: #1d2029;
+  --raise: #272b38;
+  --line: #353a4b;
+  --ink: #f1eee9;
+  --muted: #a6a9bb;
+  --dim: #71758a;
+  --a: #8fb2ff;        /* tone A, everywhere */
+  --b: #f7b889;        /* tone B, everywhere (the desk's existing peach) */
+  --ref: #c9b5f5;      /* reference */
+  --live: #6fdd9f;     /* on air, fine */
+  --warn: #f0c95c;     /* needs you */
+  --rec: #ff6b5e;      /* recording, errors */
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
+  --data: "IBM Plex Mono", Consolas, "Courier New", monospace;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.55;
+  padding-block: 40px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 1120px; margin-inline: auto; display: flex; flex-direction: column; gap: 60px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.12; }
+h1 { font-size: clamp(30px, 4.6vw, 50px); font-weight: 700; letter-spacing: -.015em; max-width: 18ch; }
+h2 { font-size: 25px; font-weight: 700; }
+h3 { font-size: 16px; font-weight: 700; }
+p { margin: 0; }
+.eyebrow { font-family: var(--data); font-size: 12px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+.lead { color: var(--muted); font-size: 17px; max-width: 62ch; }
+.lead b { color: var(--ink); font-weight: 600; }
+header, section { display: flex; flex-direction: column; gap: 18px; }
+.note { color: var(--muted); font-size: 13.5px; max-width: 74ch; }
+code { font-family: var(--data); font-size: .88em; color: var(--muted); }
+kbd {
+  font-family: var(--data); font-size: 11px; color: var(--ink); background: var(--raise);
+  border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; white-space: nowrap;
+}
+.mono { font-family: var(--data); font-variant-numeric: tabular-nums; }
+
+/* ---------- frames ---------- */
+.frames { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: 26px 22px; }
+figure { margin: 0; display: flex; flex-direction: column; gap: 11px; }
+figcaption { color: var(--muted); font-size: 14px; max-width: 58ch; }
+figcaption b { color: var(--ink); font-weight: 600; }
+.win {
+  background: var(--desk); border: 1px solid var(--line); border-radius: 14px; padding: 15px 17px 16px;
+  min-height: 318px; display: flex; flex-direction: column; gap: 14px; font-size: 13px; line-height: 1.35;
+}
+.top { display: flex; align-items: center; gap: 10px; min-height: 24px; }
+.air { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); }
+.air i { width: 8px; height: 8px; border-radius: 50%; background: var(--live); box-shadow: 0 0 0 4px #6fdd9f26; }
+.air.warn { color: var(--ink); }
+.air.warn i { background: var(--warn); box-shadow: 0 0 0 4px #f0c95c2e; }
+.air .link { color: var(--warn); border-bottom: 1px solid currentColor; margin-left: 4px; }
+.rail { margin-left: auto; display: flex; gap: 3px; }
+.rail span { width: 26px; height: 24px; border-radius: 6px; display: grid; place-items: center; color: var(--dim); }
+.rail span.on { background: var(--raise); color: var(--ink); }
+.rail svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.tones { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tone {
+  background: var(--panel); border: 1.5px solid transparent; border-radius: 13px; padding: 14px 16px;
+  display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; min-width: 0;
+}
+.tone b { font-family: var(--display); font-size: 34px; line-height: 1; }
+.tone span { font-weight: 600; font-size: 14.5px; }
+.tone small { color: var(--muted); font-size: 12px; }
+.tone.a b { color: var(--a); } .tone.b b { color: var(--b); }
+.tone.b.on { border-color: var(--b); background: #2a2320; }
+.phrase { display: flex; align-items: center; gap: 10px; color: var(--dim); font-size: 11.5px; }
+.src { display: inline-flex; background: var(--raise); border-radius: 7px; padding: 2px; font-weight: 600; font-size: 12px; flex: none; }
+.src span { padding: 3px 9px; border-radius: 5px; color: var(--muted); }
+.src span.on { background: var(--ink); color: var(--bg); }
+.phrase .livehint { flex: 1; }
+.phrase .bar { flex: 1; height: 3px; border-radius: 2px; background: var(--raise); }
+.phrase .bar i { display: block; height: 100%; border-radius: 2px; background: var(--muted); }
+.result { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.result .what { font-weight: 600; }
+.result .what i { font-style: normal; color: var(--b); }
+.result .more { color: var(--muted); border-bottom: 1px solid var(--line); margin-left: auto; }
+.pill { background: var(--raise); border-radius: 6px; padding: 3px 9px; font-weight: 600; display: inline-flex; gap: 6px; align-items: center; }
+.askline {
+  display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 10px;
+  padding: 9px 12px; color: var(--dim); font-size: 14px; background: #12141a;
+}
+.askline.typed { color: var(--ink); }
+.askline kbd { margin-left: auto; }
+
+.win.split { display: grid; grid-template-columns: minmax(0, 1fr) 218px; gap: 14px; }
+.win.split .main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.win.split .tone b { font-size: 28px; }
+.tray { display: flex; flex-direction: column; gap: 9px; }
+.card { background: var(--panel); border-radius: 11px; padding: 10px 11px; display: flex; flex-direction: column; gap: 7px; }
+.card-head { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+.card-head .pin { margin-left: auto; font-family: var(--data); font-size: 10.5px; color: var(--dim); font-weight: 400; }
+.card-head .pin.set { color: var(--ink); }
+.knob-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
+.knob { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.knob .t { font-size: 11.5px; font-weight: 600; }
+.knob svg { width: 54px; height: 47px; }
+.knob .v { font-family: var(--data); font-size: 11px; color: var(--muted); }
+.card .more { color: var(--muted); font-size: 12px; }
+.card svg.spec { display: block; width: 100%; height: auto; }
+.card p { color: var(--muted); font-size: 12px; }
+@media (max-width: 520px) { .win.split { grid-template-columns: 1fr; } }
+
+/* ---------- text sections ---------- */
+.rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 22px 34px; margin: 0; padding: 0; list-style: none; }
+.rules li { display: flex; flex-direction: column; gap: 5px; border-top: 1px solid var(--line); padding-top: 12px; }
+.rules p { color: var(--muted); font-size: 14px; }
+
+.table-scroll { overflow-x: auto; border-radius: 11px; background: var(--desk); }
+table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 14px; }
+th { text-align: left; font-family: var(--data); font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--dim); font-weight: 500; padding: 12px 16px 8px; }
+td { padding: 9px 16px; border-top: 1px solid var(--line); vertical-align: top; color: var(--muted); }
+td:first-child { color: var(--ink); font-weight: 600; white-space: nowrap; }
+table.router td:first-child { font-family: var(--data); font-size: 13px; font-weight: 400; white-space: normal; }
+td .bad { color: var(--rec); font-weight: 600; }
+
+.today { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.today img { border-radius: 10px; border: 1px solid var(--line); display: block; }
+.facts { margin: 0; padding-left: 18px; color: var(--muted); display: grid; gap: 9px; font-size: 14px; }
+.facts b { color: var(--ink); font-weight: 600; }
+@media (max-width: 760px) { .today { grid-template-columns: 1fr; } }
+
+.road { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr)); gap: 12px; }
+.stage { background: var(--desk); border-radius: 11px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.stage .when { font-family: var(--data); font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--b); }
+.stage ul { margin: 0; padding-left: 18px; display: grid; gap: 7px; color: var(--muted); font-size: 14px; }
+.stage b { color: var(--ink); font-weight: 600; }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-shape" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M8 8l2.6-2.6"/></symbol>
+  <symbol id="i-diff" viewBox="0 0 16 16"><path d="M1.5 10c2.5-6 4.5-6 6.5-2s4 3 6.5-2"/><path d="M1.5 12.5c3-3 5-3 7-1.500s3.500 1 6-1"/></symbol>
+  <symbol id="i-chain" viewBox="0 0 16 16"><rect x="1.5" y="6" width="3.500" height="4" rx="1"/><rect x="6.250" y="6" width="3.500" height="4" rx="1"/><rect x="11" y="6" width="3.500" height="4" rx="1"/></symbol>
+  <symbol id="i-history" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M8 5v3l2 1.500"/></symbol>
+  <symbol id="i-sounds" viewBox="0 0 16 16"><path d="M3 4.500h10M3 8h10M3 11.500h6"/></symbol>
+</svg>
+
+<div class="wrap">
+<header>
+  <span class="eyebrow">Design review · Tone Lab for Quad Cortex · second pass</span>
+  <h1>Two tones, one input, one place to ask.</h1>
+  <p class="lead">The first pass of this concept answered "the app hides what it knows" by showing all of it at once. That was the wrong fix. Most of the time you want almost none of it. <b>This pass keeps the desk nearly empty and lets each piece arrive when there is a reason, then leave.</b> Which pieces belong together is left open on purpose: you pin what you use, and the desk remembers.</p>
+</header>
+
+<section>
+  <h2>The same desk in four moments</h2>
+  <div class="frames">
+
+    <figure>
+      <div class="win">
+        <div class="top">
+          <span class="air"><i></i>On air</span>
+          <span class="rail"><span><svg><use href="#i-shape"/></svg></span><span><svg><use href="#i-diff"/></svg></span><span><svg><use href="#i-chain"/></svg></span><span><svg><use href="#i-history"/></svg></span><span><svg><use href="#i-sounds"/></svg></span></span>
+        </div>
+        <div class="tones">
+          <div class="tone a"><b>A</b><span>Timmons Bloom</span></div>
+          <div class="tone b on"><b>B</b><span>Stone Pulse</span></div>
+        </div>
+        <div class="phrase"><span class="src"><span>Guitar</span><span class="on">Phrase</span></span><div class="bar"><i style="width:38%"></i></div><span class="mono">10.1 s</span></div>
+        <div class="askline">Ask for a change, a sound or a song<kbd>/</kbd></div>
+      </div>
+      <figcaption><b>At rest.</b> Eleven controls. The lit tone is the one on air, fed by your guitar or the recorded phrase. Switching input keeps both tones and their settings. Everything else is behind the five glyphs, a key, or a sentence.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="win">
+        <div class="top">
+          <span class="air"><i></i>On air</span>
+          <span class="rail"><span><svg><use href="#i-shape"/></svg></span><span><svg><use href="#i-diff"/></svg></span><span><svg><use href="#i-chain"/></svg></span><span><svg><use href="#i-history"/></svg></span><span><svg><use href="#i-sounds"/></svg></span></span>
+        </div>
+        <div class="tones">
+          <div class="tone a"><b>A</b><span>Timmons Bloom</span></div>
+          <div class="tone b on"><b>B</b><span>Stone Pulse</span></div>
+        </div>
+        <div class="phrase"><span class="src"><span>Guitar</span><span class="on">Phrase</span></span><div class="bar"><i style="width:61%"></i></div><span class="mono">10.1 s</span></div>
+        <div class="result"><span class="what">Tightened the low end on <i>B</i></span><span class="pill">Undo <kbd>Z</kbd></span><span class="more">What changed</span></div>
+        <div class="askline typed">the low end gets muddy when I palm mute</div>
+      </div>
+      <figcaption><b>After you ask.</b> How the request was read is one line that names the tone it changed, already audible, with undo. It goes to history at your next action. The parameter list is behind "What changed".</figcaption>
+    </figure>
+
+    <figure>
+      <div class="win">
+        <div class="top">
+          <span class="air warn"><i></i>Input clips on hard picks<span class="link">Show levels</span></span>
+          <span class="rail"><span><svg><use href="#i-shape"/></svg></span><span><svg><use href="#i-diff"/></svg></span><span><svg><use href="#i-chain"/></svg></span><span><svg><use href="#i-history"/></svg></span><span><svg><use href="#i-sounds"/></svg></span></span>
+        </div>
+        <div class="tones">
+          <div class="tone a"><b>A</b><span>Timmons Bloom</span></div>
+          <div class="tone b on"><b>B</b><span>Stone Pulse</span></div>
+        </div>
+        <div class="phrase"><span class="src"><span class="on">Guitar</span><span>Phrase</span></span><span class="livehint">your playing, live through B</span></div>
+        <div class="askline">Ask for a change, a sound or a song<kbd>/</kbd></div>
+      </div>
+      <figcaption><b>When something needs you.</b> Here the guitar is live. Levels, routing and the device say nothing while they are fine. A problem is one sentence with one way to look closer.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="win split">
+        <div class="main">
+          <div class="top">
+            <span class="air"><i></i>On air</span>
+            <span class="rail"><span class="on"><svg><use href="#i-shape"/></svg></span><span class="on"><svg><use href="#i-diff"/></svg></span><span><svg><use href="#i-chain"/></svg></span><span><svg><use href="#i-history"/></svg></span><span><svg><use href="#i-sounds"/></svg></span></span>
+          </div>
+          <div class="tones">
+            <div class="tone a"><b>A</b><span>Timmons Bloom</span></div>
+            <div class="tone b on"><b>B</b><span>Stone Pulse</span></div>
+          </div>
+          <div class="phrase"><span class="src"><span>Guitar</span><span class="on">Phrase</span></span><div class="bar"><i style="width:74%"></i></div><span class="mono">10.1 s</span></div>
+          <div class="askline">closer to the reference<kbd>/</kbd></div>
+        </div>
+        <div class="tray">
+          <div class="card">
+            <div class="card-head">Shape B<span class="pin">pin</span></div>
+            <div class="knob-row">
+              <div class="knob"><span class="t">Tightness</span><svg data-v=".3" data-min="-1"></svg><span class="v">+30%</span></div>
+              <div class="knob"><span class="t">Drive</span><svg data-v="0" data-min="-1"></svg><span class="v">0%</span></div>
+              <div class="knob"><span class="t">Pulse</span><svg data-v=".42" data-min="0"></svg><span class="v">42%</span></div>
+            </div>
+            <span class="more">7 more for this chain</span>
+          </div>
+          <div class="card">
+            <div class="card-head">Difference<span class="pin set">pinned</span></div>
+            <svg class="spec" id="spec" viewBox="0 0 196 60" role="img" aria-label="Spectrum of B against the reference on the same phrase"></svg>
+            <p>B sits 3 dB under the reference at 2.5 kHz.</p>
+          </div>
+        </div>
+      </div>
+      <figcaption><b>When you ask for more.</b> A panel opens by key, by voice or from the rail, and closes when you are done unless you pin it. Shape leads with the knobs you last touched.</figcaption>
+    </figure>
+
+  </div>
+  <p class="note">Static concept. Tone names and the phrase length come from your current session. The request, the clipping warning and the measured values are illustrative.</p>
+</section>
+
+<section>
+  <h2>Rules the desk follows</h2>
+  <ul class="rules">
+    <li><h3>One thing at a time</h3><p>The resting desk holds two tones, the input switch and a request line. A second thing appears only because you called it or something happened.</p></li>
+    <li><h3>Quiet while fine</h3><p>Meters, routing, device state and loudness matching are checked constantly and shown only when they fail.</p></li>
+    <li><h3>Arrive on cause, leave on the next action</h3><p>The reading of your request, progress and confirmations are single lines that retire into history by themselves.</p></li>
+    <li><h3>Summon, don't navigate</h3><p>No tabs. Any panel is one key, one phrase or one glyph away, and one panel is open at a time unless you pin it.</p></li>
+    <li><h3>Marks before words</h3><p>Colour says which tone, light says on air, a dot says healthy. Labels appear on hover and focus.</p></li>
+    <li><h3>The layout is learned</h3><p>Nobody knows yet which panels you need together. The app logs what you open and pin in each situation, then offers that set next time.</p></li>
+  </ul>
+</section>
+
+<section>
+  <h2>Where everything went</h2>
+  <div class="table-scroll"><table>
+    <thead><tr><th>Piece</th><th>Shows by itself when</th><th>You call it with</th></tr></thead>
+    <tbody>
+      <tr><td>What's on air</td><td>Always: the lit tone and the dot</td><td></td></tr>
+      <tr><td>Guitar or Phrase</td><td>Always: both one click away</td><td><kbd>G</kbd> · <kbd>P</kbd> · <kbd>Space</kbd> stops</td></tr>
+      <tr><td>Keep and Save</td><td>Keep once something is on air. Save once something is unsaved.</td><td><kbd>K</kbd> keeps what you hear. Saving to the Quad Cortex is a separate step.</td></tr>
+      <tr><td>How a request was read</td><td>After each request, one line with undo</td><td>"What changed" for the parameters</td></tr>
+      <tr><td>Shape knobs</td><td>A request moved one</td><td><kbd>S</kbd> · last-touched first, only what the chain has</td></tr>
+      <tr><td>Difference</td><td>You set a reference</td><td><kbd>D</kbd> · <kbd>R</kbd> plays the reference</td></tr>
+      <tr><td>Chain and rationale</td><td>A new sound was built, once</td><td><kbd>C</kbd> · click the tone's name</td></tr>
+      <tr><td>History</td><td>Never</td><td><kbd>Z</kbd> undoes · <kbd>H</kbd> opens the strip</td></tr>
+      <tr><td>Levels</td><td>Clipping, silence or a mismatch</td><td><kbd>L</kbd></td></tr>
+      <tr><td>Your sounds</td><td>Never</td><td>Type a name in the request line</td></tr>
+      <tr><td>Recording</td><td>Never</td><td>"keep that" takes the last 20 s</td></tr>
+      <tr><td>Setup, Guitar Learner</td><td>Never</td><td>The menu. They stay off the desk.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2>Today's desk</h2>
+  <div class="today">
+    <img src="today.png" alt="Screenshot of the current Tone Lab window on the Shape tab" width="1196" height="839">
+    <ul class="facts">
+      <li><b>About 40 controls on the default screen</b>, all permanent. The reference row, Keep and Save are there before there is anything to reference, keep or save.</li>
+      <li><b>The request box misreads plain sentences.</b> The table below is from the app's own router. A reply that arrives late also lands on B whatever B has become since.</li>
+      <li><b>No verdict in the main mode.</b> "Keep this sound" is disabled while the Quad Cortex is live.</li>
+      <li><b>No way back.</b> Nine drafts are saved and none can be browsed. There is no undo.</li>
+      <li><b>What it knows goes into one grey status line</b> that the next message erases: the rationale, the chain, errors and the assistant's reply.</li>
+      <li><b>Four palettes</b> across desk, Setup, Guitar Learner and workbench. The Shape footer is clipped at minimum window size.</li>
+    </ul>
+  </div>
+  <div class="table-scroll"><table class="router">
+    <thead><tr><th>You type, with a draft on B</th><th>Today</th><th>Should</th></tr></thead>
+    <tbody>
+      <tr><td>the low end gets muddy when I palm mute</td><td><span class="bad">Builds a new preset</span> with web research, up to 85 s, then replaces B</td><td>Tighten B, one line, undo</td></tr>
+      <tr><td>undo</td><td><span class="bad">Builds a new preset</span> and replaces B</td><td>Revert the last change</td></tr>
+      <tr><td>switch to A</td><td><span class="bad">Builds a new preset</span> and replaces B</td><td>Flip to A</td></tr>
+      <tr><td>save this</td><td><span class="bad">Builds a new preset</span> and replaces B</td><td>Save what's on air</td></tr>
+      <tr><td>more jazzy</td><td>Subprocess round trip. "more jazz" is instant</td><td>Both instant</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2>Order of work</h2>
+  <div class="road">
+    <div class="stage"><span class="when">Days · inside the current app</span><h3>Make it safe to try things</h3><ul>
+      <li><b>Requests:</b> stop routing unrecognised text to "create". Show how each request was read, apply the result only to the tone it was asked about, and give one-step undo.</li>
+      <li><b>Input and tones stay independent:</b> Guitar and Phrase equally direct, switching keeps both tones. <b>Keep</b> works on the tone you are hearing, live included. Save to QC stays separate.</li>
+      <li><b>Shape:</b> open with the few knobs this chain can move, last-touched first, with a pin.</li>
+      <li>Hide what has no use yet, and start logging which views are open together.</li>
+    </ul></div>
+    <div class="stage"><span class="when">Weeks · the quiet desk</span><h3>Rest state and panels</h3><ul>
+      <li>Replace the four tabs with the resting desk and summoned panels with pin.</li>
+      <li>Levels and device state by exception.</li>
+      <li>Bare keys for flip, stop, undo, keep and each panel.</li>
+      <li>Rolling record buffer so "keep that" works after the fact.</li>
+    </ul></div>
+    <div class="stage"><span class="when">Then · a surface that can carry it</span><h3>Leave Tkinter</h3><ul>
+      <li>Web front end in a native shell, Python engine unchanged. Panels that slide, fade and scale need it.</li>
+      <li>Pinned sets offered per situation, from the usage log.</li>
+      <li>Footswitch and push-to-talk for the same actions.</li>
+      <li>Auto-loop: stop playing and your last phrase loops through the tone.</li>
+    </ul></div>
+  </div>
+  <p class="note">The full findings with file references, and the panel specifications, are saved in the repository as <code>UX_REVIEW.md</code>.</p>
+</section>
+</div>
+
+<script>
+(function () {
+  var NS = "http://www.w3.org/2000/svg";
+  function el(parent, name, attrs) {
+    var node = document.createElementNS(NS, name);
+    for (var key in attrs) node.setAttribute(key, attrs[key]);
+    parent.appendChild(node);
+    return node;
+  }
+
+  // Difference card: B against the reference, one scale: 80 Hz–10 kHz log, ±9 dB.
+  var spec = document.getElementById("spec");
+  var bands = [80, 160, 315, 630, 1250, 2500, 5000, 10000];
+  var L = 2, R = 194, T = 4, B = 46;
+  function sx(hz) { return L + (R - L) * Math.log(hz / 80) / Math.log(10000 / 80); }
+  function sy(db) { return T + (B - T) * (9 - db) / 18; }
+  el(spec, "line", { x1: L, y1: sy(0), x2: R, y2: sy(0), stroke: "#353a4b" });
+  [[80, "80 Hz", "start"], [2500, "2.5 kHz", "middle"], [10000, "10 kHz", "end"]].forEach(function (mark) {
+    var label = el(spec, "text", { x: sx(mark[0]), y: 58, fill: "#71758a", "font-size": 8, "text-anchor": mark[2], "font-family": "IBM Plex Mono, monospace" });
+    label.textContent = mark[1];
+  });
+  function curve(values, color, dash, width) {
+    var points = values.map(function (db, index) { return sx(bands[index]).toFixed(1) + "," + sy(db).toFixed(1); }).join(" ");
+    el(spec, "polyline", { points: points, fill: "none", stroke: color, "stroke-width": width, "stroke-dasharray": dash, "stroke-linejoin": "round", "stroke-linecap": "round" });
+  }
+  curve([-5, -1, 0, 1, 3, 4, 2, -4], "#c9b5f5", "4 3", 1.5);
+  curve([-6, -1, 1, 1, 2, 1, -2, -9], "#f7b889", "", 2.2);
+  el(spec, "line", { x1: sx(2500), y1: sy(1), x2: sx(2500), y2: sy(4), stroke: "#f1eee9", "stroke-width": 1 });
+
+  // Knobs: 270° sweep, value arc drawn from the zero point.
+  function polar(f, r) { var a = (225 - 270 * f) * Math.PI / 180; return [27 + r * Math.cos(a), 25 - r * Math.sin(a)]; }
+  function arc(from, to, r) {
+    var p = polar(from, r), q = polar(to, r);
+    return "M" + p[0].toFixed(2) + " " + p[1].toFixed(2) + " A" + r + " " + r + " 0 " + (Math.abs(to - from) * 270 > 180 ? 1 : 0) + " " + (to > from ? 1 : 0) + " " + q[0].toFixed(2) + " " + q[1].toFixed(2);
+  }
+  document.querySelectorAll(".knob svg").forEach(function (svg) {
+    svg.setAttribute("viewBox", "0 0 54 47");
+    var min = +svg.dataset.min, value = +svg.dataset.v;
+    var f = (value - min) / (1 - min), zero = (0 - min) / (1 - min);
+    el(svg, "path", { d: arc(0, 1, 20), fill: "none", stroke: "#353a4b", "stroke-width": 3, "stroke-linecap": "round" });
+    if (f !== zero) el(svg, "path", { d: arc(zero, f, 20), fill: "none", stroke: "#f7b889", "stroke-width": 3, "stroke-linecap": "round" });
+    el(svg, "circle", { cx: 27, cy: 25, r: 13.5, fill: "#272b38", stroke: "#353a4b" });
+    var inner = polar(f, 6), outer = polar(f, 11);
+    el(svg, "line", { x1: inner[0], y1: inner[1], x2: outer[0], y2: outer[1], stroke: "#f7b889", "stroke-width": 3, "stroke-linecap": "round" });
+  });
+})();
+</script>
