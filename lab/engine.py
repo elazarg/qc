@@ -282,8 +282,8 @@ class Engine:
         a value that is there."""
         self.quiet()
         target = self.slots.free_for_saving()
-        playable = chain.with_routes([(self.physical_input, MULTI_OUT) if r == 0 else row.route
-                                      for r, row in enumerate(chain.rows)])
+        # Its own routing, from the guitar input to the unit's outputs: a preset spread over several rows whole.
+        playable = chain.with_routes(routed(chain, self.physical_input, MULTI_OUT).routes)
         playable = replace(playable, rows=(replace(playable.rows[0], output=tuple(
             {**dict(playable.rows[0].output), VOLUME: leveling.norm_of(0.), MUTE: 0.}.items())),) + playable.rows[1:])
         self.slots.claim(target, name)

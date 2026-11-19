@@ -124,10 +124,13 @@ class ScenesTest(EvenAmps):
         self.assertLess(stored[1], self.split[1])
         self.assertEqual(stored[2:], self.split[2:])
 
-    def test_apply_leaves_values_assigned_to_scenes_alone_without_a_scene(self):
+    def test_without_a_scene_each_scene_moves_its_own_value(self):
         result = knobs.apply(self.source, {"drive": -.5, "body": .5})
-        self.assertEqual(result.block(0, 0).get(0, 1), self.split[1])
-        self.assertEqual(result.block(0, 0).values[0], self.split)
+        moved = result.block(0, 0).values[0]
+        once = knobs.targets(self.source, {"drive": -.5}, scene=1)[0, 0, 0]
+        self.assertEqual(moved[1], once[1])                  # as if turned in that scene alone
+        self.assertLess(moved[0], self.split[0])
+        self.assertLess(moved[1], self.split[1])
         # The shared Bass still moves.
         self.assertAlmostEqual(result.block(0, 0).display(2), 6., places=1)
         # The original chain is never changed.
@@ -234,7 +237,8 @@ class DriveTravelTest(unittest.TestCase):
 
     def test_a_pedal_bypassed_by_scene_is_bypassed_only_in_the_named_scene(self):
         source = chain(replace_bypass(block(5), (False, True) + (False,) * 6))
-        self.assertNotIn((0, 0, None), knobs.targets(source, {"drive": -1.}))
+        # Without a scene the knob is turned on the whole sound: the pedal goes off in every scene.
+        self.assertEqual(knobs.targets(source, {"drive": -1.})[0, 0, None], (True,) * 8)
         flags = knobs.targets(source, {"drive": -1.}, scene=2)[0, 0, None]
         self.assertEqual(flags, (False, True, True) + (False,) * 5)
 

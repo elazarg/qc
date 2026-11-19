@@ -166,5 +166,21 @@ class EngineTest(unittest.TestCase):
         self.assertEqual(self.unit.position()["position"], 8)
 
 
+    def test_saving_keeps_a_preset_spread_over_rows_routed_as_it_was(self):
+        spread = Chain((Row((Block(PLEXI),), inlet=1, outlet=16), Row((Block(V30),), inlet=0, outlet=0),
+                        Row((Block(DELAY),), inlet=0, outlet=MULTI_OUT), Row()))
+        slot, stored = self.engine.save(spread, "Spread")
+        self.assertEqual([row.route for row in stored.rows][:3], [(1, 16), (0, 0), (0, MULTI_OUT)])
+
+    def test_a_knob_moves_every_scene_of_a_scene_switched_sound(self):
+        gain = catalog.model(PLEXI).index("GAIN")
+        switched = Chain((Row((Block(PLEXI).set(gain, (.3, .3, .8) + (.3,) * 5), Block(V30)), inlet=1,
+                              outlet=MULTI_OUT),))
+        slot, stored = self.engine.save(switched, "Switched", {"drive": .5})
+        held = dict(stored.block(0, 0).params)[gain]
+        self.assertGreater(held[0], .35)
+        self.assertGreater(held[2], .8)
+
+
 if __name__ == "__main__":
     unittest.main()

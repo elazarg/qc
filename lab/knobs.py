@@ -404,10 +404,27 @@ def targets(chain, values, *, scene=None):
     """Every stored value the knob positions would change, as {(row, column, index): new stored value}.
 
     A bypass change is keyed (row, column, None). A value that differs by scene comes back as the whole
-    eight, with only `scene`'s entry changed; without a scene such values are left alone.
+    eight: with `scene`, only that scene's entry changed; without one, each scene's entry moved as the knob
+    moves it in that scene, so a knob works on a scene-switched preset as a whole.
     """
-    return {(edit["row"], edit["column"], None if edit.get("kind") == "bypass" else edit["index"]): edit["stored"]
-            for edit in _plan(chain, values, scene)}
+    def keyed(scene):
+        return {(edit["row"], edit["column"], None if edit.get("kind") == "bypass" else edit["index"]): edit["stored"]
+                for edit in _plan(chain, values, scene)}
+
+    found = keyed(scene)
+    if scene is not None:
+        return found
+    per_scene = [keyed(each) for each in range(8)]
+    for key in set().union(*per_scene):
+        moved = [per_scene[each].get(key) for each in range(8)]
+        if all(isinstance(value, tuple) for value in moved if value is not None) and key not in found:
+            row, column, index = key
+            block = chain.block(row, column)
+            held = block.bypass if index is None else dict(block.params).get(index)   # all eight scenes
+            if not isinstance(held, tuple):
+                continue
+            found[key] = tuple(moved[each][each] if moved[each] is not None else held[each] for each in range(8))
+    return found
 
 
 def apply(chain, values, *, scene=None):
