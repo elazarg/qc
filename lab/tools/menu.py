@@ -15,6 +15,8 @@ TOOLS = [
     ("Controls workbench", "controls"),
     ("Setup and sound check", "soundcheck"),
     ("Usage and feedback", "usage"),
+    ("POD Go presets", "pod"),
+    ("Songs you listen to", "listening"),
 ]
 
 

@@ -367,8 +367,21 @@ class Desk:
                     choose.configure(menu=options)
                     choose.pack(side="right")
                     Tooltip(choose, "Its named settings, Neural DSP's own")
+        button(self.tray, "Nano Cortex sheet", lambda: self.nano_sheet(sound)).pack(anchor="w", pady=(8, 4))
         for note in sound.notes[-4:]:
             label(self.tray, f"You: {note['text']}", size=9, color=SUBTLE, wrap=400).pack(fill="x")
+
+    def nano_sheet(self, sound):
+        """How to set this sound up on the Nano Cortex: what to capture, the IR, and the effects by hand."""
+        from .nano import sheet
+
+        top = tk.Toplevel(self.root, bg=PAPER)
+        top.title(f"Nano Cortex · {sound.name}")
+        text = tk.Text(top, bg=DARK, fg=INK, font=(FONT, 10), relief="flat", wrap="word", padx=14, pady=12,
+                       width=70, height=30)
+        text.insert("1.0", "\n".join(sheet(sound.chain).lines()))
+        text.configure(state="disabled")
+        text.pack(fill="both", expand=True)
 
     def panel_difference(self):
         for line in self.studio.difference():

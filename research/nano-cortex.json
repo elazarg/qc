@@ -1,0 +1,61 @@
+{
+ "about": "What the Neural DSP Nano Cortex holds per preset, and which virtual devices each fixed slot accepts (NanOS 2.x). Read by lab/nano.py. Device names are as Neural DSP publishes them; based-on names are Neural DSP's own.",
+ "sources": {
+  "manual": {"title": "Nano Cortex User Manual", "url": "https://neuraldsp.com/manual/nano-cortex", "publisher": "Neural DSP", "accessed": "2026-11-19",
+             "used_for": "Signal path (Performance Mode > Signal Path): 2 pre-effect slots, 1 Neural Capture, 1 IR Loader, 3 post-effect slots; capture volume -24 to +12 dB; BASS/MID/TREBLE knobs act on the current capture; IR Loader HI PASS, LOW PASS and LEVEL faders; six mic positions per factory microphone; AMOUNT knob moves a predetermined parameter per device; device parameters are dialled in the Cortex Cloud app."},
+  "faq": {"title": "Nano Cortex FAQ", "url": "https://support.neuraldsp.com/help/nano-cortex-r-faq", "publisher": "Neural DSP", "accessed": "2026-11-19",
+          "used_for": "Slot restrictions by device; Input Gate sits before the pre slots and uses none of them; 64 presets; 256 user captures and 256 user IRs; ten stock cabinets with five microphones and six positions each; 'Neural Captures created on Nano Cortex can be loaded on Quad Cortex, and vice versa.'"},
+  "device_list": {"title": "Nano Cortex Device List", "url": "https://neuraldsp.com/nano-cortex-device-list", "publisher": "Neural DSP", "accessed": "2026-11-19",
+                  "used_for": "Every device with its category, based-on gear and slot; the ten IR Loader cabinets."}
+ },
+ "chain": ["Input Gate", "Pre 1", "Pre 2", "Neural Capture", "IR Loader", "Post 1", "Post 2", "Post 3"],
+ "capture": {"per_preset": 1, "volume_db": [-24, 12], "knobs": ["BASS", "MID", "TREBLE"], "user_captures": 256, "source": "manual"},
+ "ir_loader": {"controls": ["HI PASS", "LOW PASS", "LEVEL"], "user_irs": 256, "mic_positions": 6, "microphones_per_cab": 5,
+               "note": "The manual and device list do not name the five microphones; they are chosen on the unit or in the app.", "source": "manual"},
+ "input_gate": {"control": "noise reduction 0 to 100 %", "source": "manual"},
+ "slots": {
+  "Pre 1": ["utility", "compressor_mono", "wah", "filter", "drive", "bass_drive", "eq", "pitch"],
+  "Pre 2": ["utility", "compressor_mono", "wah", "filter", "drive", "bass_drive", "eq"],
+  "Post 1": ["modulation", "doubler", "compressor_stereo", "eq"],
+  "Post 2": ["delay", "compressor_stereo", "eq"],
+  "Post 3": ["reverb", "compressor_stereo", "eq"]
+ },
+ "devices": {
+  "drive": {
+   "Chief BD2": "BOSS BD-2", "Chief OD1": "BOSS OD-1", "Exotic": "Xotic BB Preamp", "Exotic Z Boost": "Xotic RC Booster",
+   "Facial Fuzz": "Dunlop Fuzz Face", "Green 808": "Ibanez TS808", "Obsessive Drive": "Fulltone OCD",
+   "OD250": "DOD Overdrive Preamp 250", "Rodent Drive": "ProCo Rat"
+  },
+  "bass_drive": {"Exotic Bass Z Boost": "Xotic RC Bass Booster", "Microtubes B3K": "Darkglass Microtubes B3K"},
+  "delay": {"Analog Delay (ST)": null, "Circular Delay": null, "Digital Delay (ST)": null, "Dual Delay": null,
+            "Dual Reverse Delay": null, "Tape Delay (ST)": null},
+  "reverb": {"Ambience": null, "Cave": null, "Hall": null, "Mind Hall": "Lexicon 224", "Modulated": null, "Room": null,
+             "Blossom (ST)": "Strymon BigSky (Bloom mode)", "Shimmer": null},
+  "compressor_mono": {"Legendary 87 (M)": "Universal Audio 1176", "Opto Comp (M)": null, "Solid State Comp (M)": "SSL Bus",
+                      "VCA Comp (M)": null},
+  "compressor_stereo": {"Legendary 87 (ST)": "Universal Audio 1176", "Opto Comp (ST)": null,
+                        "Solid State Comp (ST)": "SSL Bus", "VCA Comp (ST)": null},
+  "pitch": {"Transpose": null, "Poly Octaver": "Electro-Harmonix POG", "Wham": "DigiTech Whammy", "Chief OC2": "BOSS OC-2"},
+  "modulation": {"Chief CE2W (ST)": "BOSS CE-2W", "Chief DC2W (ST)": "BOSS DC-2W Dimension", "Chorus 229T": "TC Electronic TC-2290",
+                 "Dream Chorus (ST)": "TC Electronic Dreamscape", "MX Flanger": "MXR Flanger M117R", "MX Phase 95": "MXR Phase 95",
+                 "MX Vibes": "MXR UniVibe", "Tremolo": null},
+  "filter": {"Envelope Filter": null, "Love Meat": "Lovetone Meatball"},
+  "eq": {"Graphic-9": null, "Low-High Cut": null, "Parametric-3": null},
+  "wah": {"Bass Wah": null, "Bubba Wah": "Dunlop Budda Budwah", "Crying Clyde Wah": "Dunlop Cry Baby Clyde McCoy",
+          "Crying Wah": "Dunlop Cry Baby GCB-95"},
+  "utility": {"Adaptive Gate": null, "Utility Gate": null, "Volume": null},
+  "doubler": {"Doubler": null}
+ },
+ "cabs": {
+  "110 US PRN C10R": {"based_on": "Fender Princeton with Jensen C10R drivers", "config": "1x10", "speaker": "Jensen C10R"},
+  "112 UK C15 Blue": {"based_on": "Vox AC15 with Celestion Alnico Blue drivers", "config": "1x12", "speaker": "Celestion Alnico Blue"},
+  "212 Match D30 Sig A": {"based_on": "Matchless DC30 Sig A", "config": "2x12", "speaker": null},
+  "212 US TWN C12Q 00s": {"based_on": "Fender Twin Reverb with Jensen C12K-2 drivers", "config": "2x12", "speaker": "Jensen C12K"},
+  "412 Brit TV GB75Hz '69": {"based_on": "Marshall 1960TV with Celestion G12M25 drivers", "config": "4x12", "speaker": "Celestion G12M-25 Greenback"},
+  "412 CA Stand OS A V30 '01": {"based_on": "Mesa Standard OS Angled with Celestion Vintage 30 drivers", "config": "4x12", "speaker": "Celestion Vintage 30"},
+  "412 CA Trad S UKV30 90s": {"based_on": "Mesa Traditional Straight with Celestion Vintage 30 drivers", "config": "4x12", "speaker": "Celestion Vintage 30"},
+  "412 Zila Cust V30 '12 V2": {"based_on": "Zilla Custom with Celestion Vintage 30 drivers", "config": "4x12", "speaker": "Celestion Vintage 30"},
+  "115 Amped Modern": {"based_on": "Ampeg SVT 115HE", "config": "1x15", "speaker": null, "bass": true},
+  "810 Amped VT Aln 70s": {"based_on": "Ampeg SVT 810 with custom Eminence ceramic drivers", "config": "8x10", "speaker": "Eminence ceramic", "bass": true}
+ }
+}

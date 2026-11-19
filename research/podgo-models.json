@@ -1,0 +1,3222 @@
+{
+ "about": "Line 6 POD Go model ids (as stored in a .pgb backup) with the display name and the real gear Line 6 says each model is based on. Read by lab/podgo.py. certainty: 'published' = stated by Line 6; 'line6_original' = Line 6 lists it as its own design (based_on null unless an inspiration is published); 'community' = third-party only; 'unknown' = no source found. Display names are often inferred from the id; 'note' says so where they are.",
+ "built": "2026-11-19",
+ "sources": {
+  "podgo_models": {
+   "title": "POD Go 2.50 Models",
+   "url": "https://line6.com/podgo-models/",
+   "publisher": "Line 6",
+   "accessed": "2026-11-19"
+  },
+  "helix_models": {
+   "title": "Helix 3.80 Models",
+   "url": "https://line6.com/helix-models/",
+   "publisher": "Line 6",
+   "accessed": "2026-11-19"
+  },
+  "helix_280_rn": {
+   "title": "Helix/HX 2.80 Release Notes (Ampeg model renames)",
+   "url": "https://line6.com/support/page/kb/effects-controllers/helix/helixhx-280-release-notes-r913/",
+   "publisher": "Line 6",
+   "accessed": "2026-11-19"
+  },
+  "podgo_manual_2_0": {
+   "title": "POD Go 2.0 Owner's Manual (English, Rev E)",
+   "url": "https://jp.line6.com/data/6/0a00050b25196643a3b67f821/application/pdf/POD%20Go%202.0%20Owner's%20Manual%20-%20English%20.pdf",
+   "publisher": "Line 6",
+   "accessed": "2026-11-19"
+  },
+  "helixhelp_rn": {
+   "title": "Helix Help release notes (mirror of Line 6 Helix 3.00 / 3.50 release notes)",
+   "url": "https://helixhelp.com/release-notes",
+   "publisher": "helixhelp.com (community)",
+   "accessed": "2026-11-19"
+  },
+  "podgo_manual": {
+   "title": "POD Go 2.00 Owner's Manual (40-00-0568 Rev E), model tables pp. 18-32",
+   "url": "https://jp.line6.com/data/6/0a00050b25196643a3b67f821/application/pdf/POD%20Go%202.0%20Owner's%20Manual%20-%20English%20.pdf",
+   "publisher": "Line 6",
+   "accessed": "2026-11-19"
+  },
+  "line6_manuals": {
+   "title": "Line 6 manuals index (POD Go Owner's Manual listing)",
+   "url": "https://line6.com/support/manuals/",
+   "publisher": "Line 6",
+   "accessed": "2026-11-19"
+  }
+ },
+ "models": {
+  "HD2_AmpA30FawnBrt": {
+   "name": "A30 Fawn Brt",
+   "category": "amp",
+   "based_on": "Vox AC-30 Fawn (bright channel)",
+   "maker": "Vox",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpA30FawnNrm": {
+   "name": "A30 Fawn Nrm",
+   "category": "amp",
+   "based_on": "Vox AC-30 Fawn (normal channel)",
+   "maker": "Vox",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpANGLMeteor": {
+   "name": "ANGL Meteor",
+   "category": "amp",
+   "based_on": "ENGL Fireball 100",
+   "maker": "ENGL",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpAgua51": {
+   "name": "Agua 51",
+   "category": "amp",
+   "based_on": "Aguilar DB51",
+   "maker": "Aguilar",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpArchetypeClean": {
+   "name": "Archetype Clean",
+   "category": "amp",
+   "based_on": "Paul Reed Smith Archon (clean channel)",
+   "maker": "PRS",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpArchetypeLead": {
+   "name": "Archetype Lead",
+   "category": "amp",
+   "based_on": "Paul Reed Smith Archon (lead channel)",
+   "maker": "PRS",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpBrit2204": {
+   "name": "Brit 2204",
+   "category": "amp",
+   "based_on": "Marshall JCM-800 (50 watt)",
+   "maker": "Marshall",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id. Helix page adds '(50 watt)': Marshall JCM-800 (50 watt)."
+  },
+  "HD2_AmpBritJ45Brt": {
+   "name": "Brit J45 Brt",
+   "category": "amp",
+   "based_on": "Marshall JTM-45 (bright channel)",
+   "maker": "Marshall",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpBritJ45Nrm": {
+   "name": "Brit J45 Nrm",
+   "category": "amp",
+   "based_on": "Marshall JTM-45 (normal channel)",
+   "maker": "Marshall",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpBritPlexiBrt": {
+   "name": "Brit Plexi Brt",
+   "category": "amp",
+   "based_on": "Marshall Super Lead 100 (bright channel)",
+   "maker": "Marshall",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpBritPlexiJump": {
+   "name": "Brit Plexi Jump",
+   "category": "amp",
+   "based_on": "Marshall Super Lead 100 (jumped)",
+   "maker": "Marshall",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpBritPlexiNrm": {
+   "name": "Brit Plexi Nrm",
+   "category": "amp",
+   "based_on": "Marshall Super Lead 100 (normal channel)",
+   "maker": "Marshall",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpBritTremBrt": {
+   "name": "Brit Trem Brt",
+   "category": "amp",
+   "based_on": "Marshall JTM-50 (bright channel)",
+   "maker": "Marshall",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpBritTremJump": {
+   "name": "Brit Trem Jump",
+   "category": "amp",
+   "based_on": "Marshall JTM-50 (jumped)",
+   "maker": "Marshall",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpBritTremNrm": {
+   "name": "Brit Trem Nrm",
+   "category": "amp",
+   "based_on": "Marshall JTM-50 (normal channel)",
+   "maker": "Marshall",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpCali400Ch1": {
+   "name": "Cali 400 Ch1",
+   "category": "amp",
+   "based_on": "MESA/Boogie Bass 400+ (channel 1)",
+   "maker": "MESA/Boogie",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpCaliBass": {
+   "name": "Cali Bass",
+   "category": "amp",
+   "based_on": "MESA/Boogie M9 Carbine",
+   "maker": "MESA/Boogie",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpCaliIVLead": {
+   "name": "Cali IV Lead",
+   "category": "amp",
+   "based_on": "MESA/Boogie Mark IV (lead channel)",
+   "maker": "MESA/Boogie",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpCaliIVR1": {
+   "name": "Cali IV Rhythm 1",
+   "category": "amp",
+   "based_on": "MESA/Boogie Mark IV (channel I)",
+   "maker": "MESA/Boogie",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpCaliIVR2": {
+   "name": "Cali IV Rhythm 2",
+   "category": "amp",
+   "based_on": "MESA/Boogie Mark IV (channel II)",
+   "maker": "MESA/Boogie",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpCaliRectifire": {
+   "name": "Cali Rectifire",
+   "category": "amp",
+   "based_on": "MESA/Boogie Dual Rectifier",
+   "maker": "MESA/Boogie",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpCaliTexasCh1": {
+   "name": "Cali Texas Ch1",
+   "category": "amp",
+   "based_on": "MESA/Boogie Lone Star (clean channel)",
+   "maker": "MESA/Boogie",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpCaliTexasCh2": {
+   "name": "Cali Texas Ch2",
+   "category": "amp",
+   "based_on": "MESA/Boogie Lone Star (drive channel)",
+   "maker": "MESA/Boogie",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpCartographer": {
+   "name": "Cartographer",
+   "category": "amp",
+   "based_on": "Ben Adrian Cartographer",
+   "maker": "Ben Adrian",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id. Based on a boutique amp by Ben Adrian; Line 6 does not class it as a Line 6 Original."
+  },
+  "HD2_AmpDerailedIngrid": {
+   "name": "Derailed Ingrid",
+   "category": "amp",
+   "based_on": "Trainwreck Circuits Express",
+   "maker": "Trainwreck",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpDividedDuo": {
+   "name": "Divided Duo",
+   "category": "amp",
+   "based_on": "÷13 JRT 9/15",
+   "maker": "Divided by 13",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpEssexA15": {
+   "name": "Essex A15",
+   "category": "amp",
+   "based_on": "Vox AC-15",
+   "maker": "Vox",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpEssexA30": {
+   "name": "Essex A30",
+   "category": "amp",
+   "based_on": "Vox AC-30 with top boost",
+   "maker": "Vox",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpFullertonBrt": {
+   "name": "Fullerton Brt",
+   "category": "amp",
+   "based_on": "Fender 5C3 Tweed Deluxe (bright channel)",
+   "maker": "Fender",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpFullertonJump": {
+   "name": "Fullerton Jump",
+   "category": "amp",
+   "based_on": "Fender 5C3 Tweed Deluxe (jumped channels)",
+   "maker": "Fender",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpFullertonNrm": {
+   "name": "Fullerton Nrm",
+   "category": "amp",
+   "based_on": "Fender 5C3 Tweed Deluxe (normal channel)",
+   "maker": "Fender",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpGCougar800": {
+   "name": "G Cougar 800",
+   "category": "amp",
+   "based_on": "Gallien-Krueger GK 800RB",
+   "maker": "Gallien-Krueger",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpGSG100": {
+   "name": "Grammatico GSG",
+   "category": "amp",
+   "based_on": "Grammatico GSG100",
+   "maker": "Grammatico",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id. Id says GSG100; Line 6 display name is 'Grammatico GSG'."
+  },
+  "HD2_AmpGermanMahadeva": {
+   "name": "German Mahadeva",
+   "category": "amp",
+   "based_on": "Bogner Shiva",
+   "maker": "Bogner",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpGermanUbersonic": {
+   "name": "German Ubersonic",
+   "category": "amp",
+   "based_on": "Bogner Überschall",
+   "maker": "Bogner",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpGrammaticoBrt": {
+   "name": "Grammatico LG Brt",
+   "category": "amp",
+   "based_on": "Grammatico LaGrange (bright channel)",
+   "maker": "Grammatico",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id. POD Go page spells 'Grammatico LG ...', Helix page 'GrammaticoLG ...'."
+  },
+  "HD2_AmpGrammaticoJump": {
+   "name": "Grammatico LG Jump",
+   "category": "amp",
+   "based_on": "Grammatico LaGrange (jumped channels)",
+   "maker": "Grammatico",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id. POD Go page spells 'Grammatico LG ...', Helix page 'GrammaticoLG ...'."
+  },
+  "HD2_AmpInterstateZed": {
+   "name": "Interstate Zed",
+   "category": "amp",
+   "based_on": "Dr Z Route 66",
+   "maker": "Dr. Z",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpJazzRivet120": {
+   "name": "Jazz Rivet 120",
+   "category": "amp",
+   "based_on": "Roland JC-120 Jazz Chorus",
+   "maker": "Roland",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpLine62204Mod": {
+   "name": "Line 6 2204 Mod",
+   "category": "amp",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id. Line 6 lists it as 'Line 6 Original (Amp Design)'; the model tables publish no inspiring amp."
+  },
+  "HD2_AmpLine6Elektrik": {
+   "name": "Line 6 Elektrik",
+   "category": "amp",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id. Line 6 lists it as 'Line 6 Original (Amp Design)'; the model tables publish no inspiring amp."
+  },
+  "HD2_AmpLine6Elmsley": {
+   "name": "Line 6 Elmsley",
+   "category": "amp",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id. Line 6 lists it as 'Line 6 Original (Amp Design)'; the model tables publish no inspiring amp."
+  },
+  "HD2_AmpLine6Fatality": {
+   "name": "Line 6 Fatality",
+   "category": "amp",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id. Line 6 lists it as 'Line 6 Original (Amp Design)'; the model tables publish no inspiring amp."
+  },
+  "HD2_AmpLine6Litigator": {
+   "name": "Line 6 Litigator",
+   "category": "amp",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id. Line 6 lists it as 'Line 6 Original (Amp Design)'; the model tables publish no inspiring amp."
+  },
+  "HD2_AmpLine6Voltage": {
+   "name": "Line 6 Voltage",
+   "category": "amp",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id. Line 6 lists it as 'Line 6 Original (Amp Design)'; the model tables publish no inspiring amp."
+  },
+  "HD2_AmpMailOrderTwin": {
+   "name": "Mail Order Twin",
+   "category": "amp",
+   "based_on": "Silvertone 1484",
+   "maker": "Silvertone",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpMandarin80": {
+   "name": "Mandarin 80",
+   "category": "amp",
+   "based_on": "Orange OR80",
+   "maker": "Orange",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpMatchstickCh1": {
+   "name": "Matchstick Ch1",
+   "category": "amp",
+   "based_on": "Matchless DC30 (channel 1)",
+   "maker": "Matchless",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpMatchstickCh2": {
+   "name": "Matchstick Ch2",
+   "category": "amp",
+   "based_on": "Matchless DC30 (channel 2)",
+   "maker": "Matchless",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpMatchstickJump": {
+   "name": "Matchstick Jump",
+   "category": "amp",
+   "based_on": "Matchless DC30 (jumped)",
+   "maker": "Matchless",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpPVPanama": {
+   "name": "PV Panama",
+   "category": "amp",
+   "based_on": "Peavey 5150",
+   "maker": "Peavey",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpPlacaterClean": {
+   "name": "Placater Clean",
+   "category": "amp",
+   "based_on": "Friedman BE-100 (clean channel)",
+   "maker": "Friedman",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpPlacaterDirty": {
+   "name": "Placater Dirty",
+   "category": "amp",
+   "based_on": "Friedman BE-100 (BE/HBE channel)",
+   "maker": "Friedman",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpRevvGenPurple": {
+   "name": "Revv Gen Purple",
+   "category": "amp",
+   "based_on": "Revv Generator 120 (purple/gain ch. 3)",
+   "maker": "Revv",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name matches a label seen in the user's presets."
+  },
+  "HD2_AmpRevvGenRed": {
+   "name": "Revv Gen Red",
+   "category": "amp",
+   "based_on": "Revv Generator 120 (red/high gain ch. 4)",
+   "maker": "Revv",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpSVBeastBrt": {
+   "name": "Ampeg SVT Brt",
+   "category": "amp",
+   "based_on": "Ampeg SVT (bright channel)",
+   "maker": "Ampeg",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models",
+    "helix_280_rn"
+   ],
+   "note": "Display name inferred from the internal id. Formerly 'SV Beast Brt'; Line 6 renamed it 'Ampeg SVT Brt' in Helix/HX 2.80 (the id keeps the old name)."
+  },
+  "HD2_AmpSVBeastNrm": {
+   "name": "Ampeg SVT Nrm",
+   "category": "amp",
+   "based_on": "Ampeg SVT (normal channel)",
+   "maker": "Ampeg",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models",
+    "helix_280_rn"
+   ],
+   "note": "Display name inferred from the internal id. Formerly 'SV Beast Nrm'; Line 6 renamed it 'Ampeg SVT Nrm' in Helix/HX 2.80 (the id keeps the old name)."
+  },
+  "HD2_AmpSVT4Pro": {
+   "name": "Ampeg SVT-4 Pro",
+   "category": "amp",
+   "based_on": "Ampeg SVT-4 PRO",
+   "maker": "Ampeg",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id. POD Go page spells it 'Ampeg SVT-4 Pro', Helix page 'Ampeg SVT-4 PRO'."
+  },
+  "HD2_AmpSoloLeadClean": {
+   "name": "Solo Lead Clean",
+   "category": "amp",
+   "based_on": "Soldano SLO-100 (clean channel)",
+   "maker": "Soldano",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpSoloLeadCrunch": {
+   "name": "Solo Lead Crunch",
+   "category": "amp",
+   "based_on": "Soldano SLO-100 (crunch channel)",
+   "maker": "Soldano",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpSoloLeadOD": {
+   "name": "Solo Lead OD",
+   "category": "amp",
+   "based_on": "Soldano SLO-100 (overdrive channel)",
+   "maker": "Soldano",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpSoupPro": {
+   "name": "Soup Pro",
+   "category": "amp",
+   "based_on": "Supro S6616",
+   "maker": "Supro",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpStoneAge185": {
+   "name": "Stone Age 185",
+   "category": "amp",
+   "based_on": "Gibson EH-185",
+   "maker": "Gibson",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpTucknGo": {
+   "name": "Ampeg B-15NF",
+   "category": "amp",
+   "based_on": "Ampeg B-15NF Portaflex",
+   "maker": "Ampeg",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models",
+    "helix_280_rn"
+   ],
+   "note": "Display name inferred from the internal id. Formerly 'Tuck n' Go'; Line 6 renamed it 'Ampeg B-15NF' in Helix/HX 2.80 (the id keeps the old name)."
+  },
+  "HD2_AmpTweedBluesBrt": {
+   "name": "Tweed Blues Brt",
+   "category": "amp",
+   "based_on": "Fender Bassman (bright channel)",
+   "maker": "Fender",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpTweedBluesNrm": {
+   "name": "Tweed Blues Nrm",
+   "category": "amp",
+   "based_on": "Fender Bassman (normal channel)",
+   "maker": "Fender",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpUSDeluxeNrm": {
+   "name": "US Deluxe Nrm",
+   "category": "amp",
+   "based_on": "Fender Deluxe Reverb (normal channel)",
+   "maker": "Fender",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpUSDeluxeVib": {
+   "name": "US Deluxe Vib",
+   "category": "amp",
+   "based_on": "Fender Deluxe Reverb (vibrato channel)",
+   "maker": "Fender",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpUSDoubleNrm": {
+   "name": "US Double Nrm",
+   "category": "amp",
+   "based_on": "Fender Twin Reverb (normal channel)",
+   "maker": "Fender",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpUSDoubleVib": {
+   "name": "US Double Vib",
+   "category": "amp",
+   "based_on": "Fender Twin Reverb (vibrato channel)",
+   "maker": "Fender",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpUSPrincess": {
+   "name": "US Princess",
+   "category": "amp",
+   "based_on": "Fender Princeton Reverb",
+   "maker": "Fender",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpVoltageQueen": {
+   "name": "Voltage Queen",
+   "category": "amp",
+   "based_on": "Victoria Vintage Queen",
+   "maker": "Victoria",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpWhoWatt100": {
+   "name": "WhoWatt 100",
+   "category": "amp",
+   "based_on": "Hiwatt DR-103 (Brilliant channel)",
+   "maker": "Hiwatt",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_AmpWoodyBlue": {
+   "name": "Woody Blue",
+   "category": "amp",
+   "based_on": "Acoustic 360",
+   "maker": "Acoustic",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id."
+  },
+  "HD2_Cab1x10PrincessCopperhead": {
+   "name": "1x10 US Princess",
+   "category": "cab",
+   "based_on": "1x10\" Fender Princeton Reverb",
+   "maker": "Fender",
+   "speaker": "Eminence Copperhead",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models",
+    "helixhelp_rn"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id. Speaker taken from Line 6 Helix 3.50 release notes for the newer 1x10 US Princess cab ('1x10\" Fender Princeton Eminence Copperhead'), matching 'Copperhead' in the id; the legacy table only says 1x10 Fender Princeton Reverb."
+  },
+  "HD2_Cab1x12BlueBell": {
+   "name": "1x12 Blue Bell",
+   "category": "cab",
+   "based_on": "1x12\" Vox AC-15 Blue",
+   "maker": "Vox",
+   "speaker": "Celestion Alnico Blue",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id. Speaker: Line 6 gives the speaker code (e.g. V30, G12H30, C12N, Alnico Blue); the maker name (Celestion/Jensen/Electro-Voice) is the standard expansion of that code, not in the Line 6 text."
+  },
+  "HD2_Cab1x12CaliIV": {
+   "name": "1x12 Cali IV",
+   "category": "cab",
+   "based_on": "1x12\" MESA/Boogie Mk IV",
+   "maker": "MESA/Boogie",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id. No speaker named in the Line 6 text."
+  },
+  "HD2_Cab1x12Celest12H": {
+   "name": "1x12 Celest 12H",
+   "category": "cab",
+   "based_on": "1x12\" ÷13 JRT 9/15 G12 H30",
+   "maker": "Divided by 13",
+   "speaker": "Celestion G12H-30",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id. Speaker: Line 6 gives the speaker code (e.g. V30, G12H30, C12N, Alnico Blue); the maker name (Celestion/Jensen/Electro-Voice) is the standard expansion of that code, not in the Line 6 text."
+  },
+  "HD2_Cab1x12FieldCoil": {
+   "name": "1x12 Field Coil",
+   "category": "cab",
+   "based_on": "1x12\" Gibson EH185",
+   "maker": "Gibson",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id. Speaker model not published (the name implies a field-coil speaker). No speaker named in the Line 6 text."
+  },
+  "HD2_Cab1x12Fullerton5C3": {
+   "name": "1x12 Fullerton",
+   "category": "cab",
+   "based_on": "1x12\" Fender 5C3 Tweed Deluxe",
+   "maker": "Fender",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id. The 5C3/5E3 suffix appears only in the id."
+  },
+  "HD2_Cab1x12Grammatico5E3": {
+   "name": "1x12 Grammatico",
+   "category": "cab",
+   "based_on": "1x12\" Grammatico LaGrange",
+   "maker": "Grammatico",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id. The 5C3/5E3 suffix appears only in the id."
+  },
+  "HD2_Cab1x12Lead80": {
+   "name": "1x12 Lead 80",
+   "category": "cab",
+   "based_on": "1x12\" Bogner Shiva CL80",
+   "maker": "Bogner",
+   "speaker": "CL80 (Celestion Classic Lead 80)",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id. Line 6 text says only 'CL80'; reading it as Celestion Classic Lead 80 is an interpretation."
+  },
+  "HD2_Cab1x12MatchG25": {
+   "name": "2x12 Match G25",
+   "category": "cab",
+   "based_on": "1x12\" Matchless DC-30 Greenback 25",
+   "maker": "Matchless",
+   "speaker": "Celestion G12M-25 Greenback",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id. Line 6 names the legacy cab '2x12 Match ...' yet its based-on text and this id say 1x12 Matchless DC-30; name mapping is an inference. Speaker: Line 6 gives the speaker code (e.g. V30, G12H30, C12N, Alnico Blue); the maker name (Celestion/Jensen/Electro-Voice) is the standard expansion of that code, not in the Line 6 text."
+  },
+  "HD2_Cab1x12MatchH30": {
+   "name": "2x12 Match H30",
+   "category": "cab",
+   "based_on": "1x12\" Matchless DC-30 G12H30",
+   "maker": "Matchless",
+   "speaker": "Celestion G12H-30",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id. Line 6 names the legacy cab '2x12 Match ...' yet its based-on text and this id say 1x12 Matchless DC-30; name mapping is an inference. Speaker: Line 6 gives the speaker code (e.g. V30, G12H30, C12N, Alnico Blue); the maker name (Celestion/Jensen/Electro-Voice) is the standard expansion of that code, not in the Line 6 text."
+  },
+  "HD2_Cab1x12PrincessBlue": {
+   "name": "1x12 US Princess",
+   "category": "cab",
+   "based_on": "1x12\" Fender Princeton Reverb",
+   "maker": "Fender",
+   "speaker": "Celestion Alnico Blue",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models",
+    "helixhelp_rn"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id. Mapped to legacy '1x12 US Princess' by elimination; Line 6 Helix 3.00 release notes describe it as a Princeton Reverb with a 12\" Alnico Blue driver, matching 'Blue' in the id."
+  },
+  "HD2_Cab1x12USDeluxe": {
+   "name": "1x12 US Deluxe",
+   "category": "cab",
+   "based_on": "1x12\" Fender Deluxe Oxford",
+   "maker": "Fender",
+   "speaker": "Oxford",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id."
+  },
+  "HD2_Cab1x15TucknGo": {
+   "name": "1x15 Ampeg B-15",
+   "category": "cab",
+   "based_on": "1x15\" Ampeg B-15",
+   "maker": "Ampeg",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models",
+    "helix_280_rn"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id. Formerly '1x15 Tuck n' Go'; Line 6 renamed it '1x15 Ampeg B-15' in Helix/HX 2.80 (the id keeps the old name). No speaker named in the Line 6 text."
+  },
+  "HD2_Cab1x18WoodyBlue": {
+   "name": "1x18 Woody Blue",
+   "category": "cab",
+   "based_on": "1x18\" Acoustic 360",
+   "maker": "Acoustic",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id. No speaker named in the Line 6 text."
+  },
+  "HD2_Cab1x6x9SoupProEllipse": {
+   "name": "Soup Pro Ellipse",
+   "category": "cab",
+   "based_on": "1 x 6x9\" Supro S6616",
+   "maker": "Supro",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id. No speaker named in the Line 6 text."
+  },
+  "HD2_Cab2x12BlueBell": {
+   "name": "2x12 Blue Bell",
+   "category": "cab",
+   "based_on": "2x12\" Vox AC-30 Fawn Blue",
+   "maker": "Vox",
+   "speaker": "Celestion Alnico Blue",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id. Speaker: Line 6 gives the speaker code (e.g. V30, G12H30, C12N, Alnico Blue); the maker name (Celestion/Jensen/Electro-Voice) is the standard expansion of that code, not in the Line 6 text."
+  },
+  "HD2_Cab2x12DoubleC12N": {
+   "name": "2x12 Double C12N",
+   "category": "cab",
+   "based_on": "2x12\" Fender Twin C12N",
+   "maker": "Fender",
+   "speaker": "Jensen C12N",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id. Speaker: Line 6 gives the speaker code (e.g. V30, G12H30, C12N, Alnico Blue); the maker name (Celestion/Jensen/Electro-Voice) is the standard expansion of that code, not in the Line 6 text."
+  },
+  "HD2_Cab2x12Interstate": {
+   "name": "2x12 Interstate",
+   "category": "cab",
+   "based_on": "2x12\" Dr Z Z Best V30",
+   "maker": "Dr. Z",
+   "speaker": "Celestion Vintage 30",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name matches a label seen in the user's presets. Speaker: Line 6 gives the speaker code (e.g. V30, G12H30, C12N, Alnico Blue); the maker name (Celestion/Jensen/Electro-Voice) is the standard expansion of that code, not in the Line 6 text."
+  },
+  "HD2_Cab2x12JazzRivet": {
+   "name": "2x12 Jazz Rivet",
+   "category": "cab",
+   "based_on": "2x12\" Roland JC-120",
+   "maker": "Roland",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id. No speaker named in the Line 6 text."
+  },
+  "HD2_Cab2x12MailC12Q": {
+   "name": "2x12 Mail C12Q",
+   "category": "cab",
+   "based_on": "2x12\" Silvertone 1484",
+   "maker": "Silvertone",
+   "speaker": "Jensen C12Q",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id. Speaker: Line 6 gives the speaker code (e.g. V30, G12H30, C12N, Alnico Blue); the maker name (Celestion/Jensen/Electro-Voice) is the standard expansion of that code, not in the Line 6 text."
+  },
+  "HD2_Cab2x12SilverBell": {
+   "name": "2x12 Silver Bell",
+   "category": "cab",
+   "based_on": "2x12\" Vox AC-30TB Silver",
+   "maker": "Vox",
+   "speaker": "Celestion Alnico Silver",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id. Speaker: Line 6 gives the speaker code (e.g. V30, G12H30, C12N, Alnico Blue); the maker name (Celestion/Jensen/Electro-Voice) is the standard expansion of that code, not in the Line 6 text."
+  },
+  "HD2_Cab2x15Brute": {
+   "name": "2x15 Brute",
+   "category": "cab",
+   "based_on": "2x15\" MESA/Boogie 2x15 EV",
+   "maker": "MESA/Boogie",
+   "speaker": "Electro-Voice 15\"",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id. Speaker: Line 6 gives the speaker code (e.g. V30, G12H30, C12N, Alnico Blue); the maker name (Celestion/Jensen/Electro-Voice) is the standard expansion of that code, not in the Line 6 text."
+  },
+  "HD2_Cab4X12CaliV30": {
+   "name": "4x12 Cali V30",
+   "category": "cab",
+   "based_on": "4x12\" MESA/Boogie 4FB V30",
+   "maker": "MESA/Boogie",
+   "speaker": "Celestion Vintage 30",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id. Speaker: Line 6 gives the speaker code (e.g. V30, G12H30, C12N, Alnico Blue); the maker name (Celestion/Jensen/Electro-Voice) is the standard expansion of that code, not in the Line 6 text."
+  },
+  "HD2_Cab4x10Rhino": {
+   "name": "4x10 Ampeg HLF",
+   "category": "cab",
+   "based_on": "4x10\" Ampeg SVT 410HLF",
+   "maker": "Ampeg",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models",
+    "helix_280_rn"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id. Formerly '4x10 Rhino'; Line 6 renamed it '4x10 Ampeg HLF' in Helix/HX 2.80 (the id keeps the old name). No speaker named in the Line 6 text."
+  },
+  "HD2_Cab4x10TweedP10R": {
+   "name": "4x10 Tweed P10R",
+   "category": "cab",
+   "based_on": "4x10\" Fender Bassman P10R",
+   "maker": "Fender",
+   "speaker": "Jensen P10R",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id. Speaker: Line 6 gives the speaker code (e.g. V30, G12H30, C12N, Alnico Blue); the maker name (Celestion/Jensen/Electro-Voice) is the standard expansion of that code, not in the Line 6 text."
+  },
+  "HD2_Cab4x121960T75": {
+   "name": "4x12 1960 T75",
+   "category": "cab",
+   "based_on": "4x12\" Marshall 1960 AT75",
+   "maker": "Marshall",
+   "speaker": "Celestion G12T-75",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id. Speaker: Line 6 gives the speaker code (e.g. V30, G12H30, C12N, Alnico Blue); the maker name (Celestion/Jensen/Electro-Voice) is the standard expansion of that code, not in the Line 6 text."
+  },
+  "HD2_Cab4x12Blackback30": {
+   "name": "4x12 Blackback 30",
+   "category": "cab",
+   "based_on": "4x12\" Park 75 G12 H30",
+   "maker": "Park",
+   "speaker": "Celestion G12H-30",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name matches a label seen in the user's presets. Speaker: Line 6 gives the speaker code (e.g. V30, G12H30, C12N, Alnico Blue); the maker name (Celestion/Jensen/Electro-Voice) is the standard expansion of that code, not in the Line 6 text."
+  },
+  "HD2_Cab4x12Greenback20": {
+   "name": "4x12 Greenback 20",
+   "category": "cab",
+   "based_on": "4x12\" Marshall Basketweave G12 M20",
+   "maker": "Marshall",
+   "speaker": "Celestion G12M-20 Greenback",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id. Speaker: Line 6 gives the speaker code (e.g. V30, G12H30, C12N, Alnico Blue); the maker name (Celestion/Jensen/Electro-Voice) is the standard expansion of that code, not in the Line 6 text."
+  },
+  "HD2_Cab4x12Greenback25": {
+   "name": "4x12 Greenback 25",
+   "category": "cab",
+   "based_on": "4x12\" Marshall Basketweave G12 M25",
+   "maker": "Marshall",
+   "speaker": "Celestion G12M-25 Greenback",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id. Speaker: Line 6 gives the speaker code (e.g. V30, G12H30, C12N, Alnico Blue); the maker name (Celestion/Jensen/Electro-Voice) is the standard expansion of that code, not in the Line 6 text."
+  },
+  "HD2_Cab4x12MandarinEM": {
+   "name": "4x12 Mandarin EM",
+   "category": "cab",
+   "based_on": "4x12\" Orange Eminence",
+   "maker": "Orange",
+   "speaker": "Eminence",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id. Line 6 text says 'Orange Eminence'; exact Eminence model not given."
+  },
+  "HD2_Cab4x12SoloLeadEM": {
+   "name": "4x12 SoloLead EM",
+   "category": "cab",
+   "based_on": "4x12\" Soldano",
+   "maker": "Soldano",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id. Line 6 names no speaker; the 'EM' in the name is not explained in the source. No speaker named in the Line 6 text."
+  },
+  "HD2_Cab4x12UberV30": {
+   "name": "4x12 Uber V30",
+   "category": "cab",
+   "based_on": "4x12\" Bogner Uberkab V30",
+   "maker": "Bogner",
+   "speaker": "Celestion Vintage 30",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id. Speaker: Line 6 gives the speaker code (e.g. V30, G12H30, C12N, Alnico Blue); the maker name (Celestion/Jensen/Electro-Voice) is the standard expansion of that code, not in the Line 6 text."
+  },
+  "HD2_Cab4x12WhoWatt100": {
+   "name": "4x12 WhoWatt 100",
+   "category": "cab",
+   "based_on": "4x12\" Hiwatt AP Fane",
+   "maker": "Hiwatt",
+   "speaker": "Fane AP",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id."
+  },
+  "HD2_Cab4x12XXLV30": {
+   "name": "4x12 XXL V30",
+   "category": "cab",
+   "based_on": "4x12\" ENGL XXL V30",
+   "maker": "ENGL",
+   "speaker": "Celestion Vintage 30",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id. Speaker: Line 6 gives the speaker code (e.g. V30, G12H30, C12N, Alnico Blue); the maker name (Celestion/Jensen/Electro-Voice) is the standard expansion of that code, not in the Line 6 text."
+  },
+  "HD2_Cab8x10SVBeast": {
+   "name": "8x10 Ampeg SVT E",
+   "category": "cab",
+   "based_on": "8x10\" Ampeg SVT",
+   "maker": "Ampeg",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models",
+    "helix_280_rn"
+   ],
+   "note": "Legacy cab (listed in the Legacy cab table, not the newer single-mic Cab models). Display name inferred from the internal id. Formerly '8x10 SV Beast'; Line 6 renamed it '8x10 Ampeg SVT E' in Helix/HX 2.80 (the id keeps the old name). No speaker named in the Line 6 text."
+  },
+  "HD2_CabMicIr_1x12Grammatico": {
+   "name": "1x12 Grammatico",
+   "category": "cab",
+   "based_on": "1x12\" Grammatico LaGrange cab",
+   "maker": "Grammatico",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Cab block (v2.00 IR-based cab); manual column is 'Captured From'."
+  },
+  "HD2_CabMicIr_1x12OpenCast": {
+   "name": "1x12 Open Cast",
+   "category": "cab",
+   "based_on": "1x12\" custom open-back cab, EV EVM12L",
+   "maker": "Electro-Voice",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Cab block (v2.00 IR-based cab); manual column is 'Captured From'."
+  },
+  "HD2_CabMicIr_1x12USDeluxe": {
+   "name": "1x12 US Deluxe",
+   "category": "cab",
+   "based_on": "1x12\" Fender Deluxe, Oxford speaker",
+   "maker": "Fender",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Cab block (v2.00 IR-based cab); manual column is 'Captured From'."
+  },
+  "HD2_CabMicIr_2x12MatchG25": {
+   "name": "2x12 Match G25",
+   "category": "cab",
+   "based_on": "2x12\" Matchless DC30, custom Celestion G12M",
+   "maker": "Matchless",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Cab block (v2.00 IR-based cab); manual column is 'Captured From'. Manual prints the speaker as 'Custom G12M-35' (likely a typo for G12M-25)."
+  },
+  "HD2_CabMicIr_4x12BlackbackH30": {
+   "name": "4x12 Blackback H30",
+   "category": "cab",
+   "based_on": "4x12\" Park 75, Celestion G12-H30",
+   "maker": "Park",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Cab block (v2.00 IR-based cab); manual column is 'Captured From'. Manual table prints the name as '4x12 Blackback30'; 'Blackback H30' inferred from the id."
+  },
+  "HD2_CabMicIr_4x12CaliV30": {
+   "name": "4x12 Cali V30",
+   "category": "cab",
+   "based_on": "4x12\" MESA/Boogie 4FB, Celestion Vintage 30",
+   "maker": "MESA/Boogie",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Cab block (v2.00 IR-based cab); manual column is 'Captured From'."
+  },
+  "HD2_CabMicIr_4x12Greenback20": {
+   "name": "4x12 Greenback20",
+   "category": "cab",
+   "based_on": "4x12\" Marshall Basketweave, Celestion G12M-20",
+   "maker": "Marshall",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Cab block (v2.00 IR-based cab); manual column is 'Captured From'."
+  },
+  "HD2_CabMicIr_4x12Greenback25": {
+   "name": "4x12 Greenback25",
+   "category": "cab",
+   "based_on": "4x12\" Marshall Basketweave, Celestion G12M-25",
+   "maker": "Marshall",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Cab block (v2.00 IR-based cab); manual column is 'Captured From'."
+  },
+  "HD2_CabMicIr_8x10SVTAV": {
+   "name": "8x10 SVT AV",
+   "category": "cab",
+   "based_on": "8x10\" Ampeg SVT-810AV",
+   "maker": "Ampeg",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Bass cab. Cab block (v2.00 IR-based cab); manual column is 'Captured From'."
+  },
+  "HD2_Chorus4VoiceStereo": {
+   "name": "4-Voice Chorus",
+   "category": "chorus",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Four-voice chorus."
+  },
+  "HD2_Chorus70sChorusStereo": {
+   "name": "70s Chorus",
+   "category": "chorus",
+   "based_on": "BOSS CE-1",
+   "maker": "BOSS",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_ChorusPlastiChorusStereo": {
+   "name": "PlastiChorus",
+   "category": "chorus",
+   "based_on": "Modded Arion SCH-Z chorus",
+   "maker": "Arion",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_ChorusStereo": {
+   "name": "Chorus",
+   "category": "chorus",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_ChorusTrinityChorusStereo": {
+   "name": "Trinity Chorus",
+   "category": "chorus",
+   "based_on": "Dytronics Tri-Stereo Chorus",
+   "maker": "Dytronics",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_Compressor3BandCompMono": {
+   "name": "3-Band Comp",
+   "category": "compressor",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Multiband compressor."
+  },
+  "HD2_CompressorAutoSwellMono": {
+   "name": "Autoswell",
+   "category": "volume",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Automatic volume swell (listed under Dynamics). No label in presets; name inferred from id and manual table."
+  },
+  "HD2_CompressorDeluxeCompMono": {
+   "name": "Deluxe Comp",
+   "category": "compressor",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_CompressorKinkyCompMono": {
+   "name": "Kinky Comp",
+   "category": "compressor",
+   "based_on": "Xotic SP Compressor",
+   "maker": "Xotic",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_CompressorLAStudioCompMono": {
+   "name": "LA Studio Comp",
+   "category": "compressor",
+   "based_on": "Teletronix LA-2A",
+   "maker": "Teletronix",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_CompressorOptoCompMono": {
+   "name": "Ampeg Opto Comp",
+   "category": "compressor",
+   "based_on": "Ampeg Opto Comp",
+   "maker": "Ampeg",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Licensed Ampeg model."
+  },
+  "HD2_CompressorRedSqueezeMono": {
+   "name": "Red Squeeze",
+   "category": "compressor",
+   "based_on": "MXR Dyna Comp",
+   "maker": "MXR",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_CompressorRochesterCompMono": {
+   "name": "Rochester Comp",
+   "category": "compressor",
+   "based_on": "Ashly CLX-52 (made with Billy Sheehan)",
+   "maker": "Ashly",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DL4AnalogDelayStereo": {
+   "name": "Analog Echo",
+   "category": "delay",
+   "based_on": "BOSS DM-2",
+   "maker": "BOSS",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Legacy DL4 model."
+  },
+  "HD2_DL4DigDelay": {
+   "name": "Digital",
+   "category": "delay",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Legacy DL4 model."
+  },
+  "HD2_DL4DigDelayWithMod": {
+   "name": "Dig w/Mod",
+   "category": "delay",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Legacy DL4 model."
+  },
+  "HD2_DL4EchoPlatterStereo": {
+   "name": "Echo Platter",
+   "category": "delay",
+   "based_on": "Binson EchoRec",
+   "maker": "Binson",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Legacy DL4 model."
+  },
+  "HD2_DL4LowResDelay": {
+   "name": "Lo Res",
+   "category": "delay",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Legacy DL4 model."
+  },
+  "HD2_DL4MultiheadStereo": {
+   "name": "Multi-Head",
+   "category": "delay",
+   "based_on": "Roland RE-101 Space Echo",
+   "maker": "Roland",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Legacy DL4 model. No label in presets; name inferred from id and manual table."
+  },
+  "HD2_DL4PingPong": {
+   "name": "Ping Pong Legacy",
+   "category": "delay",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Legacy DL4 model."
+  },
+  "HD2_DM4BassOctaver": {
+   "name": "Bass Octaver",
+   "category": "pitch",
+   "based_on": "EBS OctaBass",
+   "maker": "EBS",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Legacy model (shaded row in manual)."
+  },
+  "HD2_DM4BlueComp": {
+   "name": "Blue Comp",
+   "category": "compressor",
+   "based_on": "BOSS CS-1",
+   "maker": "BOSS",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Legacy model."
+  },
+  "HD2_DM4FacialFuzz": {
+   "name": "Facial Fuzz",
+   "category": "fuzz",
+   "based_on": "Arbiter Fuzz Face",
+   "maker": "Arbiter",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Legacy DM4 model."
+  },
+  "HD2_DM4JetFuzz": {
+   "name": "Jet Fuzz",
+   "category": "fuzz",
+   "based_on": "Roland Jet Phaser",
+   "maker": "Roland",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Legacy DM4 model."
+  },
+  "HD2_DM4JumboFuzz": {
+   "name": "Jumbo Fuzz",
+   "category": "fuzz",
+   "based_on": "Vox Tone Bender",
+   "maker": "Vox",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Legacy DM4 model."
+  },
+  "HD2_DM4OctaveFuzz": {
+   "name": "Octave Fuzz",
+   "category": "fuzz",
+   "based_on": "Tycobrahe Octavia",
+   "maker": "Tycobrahe",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Legacy DM4 model."
+  },
+  "HD2_DM4Screamer": {
+   "name": "Screamer",
+   "category": "drive",
+   "based_on": "Ibanez Tube Screamer",
+   "maker": "Ibanez",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Legacy DM4 model."
+  },
+  "HD2_DM4TubeComp": {
+   "name": "Tube Comp",
+   "category": "compressor",
+   "based_on": "Teletronix LA-2A",
+   "maker": "Teletronix",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Legacy model."
+  },
+  "HD2_DM4TubeDrive": {
+   "name": "Tube Drive",
+   "category": "drive",
+   "based_on": "Chandler Tube Driver",
+   "maker": "Chandler",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Legacy DM4 model."
+  },
+  "HD2_DM4VettaComp": {
+   "name": "Vetta Comp",
+   "category": "compressor",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Legacy model."
+  },
+  "HD2_DelayAdriaticDelayStereo": {
+   "name": "Adriatic Delay",
+   "category": "delay",
+   "based_on": "BOSS DM-2 with Adrian mod",
+   "maker": "BOSS",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DelayBucketBrigadeStereo": {
+   "name": "Bucket Brigade",
+   "category": "delay",
+   "based_on": "BOSS DM-2",
+   "maker": "BOSS",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DelayDoubleDoubleStereo": {
+   "name": "Double Take",
+   "category": "modulation",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Doubler; listed under Modulation in the manual despite the Delay id prefix."
+  },
+  "HD2_DelayDualDelayStereo": {
+   "name": "Dual Delay",
+   "category": "delay",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DelayDuckedDelayStereo": {
+   "name": "Ducked Delay",
+   "category": "delay",
+   "based_on": "TC Electronic 2290",
+   "maker": "TC Electronic",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "No label in presets; name inferred from id and manual table."
+  },
+  "HD2_DelayElephantManStereo": {
+   "name": "Elephant Man",
+   "category": "delay",
+   "based_on": "Electro-Harmonix Deluxe Memory Man",
+   "maker": "Electro-Harmonix",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DelayModChorusEchoStereo": {
+   "name": "Mod/Chorus Echo",
+   "category": "delay",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DelayMultiPassStereo": {
+   "name": "Multi Pass",
+   "category": "delay",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DelayMultitap4Stereo": {
+   "name": "Multitap 4",
+   "category": "delay",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DelayPingPongStereo": {
+   "name": "Ping Pong",
+   "category": "delay",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DelayPitchStereo": {
+   "name": "Pitch Echo",
+   "category": "delay",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DelaySimpleDelayStereo": {
+   "name": "Simple Delay",
+   "category": "delay",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DelaySweepEchoStereo": {
+   "name": "Sweep Echo",
+   "category": "delay",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DelaySwellVintageDigitalStereo": {
+   "name": "Vintage Swell",
+   "category": "delay",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DelayTransistorTapeStereo": {
+   "name": "Transistor Tape",
+   "category": "delay",
+   "based_on": "Maestro Echoplex EP-3",
+   "maker": "Maestro",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DelayVintageDigitalStereoV2": {
+   "name": "Vintage Digital",
+   "category": "delay",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DistAlpacaRougeMono": {
+   "name": "Alpaca Rouge",
+   "category": "fuzz",
+   "based_on": "Way Huge Red Llama",
+   "maker": "Way Huge",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Red Llama is an overdrive/fuzz hybrid."
+  },
+  "HD2_DistArbitratorFuzzMono": {
+   "name": "Arbitrator Fuzz",
+   "category": "fuzz",
+   "based_on": "Arbiter Fuzz Face",
+   "maker": "Arbiter",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DistCompulsiveDriveMono": {
+   "name": "Compulsive Drive",
+   "category": "drive",
+   "based_on": "Fulltone OCD",
+   "maker": "Fulltone",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DistDeezOneModMono": {
+   "name": "Deez One Mod",
+   "category": "drive",
+   "based_on": "BOSS DS-1 (Keeley modded)",
+   "maker": "BOSS",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DistDeezOneVintageMono": {
+   "name": "Deez One Vintage",
+   "category": "drive",
+   "based_on": "BOSS DS-1 (Made in Japan)",
+   "maker": "BOSS",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DistDerangedMasterMono": {
+   "name": "Deranged Master",
+   "category": "boost",
+   "based_on": "Dallas Rangemaster Treble Booster",
+   "maker": "Dallas",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DistDhyanaDriveMono": {
+   "name": "Dhyana Drive",
+   "category": "drive",
+   "based_on": "Hermida Zendrive",
+   "maker": "Hermida",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DistHedgehogD9Mono": {
+   "name": "Hedgehog D9",
+   "category": "drive",
+   "based_on": "MAXON SD9 Sonic Distortion",
+   "maker": "MAXON",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DistHeirApparentMono": {
+   "name": "Heir Apparent",
+   "category": "drive",
+   "based_on": "Analogman Prince of Tone",
+   "maker": "Analogman",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DistHorizonDriveMono": {
+   "name": "Horizon Drive",
+   "category": "drive",
+   "based_on": "Horizon Devices Precision Drive",
+   "maker": "Horizon Devices",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DistKWBMono": {
+   "name": "KWB",
+   "category": "drive",
+   "based_on": "Benadrian Kowloon Walled Bunny Distortion",
+   "maker": "Benadrian",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DistKinkyBoostMono": {
+   "name": "Kinky Boost",
+   "category": "boost",
+   "based_on": "Xotic EP Booster",
+   "maker": "Xotic",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DistMinotaurMono": {
+   "name": "Minotaur",
+   "category": "drive",
+   "based_on": "Klon Centaur",
+   "maker": "Klon",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DistObsidian7000Mono": {
+   "name": "Obsidian 7000",
+   "category": "drive",
+   "based_on": "Darkglass Microtubes B7K Ultra",
+   "maker": "Darkglass Electronics",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Bass preamp/overdrive."
+  },
+  "HD2_DistPocketFuzzMono": {
+   "name": "Pocket Fuzz",
+   "category": "fuzz",
+   "based_on": "Jordan Boss Tone Fuzz",
+   "maker": "Jordan",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DistScream808Mono": {
+   "name": "Scream 808",
+   "category": "drive",
+   "based_on": "Ibanez TS808 Tube Screamer",
+   "maker": "Ibanez",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DistStuporODMono": {
+   "name": "Stupor OD",
+   "category": "drive",
+   "based_on": "BOSS SD-1 Super Overdrive",
+   "maker": "BOSS",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DistTeemahMono": {
+   "name": "Teemah!",
+   "category": "drive",
+   "based_on": "Paul Cochrane Timmy Overdrive",
+   "maker": "Paul Cochrane",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DistThrifterFuzzMono": {
+   "name": "Thrifter Fuzz",
+   "category": "fuzz",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DistTopSecretODMono": {
+   "name": "Top Secret OD",
+   "category": "drive",
+   "based_on": "DOD OD-250",
+   "maker": "DOD",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DistTriangleFuzzMono": {
+   "name": "Triangle Fuzz",
+   "category": "fuzz",
+   "based_on": "Electro-Harmonix Big Muff Pi",
+   "maker": "Electro-Harmonix",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Triangle-era Big Muff implied by the name; manual just says Big Muff Pi."
+  },
+  "HD2_DistTycoctaviaFuzzMono": {
+   "name": "Tycoctavia Fuzz",
+   "category": "fuzz",
+   "based_on": "Tycobrahe Octavia",
+   "maker": "Tycobrahe",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DistValveDriverMono": {
+   "name": "Valve Driver",
+   "category": "drive",
+   "based_on": "Chandler Tube Driver",
+   "maker": "Chandler",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DistVerminDistMono": {
+   "name": "Vermin Dist",
+   "category": "drive",
+   "based_on": "Pro Co RAT",
+   "maker": "Pro Co",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_DistZeroAmpBassDIMono": {
+   "name": "ZeroAmp Bass DI",
+   "category": "drive",
+   "based_on": "Tech 21 SansAmp Bass Driver DI V1",
+   "maker": "Tech 21",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Bass preamp/DI."
+  },
+  "HD2_EQGraphic10BandStereo": {
+   "name": "10 Band Graphic",
+   "category": "eq",
+   "based_on": "MXR 10-Band Graphic EQ",
+   "maker": "MXR",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Effects-block EQ."
+  },
+  "HD2_EQLowShelfHighShelfStereo": {
+   "name": "Low/High Shelf",
+   "category": "eq",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Effects-block EQ."
+  },
+  "HD2_EQSimple3BandStereo": {
+   "name": "Simple EQ",
+   "category": "eq",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Effects-block EQ."
+  },
+  "HD2_EQSimpleTiltStereo": {
+   "name": "Tilt",
+   "category": "eq",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Effects-block EQ."
+  },
+  "HD2_EQ_STATIC_CaliQStereo": {
+   "name": "Cali Q Graphic",
+   "category": "eq",
+   "based_on": "MESA/Boogie Mark IV Graphic EQ",
+   "maker": "MESA/Boogie",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Preset EQ block (STATIC ids appear to be the fixed Preset EQ; inferred from the id)."
+  },
+  "HD2_EQ_STATIC_Graphic10BandStereo": {
+   "name": "10 Band Graphic",
+   "category": "eq",
+   "based_on": "MXR 10-Band Graphic EQ",
+   "maker": "MXR",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Preset EQ block (inferred from the id)."
+  },
+  "HD2_EQ_STATIC_LowCutHighCutStereo": {
+   "name": "Low and High Cut",
+   "category": "eq",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Preset EQ block (inferred from the id)."
+  },
+  "HD2_EQ_STATIC_LowShelfHighShelfStereo": {
+   "name": "Low/High Shelf",
+   "category": "eq",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Preset EQ block (inferred from the id)."
+  },
+  "HD2_EQ_STATIC_ParametricStereo": {
+   "name": "Parametric",
+   "category": "eq",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Preset EQ block (inferred from the id)."
+  },
+  "HD2_EQ_STATIC_Simple3BandStereo": {
+   "name": "Simple EQ",
+   "category": "eq",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Preset EQ block (inferred from the id)."
+  },
+  "HD2_EQ_STATIC_SimpleTiltStereo": {
+   "name": "Tilt",
+   "category": "eq",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Preset EQ block (inferred from the id)."
+  },
+  "HD2_FM4SynthOMatic": {
+   "name": "Synth O Matic",
+   "category": "synth",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Legacy FM4 model."
+  },
+  "HD2_FM4TronUp": {
+   "name": "Tron Up",
+   "category": "filter",
+   "based_on": "Musitronics Mu-Tron III (up position)",
+   "maker": "Musitronics",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Legacy FM4 model."
+  },
+  "HD2_FM4VoiceBox": {
+   "name": "Voice Box",
+   "category": "filter",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Legacy FM4 model; vowel/talk-box style filter."
+  },
+  "HD2_FXLoopMono1": {
+   "name": "Mono FX Loop",
+   "category": "utility",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "FX Loop block (external send/return). Name is the preset label; FX Loop is not in a model table."
+  },
+  "HD2_FXLoopStereo1_2": {
+   "name": "Stereo FX Loop",
+   "category": "utility",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "FX Loop block (external send/return). Name is the preset label; FX Loop is not in a model table."
+  },
+  "HD2_FilterAutoFilterStereo": {
+   "name": "Autofilter",
+   "category": "filter",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_FilterMysterFilterStereo": {
+   "name": "Mystery Filter",
+   "category": "filter",
+   "based_on": "Korg A3",
+   "maker": "Korg",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_FlangerCourtesanFlangeStereo": {
+   "name": "Courtesan Flange",
+   "category": "flanger",
+   "based_on": "Electro-Harmonix Deluxe Electric Mistress",
+   "maker": "Electro-Harmonix",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Manual: 'Electro-Harmonix Deluxe EM'."
+  },
+  "HD2_FlangerGrayFlangerStereo": {
+   "name": "Gray Flanger",
+   "category": "flanger",
+   "based_on": "MXR 117 Flanger",
+   "maker": "MXR",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_GateHardGateMono": {
+   "name": "Hard Gate",
+   "category": "gate",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_GateNoiseGateMono": {
+   "name": "Noise Gate",
+   "category": "gate",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_ImpulseResponse1024Mono": {
+   "name": "IR (1024, Mono)",
+   "category": "ir",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual_2_0"
+   ],
+   "note": "User impulse-response loader block, not a model of real gear. POD Go Owner's Manual: imported IRs are shortened or lengthened to 1,024 samples; 128 IR slots. Display name inferred from the id."
+  },
+  "HD2_LooperOneSwitchStereo": {
+   "name": "1 Switch Stereo Looper",
+   "category": "looper",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_models"
+   ],
+   "note": "Line 6 lists it as 'Line 6 Original'. User preset label seen: '1 Sw Ster Looper'."
+  },
+  "HD2_MM4AnalogChorus": {
+   "name": "Analog Chorus",
+   "category": "chorus",
+   "based_on": "BOSS CE-1",
+   "maker": "BOSS",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Legacy MM4 model."
+  },
+  "HD2_MM4AnalogFlanger": {
+   "name": "Analog Flanger",
+   "category": "flanger",
+   "based_on": "MXR Flanger",
+   "maker": "MXR",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Legacy MM4 model."
+  },
+  "HD2_MM4Dimension": {
+   "name": "Dimension",
+   "category": "chorus",
+   "based_on": "Roland Dimension D",
+   "maker": "Roland",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Legacy MM4 model."
+  },
+  "HD2_MM4Panner": {
+   "name": "Panner",
+   "category": "tremolo",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Legacy MM4 model; auto-panner."
+  },
+  "HD2_MM4PitchVibrato": {
+   "name": "Pitch Vibrato",
+   "category": "modulation",
+   "based_on": "BOSS VB-2",
+   "maker": "BOSS",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Legacy MM4 model."
+  },
+  "HD2_PhaserScriptModPhaseStereo": {
+   "name": "Script Mod Phase",
+   "category": "phaser",
+   "based_on": "MXR Phase 90",
+   "maker": "MXR",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Script-logo version implied by the name; manual just says MXR Phase 90."
+  },
+  "HD2_PhaserUbiquitousVibeStereo": {
+   "name": "Ubiquitous Vibe",
+   "category": "phaser",
+   "based_on": "Shin-ei Uni-Vibe",
+   "maker": "Shin-ei",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_PitchDualPitchMono": {
+   "name": "Dual Pitch",
+   "category": "pitch",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_PitchPitchWhamMono": {
+   "name": "Pitch Wham",
+   "category": "pitch",
+   "based_on": "DigiTech Whammy",
+   "maker": "DigiTech",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_PitchSimplePitchMono": {
+   "name": "Simple Pitch",
+   "category": "pitch",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_PitchTwinHarmonyMono": {
+   "name": "Twin Harmony",
+   "category": "pitch",
+   "based_on": "Eventide H3000",
+   "maker": "Eventide",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_PreampArchetypeLead": {
+   "name": "Archetype Lead",
+   "category": "preamp",
+   "based_on": "Paul Reed Smith Archon (lead channel)",
+   "maker": "PRS",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id. Preamp-only version of the amp of the same name; based-on taken from that amp's row."
+  },
+  "HD2_PreampCaliIVLead": {
+   "name": "Cali IV Lead",
+   "category": "preamp",
+   "based_on": "MESA/Boogie Mark IV (lead channel)",
+   "maker": "MESA/Boogie",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id. Preamp-only version of the amp of the same name; based-on taken from that amp's row."
+  },
+  "HD2_PreampMatchstickCh2": {
+   "name": "Matchstick Ch2",
+   "category": "preamp",
+   "based_on": "Matchless DC30 (channel 2)",
+   "maker": "Matchless",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id. Preamp-only version of the amp of the same name; based-on taken from that amp's row."
+  },
+  "HD2_PreampTweedBluesBrt": {
+   "name": "Tweed Blues Brt",
+   "category": "preamp",
+   "based_on": "Fender Bassman (bright channel)",
+   "maker": "Fender",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id. Preamp-only version of the amp of the same name; based-on taken from that amp's row."
+  },
+  "HD2_PreampWhoWatt100": {
+   "name": "WhoWatt 100",
+   "category": "preamp",
+   "based_on": "Hiwatt DR-103 (Brilliant channel)",
+   "maker": "Hiwatt",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id. Preamp-only version of the amp of the same name; based-on taken from that amp's row."
+  },
+  "HD2_PreampWoodyBlue": {
+   "name": "Woody Blue",
+   "category": "preamp",
+   "based_on": "Acoustic 360",
+   "maker": "Acoustic",
+   "certainty": "published",
+   "sources": [
+    "podgo_models",
+    "helix_models"
+   ],
+   "note": "Display name inferred from the internal id. Preamp-only version of the amp of the same name; based-on taken from that amp's row."
+  },
+  "HD2_Reverb63SpringStereo": {
+   "name": "'63 Spring",
+   "category": "reverb",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Spring reverb voicing; the manual lists it as a Line 6 Original."
+  },
+  "HD2_ReverbCaveStereo": {
+   "name": "Cave",
+   "category": "reverb",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_ReverbChamberStereo": {
+   "name": "Chamber",
+   "category": "reverb",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_ReverbDoubleTankStereo": {
+   "name": "Double Tank",
+   "category": "reverb",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_ReverbEchoStereo": {
+   "name": "Echo",
+   "category": "reverb",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Legacy reverb named Echo (a reverb, not a delay)."
+  },
+  "HD2_ReverbGanymedeStereo": {
+   "name": "Ganymede",
+   "category": "reverb",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_ReverbGlitzStereo": {
+   "name": "Glitz",
+   "category": "reverb",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_ReverbHallStereo": {
+   "name": "Hall",
+   "category": "reverb",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_ReverbHxSpringStereo": {
+   "name": "Hot Springs",
+   "category": "reverb",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_ReverbOctoStereo": {
+   "name": "Octo",
+   "category": "reverb",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_ReverbParticleStereo": {
+   "name": "Particle Verb",
+   "category": "reverb",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_ReverbPlateStereo": {
+   "name": "Plate",
+   "category": "reverb",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_ReverbPlateauxStereo": {
+   "name": "Plateaux",
+   "category": "reverb",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_ReverbRoomStereo": {
+   "name": "Room",
+   "category": "reverb",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_ReverbSearchlightsStereo": {
+   "name": "Searchlights",
+   "category": "reverb",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_ReverbSpringStereo": {
+   "name": "Spring",
+   "category": "reverb",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_ReverbTileStereo": {
+   "name": "Tile",
+   "category": "reverb",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_RingModulatorAMRingModStereo": {
+   "name": "AM Ring Mod",
+   "category": "modulation",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Ring modulator."
+  },
+  "HD2_Rotary122RotaryStereo": {
+   "name": "122 Rotary",
+   "category": "rotary",
+   "based_on": "Leslie 122",
+   "maker": "Leslie",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_Rotary145RotaryStereo": {
+   "name": "145 Rotary",
+   "category": "rotary",
+   "based_on": "Leslie 145",
+   "maker": "Leslie",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_RotaryVibeRotaryStereo": {
+   "name": "Vibe Rotary",
+   "category": "rotary",
+   "based_on": "Fender Vibratone",
+   "maker": "Fender",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_Tremolo60sBiasTremStereo": {
+   "name": "60s Bias Trem",
+   "category": "tremolo",
+   "based_on": "Vox AC-15 tremolo",
+   "maker": "Vox",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_TremoloHarmonicStereo": {
+   "name": "Harmonic Tremolo",
+   "category": "tremolo",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_TremoloOpticalTremStereo": {
+   "name": "Optical Trem",
+   "category": "tremolo",
+   "based_on": "Fender optical tremolo circuit",
+   "maker": "Fender",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_TremoloTremoloStereo": {
+   "name": "Tremolo/Autopan",
+   "category": "tremolo",
+   "based_on": "BOSS PN-2",
+   "maker": "BOSS",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_VolPanGainStereo": {
+   "name": "Gain",
+   "category": "utility",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Gain/level block."
+  },
+  "HD2_VolPanStereoWidthStereo": {
+   "name": "Stereo Width",
+   "category": "utility",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_VolPanVolStereo": {
+   "name": "Volume Pedal",
+   "category": "utility",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_WahChromeCustomStereo": {
+   "name": "Chrome Custom",
+   "category": "wah",
+   "based_on": "Modded Vox V847",
+   "maker": "Vox",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_WahChromeStereo": {
+   "name": "Chrome",
+   "category": "wah",
+   "based_on": "Vox V847",
+   "maker": "Vox",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_WahColorfulStereo": {
+   "name": "Colorful",
+   "category": "wah",
+   "based_on": "Colorsound Wah-fuzz",
+   "maker": "Colorsound",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_WahConductorStereo": {
+   "name": "Conductor",
+   "category": "wah",
+   "based_on": "Maestro Boomerang",
+   "maker": "Maestro",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_WahFasselStereo": {
+   "name": "Fassel",
+   "category": "wah",
+   "based_on": "Dunlop Cry Baby Super",
+   "maker": "Dunlop",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_WahTeardrop310Stereo": {
+   "name": "Teardrop 310",
+   "category": "wah",
+   "based_on": "Dunlop Cry Baby Fasel model 310",
+   "maker": "Dunlop",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_WahThroatyStereo": {
+   "name": "Throaty",
+   "category": "wah",
+   "based_on": "RMC Real McCoy 1",
+   "maker": "RMC",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_WahUKWah846Stereo": {
+   "name": "UK Wah 846",
+   "category": "wah",
+   "based_on": "Vox V846",
+   "maker": "Vox",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_WahVettaWahStereo": {
+   "name": "Vetta Wah",
+   "category": "wah",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "HD2_WahWeeperStereo": {
+   "name": "Weeper",
+   "category": "wah",
+   "based_on": "Arbiter Cry Baby",
+   "maker": "Arbiter",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "KillerZ": {
+   "name": "Killer Z",
+   "category": "drive",
+   "based_on": "BOSS MT-2 Metal Zone",
+   "maker": "BOSS",
+   "certainty": "published",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "L6SPB_AcousGtrSimStereo": {
+   "name": "Acoustic Sim",
+   "category": "acoustic",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Electric-to-acoustic simulator (listed in the EQ table)."
+  },
+  "VIC_DynPlateStereo": {
+   "name": "Dynamic Plate",
+   "category": "reverb",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "VIC_FlexoVibeStereo": {
+   "name": "FlexoVibe",
+   "category": "phaser",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Vibe-style modulation."
+  },
+  "VIC_ReverbDynAmbienceStereo": {
+   "name": "Dynamic Ambience",
+   "category": "reverb",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "VIC_ReverbDynRoomStereo": {
+   "name": "Dynamic Room",
+   "category": "reverb",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": ""
+  },
+  "VIC_ReverbRotatingStereo": {
+   "name": "Dynamic Hall",
+   "category": "reverb",
+   "based_on": null,
+   "maker": null,
+   "certainty": "line6_original",
+   "sources": [
+    "podgo_manual"
+   ],
+   "note": "Id says 'Rotating' but presets label it Dynamic Hall. Name taken from the preset label; no published source links this id to the name."
+  }
+ }
+}
