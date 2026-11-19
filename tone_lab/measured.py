@@ -54,7 +54,7 @@ def drive_curve(model_id, names):
     """How distorted an amp was at three settings of its gain control, as [(points from default, word)].
 
     `names` are the controls that can be the amp's gain, most likely first.
-    Measured with the bridge humbucker and nothing in front of the amp, so an
+    Measured with one recorded phrase, whose pickup was not noted, and nothing in front of the amp, so an
     amp that stays clean here can still be driven hard by a pedal.
     """
     amp = table()["amps"].get(str(model_id))
