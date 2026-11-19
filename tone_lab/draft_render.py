@@ -228,12 +228,24 @@ def assert_grid(qc, chain, routing, draft=None, *, edits=None, scene=0):
     return grid
 
 
+def still_working(qc, doing="the draft was being built"):
+    """Stop before a write when the player has selected another preset, which the write would land on.
+
+    Asking the unit takes about a tenth of a second, so one check guards each
+    block, the split, the mixer and each scene, and not every single write.
+    """
+    if device.live_position(qc) != WORK_SLOT:
+        raise RuntimeError(f"The selected preset changed while {doing}.")
+
+
 def _build_scenes(qc, chain):
     """Give each scene its own values, bypasses and name. Ends on the first scene."""
     names = getattr(chain, "scenes", ())
     if not names:
         return
+    doing = "the draft's scenes were being built"
     grid = device.read_preset(qc)
+    still_working(qc, doing)
     for row, column, index in chain.varied:
         qc.assign_param_to_scenes(row, column, index)
         time.sleep(.05)
@@ -243,9 +255,9 @@ def _build_scenes(qc, chain):
         time.sleep(.05)
     for scene, name in enumerate(names):
         # A plain write lands on whichever scene is active, so each switch is confirmed first.
+        still_working(qc, doing)
         device.select_scene(qc, scene)
-        if device.live_position(qc) != WORK_SLOT:
-            raise RuntimeError("The selected preset changed while the draft's scenes were being built.")
+        still_working(qc, doing)
         for (row, column, index), per_scene in chain.varied.items():
             if scene in per_scene:
                 model_id = rows_of(chain)[row][column][0]
@@ -257,6 +269,7 @@ def _build_scenes(qc, chain):
                 time.sleep(.07)
         qc.set_scene_label(scene, name)
         time.sleep(.07)
+    still_working(qc, doing)
     device.select_scene(qc, 0)
     time.sleep(.3)
     grid = device.read_preset(qc)
@@ -285,11 +298,14 @@ def build_grid(qc, scratch, chain, draft=None):
         raise RuntimeError("The Quad Cortex changed before the draft could be built.")
     iterate.set_routes(qc, iterate.USB_ROUTES)
     for row, lane in enumerate(scratch.chains):
+        parted = any((item.split, item.mix) != (-1, -1) for item in lane.split_control_points)
+        if parted or any(model.hash for model in lane.models):
+            still_working(qc)
         for column, model in enumerate(lane.models):
             if model.hash:
                 qc.delete_block(row, column)
                 time.sleep(.07)
-        if any((item.split, item.mix) != (-1, -1) for item in lane.split_control_points):
+        if parted:
             qc.set_split_points(row, -1, -1)
             time.sleep(.10)
     time.sleep(.25)
@@ -300,13 +316,13 @@ def build_grid(qc, scratch, chain, draft=None):
     for row, cells in enumerate(rows_of(chain)):
         if row == 1 and split:
             # The second row carries sound only between the split and the mix, so they are set before it is filled.
+            still_working(qc)
             qc.set_split_points(0, *split)
             time.sleep(.25)
         for column, (model_id, settings) in enumerate(cells):
             if not model_id:
                 continue
-            if device.live_position(qc) != WORK_SLOT:
-                raise RuntimeError("The selected preset changed while the draft was being built.")
+            still_working(qc)
             if row == 0 and column in assets:
                 qc_library.add_asset(qc, assets[column], 0, column)
             else:
@@ -315,6 +331,8 @@ def build_grid(qc, scratch, chain, draft=None):
             for index, value in settings:
                 qc.set_param(row, column, index, catalog.to_norm(model_id, index, value))
                 time.sleep(.07)
+    if getattr(chain, "mixer", ()):
+        still_working(qc)
     for index, value in getattr(chain, "mixer", ()):
         qc.set_lane_param(0, "mixer", index, catalog.to_norm(MIXER, index, value))
         time.sleep(.07)
@@ -479,7 +497,29 @@ def new_slot(files, name):
     raise RuntimeError("Choose a different name for this preset.")
 
 
-def save(draft, proof=None, *, physical_input=1, allow_my_presets=False, values=None):
+def assert_scenes(qc, chain, routing, draft=None, *, edits=None, scene=0):
+    """Confirm every scene of a draft, with the shape applied on `scene`.
+
+    A shape edit to a control that differs by scene belongs to that scene
+    alone. An edit to any other control is the same in all of them.
+    """
+    grid = assert_grid(qc, chain, routing, draft, edits=edits, scene=scene)
+    varied, off = getattr(chain, "varied", {}), getattr(chain, "off", {})
+    shared = {key: edit for key, edit in (edits or {}).items()
+              if key not in varied and not (key[2] is None and key[:2] in off)}
+    for other in range(len(getattr(chain, "scenes", ()))):
+        if other != scene:
+            assert_grid(qc, chain, routing, draft, edits=shared, scene=other)
+    return grid
+
+
+def save(draft, proof=None, *, physical_input=1, allow_my_presets=False, values=None, scene=None):
+    """Write a draft to a free slot. `scene` is the one the shape belongs to and the preset opens on.
+
+    Without it, the scene of a matching audition is used, and failing that the first.
+    """
+    if scene is not None and (type(scene) is not int or not 0 <= scene < max(len(draft.get("scenes") or ()), 1)):
+        raise ValueError("The draft has no such scene.")
     gain = PREVIEW_GAIN
     proof_values = {}
     proof_scene = None
@@ -504,9 +544,9 @@ def save(draft, proof=None, *, physical_input=1, allow_my_presets=False, values=
         with working_grid(qc, visited) as scratch:
             build_grid(qc, scratch, chain, draft)
             base = route_to_guitar(qc, chain, physical_input, draft)
-            edits, scene = _shape(qc, base, values, proof_scene)
-            if edits:
-                assert_grid(qc, chain, guitar_routes(physical_input), draft, edits=edits, scene=scene)
+            edits, scene = _shape(qc, base, values, proof_scene if scene is None else scene)
+            if edits or scene:
+                assert_scenes(qc, chain, guitar_routes(physical_input), draft, edits=edits, scene=scene)
             saved = qc_library.destination(qc, name, allow_my_presets=allow_my_presets)
             address = saved.position
             if device.live_position(qc) != WORK_SLOT:
@@ -517,7 +557,7 @@ def save(draft, proof=None, *, physical_input=1, allow_my_presets=False, values=
             iterate.recall(qc, address, saved.name)
             if device.active_scene(qc) != scene:
                 device.select_scene(qc, scene)
-            verified = assert_grid(qc, chain, guitar_routes(physical_input), draft, edits=edits, scene=scene)
+            verified = assert_scenes(qc, chain, guitar_routes(physical_input), draft, edits=edits, scene=scene)
             presets.archive(verified, address, qc.firmware, reason="Kept AI draft in a new Quad Cortex slot")
     return qc_library.store_receipt(draft["id"], saved, qc_library.preset_fingerprint(verified),
                                     scene=device.SCENES[scene], values=values)

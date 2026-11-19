@@ -139,7 +139,7 @@ class ShapeGuitarTest(unittest.TestCase):
             self.assertEqual(choose(b, "guitar")[0].signature, "lead")
         self.assertEqual(prepared, [(source_a, iterate.SCRATCH, "phrase"), (source_b, iterate.LIVE_B, "phrase")])
         self.assertEqual(recalled, [source_b, iterate.SCRATCH, iterate.LIVE_B, source_a])
-        self.assertEqual(events[0]["fixtures"], [iterate.SCRATCH, iterate.LIVE_B])
+        self.assertEqual(events[0]["fixtures"], [iterate.SCRATCH, iterate.LIVE_B, monitor.draft_render.WORK_SLOT])
 
     def test_callback_silences_a_recall_gap_but_keeps_the_phrase_at_the_current_frame(self):
         callbacks = []

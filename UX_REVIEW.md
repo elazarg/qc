@@ -40,6 +40,16 @@ Added on 2026-11-19, built and read back on the unit, none of it heard (see `TON
 - When the two paths of a draft hold amps of opposite polarity, the builder sets the mixer's phase switch (`measured.opposed`). Checked on twelve real blends.
 - The designer is no longer offered the 18 plugin amps that load and do nothing, or anything else from their six plugins (`preset_design.locked_models`). No saved draft used one.
 
+Fixed on 2026-11-19 after the review in `CLAUDE_WORK_REVIEW.md`, which also records how each was checked:
+
+- A draft is stored and recalled on USB, and its output trim and mute are written before it is connected (`monitor.resident_grids.select_draft`, `monitor.run`). Measured on the unit: connecting adds about one second to each flip between drafts, so a flip takes two to three seconds.
+- The builder confirms the working slot is still selected before each block, the split, the mixer and each scene (`draft_render.still_working`). Each check takes the unit about 0.1 s.
+- Crash recovery returns from the Preview slot as well as the two side slots.
+- A draft is saved on the scene chosen in the Chain panel, every scene is confirmed after saving, and an unsaved draft reopens on its scene.
+- Keep records the tone and shape last confirmed as sounding (`Desk.heard`).
+- "No fizz" asks for less. "No bite" still says bite is missing.
+- Panels that do not fit fold to their titles (`desk_panels.Tray.fit`).
+
 Verified on the Quad Cortex (CorOS as installed on 2026-11-18, output muted through the lane mute, return peak −80 dBFS): reading the unit, loading a draft, Phrase and Guitar input, switching input without changing tones, A/B flips, a knob change, an instant direction, undo, Keep, blind flips, stop and restore to the original preset and scene, and a silent capture followed by a measured difference against the reference.
 
 Not verified on the unit: recording a new phrase, Save to QC, trimming the loop while it plays (the `reload` path in `monitor.run`), saved presets as tones (only drafts were on A and B), and anything audible, since every run was muted.

@@ -183,7 +183,8 @@ class Tone:
         if kind == "draft":
             # A draft may have been saved from another route since this desk state was written.
             tone = cls.from_draft({"id": draft_id, "name": name}).with_capture(sound)
-            return tone if tone.preset else replace(tone, values=values)
+            # An unsaved draft has no receipt to say which scene was chosen, so the record does.
+            return tone if tone.preset else replace(tone, values=values, scene=_scene(record.get("scene")))
         return cls(kind, name, draft_id, choice, _scene(record.get("scene")), sound, record.get("fingerprint"), values)
 
     def asset(self, take):

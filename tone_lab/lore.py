@@ -329,7 +329,10 @@ def read(text):
     entry = LEXICON[key]
     comparative = token in COMPARATIVES
     quantity = groups.get("more")
-    if groups.get("neg") or shape.re.pattern.startswith("not ") or quantity in (
+    if quantity == "no":
+        # "No bite" says a quality is missing. "No fizz" asks to be rid of a fault.
+        wanted = bool(entry.toward)
+    elif groups.get("neg") or shape.re.pattern.startswith("not ") or quantity in (
             "more", "no", "not enough", "too little", "lacks", "lacking", "needs more") or comparative:
         wanted = True
     elif quantity in ("less", "too much", "needs less") or groups.get("too") in ("too", "way too", "far too"):

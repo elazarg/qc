@@ -192,8 +192,10 @@ def resident_grids(qc, events):
     device.require_clean(qc)
     original = device.read_preset(qc)
     original_scene = device.active_scene(qc)
+    # Recovery after a crash returns to the playing preset from any slot Tone Lab works in. A draft is
+    # built in the Preview slot before it is stored in a side's own slot.
     events({"event": "restore", "position": address, "scene": original_scene, "name": original.name,
-            "fixtures": list(reserved)})
+            "fixtures": [*reserved, draft_render.WORK_SLOT]})
     staging = ()
     prepared = {}
 
@@ -243,6 +245,10 @@ def resident_grids(qc, events):
 
         Rebuilding a chain block by block takes the unit ten seconds or more.
         A recall takes about one, so every flip after the first is quick.
+
+        The stored copy stays on USB, so building or recalling it sends nothing
+        to the outputs. The caller connects the guitar or the phrase once the
+        output trim and mute are in place.
         """
         nonlocal staging
         inlet = config["physical_input"]
@@ -282,9 +288,8 @@ def resident_grids(qc, events):
             chain = draft_render.compile_chain(draft, gain)
             draft_render.build_grid(qc, scratch, chain, draft=draft)
             draft_render.label_preview(qc, device.active_scene(qc), draft)
-            # The chain is complete and still on USB, so nothing reaches the outputs until it is routed.
-            set_input_routes(qc, draft_render.WORK_SLOT, input_routes(physical, inlet, mode))
             built = device.read_preset(qc)
+            draft_render.still_working(qc, "the draft was being stored")
             qc.write_preset_file(position["folder_key"], position["position"], name)
             time.sleep(.55)
             base = iterate.recall(qc, position, name)
@@ -451,6 +456,17 @@ def run(config, stop, commands, events):
                     if stop.is_set():
                         return loaded, controls, {}
                     changed = live.update(qc, selected, selected_scene, values, {}, position=selected_position)
+
+                    def still_selected():
+                        if (device.live_position(qc) != selected_position
+                                or device.active_scene(qc) != selected_scene):
+                            raise RuntimeError("The Quad Cortex preset or scene changed during Shape.")
+
+                    # The output trim and the mute come first. A draft arrives on USB, and connecting it
+                    # before they are set would play it at its own level for a moment, muted or not.
+                    levels.bind(selected, selected_scene, physical)
+                    levels.select(candidate, values, level_take, source=active_source)
+                    levels.apply(qc, still_selected, events)
                     routes = input_routes(physical, inlet, active_source)
                     if resident is None or iterate.routes(selected) != routes:
                         set_input_routes(qc, selected_position, routes)
@@ -474,7 +490,7 @@ def run(config, stop, commands, events):
                     observer, armed_until = attach_observer(qc, physical_input, guitar_config,
                                                            stream_stack, events, armed_until)
                 settings, current = target_values, pick
-                adjust_level(bind=True)
+                adjust_level()  # Bound to this tone in load, before it was connected.
                 cursor.muted = False
                 announce(reason, requested_revision if reason else None)
 

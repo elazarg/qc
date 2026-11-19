@@ -27,25 +27,45 @@ def small(parent, title, action):
 
 
 class Tray(tk.Frame):
-    """A column beside the tones. One panel is open at a time unless the player pins more."""
+    """A column beside the tones. One panel is open at a time unless the player pins more.
+
+    When the open panels are taller than the window, the older ones fold down
+    to their title so that every panel stays in reach. A click on a folded
+    title brings that panel forward and folds another.
+    """
 
     WIDTH = 446
+    GAP = 8
+    GROWING = 190  # The least height a panel that fills the spare room can work in.
 
     def __init__(self, parent, desk):
         super().__init__(parent, bg=PAPER, width=self.WIDTH, height=10)
         self.pack_propagate(False)
         self.desk = desk
         self.cards, self.bodies, self.pins, self.growing = {}, {}, {}, set()
+        self.heads, self.marks = {}, {}
         self.order = []
         self.pinned = set()
+        self.front = None  # The panel that stays whole when the others must fold.
+        self.folded = frozenset()
+        self.tight = False  # The front panel alone is taller than the room the titles leave it.
+        self.refitting = None
+        self.bind("<Configure>", self.resized)
 
     def add(self, name, key, *, grow=False):
         """Create the card for a panel and return the frame its content goes in."""
         card = tk.Frame(self, bg=DARK, padx=12, pady=9)
         head = tk.Frame(card, bg=DARK)
         head.pack(fill="x", pady=(0, 6))
-        label(head, name, size=11, bold=True).pack(side="left")
-        label(head, key, size=8, color=DIM).pack(side="left", padx=(7, 0))
+        mark = label(head, "", size=9, color=SUBTLE)
+        mark.pack(side="left")
+        title = label(head, name, size=11, bold=True)
+        title.pack(side="left")
+        hint = label(head, key, size=8, color=DIM)
+        hint.pack(side="left", padx=(7, 0))
+        for part in (head, mark, title, hint):
+            part.bind("<ButtonRelease-1>", lambda _, name=name: self.bring_forward(name))
+        self.heads[name], self.marks[name] = head, mark
         close = tk.Label(head, text="✕", bg=DARK, fg=SUBTLE, font=(FONT, 10), cursor="hand2", padx=4)
         close.pack(side="right")
         close.bind("<ButtonRelease-1>", lambda _: self.close(name))
@@ -55,10 +75,48 @@ class Tray(tk.Frame):
         theme.Tooltip(pin, "Keep this panel open while others come and go")
         body = tk.Frame(card, bg=DARK)
         body.pack(fill="both", expand=True)
+        body.bind("<Configure>", self.resized)
         self.cards[name], self.bodies[name], self.pins[name] = card, body, pin
         if grow:
             self.growing.add(name)
         return body
+
+    def bring_forward(self, name):
+        """Unfold a panel that had to give way, and let another give way instead."""
+        if name in self.folded:
+            self.front = name
+            self.arrange()
+            self.desk.panels_changed()
+
+    def resized(self, _=None):
+        # The window or a panel's content changed size. Decide once, after the change has settled.
+        if self.refitting is None:
+            self.refitting = self.after_idle(self.refit)
+
+    def refit(self):
+        self.refitting = None
+        if self.fit() != (self.folded, self.tight):
+            self.arrange()
+
+    def fit(self):
+        """The panels that must fold to their title for the rest to fit, oldest first, and whether that is enough."""
+        room = self.winfo_height()
+        if room <= 10 or len(self.order) < 2:
+            return frozenset(), False
+        front = self.front if self.front in self.order else self.order[-1]
+        title = {name: self.heads[name].winfo_reqheight() + 18 for name in self.order}
+        whole = {}
+        for name in self.order:
+            content = self.bodies[name].winfo_reqheight()
+            whole[name] = title[name] + 6 + (min(content, self.GROWING) if name in self.growing else content)
+        folded = set()
+        needed = lambda: sum((title[other] if other in folded else whole[other]) + self.GAP for other in self.order)
+        for name in self.order:
+            if needed() <= room:
+                break
+            if name != front:
+                folded.add(name)
+        return frozenset(folded), needed() > room
 
     def is_open(self, name):
         return name in self.order
@@ -69,6 +127,7 @@ class Tray(tk.Frame):
     def open(self, name, *, auto=False):
         """Show a panel. One that arrives by itself never pushes aside what the player opened."""
         if self.is_open(name):
+            self.bring_forward(name)
             return True
         loose = [other for other in self.order if other not in self.pinned]
         if auto and loose:
@@ -76,6 +135,7 @@ class Tray(tk.Frame):
         for other in loose:
             self.order.remove(other)
         self.order.append(name)
+        self.front = name
         self.layout()
         usage.record("open", name, auto=auto, **self.situation())
         return True
@@ -88,7 +148,9 @@ class Tray(tk.Frame):
             usage.record("close", name, **self.situation())
 
     def toggle(self, name):
-        if self.is_open(name):
+        if name in self.folded:
+            self.bring_forward(name)  # Asking for a panel that is folded away means wanting to see it.
+        elif self.is_open(name):
             self.close(name)
         else:
             self.open(name)
@@ -99,6 +161,7 @@ class Tray(tk.Frame):
             self.pinned.add(name)
             if not self.is_open(name):
                 self.order.append(name)
+                self.front = name
         else:
             self.pinned.discard(name)
         self.layout()
@@ -125,14 +188,36 @@ class Tray(tk.Frame):
                 self.pinned.add(name)
         self.layout()
 
-    def layout(self):
+    def arrange(self):
+        self.folded, self.tight = self.fit()
         for card in self.cards.values():
             card.pack_forget()
-        for name in self.order:
-            grow = name in self.growing
-            self.cards[name].pack(fill="both" if grow else "x", expand=grow, pady=(0, 8))
+        front = self.front if self.front in self.order else self.order[-1] if self.order else None
+        # Space is handed out in packing order, and a panel is given all it asks for while any is left. So the
+        # one panel that can make do with less is placed last: the front panel when it is taller than the room,
+        # otherwise the open panel that fills spare room. The panels below it are placed from the bottom up.
+        roomy = [name for name in self.order if name in self.growing and name not in self.folded]
+        elastic = front if self.tight else max(roomy, key=lambda name: self.bodies[name].winfo_reqheight(),
+                                               default=None)
+        after = self.order[self.order.index(elastic) + 1:] if elastic else []
+        for name in [name for name in self.order if name not in after and name != elastic] + after[::-1] + (
+                [elastic] if elastic else []):
+            shut = name in self.folded
+            if shut:
+                self.bodies[name].pack_forget()
+            else:
+                self.bodies[name].pack(fill="both", expand=True)
+            self.marks[name].configure(text="▸ " if shut else "")
+            for part in (self.heads[name], *self.heads[name].winfo_children()[:3]):
+                part.configure(cursor="hand2" if shut else "")
+            grow = (name in self.growing or name == elastic) and not shut
+            self.cards[name].pack(side="bottom" if name in after else "top", fill="both" if grow else "x",
+                                  expand=grow, pady=(0, self.GAP))
             pinned = name in self.pinned
             self.pins[name].configure(text="Pinned" if pinned else "Pin", fg=INK if pinned else SUBTLE)
+
+    def layout(self):
+        self.arrange()
         if self.order:
             self.grid(row=0, column=1, sticky="ns", padx=(14, 0))
         else:

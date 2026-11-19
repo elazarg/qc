@@ -1844,10 +1844,22 @@ class Desk:
             self.remember()
             self.update()
 
+    def heard(self, side):
+        """The tone, shape and revision last confirmed as sounding on a side.
+
+        While the unit is still loading a newly chosen tone the old one keeps
+        sounding, and with the base switched in the shape is not heard at all.
+        """
+        tone, shape, revision = self.confirmed_tones.get(side) or self.tone_snapshot(side)
+        if side == self.side and self.base_bypassed:
+            shape = {}
+        return tone, dict(shape), revision
+
     def is_kept(self):
         side = self.on_air()
         if side:
-            return self.kept_live == (side, self.tone_revisions[side], tuple(sorted(self.shapes[side].items())))
+            _, shape, revision = self.heard(side)
+            return self.kept_live == (side, revision, tuple(sorted(shape.items())))
         sound = self.selected_sound()
         return bool(sound and sound.path == self.kept)
 
@@ -1855,15 +1867,15 @@ class Desk:
         """Record a preference for the sound being heard. Saving to the unit is a separate act."""
         side = self.on_air()
         if side:
-            tone = self.tone(side)
+            tone, shape, revision = self.heard(side)
             record = tone.to_record() if tone else {"kind": "current", "name": self.qc_name or "Current Quad Cortex"}
             try:
-                listening.keep_tone(record, self.shapes[side], self.take, source=self.active_source,
+                listening.keep_tone(record, shape, self.take, source=self.active_source,
                                     reference=self.reference.name if self.reference else "", note=note)
             except OSError as error:
                 self.set_status(str(error), kind="error")
                 return
-            self.kept_live = (side, self.tone_revisions[side], tuple(sorted(self.shapes[side].items())))
+            self.kept_live = (side, revision, tuple(sorted(shape.items())))
             self.kept_note = note
             if self.blind:
                 self.reveal(kept=side)
@@ -1898,7 +1910,7 @@ class Desk:
             proof = self.alternative.folder if (side == "b" and self.alternative and self.alternative.draft_id == draft["id"]
                                                   and not self.shape_dirty()) else None
             self.submit("save", "Saving the tone in the Tone Lab setlist…", draft_render.save, draft, proof,
-                        physical_input=self.input_channel, values=dict(self.values),
+                        physical_input=self.input_channel, values=dict(self.values), scene=self.draft_scene(tone, draft),
                         done=lambda location: self.saved(location, draft, side))
         elif self.values:
             self.submit("save", "Saving this shape in the Tone Lab setlist…", monitor.save_variant,
@@ -1927,6 +1939,14 @@ class Desk:
         self.browser.changed()
         self.set_status(f"Saved · {preset.setlist} {preset.slot} · {preset.name}")
 
+    @staticmethod
+    def draft_scene(tone, draft):
+        """The scene of a draft that the player has chosen, or None for a draft that has no scenes."""
+        count = len(draft.get("scenes") or ())
+        if not count:
+            return None
+        return tone.scene if tone.scene is not None and tone.scene < count else 0
+
     def monitor_config(self, source, *, side=None):
         side = side or self.side
         tone = self.shape_tone(side)
@@ -1940,7 +1960,7 @@ class Desk:
         elif tone and tone.kind == "draft":
             config["draft"] = self.drafts[tone.draft_id]
             if config["draft"].get("scenes"):
-                config["scene"] = tone.scene or 0
+                config["scene"] = self.draft_scene(tone, config["draft"])
             proof = self.baseline if side == "a" else self.alternative
             if proof and proof.draft_id == tone.draft_id and proof.folder:
                 config["gain"] = self.read_state(proof.folder / "session.json").get("output_gain_db")
