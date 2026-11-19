@@ -172,7 +172,7 @@ def design_schema(model_ids):
 def round_schema(model_ids):
     word = lambda kind: {"type": "string", "enum": list(AIM[kind])}
     return _fields(aim=_fields(drive=word("drive"), tone=word("tone"), space=word("space"), note={"type": "string"}),
-                   designs={"type": "array", "minItems": 3, "maxItems": 3, "items": design_schema(model_ids)})
+                   designs={"type": "array", "items": design_schema(model_ids)})
 
 
 # ---- From a chain to the form, and back ----

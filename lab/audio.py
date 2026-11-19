@@ -153,3 +153,49 @@ def onset(returned, sent_at=RATE // 10):
     if peak < 1e-4:
         raise RuntimeError("Nothing came back. Check that the chain passes USB 5/6 through.")
     return int(np.argmax(mono > .2 * peak)) - sent_at
+
+
+class Loop:
+    """A phrase played round and round into USB 5, with the processed return's peak noted.
+
+    `muted` silences what is sent without losing the place in the phrase, so
+    that switching between sounds does not restart it. The audio itself runs
+    on the driver's own thread; `start` and `stop` may be called from any.
+    """
+
+    def __init__(self, audio, dry):
+        if dry.ndim != 2 or dry.shape[1] != 1 or not .001 <= float(np.max(np.abs(dry))) < .999:
+            raise ValueError("Loop a mono phrase that is neither silent nor clipped.")
+        self.audio = audio
+        riff = np.pad(dry[:, 0].astype(np.float32), (0, RATE // 2))
+        fade = np.linspace(0, 1, RATE // 100, dtype=np.float32)
+        riff[:len(fade)] *= fade
+        riff[len(dry) - len(fade):len(dry)] *= fade[::-1]
+        self.riff, self.cursor, self.muted, self.peak, self.stream = riff, 0, False, 0., None
+
+    def _process(self, indata, outdata, frames, timing, status):
+        outdata.fill(0)
+        if not self.muted:
+            written = 0
+            while written < frames:
+                count = min(frames - written, len(self.riff) - self.cursor)
+                outdata[written:written + count, 0] = self.riff[self.cursor:self.cursor + count]
+                self.cursor = (self.cursor + count) % len(self.riff)
+                written += count
+            self.peak = max(self.peak, float(np.max(np.abs(indata))) if len(indata) else 0.)
+        else:
+            self.cursor = (self.cursor + frames) % len(self.riff)
+
+    def start(self):
+        sd = self.audio.sd
+        self.stream = sd.Stream(device=self.audio.device, samplerate=RATE, dtype="float32", channels=(2, 2),
+                                latency="high", extra_settings=(sd.AsioSettings(USB_PAIR), sd.AsioSettings(USB_PAIR)),
+                                callback=self._process)
+        self.stream.start()
+        return self
+
+    def stop(self):
+        if self.stream is not None:
+            self.stream.abort()
+            self.stream.close()
+            self.stream = None
