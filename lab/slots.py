@@ -159,11 +159,11 @@ class Slots:
         return record
 
     def ours(self, slot):
-        """Whether a slot is one the app works in: the build slot or a cache slot."""
+        """Whether a slot is one the app works in: the build slot, or any slot of the Tone Lab setlist,
+        which is the app's (the player said so on 2026-11-19), saved sounds included."""
         if same_slot(slot, BUILD):
             return True
-        return bool(self.tone_lab and slot and slot.get("folder_key") == self.tone_lab
-                    and slot.get("position") in CACHE_SLOTS)
+        return bool(self.tone_lab and slot and slot.get("folder_key") == self.tone_lab)
 
     def give_back(self, record):
         """Select the player's preset and scene again, if the unit is still on one of the app's slots."""
