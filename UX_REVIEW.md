@@ -42,7 +42,7 @@ Added on 2026-11-19, built and read back on the unit, none of it heard (see `TON
 
 Fixed on 2026-11-19 after the review in `CLAUDE_WORK_REVIEW.md`, which also records how each was checked:
 
-- A draft is stored and recalled on USB, and its output trim and mute are written before it is connected (`monitor.resident_grids.select_draft`, `monitor.run`). Measured on the unit: connecting adds about one second to each flip between drafts, so a flip takes two to three seconds.
+- A draft is stored and recalled on USB, and its output trim and mute are written before it is connected (`monitor.resident_grids.select_draft`, `monitor.run`). A saved preset's working copy for Guitar is held with no input connected in the same way (`iterate.held_routes`). Measured on the unit: connecting adds about one second to each flip between drafts, so a flip takes two to three seconds.
 - The builder confirms the working slot is still selected before each block, the split, the mixer and each scene (`draft_render.still_working`). Each check takes the unit about 0.1 s.
 - Crash recovery returns from the Preview slot as well as the two side slots.
 - A draft is saved on the scene chosen in the Chain panel, every scene is confirmed after saving, and an unsaved draft reopens on its scene.

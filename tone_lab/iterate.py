@@ -36,6 +36,11 @@ def reamp_routes(source, physical_input, *, monitor=False):
              14 if out_port == 19 and not monitor else out_port) for in_port, out_port in original]
 
 
+def held_routes(original):
+    """A preset's routing with every input disconnected and its outputs as they were."""
+    return [(0, out_port) for _, out_port in original]
+
+
 def sound_state(preset):
     grid = wire.describe(preset)
     return ([[chain[k] for k in ("models", "split_points", "splitter", "mixer", "combined_splitter")]
@@ -100,13 +105,20 @@ def _fixture_sound(preset):
 
 
 def prepare_fixture(qc, source_position, source, physical_input, *, position=SCRATCH, monitor_mode=None):
-    """Stage a protected copy for offline reamp, guitar, or an audible USB phrase."""
+    """Stage a protected copy for offline reamp, guitar, or an audible USB phrase.
+
+    For guitar the copy keeps the preset's own outputs and has no input
+    connected. Recalling it is then silent, and the caller connects the guitar
+    once the output trim and mute are in place. A phrase copy takes its input
+    from USB, which is silent until the phrase plays.
+    """
     name, slot = fixture_identity(position)
     if monitor_mode not in (None, "guitar", "phrase"):
         raise ValueError("Choose Guitar or Phrase as the input.")
-    expected = reamp_routes(source, physical_input, monitor=monitor_mode == "phrase")
     if monitor_mode == "guitar":
-        expected = routes(source)
+        expected = held_routes(routes(source))
+    else:
+        expected = reamp_routes(source, physical_input, monitor=monitor_mode == "phrase")
     if source_position in (SCRATCH, LIVE_B) or qc.get_setlist_position() != source_position:
         raise RuntimeError("The original preset is no longer selected.")
     presets.archive(source, source_position, qc.firmware, reason="Before Tone Lab reamp")

@@ -44,11 +44,29 @@ class LiveFixtureTest(unittest.TestCase):
             self.prepare()
         self.qc.write_preset_file.assert_not_called()
 
+    def test_a_guitar_copy_is_stored_with_no_input_so_that_recalling_it_is_silent(self):
+        copy, held = self.preset(iterate.LIVE_B_NAME), self.preset(iterate.LIVE_B_NAME, inlet=0)
+        self.recall.side_effect = [self.preset("Unsaved", inlet=0), self.source, copy, held]
+        self.directory()
+        silent = [(0, 19), (0, 0), (0, 0), (0, 0)]
+        with (patch.object(iterate, "set_routes") as set_routes,
+              patch.object(iterate, "verify_fixture", return_value=held) as verify):
+            self.assertEqual(self.prepare("guitar"), held)
+        set_routes.assert_called_once_with(self.qc, silent)
+        self.assertEqual([args.args[2] for args in verify.call_args_list], [silent, silent])
+        # Written as copied, then again once its input is disconnected.
+        self.assertEqual(self.qc.write_preset_file.call_count, 2)
+        # A copy already held that way is used as it is.
+        self.qc.write_preset_file.reset_mock()
+        self.recall.side_effect = [held]
+        self.assertEqual(self.prepare("guitar"), held)
+        self.qc.write_preset_file.assert_not_called()
+
     def test_vacant_slot_is_written_only_under_the_exact_app_name(self):
-        scratch = self.preset(iterate.LIVE_B_NAME)
+        scratch = self.preset(iterate.LIVE_B_NAME, inlet=12)
         self.recall.side_effect = [self.preset("Unsaved", inlet=0), self.source, scratch]
         self.directory()
-        self.assertEqual(self.prepare(), scratch)
+        self.assertEqual(self.prepare("phrase"), scratch)
         self.qc.write_preset_file.assert_called_once_with(iterate.LIVE_B["folder_key"],
                                                           iterate.LIVE_B["position"], iterate.LIVE_B_NAME)
         self.assertEqual(self.recall.call_args_list, [call(self.qc, iterate.LIVE_B, None),

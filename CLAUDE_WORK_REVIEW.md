@@ -41,6 +41,6 @@ All seven findings were confirmed in the code and fixed. 246 automated tests pas
 
 ### Left as it was
 
-- **Saved presets are still recalled already connected.** A saved preset's working copy carries the preset's own routing, so on a flip the guitar is live at the preset's saved level for the moment before the trim and mute are written. This is how it worked before these changes. Staging those copies on USB too would close it at the same one-second cost per flip, and it means changing `iterate.prepare_fixture`.
+- ~~Saved presets are still recalled already connected.~~ **Fixed later the same day.** A saved preset's working copy for Guitar now keeps the preset's own outputs and has no input connected (`iterate.held_routes`), so recalling it is silent and the guitar is connected after the trim and mute, as for drafts. **Checked on the unit, silently,** with the playing preset: no input after staging and after a recall, the mute written to the row that leaves the preset, then the guitar connected in 0.96 s. A flip between saved presets in Guitar now also takes about a second longer.
 - **Saving a draft connects the guitar** for the few seconds the save takes, at the draft's own level, because the saved preset has to carry the guitar routing.
 - The workbench's **Play draft** (`draft_render.try_guitar`) connects a draft as soon as it is built. It has no mute or level control.
