@@ -50,7 +50,7 @@ What listening can say: how driven a sound is, how bright, how much low end, how
 
 **2. Check.** The app builds each design silently and listens.
 
-- A design that misses the brief on drive is first corrected with the app's own Drive knob and listened to again. That costs 15 seconds and no call.
+- A design that misses the brief on drive is first corrected with the app's own Drive knob and listened to again. That costs about 15 seconds, by estimate, and no call.
 - A design that still misses, or misses on tone, is dropped, or sent back once with the measurements. At most one repair call per round.
 
 **3. Serve.** The first design that passes is offered as soon as it is ready. The others arrive on the line as they pass. You step through them on B. Each shows its one-line difference and what was heard of it. A stays where it is, as the sound to compare against.
