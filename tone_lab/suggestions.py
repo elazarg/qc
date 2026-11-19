@@ -156,7 +156,11 @@ class Suggestions:
         if place is None:
             return
         candidate = found["candidates"][place]
-        shape, played = dict(desk.shapes["b"]), candidate["played"] or desk.on_air() == "b"
+        # Heard means the unit has confirmed this design as the one sounding. While it is still being
+        # built the earlier tone is what plays.
+        sounding = desk.sounding("b")[0] if desk.on_air() == "b" else None
+        heard = sounding is not None and sounding.draft_id == candidate["draft"]
+        shape, played = dict(desk.shapes["b"]), candidate["played"] or heard
         if (shape, played) != (candidate["shape"], candidate["played"]):
             candidate.update(shape=shape, played=played)
             rounds.save(found)
@@ -176,15 +180,23 @@ class Suggestions:
         self.reviewing = (found["id"], place)
         self.desk.set_status(f"Say what you think of {place + 1} · {candidate['name']}, then Enter.", kind="progress",
                              actions=(("Cancel", self.cancel_review),))
+        # The request line itself says what it is taking, for as long as it is taking it.
+        self.desk.placeholder.configure(text=f"Your remark on {place + 1} · {candidate['name']}  (Esc to cancel)")
         self.desk.focus_request()
 
     def cancel_review(self):
-        self.reviewing = None
+        if self.reviewing is None:
+            return
+        self.end_review()
         self.desk.set_status("")
+
+    def end_review(self):
+        self.reviewing = None
+        self.desk.placeholder.configure(text="Ask for a change, a sound or a song")
 
     def reviewed(self, text):
         round_id, place = self.reviewing
-        self.reviewing = None
+        self.end_review()
         found = next(found for found in self.rounds if found["id"] == round_id)
         found["candidates"][place]["review"] = text
         rounds.save(found)

@@ -361,7 +361,7 @@ class Desk:
         self.command.bind("<FocusIn>", lambda _: self.rest_request(ask, True))
         self.command.bind("<FocusOut>", lambda _: self.rest_request(ask, False))
         self.command.bind("<Return>", lambda _: self.ask())
-        self.command.bind("<Escape>", lambda _: self.root.focus_set())
+        self.command.bind("<Escape>", lambda _: (self.suggestions.cancel_review(), self.root.focus_set()))
         self.request.trace_add("write", lambda *_: self.rest_request(ask, self.typing()))
         self.rest_request(ask, False)
 
@@ -600,8 +600,8 @@ class Desk:
             self.listen("reference")
 
     def stop_for_reference(self):
+        self.stop()  # Stop drops whatever was waiting for the unit, so the wish to hear R is noted after it.
         self.reference_waiting = True
-        self.stop()
 
     def toggle_source(self, source):
         running = self.task_if_active("monitor") and not self.stop_signal.is_set()
@@ -2097,6 +2097,20 @@ class Desk:
         self.update()
 
     def tick(self):
+        """Run one turn of the desk's clock, and always arrange the next.
+
+        Jobs finish, events arrive and the window closes only from here, so a
+        failure in one turn is logged and the clock keeps going.
+        """
+        try:
+            again = self.turn()
+        except Exception:  # noqa: BLE001
+            diagnostics.LOG.exception("A turn of the listening desk failed")
+            again = True
+        if again:
+            self.root.after(65, self.tick)
+
+    def turn(self):
         if self.check is not None and self.check.done():
             try:
                 self.qc_name, self.qc_scene, self.qc_position = self.check.result()
@@ -2208,8 +2222,8 @@ class Desk:
         self.playhead.coords(self.position, 0, 0, cursor, 4)
         if self.leaving is not None and self.job is None and self.play_job is None and self.check is None:
             self.finish_close(self.leaving)
-            return
-        self.root.after(65, self.tick)
+            return False
+        return True
 
     def monitor_event(self, message):
         if isinstance(message, str):

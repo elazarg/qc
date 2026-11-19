@@ -30,6 +30,11 @@ class Desk:
                                     after_cancel=lambda timer: None, after_idle=lambda action: action())
         self.advisor = SimpleNamespace(submit=self.ask_assistant)
         self.tray = SimpleNamespace(open=lambda name: None)
+        self.confirmed = None  # The tone the unit has confirmed on B, when that trails what the desk shows.
+        self.placeholder = SimpleNamespace(text="", configure=lambda text: setattr(self.placeholder, "text", text))
+
+    def sounding(self, side):
+        return self.confirmed or self.tone_b, dict(self.shapes[side]), 1
 
     def ask_assistant(self, work, *args):
         self.asked_for.append((work, args))
@@ -348,6 +353,33 @@ class SuggestionsTest(unittest.TestCase):
         self.desk.take = SimpleNamespace(folder=Path("clip-newer"))
         self.suggestions.idle()
         self.assertEqual(self.desk.submitted[-1][2][0]["phrase"], "clip-chosen")
+
+    # ---- Found by the review for the rewrite, 2026-11-19 (review/reports/desk-ui.md) ----
+
+    def test_a_design_counts_as_heard_only_once_the_unit_confirms_it_is_sounding(self):
+        first, second, _ = self.arrive()
+        self.desk.live = "b"
+        self.desk.confirmed = self.desk.tone_b      # The first design is on air.
+        self.suggestions.step(1)                    # The second is chosen and is still being built.
+        self.suggestions.sync()
+        self.assertEqual((first["played"], second["played"]), (True, False))
+        self.desk.confirmed = self.desk.tone_b      # Now the unit confirms the second.
+        self.suggestions.sync()
+        self.assertTrue(second["played"])
+
+    def test_the_request_line_says_it_is_taking_a_remark_and_escape_leaves_it(self):
+        self.arrive()
+        self.suggestions.review(1)
+        self.assertIn("Your remark on 2 · Measured", self.desk.placeholder.text)
+        self.suggestions.cancel_review()            # Escape.
+        self.assertIsNone(self.suggestions.reviewing)
+        self.assertEqual(self.desk.placeholder.text, "Ask for a change, a sound or a song")
+        said = len(self.desk.said)
+        self.suggestions.cancel_review()            # Escape again, with nothing to cancel, says nothing.
+        self.assertEqual(len(self.desk.said), said)
+        self.suggestions.review(0)
+        self.suggestions.reviewed("too dark")
+        self.assertEqual(self.desk.placeholder.text, "Ask for a change, a sound or a song")
 
 if __name__ == "__main__":
     unittest.main()

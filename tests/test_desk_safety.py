@@ -267,7 +267,11 @@ class ReferenceTest(unittest.TestCase):
                                root=SimpleNamespace(after_idle=lambda action: action()))
         desk.listen = desk.heard.append
         desk.set_status = lambda text, **options: desk.said.append((text, options.get("actions", ())))
-        desk.stop = lambda: desk.stopped.append(True)
+        def stop():  # As the real Stop does: everything that was waiting for the unit is dropped.
+            desk.stopped.append(True)
+            desk.reference_waiting = False
+
+        desk.stop = stop
         desk.hear_reference = lambda: listening_room.Desk.hear_reference(desk)
         desk.stop_for_reference = lambda: listening_room.Desk.stop_for_reference(desk)
         vars(desk).update(changes)
@@ -356,6 +360,19 @@ class KeepTest(unittest.TestCase):
         desk.base_bypassed = False  # The shape is back in, and that sound was not the one kept.
         self.assertFalse(listening_room.Desk.is_kept(desk))
 
+
+
+class ClockTest(unittest.TestCase):
+    def test_a_failure_in_one_turn_does_not_stop_the_desk(self):
+        scheduled = []
+        desk = SimpleNamespace(root=SimpleNamespace(after=lambda ms, action: scheduled.append(ms)), tick=None)
+        desk.turn = Mock(side_effect=RuntimeError("an event the desk did not expect"))
+        with self.assertLogs("tone_lab", level="ERROR"):
+            listening_room.Desk.tick(desk)
+        self.assertEqual(scheduled, [65])
+        desk.turn = Mock(return_value=False)  # The window is closing: no further turn.
+        listening_room.Desk.tick(desk)
+        self.assertEqual(scheduled, [65])
 
 if __name__ == "__main__":
     unittest.main()
