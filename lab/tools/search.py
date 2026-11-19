@@ -207,8 +207,8 @@ def features_of(tone=None, heard=None):
     if tone is not None:
         return {key: getattr(tone, key) for key in FIELDS}
     if heard:
-        return {"brightness": heard.get("brightness", 0.), "dynamics": heard.get("crest_db", 0.), "width": 0.,
-                "tails": heard.get("ambience_db", -60.), "fizz": heard.get("brightness", 0.)}
+        return {"brightness": heard.get("brightness_oct", 0.), "dynamics": heard.get("crest_db", 0.), "width": 0.,
+                "tails": heard.get("tail_db", heard.get("ambience_db", -60.)), "fizz": heard.get("brightness_oct", 0.)}
     return None
 
 
@@ -217,7 +217,7 @@ def entry(sound):
     tags = [origin.get("kind", ""), origin.get("request", ""), origin.get("song", ""), sound.explanation, *sound.tags,
             *(note.get("text", "") for note in sound.notes), *describe_chain(sound.chain)]
     if sound.heard:
-        tags += [sound.heard.get(key, "") for key in ("drive", "tone", "space")]
+        tags += [sound.heard.get(key) or "" for key in ("distortion", "compressed", "brightness", "tail")]
     if sound.saved:
         tags.append(f"saved {sound.saved.get('name', '')}")
     return {"title": sound.name, "sound": sound.id, "digest": sound.chain.digest(), "target": origin.get("song", ""),

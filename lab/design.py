@@ -34,9 +34,11 @@ ALWAYS = ("Equalizer", "Compressor", "Delay", "Reverb", "Modulation", "Filter", 
 NUMBERS = {"float", "fader"}
 SWITCHES = {"switch", "rotarySwitch", "comboBox"}
 SKIP = {"MUTE TRIG", "OUTPUT"}                 # the amp's OUTPUT is the app's to set
-AIM = {"drive": ("clean", "edge of breakup", "crunch", "overdriven", "saturated"),
-       "tone": ("dark", "balanced", "bright"),
-       "space": ("dry", "a touch of room", "ambient", "wet")}
+# The aim, on the scales listening measures (lab/measure.py): distortion from test tones, brightness against
+# the dry guitar, and the tail that rings on after the playing stops.
+AIM = {"distortion": ("clean", "edge of breakup", "crunch", "overdriven", "saturated"),
+       "brightness": ("dark", "balanced", "bright"),
+       "tail": ("dry", "a touch of room", "ambient", "wet")}
 SCENE_NAME = 12
 MULTI_OUT = 19
 
@@ -221,7 +223,7 @@ def card(model_id):
         found["named_settings"] = named
     drive = knowledge.drive_curve(model_id) if info.category.endswith("Amplifier") else None
     if drive:
-        found["measured_drive"] = drive
+        found["crest_by_gain"] = drive
     return found
 
 
@@ -247,7 +249,8 @@ def design_schema(model_ids):
 
 def round_schema(model_ids):
     word = lambda kind: {"type": "string", "enum": list(AIM[kind])}
-    return _fields(aim=_fields(drive=word("drive"), tone=word("tone"), space=word("space"), note={"type": "string"}),
+    return _fields(aim=_fields(distortion=word("distortion"), brightness=word("brightness"), tail=word("tail"),
+                               note={"type": "string"}),
                    designs={"type": "array", "items": design_schema(model_ids)})
 
 

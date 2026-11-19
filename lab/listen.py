@@ -14,6 +14,7 @@ from pathlib import Path
 
 from .audio import RATE, click, onset
 from .chain import Chain, Row, routed
+from . import probe
 from .measure import SOFTER, heard
 from .rig import USB
 
@@ -44,7 +45,7 @@ def calibrate(rig, audio, folder):
 
 
 def listen(rig, audio, chain, dry, offset, *, stop=None):
-    """What `chain` does to the mono phrase `dry`, in the words of `measure.Heard`."""
+    """What `chain` does to the mono phrase `dry`, and what test signals show of it (`measure.Heard`)."""
     slot, held = rig.ready(chain, stop=stop)
     # The chain's own routing, fed from the computer and returned to it: a preset spread over several rows is
     # heard whole.
@@ -56,6 +57,10 @@ def listen(rig, audio, chain, dry, offset, *, stop=None):
     rig.unit.guard()
     soft = audio.reamp(dry * SOFTER, tail=.3, cancel=stop)[offset:offset + len(dry)]
     rig.unit.guard()
-    if len(loud) < len(dry) or len(soft) < len(dry):
+    # Test signals at the level of a firmly held note in this phrase: distortion and the rest, measured directly.
+    tones = probe.test_signal(probe.held_note_peak(dry))
+    returned = audio.reamp(tones, tail=.2, cancel=stop)[offset:offset + len(tones)]
+    rig.unit.guard()
+    if len(loud) < len(dry) or len(soft) < len(dry) or len(returned) < len(tones):
         raise RuntimeError("The unit returned less audio than was sent.")
-    return heard(dry, loud, soft, tail)
+    return heard(dry, loud, soft, tail, probe=probe.analyse(returned).to_record())

@@ -30,7 +30,7 @@ def answer(name, blocks, *, second=None, split=(-1, -1), scenes=(), differs="", 
 
 
 def reply(*designs):
-    return {"aim": {"drive": "saturated", "tone": "balanced", "space": "ambient", "note": "A singing fuzz lead."},
+    return {"aim": {"distortion": "saturated", "brightness": "balanced", "tail": "ambient", "note": "A singing fuzz lead."},
             "designs": list(designs)}
 
 
@@ -60,7 +60,7 @@ class DesignTest(unittest.TestCase):
         found = design.card(HIWATT)
         self.assertEqual(found["controls"]["GAIN"], [0, 10])
         self.assertNotIn("OUTPUT", found["controls"])   # The amp's clean level is the app's.
-        self.assertIn("measured_drive", found)
+        self.assertIn("crest_by_gain", found)
         self.assertIn("cpu", found)
         self.assertIn("about", found)
         self.assertEqual(design.card(FUZZ)["controls"]["FUZZ"], [0, 10])
@@ -115,7 +115,7 @@ class DesignTest(unittest.TestCase):
         broken = answer("Bad", [block(HIWATT, 0, gain=99)])
         assistant, script = self.assistant(reply(broken, good, good), reply(good, other, broken))
         aim, designs = design.round_of_three(assistant, "Gilmour Time solo", CHARVEL)
-        self.assertEqual(aim["drive"], "saturated")
+        self.assertEqual(aim["distortion"], "saturated")
         self.assertEqual([sound.name for sound, _ in designs], ["Fuzz", "Plexi"])
         self.assertEqual(len(script.asked), 2)
         self.assertIn("could not be used", script.asked[1][0])

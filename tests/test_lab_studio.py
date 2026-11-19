@@ -145,7 +145,7 @@ class StudioTest(unittest.TestCase):
         settle(self.studio, 20)
         prompt = self.script.asked[-1][0]
         self.assertIn('"player_marks": ["not this"]', prompt)
-        self.assertIn('"heard": {"drive"', prompt)
+        self.assertIn('"heard": {"distortion"', prompt)
         self.assertEqual(self.studio.sound("b").name, "Four")
         self.assertEqual(self.studio.round()["previous"], first)
         self.studio.round_back()

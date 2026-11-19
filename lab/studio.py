@@ -23,6 +23,7 @@ from pathlib import Path
 
 from . import design, knobs, knowledge, words
 from .assistant import Assistant
+from .measure import summary
 from .sounds import Sound, Store, describe
 
 
@@ -287,24 +288,30 @@ class Studio:
     def difference(self):
         """What listening heard differ between A and B, in plain words, when both were heard on the same phrase."""
         a, b = self.sound("a"), self.sound("b")
-        if not (a and b and a.heard and b.heard):
-            return ["Both sounds need to have been listened to. That happens by itself while the unit is free."]
+        if not (a and b and a.heard and b.heard and "probe" in a.heard and "probe" in b.heard):
+            return ["Both sounds need to have been listened to with the current tests. That happens by itself "
+                    "while the unit is free."]
         if a.heard.get("phrase") != b.heard.get("phrase"):
             return ["A and B were listened to on different phrases, so they cannot be compared fairly yet."]
         lines = []
         level = b.heard["level_db"] - a.heard["level_db"]
         if abs(level) >= 1:
             lines.append(f"B is {abs(level):.0f} dB {'louder' if level > 0 else 'quieter'}.")
-        if a.heard["drive"] != b.heard["drive"] or abs(b.heard["squash"] - a.heard["squash"]) > .1:
-            lines.append(f"Drive: A {a.heard['drive']}, B {b.heard['drive']} "
-                         f"(B {'more' if b.heard['squash'] > a.heard['squash'] else 'less'} compressed by the drive).")
-        bright = b.heard["brightness"] - a.heard["brightness"]
+        pa, pb = a.heard.get("probe") or {}, b.heard.get("probe") or {}
+        if pa and pb and abs(pb["distortion_db"] - pa["distortion_db"]) >= 3:
+            lines.append(f"Distortion: A {a.heard['distortion']} ({pa['distortion_db']:.0f} dB of harmonics), "
+                         f"B {b.heard['distortion']} ({pb['distortion_db']:.0f} dB).")
+        ca, cb = a.heard["compression"], b.heard["compression"]
+        if abs(cb - ca) > .1:
+            lines.append(f"B is {'more' if cb > ca else 'less'} compressed: of a 12 dB drop in your playing, "
+                         f"A gives back {12 * (1 - ca):.0f} dB and B {12 * (1 - cb):.0f} dB.")
+        bright = b.heard["brightness_oct"] - a.heard["brightness_oct"]
         if abs(bright) >= .1:
             lines.append(f"B is {abs(bright):.1f} octave {'brighter' if bright > 0 else 'darker'}.")
         low = b.heard["low_end_db"] - a.heard["low_end_db"]
         if abs(low) >= 1.5:
             lines.append(f"B has {abs(low):.0f} dB {'more' if low > 0 else 'less'} low end.")
-        space = b.heard["ambience_db"] - a.heard["ambience_db"]
+        space = b.heard["tail_db"] - a.heard["tail_db"]
         if abs(space) >= 3:
             lines.append(f"B rings on {abs(space):.0f} dB {'more' if space > 0 else 'less'} after you stop.")
         return lines or ["Listening heard no clear difference between A and B."]
@@ -439,7 +446,7 @@ class Studio:
             record = {"id": knowledge_id(), "request": text, "aim": aim, "created": _now(),
                       "previous": after, "by": by, "candidates": []}
             for sound, differs in designs:
-                sound.tags = [f"aim: {aim['drive']}, {aim['tone']}, {aim['space']}"]
+                sound.tags = [f"aim: {summary(aim)}"]
                 if self.state.song:
                     sound.origin = {**sound.origin, "song": self.state.song}
                 self.store.save(sound)
@@ -456,7 +463,7 @@ class Studio:
             self.set(working="", round=record["id"])
             if self.state.revision == revision:
                 self.put("b", self.store.sound(record["candidates"][0]["sound"]))
-                self.say(f"Aiming for {aim['drive']}, {aim['tone']}, {aim['space']}. "
+                self.say(f"Aiming for {summary(aim)}. "
                          f"1 of {len(designs)} is on B · {designs[0][0].name}")
             else:
                 self.say(f"{len(designs)} designs are ready. B changed meanwhile, so it was left alone.")
@@ -486,7 +493,8 @@ class Studio:
         for candidate in found["candidates"]:
             sound = self.store.sound(candidate["sound"])
             earlier.append({"name": sound.name, "differs": candidate["differs"], "chain": describe(sound.chain),
-                            "heard": {key: sound.heard[key] for key in ("drive", "tone", "space")}
+                            "heard": {key: sound.heard.get(key) for key in ("distortion", "compressed",
+                                                                               "brightness", "tail")}
                             if sound.heard else None,
                             "player_marks": sound.marks, "player_said": [note["text"] for note in sound.notes],
                             "played": sound.played})
@@ -500,8 +508,7 @@ class Studio:
             return
         self.set(round=round_id)
         self.put("b", self.store.sound(found["candidates"][0]["sound"]))
-        self.say(f"Round: {found['request']} · {found['aim']['drive']}, {found['aim']['tone']}, "
-                 f"{found['aim']['space']}")
+        self.say(f"Round: {found['request']} · {summary(found['aim'])}")
 
     def round_back(self):
         found = self.round()
@@ -617,7 +624,7 @@ class Studio:
             return
         for candidate in found["candidates"]:
             sound = self.store.sound(candidate["sound"])
-            if sound.heard is None:
+            if sound.heard is None or "probe" not in sound.heard:     # never heard, or heard before test tones
                 self.set(working=f"Listening to {sound.name}, silently…")
 
                 def heard(result, sound=sound):
@@ -625,7 +632,7 @@ class Studio:
                     self.store.save(sound)
                     if result.level_db is not None and result.level_db > -90:
                         sound.tags = [tag for tag in sound.tags if not tag.startswith("heard:")] + [
-                            f"heard: {result.drive}, {result.tone}, {result.space}"]
+                            f"heard: {result.said()}"]
                         self.store.save(sound)
                     self.set(working="")
                     self._show() if self.state.shown is None else None

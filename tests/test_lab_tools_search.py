@@ -55,10 +55,10 @@ class SearchTest(unittest.TestCase):
             search.search(entries, reference=reference, tones=tones, priorities="Loud")
 
     def test_words_find_names_and_measured_qualities(self):
-        entries = [item("Jazz Lead", "1", heard={"brightness": -.6, "crest_db": 18, "ambience_db": -50}),
+        entries = [item("Jazz Lead", "1", heard={"brightness_oct": -.6, "crest_db": 18, "tail_db": -50}),
                    item("Clean Rhythm", "2", tags=["designed", "jazzy comping"],
-                        heard={"brightness": .7, "crest_db": 12, "ambience_db": -20}),
-                   item("Metal", "3", tags=["overdriven"], heard={"brightness": .2, "crest_db": 9, "ambience_db": -45})]
+                        heard={"brightness_oct": .7, "crest_db": 12, "tail_db": -20}),
+                   item("Metal", "3", tags=["overdriven"], heard={"brightness_oct": .2, "crest_db": 9, "tail_db": -45})]
         self.assertEqual({row["title"] for row in search.search(entries, "find jazz")}, {"Jazz Lead", "Clean Rhythm"})
         self.assertEqual(search.search(entries, "bright")[0]["title"], "Clean Rhythm")
         self.assertEqual(search.search(entries, "dark")[0]["title"], "Jazz Lead")

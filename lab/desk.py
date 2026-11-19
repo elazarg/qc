@@ -15,6 +15,7 @@ from tkinter import simpledialog
 from . import knobs as knob_table
 from .audio import read_wave
 from .knowledge import REPO, home
+from .measure import summary
 from .studio import Studio
 from .theme import (ACCENT, DARK, DIM, FONT, INK, LIVE, PAPER, RULE, SIDE, SOFT, SUBTLE, TILE, Tooltip, mix)
 
@@ -227,7 +228,7 @@ class Desk:
         elif origin == "revised":
             parts.append("Revised: " + sound.origin["request"][:60] if sound.origin.get("request") else "A copy to work on")
         if sound.heard:
-            parts.append("heard: " + ", ".join(sound.heard[key] for key in ("drive", "tone", "space")))
+            parts.append("measured: " + summary(sound.heard))
         if sound.knobs:
             parts.append("shaped")
         if sound.saved:
@@ -275,7 +276,7 @@ class Desk:
             chip.pack(side="left", padx=(0, 5))
             chip.bind("<ButtonRelease-1>", lambda _, place=place: self.studio.step(place))
             if chosen:
-                heard = (" · heard: " + ", ".join(sound.heard[key] for key in ("drive", "tone", "space"))
+                heard = (" · measured: " + summary(sound.heard)
                          if sound.heard else " · not listened to yet")
                 self.strip_note.configure(text=candidate["differs"] + heard)
         ready = bool(found.get("next"))
@@ -285,7 +286,7 @@ class Desk:
         more.bind("<ButtonRelease-1>", lambda _: self.studio.round_forward())
         Tooltip(more, "Three more, from what was heard and what you marked  ·  N")
         aim = found["aim"]
-        label(self.chips, f"aiming for {aim['drive']}, {aim['tone']}, {aim['space']}", size=9, color=DIM).pack(
+        label(self.chips, f"aiming for {summary(aim)}", size=9, color=DIM).pack(
             side="right")
 
     # ---- panels ----
@@ -371,6 +372,11 @@ class Desk:
                     choose.configure(menu=options)
                     choose.pack(side="right")
                     Tooltip(choose, "Its named settings, Neural DSP's own")
+        from .measure import measured_lines
+
+        label(self.tray, "Measured", size=8, color=DIM).pack(fill="x", pady=(10, 0))
+        for line in measured_lines(sound.heard):
+            label(self.tray, line, size=9, color=SOFT, wrap=400).pack(fill="x", pady=1)
         button(self.tray, "Nano Cortex sheet", lambda: self.nano_sheet(sound)).pack(anchor="w", pady=(8, 4))
         for note in sound.notes[-4:]:
             label(self.tray, f"You: {note['text']}", size=9, color=SUBTLE, wrap=400).pack(fill="x")

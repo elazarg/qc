@@ -45,32 +45,46 @@ class MeasureTest(unittest.TestCase):
 
 
 class HeardTest(unittest.TestCase):
-    def test_clean_saturated_and_the_steps_between(self):
-        self.assertEqual(measure.heard(*through(lambda sound: sound * .5, note())).drive, "clean")
-        self.assertEqual(measure.heard(*through(lambda sound: np.clip(sound * 300, -.3, .3), note())).drive,
-                         "saturated")
-        words = [measure.heard(*through(lambda sound: np.tanh(sound * gain), note())).drive
-                 for gain in (.5, 1.6, 3., 6., 4000.)]
-        order = measure.WORDS["drive"]
-        self.assertEqual(sorted(words, key=order.index), words)
+    """From the phrase: compression, brightness, tail. Distortion comes only from the test tones."""
 
-    def test_a_compressor_that_leaves_the_peaks_standing_is_not_distortion(self):
+    def test_compression_is_how_much_of_a_12_db_drop_fails_to_come_back(self):
+        self.assertEqual(measure.heard(*through(lambda sound: sound * .5, note())).compressed, "none")
         squeeze = lambda sound: sound * (.02 / max(float(np.sqrt(np.mean(sound ** 2))), 1e-9))
         found = measure.heard(*through(squeeze, note(4.)))
-        self.assertGreater(found.squash, .82)
-        self.assertEqual(found.drive, "edge of breakup")
+        self.assertGreater(found.compression, .82)
+        self.assertEqual(found.compressed, "squashed")
 
-    def test_what_rings_on_is_ambience_and_a_short_echo_counts(self):
+    def test_a_compressor_is_not_called_distorted(self):
+        # Squashed, but without test tones there is no distortion word at all.
+        squeeze = lambda sound: sound * (.02 / max(float(np.sqrt(np.mean(sound ** 2))), 1e-9))
+        self.assertIsNone(measure.heard(*through(squeeze, note(4.))).distortion)
+
+    def test_distortion_words_follow_the_measured_harmonics(self):
+        # As measured on the unit: Twin, Plexi at gain 2, 5, 8 and 10 (loud, then 12 dB softer).
+        ladder = [(-45.4, -64.0), (-29.7, -49.4), (-18.0, -39.4), (-17.9, -21.4), (-18.1, -18.7)]
+        words = [measure.heard(*through(lambda sound: sound, note()),
+                               probe={"distortion_db": loud, "distortion_soft_db": soft}).distortion
+                 for loud, soft in ladder]
+        self.assertEqual(words, list(measure.WORDS["distortion"]))
+        # A compressor alone, however hard it squeezes, adds no harmonics: clean.
+        self.assertEqual(measure.distortion_word(-67.6, -70.), "clean")
+
+    def test_what_rings_on_is_the_tail_and_a_short_echo_counts(self):
         dry = note()
         echo = np.zeros((RATE, 1))
         echo[round(.08 * RATE):round(.2 * RATE)] = dry[:round(.12 * RATE)] * .5
-        self.assertIn(measure.heard(dry, dry, dry * measure.SOFTER, echo).space, ("ambient", "wet"))
-        self.assertEqual(measure.heard(*through(lambda sound: sound, note())).space, "dry")
+        self.assertIn(measure.heard(dry, dry, dry * measure.SOFTER, echo).tail, ("ambient", "wet"))
+        self.assertEqual(measure.heard(*through(lambda sound: sound, note())).tail, "dry")
 
     def test_dark_is_dark(self):
         lows = dsp.butter(2, 300, "low", fs=RATE, output="sos")
         found = measure.heard(*through(lambda sound: dsp.sosfilt(lows, sound, axis=0), note()))
-        self.assertEqual((found.tone, found.drive), ("dark", "clean"))
+        self.assertEqual((found.tone, found.compressed), ("dark", "none"))
+
+    def test_a_summary_reads_current_and_earlier_names(self):
+        self.assertEqual(measure.summary({"distortion": "crunch", "brightness": "bright", "tail": "dry"}),
+                         "crunch, bright, dry")
+        self.assertEqual(measure.summary({"drive": "crunch", "tone": "bright", "space": "dry"}), "crunch, bright, dry")
 
 
 class MatchTest(unittest.TestCase):
