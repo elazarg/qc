@@ -1,11 +1,11 @@
 """Open Tone Lab and report startup failures even under pythonw.
 
-Two desks can be opened: the old one (`tone_lab`, the default for now) and the
-rewritten one (`python -m lab`). The first of these that says which wins:
+Two desks can be opened: the rewritten one (`python -m lab`, the default) and
+the earlier one (`tone_lab`). The first of these that says which wins:
 
 1. `--new` or `--old` on the command line (Tone Lab.exe passes its own on);
 2. the environment variable TONE_LAB_DESK set to `new` or `old`;
-3. `{"desk": "new"}` in `launcher.json` in the data folder
+3. `{"desk": "old"}` (or "new") in `launcher.json` in the data folder
    (`%LOCALAPPDATA%\\Tone Lab`, or TONE_LAB_HOME when that is set).
 
 Other arguments go to the new desk, such as `--simulated`.
@@ -48,7 +48,7 @@ def setting_file(environ=os.environ):
 
 
 def chosen_desk(arguments, environ=os.environ):
-    """"old" or "new": the command line first, then TONE_LAB_DESK, then the setting; "old" when none says."""
+    """"old" or "new": the command line first, then TONE_LAB_DESK, then the setting; "new" when none says."""
     for desk in DESKS:
         if f"--{desk}" in arguments:
             return desk
@@ -58,8 +58,8 @@ def chosen_desk(arguments, environ=os.environ):
     try:
         value = json.loads(setting_file(environ).read_text(encoding="utf-8")).get("desk", "")
     except (OSError, ValueError, AttributeError):
-        return "old"
-    return value if value in DESKS else "old"
+        return "new"
+    return value if value in DESKS else "new"
 
 
 def open_new_desk(arguments):

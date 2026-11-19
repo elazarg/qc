@@ -2,7 +2,7 @@
 
 Tone Lab helps you make and improve presets for a Neural DSP Quad Cortex by playing and talking: two sounds side by side, your guitar or a recorded phrase through either, and one line to ask in. Designs come from an assistant that knows the unit's models and how players set them; the app builds them on the unit, listens to them silently, and puts them in front of you.
 
-Start it with **Start Tone Lab (new).cmd**, `.\.venv\Scripts\python.exe -m lab`, or `Tone Lab.exe --new` (the earlier app still starts by default; `launcher.json` in the data folder with `{"desk": "new"}` makes the new one the default). `python -m lab --simulated` runs it with a simulated unit and no hardware. Opening it again brings the open window forward.
+Start it with **Tone Lab.exe**, **Start Tone Lab.cmd**, or `.\.venv\Scripts\python.exe -m lab`. The earlier app is still here: `Tone Lab.exe --old`, or `{"desk": "old"}` in `launcher.json` in the data folder to make it the default again. `python -m lab --simulated` runs it with a simulated unit and no hardware. Opening it again brings the open window forward.
 
 ## The desk
 
@@ -14,7 +14,7 @@ Start it with **Start Tone Lab (new).cmd**, `.\.venv\Scripts\python.exe -m lab`,
 - **Scenes.** A sound whose scenes differ shows them under the tiles; the one chosen is heard on both sides.
 - **Save to QC** writes the selected sound, with its knob positions, to the next free slot of the **Tone Lab** setlist.
 
-Panels open beside the tiles: **Shape** (the knobs this chain can move), **Chain** (the blocks, each with a ▾ of its model's named settings), **Difference** (what listening heard differ between A and B), **Phrase** (drag the loop's edges), **Sounds** (your presets on the unit, with search; **Work on this** puts one on A as saved and a copy on B), **History**, **Song** (parts of one song, each a sound or one scene of it) and **Guitar** (what each pickup setting of your instrument puts out, from phrases recorded with the setting noted).
+Panels open beside the tiles: **Shape** (the knobs this chain can move), **Chain** (the blocks, each with a ▾ of its model's named settings), **Difference** (what listening heard differ between A and B), **Phrase** (drag the loop's edges), **Sounds** (your presets on the unit, with search; **Work on this** puts one on A as saved and a copy on B; and your IRs and Neural Captures: an IR goes into B's cab, a capture in place of B's amp, or amp and cab. The designer also uses an IR of yours when a request names it), **History**, **Song** (parts of one song, each a sound or one scene of it) and **Guitar** (what each pickup setting of your instrument puts out, from phrases recorded with the setting noted).
 
 The **⋯** menu: **Guitar Learner**, **Guitar input calibration**, **Gestures on / off**, **Instrument** (Charvel, Les Paul, bass, acoustic, classical; the designer has its own guidance for bass, acoustic and classical), the side tools (**Library**, **Levels**, **Tone search**, **Tone field**, the **Comparison** and **Controls** workbenches, **Setup and sound check**, **Usage and feedback** with the assistant's calls by day), and **Measure the USB round trip**.
 
@@ -55,4 +55,4 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m unittest discover -s tests
 ```
 
-Close Cortex Control and any audio program holding the driver before starting. The earlier app (`tone_lab/`, `python -m tone_lab`) is still here while the new one is tried; see [the rewrite review](REWRITE_REVIEW.md) for why it was rewritten and how, and [what Tone Lab knows about tone](TONE_KNOWLEDGE.md).
+Close Cortex Control and any audio program holding the driver before starting. The earlier app (`tone_lab/`, `python -m tone_lab`) is still here, reachable with `--old`; see [the rewrite review](REWRITE_REVIEW.md) for why it was rewritten and how, and [what Tone Lab knows about tone](TONE_KNOWLEDGE.md).

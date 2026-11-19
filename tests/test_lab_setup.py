@@ -212,8 +212,8 @@ class LauncherTest(unittest.TestCase):
     def choose(self, arguments=(), **environ):
         return self.launcher["chosen_desk"](list(arguments), {**self.environ, **environ})
 
-    def test_the_old_desk_by_default(self):
-        self.assertEqual(self.choose(), "old")
+    def test_the_new_desk_by_default(self):
+        self.assertEqual(self.choose(), "new")
 
     def test_the_command_line_wins(self):
         self.assertEqual(self.choose(["--new"], TONE_LAB_DESK="old"), "new")
@@ -221,21 +221,21 @@ class LauncherTest(unittest.TestCase):
 
     def test_then_the_environment(self):
         self.assertEqual(self.choose(TONE_LAB_DESK="NEW"), "new")
-        self.assertEqual(self.choose(TONE_LAB_DESK="something else"), "old")
+        self.assertEqual(self.choose(TONE_LAB_DESK="something else"), "new")
 
     def test_then_the_setting_in_the_data_folder(self):
         folder = Path(self.temporary.name) / "Tone Lab"
         folder.mkdir()
-        (folder / "launcher.json").write_text('{"desk": "new"}', encoding="utf-8")
-        self.assertEqual(self.choose(), "new")
-        (folder / "launcher.json").write_text("{ broken", encoding="utf-8")
+        (folder / "launcher.json").write_text('{"desk": "old"}', encoding="utf-8")
         self.assertEqual(self.choose(), "old")
+        (folder / "launcher.json").write_text("{ broken", encoding="utf-8")
+        self.assertEqual(self.choose(), "new")
 
     def test_the_setting_follows_tone_lab_home(self):
         chosen = Path(self.temporary.name) / "chosen"
         chosen.mkdir()
-        (chosen / "launcher.json").write_text('{"desk": "new"}', encoding="utf-8")
-        self.assertEqual(self.choose(TONE_LAB_HOME=str(chosen)), "new")
+        (chosen / "launcher.json").write_text('{"desk": "old"}', encoding="utf-8")
+        self.assertEqual(self.choose(TONE_LAB_HOME=str(chosen)), "old")
         self.assertFalse((Path(self.temporary.name) / "Tone Lab").exists())   # finding it creates nothing
 
     def test_the_new_desk_gets_the_other_arguments(self):
