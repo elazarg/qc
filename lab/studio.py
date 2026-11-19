@@ -246,6 +246,69 @@ class Studio:
         if self.state.shown:
             self.later(self.host.call("turn", side, sound.knobs), lambda moves: None)
 
+    def base(self):
+        """Hear the sound on show without its Shape knobs, or with them again (the 0 key)."""
+        side = self.state.side
+        sound = self.sound(side)
+        if sound is None or not sound.knobs or not self.state.shown:
+            self.say("Nothing shaped to compare with.")
+            return
+        self.hearing_base = not getattr(self, "hearing_base", False)
+        self.later(self.host.call("turn", side, {} if self.hearing_base else sound.knobs), lambda moves: None)
+        self.say(f"{sound.name}: " + ("the base, without the Shape knobs" if self.hearing_base else "shaped"))
+
+    def named(self, row, column, setting, side=None):
+        """A copy of the sound with one block set to one of its model's named settings, put on the same side."""
+        from . import catalog
+        from .sounds import Sound
+
+        side = side or self.state.side
+        sound = self.sound(side)
+        block = sound.chain.block(row, column) if sound else None
+        if block is None:
+            return
+        values = knowledge.named_settings(block.model).get(setting)
+        if not values:
+            self.say(f"{setting} is not a named setting of {block.name}.")
+            return
+        info = catalog.model(block.model)
+        for name, value in values.items():
+            try:
+                block = block.set_display(info.index(name), value)
+            except (KeyError, ValueError):
+                continue
+        chain = sound.chain.with_block(row, column, block)
+        copy = Sound(f"{sound.name}"[:24], chain, {"kind": "revised", "from": sound.id,
+                                                   "request": f"{block.name}: {setting}"},
+                     parent=sound.id, knobs=dict(sound.knobs), explanation=sound.explanation)
+        self.put(side, copy)
+        self.say(f"{block.name} set to its named setting {setting}. Z undoes it.")
+
+    def difference(self):
+        """What listening heard differ between A and B, in plain words, when both were heard on the same phrase."""
+        a, b = self.sound("a"), self.sound("b")
+        if not (a and b and a.heard and b.heard):
+            return ["Both sounds need to have been listened to. That happens by itself while the unit is free."]
+        if a.heard.get("phrase") != b.heard.get("phrase"):
+            return ["A and B were listened to on different phrases, so they cannot be compared fairly yet."]
+        lines = []
+        level = b.heard["level_db"] - a.heard["level_db"]
+        if abs(level) >= 1:
+            lines.append(f"B is {abs(level):.0f} dB {'louder' if level > 0 else 'quieter'}.")
+        if a.heard["drive"] != b.heard["drive"] or abs(b.heard["squash"] - a.heard["squash"]) > .1:
+            lines.append(f"Drive: A {a.heard['drive']}, B {b.heard['drive']} "
+                         f"(B {'more' if b.heard['squash'] > a.heard['squash'] else 'less'} compressed by the drive).")
+        bright = b.heard["brightness"] - a.heard["brightness"]
+        if abs(bright) >= .1:
+            lines.append(f"B is {abs(bright):.1f} octave {'brighter' if bright > 0 else 'darker'}.")
+        low = b.heard["low_end_db"] - a.heard["low_end_db"]
+        if abs(low) >= 1.5:
+            lines.append(f"B has {abs(low):.0f} dB {'more' if low > 0 else 'less'} low end.")
+        space = b.heard["ambience_db"] - a.heard["ambience_db"]
+        if abs(space) >= 3:
+            lines.append(f"B rings on {abs(space):.0f} dB {'more' if space > 0 else 'less'} after you stop.")
+        return lines or ["Listening heard no clear difference between A and B."]
+
     def available(self, side=None):
         sound = self.sound(side or self.state.side)
         return knobs.available(sound.chain) if sound else []
@@ -587,6 +650,7 @@ class Studio:
                     "seconds": round(len(dry) / 48000, 2)}
             (folder / "phrase.json").write_text(json.dumps(info, indent=1), encoding="utf-8")
             self.phrase = (phrase_id, dry[:, :1])
+            self.phrase_whole = (dry[:, :1], 0, len(dry))
             peak = float(abs(dry).max()) if len(dry) else 0.
             level = 20 * __import__("math").log10(max(peak, 1e-9))
             self.set(working="", status=f"Recorded {info['seconds']:g} s on {setting}, peaking at {level:.0f} dBFS. "

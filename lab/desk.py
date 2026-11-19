@@ -18,7 +18,7 @@ from .knowledge import REPO, home
 from .studio import Studio
 from .theme import (ACCENT, DARK, DIM, FONT, INK, LIVE, PAPER, RULE, SIDE, SOFT, SUBTLE, TILE, Tooltip, mix)
 
-PANELS = ("Shape", "Chain", "Sounds", "History", "Song", "Guitar")
+PANELS = ("Shape", "Chain", "Difference", "Phrase", "Sounds", "History", "Song", "Guitar")
 PHRASE_SECONDS = 3.5
 
 
@@ -46,15 +46,20 @@ def phrases():
     return found
 
 
-def loudest(path, seconds=PHRASE_SECONDS):
+def loudest_at(dry, seconds=PHRASE_SECONDS):
+    """Where the loudest `seconds` of a take start, and how long they are."""
     import numpy as np
 
-    dry = read_wave(path)[:, :1]
     length = round(seconds * 48000)
     if len(dry) <= length:
-        return dry
+        return 0, len(dry)
     energy = np.concatenate(([0.], np.cumsum(np.square(dry[:, 0], dtype=np.float64))))
-    start = int(np.argmax(energy[length:] - energy[:-length]))
+    return int(np.argmax(energy[length:] - energy[:-length])), length
+
+
+def loudest(path, seconds=PHRASE_SECONDS):
+    dry = read_wave(path)[:, :1]
+    start, length = loudest_at(dry, seconds)
     return dry[start:start + length].copy()
 
 
@@ -119,6 +124,7 @@ class Desk:
         main.grid(row=0, column=0, sticky="nsew")
         self.tray = tk.Frame(body, bg=DARK, width=430, padx=12, pady=10)
         self.tray.grid_propagate(False)
+        self.tray.pack_propagate(False)        # one width for every panel
 
         pair = tk.Frame(main, bg=PAPER)
         pair.pack(fill="both", expand=True)
@@ -334,10 +340,85 @@ class Desk:
         label(self.tray, f"{studio.state.side.upper()} · {sound.name}", size=12, bold=True, wrap=400).pack(fill="x")
         if sound.explanation:
             label(self.tray, sound.explanation, size=9, color=SOFT, wrap=400).pack(fill="x", pady=(2, 6))
-        for line in studio.chain_text():
-            label(self.tray, line, size=9, wrap=400).pack(fill="x", pady=2)
+        from .knowledge import named_settings
+        from .sounds import settings as stated
+
+        for r, row in enumerate(sound.chain.rows):
+            if not row.blocks:
+                continue
+            label(self.tray, f"Row {r + 1}" + (f" · split at {row.split[0] + 1}, joined at {row.split[1] + 1}"
+                                                 if row.split else ""), size=8, color=DIM).pack(fill="x", pady=(4, 0))
+            for column, block in row.blocks:
+                line = tk.Frame(self.tray, bg=DARK)
+                line.pack(fill="x")
+                shown = stated(block)
+                text = block.name + (" · " + ", ".join(f"{key} {value:g}" if isinstance(value, float) else
+                                                       f"{key} {value}" for key, value in list(shown.items())[:6])
+                                     if shown else "")
+                label(line, text, size=9, wrap=330).pack(side="left", fill="x", expand=True)
+                names = named_settings(block.model)
+                if names:
+                    choose = tk.Menubutton(line, text="▾", bg=DARK, fg=ACCENT, relief="flat", cursor="hand2",
+                                           font=(FONT, 10))
+                    options = tk.Menu(choose, tearoff=False, bg="#252834", fg=INK)
+                    for name in names:
+                        options.add_command(label=name, command=lambda r=r, column=column, name=name:
+                                            studio.named(r, column, name))
+                    choose.configure(menu=options)
+                    choose.pack(side="right")
+                    Tooltip(choose, "Its named settings, Neural DSP's own")
         for note in sound.notes[-4:]:
             label(self.tray, f"You: {note['text']}", size=9, color=SUBTLE, wrap=400).pack(fill="x")
+
+    def panel_difference(self):
+        for line in self.studio.difference():
+            label(self.tray, line, size=10, wrap=400).pack(fill="x", pady=2)
+
+    def panel_phrase(self):
+        """The phrase as a waveform; drag the edges to choose the part that loops."""
+        import numpy as np
+
+        whole = getattr(self.studio, "phrase_whole", None)
+        if whole is None:
+            label(self.tray, "Choose or record a phrase first.", color=SUBTLE).pack(fill="x")
+            return
+        audio, start, end = whole
+        width, height = 400, 120
+        canvas = tk.Canvas(self.tray, width=width, height=height, bg=TILE, highlightthickness=0, cursor="sb_h_double_arrow")
+        canvas.pack(fill="x")
+        columns = np.array_split(np.abs(audio[:, 0]), width)
+        peak = max(float(audio.max()), 1e-6)
+        for x, part in enumerate(columns):
+            value = float(part.max()) / peak if len(part) else 0.
+            canvas.create_line(x, height / 2 - value * height / 2, x, height / 2 + value * height / 2, fill=SOFT)
+        shade = canvas.create_rectangle(0, 0, 0, height, fill=ACCENT, stipple="gray25", width=0)
+        seconds = len(audio) / 48000
+        note = label(self.tray, size=9, color=SUBTLE)
+        note.pack(fill="x", pady=(4, 0))
+        edges = {"start": start, "end": end}
+
+        def draw():
+            canvas.coords(shade, edges["start"] / len(audio) * width, 0, edges["end"] / len(audio) * width, height)
+            note.configure(text=f"Loop {edges['start'] / 48000:.1f}–{edges['end'] / 48000:.1f} s of {seconds:.1f} s. "
+                                "Drag either edge; the recording itself is never changed.")
+
+        def drag(event):
+            at = int(min(max(event.x, 0), width) / width * len(audio))
+            nearer = "start" if abs(at - edges["start"]) < abs(at - edges["end"]) else "end"
+            edges[nearer] = at
+            if edges["end"] - edges["start"] < 24000:
+                return
+            draw()
+
+        def done(_):
+            self.studio.phrase = (self.studio.phrase[0], audio[edges["start"]:edges["end"]].copy())
+            self.studio.phrase_whole = (audio, edges["start"], edges["end"])
+            if self.studio.state.mode == "phrase":
+                self.studio.play("phrase")
+
+        canvas.bind("<B1-Motion>", drag)
+        canvas.bind("<ButtonRelease-1>", done)
+        draw()
 
     def panel_sounds(self):
         """Presets saved on the unit, from the last time the app read its directory. Choose one to work on."""
@@ -457,7 +538,7 @@ class Desk:
                    "g": lambda: self.toggle_play("guitar"), "p": lambda: self.toggle_play("phrase"),
                    "space": self.studio.stop, "z": self.studio.undo, "slash": self.request.focus_set,
                    "1": lambda: self.studio.step(0), "2": lambda: self.studio.step(1), "3": lambda: self.studio.step(2),
-                   "escape": self.studio.cancel,
+                   "escape": self.studio.cancel, "0": self.studio.base,
                    "k": lambda: self.studio.mark("keeper"), "d": lambda: self.studio.mark("not this"),
                    "t": self.mark_with_word, "x": self.studio.blind, "n": self.studio.round_forward,
                    "bracketright": self.studio.round_forward, "bracketleft": self.studio.round_back,
@@ -519,7 +600,11 @@ class Desk:
             self.studio.record(choice.strip())
 
     def choose_recorded(self, item):
-        self.studio.phrase = (item["id"], loudest(self.studio.folder / "phrases" / item["id"] / "dry.wav"))
+        path = self.studio.folder / "phrases" / item["id"] / "dry.wav"
+        whole = read_wave(path)[:, :1]
+        start, length = loudest_at(whole)
+        self.studio.phrase = (item["id"], whole[start:start + length].copy())
+        self.studio.phrase_whole = (whole, start, start + length)
         self.phrase_menu.configure(text=f"Phrase · {item.get('instrument', '')} · {item['setting']}")
 
     def panel_guitar(self):

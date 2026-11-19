@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lab.assistant import Assistant
 from lab.host import Host
 from lab.sim import MY_PRESETS
+from lab import catalog
 from lab.studio import Studio
 from test_lab_design import CHARVEL, FUZZ, GREENBACK, HIWATT, PLEXI, V30, Scripted, answer, block, reply
 
@@ -263,6 +264,34 @@ class StudioTest(unittest.TestCase):
         settle(self.studio, 20)
         self.assertIsNone(self.studio.sound("b"))
         self.assertEqual(self.studio.state.status, "Request cancelled.")
+
+
+    def test_a_named_setting_makes_a_copy_with_that_block_changed(self):
+        from unittest.mock import patch
+        self.script.answers.append(self.three("One", "Two", "Three"))
+        self.studio.ask("make a classic rock crunch")
+        settle(self.studio, 20)
+        before = self.studio.sound("b")
+        with patch("lab.knowledge.named_settings", return_value={"Hot": {"GAIN": 9.0}}):
+            self.studio.named(0, 0, "Hot")
+        settle(self.studio)
+        after = self.studio.sound("b")
+        gain = catalog.model(PLEXI).index("GAIN")
+        self.assertEqual((after.parent, round(after.chain.block(0, 0).display(gain))), (before.id, 9))
+        self.studio.undo()
+        self.assertEqual(self.studio.state.b, before.id)
+
+    def test_the_difference_between_a_and_b_in_words(self):
+        self.script.answers.append(self.three("One", "Two", "Three"))
+        self.studio.ask("make a classic rock crunch")
+        settle(self.studio, 20)
+        self.studio.copy_to_a()
+        settle(self.studio)
+        self.studio.step(2)
+        settle(self.studio)
+        lines = self.studio.difference()
+        self.assertTrue(lines)
+        self.assertNotIn("need to have been listened to", lines[0])
 
 
 if __name__ == "__main__":
