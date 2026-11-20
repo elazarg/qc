@@ -63,9 +63,9 @@ def _wanted(name):
         and "Video" not in base and "podcast" not in base.lower()
 
 
-def history(paths):
-    """Every play in the given files, folders or zip archives, as (artist, title, ms) tuples."""
-    plays = []
+def entries(paths):
+    """Every entry of the listening-history files in the given files, folders or zip archives, as dicts.
+    The one place an export is read; `history` here and `lab.listening.plays` both use it."""
     for path in map(Path, paths):
         if path.is_dir():
             files = sorted(p for p in path.rglob("*.json") if _wanted(p.name))
@@ -78,13 +78,19 @@ def history(paths):
             sources = [(path.name, path.read_text(encoding="utf-8-sig"))]
         for name, text in sources:
             for entry in _entries(text, name):
-                if not isinstance(entry, dict):
-                    continue
-                artist = entry.get("master_metadata_album_artist_name") or entry.get("artistName")
-                title = entry.get("master_metadata_track_name") or entry.get("trackName")
-                ms = entry.get("ms_played", entry.get("msPlayed", 0))
-                if artist and title and isinstance(ms, int) and not isinstance(ms, bool):
-                    plays.append((str(artist).strip(), str(title).strip(), ms))
+                if isinstance(entry, dict):
+                    yield entry
+
+
+def history(paths):
+    """Every play in the given files, folders or zip archives, as (artist, title, ms) tuples."""
+    plays = []
+    for entry in entries(paths):
+        artist = entry.get("master_metadata_album_artist_name") or entry.get("artistName")
+        title = entry.get("master_metadata_track_name") or entry.get("trackName")
+        ms = entry.get("ms_played", entry.get("msPlayed", 0))
+        if artist and title and isinstance(ms, int) and not isinstance(ms, bool):
+            plays.append((str(artist).strip(), str(title).strip(), ms))
     return plays
 
 

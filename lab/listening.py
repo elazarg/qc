@@ -28,11 +28,9 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import json
-from pathlib import Path
 import re
-import zipfile
 
-from .spotify import song_key
+from .spotify import entries, song_key
 
 DELIBERATE_STARTS = {"clickrow", "playbtn", "backbtn"}
 COMPLETE_ENDS = {"trackdone"}
@@ -52,30 +50,10 @@ class Play:
     skipped: bool
 
 
-def _history_file(name):
-    """A streaming-history file of music: the extended export's audio files or the short export's files."""
-    name = Path(name).name.lower()
-    return name.endswith(".json") and ("streaming_history_audio" in name or name.startswith("streaminghistory"))
-
-
-def _rows(paths):
-    for path in paths:
-        path = Path(path)
-        if path.is_dir():
-            yield from _rows(sorted(path.rglob("*.json")))
-        elif path.suffix.lower() == ".zip":
-            with zipfile.ZipFile(path) as archive:
-                for name in archive.namelist():
-                    if _history_file(name):
-                        yield from json.loads(archive.read(name).decode("utf-8"))
-        elif _history_file(path.name):
-            yield from json.loads(path.read_text(encoding="utf-8"))
-
-
 def plays(paths):
     """The music plays in an export: files, folders or the zip. Podcasts, audiobooks and video are left out."""
     found = []
-    for row in _rows(paths):
+    for row in entries(paths):
         if not isinstance(row, dict):
             continue
         artist = row.get("master_metadata_album_artist_name") or row.get("artistName")
