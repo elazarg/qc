@@ -448,7 +448,8 @@ def _block(spec, count, kept=None, *, names=None, label=None):
 
 # ---- Asking ----
 
-def facts(text, instrument, *, phrase=None, chain=None, earlier=None, models=(), irs=None, guitar=None):
+def facts(text, instrument, *, phrase=None, chain=None, earlier=None, models=(), irs=None, guitar=None,
+          listening=None):
     notes = knowledge.guitar_notes(instrument.get("name")) if instrument else None
     recipe = _recipe(text) if chain is None else None
     irs = irs or {}
@@ -456,6 +457,7 @@ def facts(text, instrument, *, phrase=None, chain=None, earlier=None, models=(),
             "instrument": {key: instrument.get(key) for key in ("name", "kind", "about")} if instrument else None,
             **({"instrument_notes": notes} if notes else {}),
             **({"guitar_profile": guitar} if guitar else {}),
+            **({"player_listening": listening} if listening else {}),
             **({"phrase": phrase} if phrase else {}),
             **({"community_recipe": recipe} if recipe else {}),
             **({"current_chain": as_form(chain, irs)} if chain is not None else {}),
@@ -516,8 +518,11 @@ def played_on(instrument, setting=None, guitar=None):
 
 
 def round_of_three(assistant, text, instrument, *, phrase=None, earlier=None, research=False, by="player",
-                   cancel=None, assets_known=None, guitar=None, setting=None):
+                   cancel=None, assets_known=None, guitar=None, setting=None, listening=None):
     """An aim and up to three sounds that reach it by different routes.
+
+    `listening` (`lab.listening.prior`) says what guitar music the player listens to most; the assistant uses
+    it only for requests that name no artist, song or sound (designer.md, "listening").
 
     `assets_known` are the IRs and captures read from the unit (None: those last read, `assets.cached`); the
     player's IRs the request names are offered as models. `guitar` is what the instrument puts out
@@ -526,9 +531,11 @@ def round_of_three(assistant, text, instrument, *, phrase=None, earlier=None, re
     kind = (instrument or {}).get("kind", "electric")
     irs = player_irs(text, known=assets_known)
     models = _with_irs(offered(text, kind), irs)
-    names = ("task", "chain", craft_for(kind), *(("input",) if guitar else ()), "scenes", "paths", "budget", "round")
+    names = ("task", "chain", craft_for(kind), *(("input",) if guitar else ()),
+             *(("listening",) if listening else ()), "scenes", "paths", "budget", "round")
     prompt = sections(*names) + "\n\n" + json.dumps(
-        facts(text, instrument, phrase=phrase, earlier=earlier, models=models, irs=irs, guitar=guitar),
+        facts(text, instrument, phrase=phrase, earlier=earlier, models=models, irs=irs, guitar=guitar,
+              listening=listening),
         ensure_ascii=False)
     source = played_on(instrument, setting, guitar)
     origin = {"kind": "designed", "request": text, **({"input": source} if source else {})}

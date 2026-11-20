@@ -61,5 +61,17 @@ class ListeningTest(unittest.TestCase):
         self.assertTrue(any("Band A - Song One" in line for line in lines))
 
 
+    def test_the_designer_gets_only_guitar_led_artists_most_listened_first(self):
+        summary = listening.summarize(listening.plays([self.zip]))
+        record = {"summary": summary, "guitar_context": [
+            {"artist": "Band B", "guitar_led": True, "guitarists": ["X"], "tones": ["clean"]},
+            {"artist": "Band A", "guitar_led": True, "guitarists": ["Y"], "tones": ["crunch", "fuzz"]},
+            {"artist": "Band C", "guitar_led": False, "guitarists": [], "tones": ["none"]}]}
+        found = listening.prior(record)
+        self.assertEqual([item["artist"] for item in found["artists"]], ["Band A", "Band B"])
+        self.assertEqual(found["tone_families"], {"crunch": 1, "fuzz": 1, "clean": 1})
+        self.assertIsNone(listening.prior({"summary": summary}))
+
+
 if __name__ == "__main__":
     unittest.main()

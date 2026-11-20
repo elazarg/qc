@@ -283,5 +283,21 @@ class PlayerIRTest(unittest.TestCase):
         self.assertTrue(any("name the IR by its id" in problem for problem in problems))
 
 
+
+class ListeningPriorTest(unittest.TestCase):
+    def test_what_the_player_listens_to_reaches_the_assistant_with_its_rule(self):
+        folder = TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        script = Scripted(reply(answer("Vox V30", [block(1011, 0), block(V30, 1)]),        # offered for any request
+                                answer("Vox Greenback", [block(1011, 0), block(GREENBACK, 1)])))
+        assistant = Assistant(Path(folder.name), run=script)
+        prior = {"artists": [{"artist": "Band A", "guitarists": ["Y"], "tones": ["crunch"]}],
+                 "tone_families": {"crunch": 1}}
+        design.round_of_three(assistant, "a lead tone", CHARVEL, listening=prior)
+        prompt = script.asked[-1][0]
+        self.assertIn('"player_listening"', prompt)
+        self.assertIn("names no artist, song, player or sound", prompt)
+
+
 if __name__ == "__main__":
     unittest.main()

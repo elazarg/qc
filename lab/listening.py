@@ -186,6 +186,21 @@ def guitar_context(assistant, artists, songs, *, by="player", cancel=None):
     return assistant.ask("listening", prompt, GUITAR_SCHEMA, by=by, web=False, seconds=180, cancel=cancel)["artists"]
 
 
+def prior(record, *, limit=10):
+    """What the designer may know of the player's listening: the guitar-led artists listened to most, with their
+    guitarists and tone families, and how those families add up. None when the guitar context was never asked."""
+    context = (record or {}).get("guitar_context") or []
+    hours = {artist.casefold(): h for artist, h in ((record or {}).get("summary") or {}).get("artists", [])}
+    led = [item for item in context if item.get("guitar_led")]
+    led.sort(key=lambda item: hours.get(item["artist"].casefold(), 0), reverse=True)
+    if not led:
+        return None
+    families = Counter(tone for item in led for tone in item.get("tones", []) if tone != "none")
+    return {"artists": [{"artist": item["artist"], "guitarists": item.get("guitarists", [])[:3],
+                         "tones": item.get("tones", [])} for item in led[:limit]],
+            "tone_families": dict(families.most_common())}
+
+
 def report(summary, context=None, presets=None):
     """Plain lines for the player, and nothing that is not already in the summary or the context."""
     lines = [f"{summary['hours']} hours of music over {len(summary['years'])} years "
