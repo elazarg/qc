@@ -5,3 +5,8 @@ tone_sessions/
 /Tone Lab.exe
 .pytest_cache/
 
+# Personal data never goes to the public repository: account exports, and anything under personal/.
+my_spotify_data*.zip
+*Streaming_History*
+*StreamingHistory*
+personal/
