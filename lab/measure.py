@@ -198,6 +198,7 @@ class Heard:
     attack_ms: float | None = None       # median 10%-90% rise of the notes' peak envelope, played as recorded
     attack_soft_ms: float | None = None  # the same, played 12 dB softer
     brightness_bands_db: dict | None = None  # {"1-3 kHz", "3-6 kHz", "6-12 kHz"}: share of energy against the dry's
+    loudness_lufs: float | None = None  # integrated loudness of the return (ITU-R BS.1770), for matching A and B
 
     @property
     def distortion(self):
@@ -370,7 +371,7 @@ def heard(dry, loud, soft, tail, probe=None):
     return Heard(compression=float(min(1., max(0., 1 - step / STEP_DB))), crest_db=crest,
                  brightness_oct=float(np.log2(max(loud_m.centroid_hz, 1.) / max(dry_m.centroid_hz, 1.))),
                  low_end_db=float(_lows(loud_m) - _lows(dry_m)), tail_db=rings - level(loud),
-                 level_db=level(loud), probe=probe, attack_ms=attack_ms(loud, starts),
+                 level_db=level(loud), probe=probe, loudness_lufs=loud_m.lufs, attack_ms=attack_ms(loud, starts),
                  attack_soft_ms=attack_ms(soft, starts),
                  brightness_bands_db={name: round(loud_bands[name] - dry_bands[name], 2) for name in BANDS})
 
