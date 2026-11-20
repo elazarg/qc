@@ -8,7 +8,7 @@ typical passive humbucker gives), how bright, and how much low end, and
 compares each setting with the bridge pickup in series, which is what most
 presets assume.
 
-The reference figures are published measurements (review/reports/gear-research.md):
+The reference figures are published measurements (gathered in the gear research for the rewrite):
 with the unit's input at full scale near 14 to 15 dBu, a medium-hot passive
 humbucker played firmly peaks around -18 dBFS.
 """

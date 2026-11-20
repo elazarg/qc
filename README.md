@@ -55,4 +55,8 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m unittest discover -s tests
 ```
 
-Close Cortex Control and any audio program holding the driver before starting. The earlier app (`tone_lab/`, `python -m tone_lab`) is still here, reachable with `--old`; see [the rewrite review](REWRITE_REVIEW.md) for why it was rewritten and how, and [what Tone Lab knows about tone](TONE_KNOWLEDGE.md).
+Close Cortex Control and any audio program holding the driver before starting. The earlier app (`tone_lab/`, `python -m tone_lab`) is still here, reachable with `--old`; see [what Tone Lab knows about tone](TONE_KNOWLEDGE.md) and [what tone research says](TONE_RESEARCH.md).
+
+## Personal data
+
+This repository is public and holds only generic code and knowledge. Everything about a particular player stays on their computer: recordings, sounds, rounds, the assistant's ledger, the guitar profile, the taste model and the listening-history analysis live in `%LOCALAPPDATA%\Tone Lab` (its `personal` folder for analyses), and documents about one player's unit, usage or gear go in `personal/` at the top of the project, which git ignores. Account exports (`my_spotify_data*.zip`, streaming-history files) are ignored too. Tests use made-up data.

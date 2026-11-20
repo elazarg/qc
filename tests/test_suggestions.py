@@ -354,7 +354,7 @@ class SuggestionsTest(unittest.TestCase):
         self.suggestions.idle()
         self.assertEqual(self.desk.submitted[-1][2][0]["phrase"], "clip-chosen")
 
-    # ---- Found by the review for the rewrite, 2026-11-19 (review/reports/desk-ui.md) ----
+    # ---- Found by the review for the rewrite, 2026-11-19 (the desk review) ----
 
     def test_a_design_counts_as_heard_only_once_the_unit_confirms_it_is_sounding(self):
         first, second, _ = self.arrive()

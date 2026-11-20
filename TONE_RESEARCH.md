@@ -98,8 +98,7 @@ lower resonance and less treble than single coils; parallel wiring lowers induct
 output, higher resonance, thinner lows.
 Rod Elliott (sound-au.com); Frank Falbo, *Premier Guitar* 2015; standard pickup physics (Lemme, Zollner).
 - **For the app:** the guitar profile should shift what the designer aims for: gain and EQ for this guitar,
-  this setting, this cable. The phrases already carry the guitar's colour. Your recordings already show
-  parallel settings peaking 14 to 15 dB below series, which fits.
+  this setting, this cable. The phrases already carry the guitar's colour.
 
 ## Tools like this one
 
