@@ -150,17 +150,33 @@ class Studio:
         self.jobs.append((future, done, failed))
 
     def poll(self):
-        """Handle every finished piece of work. Called from the window's clock."""
+        """Handle every finished piece of work. Called from the window's clock. A fault is said on the line and
+        written with its trace to errors.log in the data folder."""
+        import traceback
+
         finished = [job for job in self.jobs if job[0].done()]
         self.jobs = [job for job in self.jobs if not job[0].done()]
         for future, done, failed in finished:
             try:
                 result = future.result()
             except Exception as error:  # noqa: BLE001
+                self.log_error(error, "".join(traceback.format_exception(error)))
                 (failed or (lambda error: self.set(status=str(error), working="")))(error)
                 continue
-            done(result)
+            try:
+                done(result)
+            except Exception as error:  # noqa: BLE001
+                self.log_error(error, traceback.format_exc())
+                self.set(working="", status=f"Something went wrong: {error}. The details are in errors.log in the "
+                                            "data folder.")
         self._check_shaping()
+
+    def log_error(self, error, trace):
+        try:
+            with open(self.folder / "errors.log", "a", encoding="utf-8") as log:
+                log.write(f"\n--- {_now()} {type(error).__name__}: {error}\n{trace}")
+        except OSError:
+            pass
 
     # ---- the session ----
 
@@ -170,6 +186,9 @@ class Studio:
         def opened(result):
             stale = knowledge.stale(getattr(self.host, "firmware", None) or "4.1.1")
             note = " Gave back the preset a crash had left borrowed." if result.get("recovered") else ""
+            if getattr(self, "notice", ""):
+                note += " " + self.notice
+                self.notice = ""
             self.set(working="", status="Ready." + note + (" Some measured tables were made on another firmware."
                                                             if stale else ""))
             if getattr(self, "restored", False):
@@ -635,6 +654,11 @@ class Studio:
             aim, designs = result
             record = {"id": knowledge_id(), "request": text, "aim": aim, "created": _now(),
                       "previous": after, "by": by, "candidates": []}
+            song = aim.get("song") or (self.round(after) or {}).get("aim", {}).get("song")
+            if song:
+                record["aim"]["song"] = song
+                if not quietly:
+                    self.set(song=song_name(song))
             for sound, differs in designs:
                 sound.tags = [f"aim: {summary(aim)}"]
                 if self.state.song:
@@ -741,7 +765,40 @@ class Studio:
             self._choice(sound, word)
         self.store.save(sound)
         self.say(f"{sound.name}: " + (", ".join(sound.marks) if sound.marks else "no marks"))
+        if word == "keeper" and word in sound.marks:
+            self._into_song(sound)
         self._learn()
+
+    def _round_of(self, sound):
+        """The round a sound was designed in, if any."""
+        for path in (self.folder / "rounds").glob("*.json"):
+            try:
+                found = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if any(candidate["sound"] == sound.id for candidate in found.get("candidates", [])):
+                return found
+        return None
+
+    def _into_song(self, sound):
+        """A sound kept or saved from a round that was for a song becomes that song's part: the request said
+        which song and part, so nothing has to be named by hand."""
+        found = self._round_of(sound) or {}
+        song = found.get("aim", {}).get("song")
+        if not song and sound.parent:
+            parent = self.store.sound(sound.parent) if (self.folder / "sounds" / f"{sound.parent}.json").exists() else None
+            song = ((self._round_of(parent) or {}).get("aim", {}) if parent else {}).get("song")
+        if not song:
+            return
+        name = song_name(song)
+        record = self.store.song(name)
+        record.update(artist=song.get("artist"), instrument=self.state.instrument)
+        part = (song.get("part") or "main").capitalize()
+        record["parts"] = [item for item in record["parts"] if item["name"] != part] + [{"name": part, "sound": sound.id}]
+        if self.phrase and not record.get("phrase"):
+            record["phrase"] = self.phrase[0]
+        self.store.save_song(record)
+        self.set(song=name)
 
     def _choice(self, sound, word):
         """A keeper or a not-this given while A and B are both on show is a choice between them (blind when names
@@ -894,6 +951,7 @@ class Studio:
             slot, _ = result
             sound.saved = {"slot": slot, "name": name}
             self.store.save(sound)
+            self._into_song(sound)
             self._learn()
             self.set(working="", shown=None, status=f"Saved · Tone Lab {slot['position'] + 1} · {name}")
             self._show()
@@ -1019,6 +1077,11 @@ def _checked_words(found, turned, correction):
         line += (f" {knobs.KNOBS[key][0]} turned {how}, from {old:+.2f} to {new:+.2f}, once; "
                  "not measured again.")
     return line
+
+
+def song_name(song):
+    """"Artist - Title" for a song the assistant named."""
+    return " - ".join(part for part in (song.get("artist"), song.get("title")) if part)
 
 
 def _now():

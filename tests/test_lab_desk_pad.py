@@ -36,7 +36,8 @@ class PadPanelTest(unittest.TestCase):
         turned = []
         sound = SimpleNamespace(knobs=knobs)
         studio = SimpleNamespace(state=SimpleNamespace(side="b"), sound=lambda side: sound,
-                                 available=lambda: available, turn=turned.append)
+                                 available=lambda: available, turn=turned.append,
+                                 undo=lambda: None, base=lambda: None)
         desk = Desk.__new__(Desk)
         desk.studio, desk.tray = studio, tk.Frame(self.root, bg=DARK)
         desk.panel_shape()
@@ -54,7 +55,8 @@ class PadPanelTest(unittest.TestCase):
         x0, y0, x1, y1 = children[0].coords(dot)
         self.assertEqual(((x0 + x1) / 2, (y0 + y1) / 2), pad_point(.5, -.25))
         self.assertEqual(children[1]["text"], "Brightness +0.50 · Texture -0.25")
-        rows = [child for child in children if isinstance(child, tk.Frame)]
+        rows = [child for child in children if isinstance(child, tk.Frame)
+                if any(isinstance(part, tk.Scale) for part in child.winfo_children())]
         self.assertEqual([row.winfo_children()[0]["text"] for row in rows], ["Distortion", "Body"])
 
     def test_no_pad_when_the_sound_has_nothing_for_either_axis(self):
@@ -104,3 +106,46 @@ class SessionDeskTest(unittest.TestCase):
         finally:
             studio.close()
             root.destroy()
+
+
+class QuietDeskTest(unittest.TestCase):
+    """No shortcuts, no dialogs: typing goes into the boxes, and the side windows open from the panels."""
+
+    def setUp(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+
+        from lab.desk.studio import Studio
+        from lab.qc.host import Host
+
+        folder = TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        home = Path(folder.name)
+        self.root = tk.Tk()
+        host = Host(home / "unit", simulated=True, local=True)
+        host.ready.result(10)
+        self.studio = Studio(host, home)
+        self.desk = Desk(self.root, self.studio)
+        import gc
+
+        # Tk variables of the windows opened are freed here, on this thread, not later on another one.
+        self.addCleanup(gc.collect)
+        self.addCleanup(self.root.destroy)
+        self.addCleanup(self.studio.close)
+
+    def test_letters_typed_anywhere_do_nothing_but_type(self):
+        self.assertEqual(self.root.bind("<Key>"), "")
+        before = self.studio.state
+        for letter in "tkdxgpn":
+            self.root.event_generate("<KeyPress>", keysym=letter)
+        self.root.update()
+        self.assertEqual(self.studio.state.mode, before.mode)
+        self.assertEqual(self.studio.state.blind, before.blind)
+
+    def test_the_guitar_learner_opens_from_the_guitar_panel(self):
+        self.desk.toggle("Guitar")
+        self.desk.open_learner()
+        self.assertIsNotNone(self.desk.learner)
+
+    def test_saving_asks_for_the_name_in_place(self):
+        self.assertFalse(hasattr(__import__("lab.desk.window", fromlist=["x"]), "simpledialog"))

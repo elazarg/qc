@@ -62,6 +62,10 @@ Each model's cpu is the share of one processor it needs. A pair of rows has two 
 
 This request is answered with a round: an aim and three designs. First state the aim, what the sound asked for is like, before choosing any gear. distortion is how distorted it is, from clean to saturated; brightness is how bright it is against a plain electric guitar; tail is how much delay and reverb rings on after the playing stops; note is one sentence on what matters most about this sound. The app will build each design and measure the same three things on the unit: distortion with test tones (the harmonics a pure tone gains), brightness and tail with the player's own phrase. An aim that flatters the designs helps nobody. Then return three designs that reach the aim by different routes: one from the gear the sound is documented or commonly believed to use, one from whatever available models are most likely to measure on the aim, and one by another route, such as another family of amp or another source of the distortion. Three settings of one chain are not three designs. differs says in one short line, for the player, what sets each design apart from the other two. earlier, when present, holds the rounds already tried for this request: the aim then, and for each design its chain, what the app measured, the knobs moved on it, whether the player heard it, and what the player said. Keep what the player liked, do not repeat a design that missed, and correct the aim if the player's remarks show it was wrong.
 
+## song
+
+song says which song the request is for, as you understand it: its artist, its title, and the part of it (rhythm, lead, solo, clean, intro, riff... in one or two words; empty for the song's main guitar sound). A request for a song need not say so ("Comfortably Numb, the second solo" is one). Leave all three empty when the request is not for a particular song, such as a style, a player's general sound or a quality.
+
 ## repair
 
 Your previous reply could not be used, for the reasons in problems. Return the same answer with those problems corrected and nothing else changed.

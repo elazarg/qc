@@ -267,9 +267,16 @@ def summary(found):
     earlier ones (drive, tone, space)."""
     if not found:
         return ""
-    first = found.get("distortion") or ("" if "distortion" in found else found.get("drive", ""))
-    return ", ".join(word for word in (first, found.get("brightness") or found.get("tone", ""),
-                                       found.get("tail") or found.get("space", "")) if word)
+    def word(key, earlier):
+        # Records from before the renaming used some of these names for numbers (brightness was the octave
+        # figure): only a word counts.
+        for value in (found.get(key), found.get(earlier)):
+            if isinstance(value, str) and value:
+                return value
+        return ""
+
+    first = word("distortion", "drive") if "distortion" not in found or isinstance(found.get("distortion"), str)         else ""
+    return ", ".join(item for item in (first, word("brightness", "tone"), word("tail", "space")) if item)
 
 
 def measured_lines(record):

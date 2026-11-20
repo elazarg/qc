@@ -1,25 +1,29 @@
-"""The desk: the window over `Studio`. It draws the state and turns clicks and keys into actions.
+"""The desk: the window over `Studio`. It draws the state and turns clicks into actions.
 
 Run it with `python -m lab` (the Quad Cortex) or `python -m lab --simulated`
 (no hardware). It is the same quiet desk as before: two sounds, the input,
 one line that speaks, one place to ask, and panels that open when called.
 Nothing here decides anything; `studio.py` does.
+
+Everything happens in this one window: no dialogs, no pop-up menus, no
+keyboard shortcuts. Choices are buttons, names are typed in place, and the
+panels say what they hold.
 """
 
 import json
 from pathlib import Path
 import sys
 import tkinter as tk
-from tkinter import simpledialog
 
 from lab.sound import knobs as knob_table
 from lab.hearing.audio import read_wave
 from lab.knowledge import REPO, home
 from lab.hearing.measure import summary
 from lab.desk.studio import Studio
-from lab.desk.theme import (ACCENT, DARK, DIM, FONT, INK, LIVE, PAPER, RULE, SIDE, SOFT, SUBTLE, TILE, Tooltip, mix)
+from lab.desk.theme import ACCENT, DARK, DIM, FONT, INK, LIVE, PAPER, RULE, SIDE, SOFT, SUBTLE, TILE, mix
 
-PANELS = ("Shape", "Chain", "Difference", "Phrase", "Sounds", "History", "Song", "Guitar")
+PANELS = ("Shape", "Chain", "Difference", "Phrase", "Sounds", "History", "Guitar", "More")
+RECORD_SECONDS = 8.
 PHRASE_SECONDS = 3.5
 PAD_SIZE = 200      # the Brightness x Texture pad, in pixels a side
 
@@ -82,6 +86,12 @@ class Desk:
     def __init__(self, root, studio):
         self.root, self.studio = root, studio
         self.panel = self.learner = None
+        self.panel_key = None           # what the open panel was drawn from; it is redrawn only when that changes
+        self.expanded = set()           # blocks whose named settings are shown in the Chain panel
+        self.show_nano = False
+        self.capture_version = 2       # what an unlabelled capture is taken to be
+        self.record_setting = None
+        root.report_callback_exception = self.failed
         root.title("Tone Lab")
         root.configure(bg=PAPER)
         try:
@@ -92,7 +102,6 @@ class Desk:
         root.minsize(980, 620)
         self.build()
         studio.listeners.append(lambda state: self.draw())
-        root.bind("<Key>", self.key)
         root.protocol("WM_DELETE_WINDOW", self.close)
         session = studio.restore() or {}
         recorded = studio.recorded_phrases()
@@ -121,24 +130,8 @@ class Desk:
         self.dot_mark = self.dot.create_oval(2, 2, 10, 10, fill=DIM, width=0)
         self.working = label(top, color=SOFT)
         self.working.pack(side="left", padx=8)
-        more = tk.Menubutton(top, text="⋯", bg=PAPER, fg=SUBTLE, relief="flat", font=(FONT, 14), cursor="hand2")
-        menu = tk.Menu(more, tearoff=False, bg="#252834", fg=INK)
-        menu.add_command(label="Guitar Learner", command=self.open_learner)
-        menu.add_command(label="Guitar input calibration", command=self.open_calibration)
-        menu.add_command(label="Gestures on / off", command=self.toggle_gestures)
-        menu.add_separator()
-        from lab.tools.menu import TOOLS, opener
-
-        for title, name in TOOLS:
-            menu.add_command(label=title, command=lambda name=name: opener(name)(self))
-        menu.add_separator()
-        menu.add_command(label="Measure the USB round trip", command=self.calibrate)
-        instruments = tk.Menu(menu, tearoff=False, bg="#252834", fg=INK)
-        for item in self.studio.store.instruments():
-            instruments.add_command(label=item["name"], command=lambda name=item["name"]: self.studio.set(instrument=name))
-        menu.add_cascade(label="Instrument", menu=instruments)
-        more.configure(menu=menu)
-        more.pack(side="right")
+        self.cancel_link = tk.Label(top, text="Cancel", bg=PAPER, fg=ACCENT, font=(FONT, 9), cursor="hand2")
+        self.cancel_link.bind("<ButtonRelease-1>", lambda _: self.studio.cancel())
         for name in PANELS[::-1]:
             link = tk.Label(top, text=name, bg=PAPER, fg=SUBTLE, font=(FONT, 10), cursor="hand2", padx=8)
             link.pack(side="right")
@@ -166,16 +159,20 @@ class Desk:
             badge = label(tile, side.upper(), size=34, color=SIDE[side], bold=True)
             name = label(tile, size=14, bold=True, wrap=320)
             caption = label(tile, size=9, color=SUBTLE, wrap=320)
-            marks = label(tile, size=9, color=ACCENT, wrap=320)
+            marks = tk.Frame(tile, bg=DARK)
+            for word in ("keeper", "not this"):
+                chip = tk.Label(marks, text="Keep" if word == "keeper" else "Not this", padx=8, pady=2,
+                                font=(FONT, 9), cursor="hand2", bg=DARK, fg=SUBTLE)
+                chip.pack(side="left", padx=(0, 6))
+                chip.bind("<ButtonRelease-1>", lambda _, side=side, word=word: self.studio.mark(word, side))
             air = label(tile, size=8, color=LIVE, bold=True)
             air.pack(side="top", fill="x")
-            marks.pack(side="bottom", fill="x", pady=(4, 0))
+            marks.pack(side="bottom", fill="x", pady=(6, 0))
             caption.pack(side="bottom", fill="x")
             name.pack(side="bottom", fill="x")
             badge.pack(side="bottom", fill="x")
-            for widget in (tile, badge, name, caption, air, marks):
+            for widget in (tile, badge, name, caption, air):
                 widget.bind("<ButtonRelease-1>", lambda _, side=side: self.studio.select(side))
-                widget.bind("<Button-3>", lambda event, side=side: self.tile_menu(event, side))
             self.tiles[side] = (tile, name, caption, air, marks)
 
         self.scene_row = tk.Frame(main, bg=PAPER)
@@ -193,15 +190,28 @@ class Desk:
         self.guitar.pack(side="left")
         self.loop = button(row, "Phrase", lambda: self.toggle_play("phrase"))
         self.loop.pack(side="left", padx=(2, 0))
-        Tooltip(self.guitar, "Play through the selected sound  ·  G")
-        Tooltip(self.loop, "Loop the recorded phrase through it  ·  P")
-        self.phrase_menu = tk.Menubutton(row, text="No phrase", bg=PAPER, fg=SUBTLE, relief="flat", font=(FONT, 9),
-                                         cursor="hand2")
-        options = tk.Menu(self.phrase_menu, tearoff=False, bg="#252834", fg=INK,
-                          postcommand=lambda: self.list_phrases(options))
-        self.phrase_menu.configure(menu=options)
-        self.phrase_menu.pack(side="right")
+        self.copy_link = tk.Label(row, text="Copy B to A", bg=PAPER, fg=SOFT, font=(FONT, 9), cursor="hand2", padx=8)
+        self.copy_link.pack(side="left", padx=(10, 0))
+        self.copy_link.bind("<ButtonRelease-1>", lambda _: self.studio.copy_to_a())
+        self.blind_link = tk.Label(row, text="Compare blind", bg=PAPER, fg=SOFT, font=(FONT, 9), cursor="hand2", padx=8)
+        self.blind_link.pack(side="left")
+        self.blind_link.bind("<ButtonRelease-1>", lambda _: self.studio.blind())
+        self.phrase_link = tk.Label(row, text="No phrase", bg=PAPER, fg=SUBTLE, font=(FONT, 9), cursor="hand2")
+        self.phrase_link.pack(side="right")
+        self.phrase_link.bind("<ButtonRelease-1>", lambda _: self.toggle("Phrase"))
         button(row, "Save to QC", self.save).pack(side="right", padx=8)
+        # Naming a save, in place: shown when Save to QC is pressed.
+        self.save_row = tk.Frame(main, bg=PAPER)
+        label(self.save_row, "Save as", size=9, color=SOFT).pack(side="left")
+        self.save_name = tk.Entry(self.save_row, font=(FONT, 11), bg=TILE, fg=INK, relief="flat", insertbackground=INK,
+                                  width=26)
+        self.save_name.pack(side="left", padx=8, ipady=4)
+        self.save_name.bind("<Return>", lambda _: self.saved())
+        button(self.save_row, "Save", self.saved).pack(side="left")
+        cancel = tk.Label(self.save_row, text="Cancel", bg=PAPER, fg=SOFT, font=(FONT, 9), cursor="hand2", padx=10)
+        cancel.pack(side="left")
+        cancel.bind("<ButtonRelease-1>", lambda _: self.save_row.pack_forget())
+        self.save_row_after = row
 
         self.line = label(main, size=10, color=INK, wrap=640)
         self.line.pack(fill="x", pady=(8, 4))
@@ -210,22 +220,30 @@ class Desk:
         self.request = tk.Entry(ask, font=(FONT, 12), bg=DARK, fg=INK, relief="flat", insertbackground=INK)
         self.request.pack(side="left", fill="x", expand=True, ipady=9, padx=12)
         self.request.bind("<Return>", lambda _: self.ask())
-        self.request.bind("<Escape>", lambda _: self.studio.cancel() or self.root.focus_set())
-        label(ask, "/", size=9, color=DIM).pack(side="right", padx=12)
 
     # ---- drawing ----
 
     def draw(self):
         state = self.studio.state
         self.working.configure(text=state.working)
+        if state.working and self.studio.cancel_signal is not None and not self.studio.cancel_signal.is_set():
+            self.cancel_link.pack(side="left")
+        else:
+            self.cancel_link.pack_forget()
         self.dot.itemconfigure(self.dot_mark, fill=LIVE if state.mode else (ACCENT if state.working else DIM))
         for side in ("a", "b"):
             tile, name, caption, air, marks = self.tiles[side]
             sound = self.studio.sound(side)
             hidden = state.blind and sound is not None
             name.configure(text="?" if hidden else (sound.name if sound else "Empty"))
-            caption.configure(text="Hidden while you compare · X shows them" if hidden else self.caption(sound))
-            marks.configure(text="" if hidden or sound is None else "  ".join(f"● {mark}" for mark in sound.marks))
+            caption.configure(text="Hidden while you compare" if hidden else self.caption(sound))
+            for chip, word in zip(marks.winfo_children(), ("keeper", "not this")):
+                marked = sound is not None and not hidden and word in sound.marks
+                chip.configure(bg=mix(SIDE[side], DARK, .35) if marked else tile["bg"], fg=INK if marked else SUBTLE)
+            if sound is None or hidden:
+                marks.pack_forget()
+            elif not marks.winfo_ismapped():
+                marks.pack(side="bottom", fill="x", pady=(6, 0), before=caption)
             selected = state.side == side
             on_air = state.mode and selected
             tile.configure(highlightbackground=SIDE[side] if selected else DARK,
@@ -236,10 +254,22 @@ class Desk:
         self.line.configure(text=state.status)
         self.guitar.configure(bg=mix(LIVE, TILE, .4) if state.mode == "guitar" else TILE)
         self.loop.configure(bg=mix(LIVE, TILE, .4) if state.mode == "phrase" else TILE)
+        self.blind_link.configure(text="Show which was which" if state.blind else "Compare blind")
         self.draw_strip()
         self.draw_scenes()
-        if self.panel:
+        if self.panel and self.drawn_from() != self.panel_key:
             self.fill_panel()
+
+    def drawn_from(self):
+        """What the open panel shows depends on: the sounds on show, what is known of them, the round, the scene."""
+        state = self.studio.state
+        sides = []
+        for side in ("a", "b"):
+            sound = self.studio.sound(side)
+            sides.append(None if sound is None else (sound.id, json.dumps(sound.heard, sort_keys=True, default=str),
+                                                     json.dumps(sound.knobs, sort_keys=True), tuple(sound.marks)))
+        return (self.panel, state.side, state.round, state.blind, state.scene, state.song, state.instrument,
+                tuple(sides), self.show_nano, tuple(sorted(self.expanded)))
 
     def caption(self, sound):
         if sound is None:
@@ -289,7 +319,6 @@ class Desk:
             back = tk.Label(self.chips, text="‹", padx=6, pady=5, cursor="hand2", font=(FONT, 10), bg=PAPER, fg=SOFT)
             back.pack(side="left")
             back.bind("<ButtonRelease-1>", lambda _: self.studio.round_back())
-            Tooltip(back, "The round before  ·  [")
         for place, candidate in enumerate(found["candidates"]):
             sound = self.studio.store.sound(candidate["sound"])
             chosen = candidate["sound"] == on_b
@@ -307,10 +336,10 @@ class Desk:
                         font=(FONT, 9, "bold" if ready else "normal"), bg=PAPER, fg=ACCENT if ready else SOFT)
         more.pack(side="left", padx=(4, 0))
         more.bind("<ButtonRelease-1>", lambda _: self.studio.round_forward())
-        Tooltip(more, "Three more, from what was heard and what you marked  ·  N")
         aim = found["aim"]
-        label(self.chips, f"aiming for {summary(aim)}", size=9, color=DIM).pack(
-            side="right")
+        song = aim.get("song")
+        part = f"{song.get('title')}{' · ' + song['part'] if song.get('part') else ''} · " if song else ""
+        label(self.chips, f"{part}aiming for {summary(aim)}", size=9, color=DIM).pack(side="right")
 
     # ---- panels ----
 
@@ -326,6 +355,7 @@ class Desk:
         self.fill_panel()
 
     def fill_panel(self):
+        self.panel_key = self.drawn_from()
         for child in self.tray.winfo_children():
             child.destroy()
         label(self.tray, self.panel, size=11, bold=True).pack(fill="x", pady=(0, 6))
@@ -353,6 +383,10 @@ class Desk:
             scale.set(values.get(key, 0.))
             scale.pack(side="right")
             scale.bind("<ButtonRelease-1>", lambda _, key=key, scale=scale: self.turned(key, scale.get()))
+        actions = tk.Frame(self.tray, bg=DARK)
+        actions.pack(fill="x", pady=(10, 0))
+        button(actions, "Undo", studio.undo).pack(side="left")
+        button(actions, "Hear it without the knobs", studio.base).pack(side="left", padx=6)
 
     def shape_pad(self, values, usable):
         """Brightness and Texture as one point on a square: dark to bright across, round to rough up. Drag the
@@ -397,11 +431,6 @@ class Desk:
         canvas.bind("<ButtonRelease-1>", done)
         show()
 
-    def part_scene(self):
-        chosen = getattr(self, "scene_choice", None)
-        value = chosen.get() if chosen else ""
-        return "ABCDEFGH".index(value[-1]) if value.startswith("scene ") else None
-
     def turned(self, key, value):
         sound = self.studio.sound(self.studio.state.side)
         self.studio.turn({**sound.knobs, key: value})
@@ -410,7 +439,7 @@ class Desk:
         studio = self.studio
         sound = studio.sound(studio.state.side)
         if studio.state.blind:
-            label(self.tray, "Hidden while you compare blind. X shows them.", color=SUBTLE).pack(fill="x")
+            label(self.tray, "Hidden while you compare blind.", color=SUBTLE).pack(fill="x")
             return
         if sound is None:
             label(self.tray, "Nothing here yet.", color=SUBTLE).pack(fill="x")
@@ -436,52 +465,70 @@ class Desk:
                 label(line, text, size=9, wrap=330).pack(side="left", fill="x", expand=True)
                 names = named_settings(block.model)
                 if names:
-                    choose = tk.Menubutton(line, text="▾", bg=DARK, fg=ACCENT, relief="flat", cursor="hand2",
-                                           font=(FONT, 10))
-                    options = tk.Menu(choose, tearoff=False, bg="#252834", fg=INK)
-                    for name in names:
-                        options.add_command(label=name, command=lambda r=r, column=column, name=name:
-                                            studio.named(r, column, name))
-                    choose.configure(menu=options)
-                    choose.pack(side="right")
-                    Tooltip(choose, "Its named settings, Neural DSP's own")
+                    place = (r, column)
+                    opened = place in self.expanded
+                    toggle = tk.Label(line, text="named settings ▴" if opened else "named settings ▾", bg=DARK,
+                                      fg=ACCENT, font=(FONT, 8), cursor="hand2")
+                    toggle.pack(side="right")
+                    toggle.bind("<ButtonRelease-1>", lambda _, place=place: self.expand(place))
+                    if opened:
+                        choices = tk.Frame(self.tray, bg=DARK)
+                        choices.pack(fill="x", padx=(12, 0), pady=(0, 4))
+                        for name in names:
+                            chip = tk.Label(choices, text=name, bg=TILE, fg=SOFT, font=(FONT, 8), padx=6, pady=2,
+                                            cursor="hand2")
+                            chip.pack(side="left", padx=(0, 4), pady=2)
+                            chip.bind("<ButtonRelease-1>", lambda _, r=r, column=column, name=name:
+                                      studio.named(r, column, name))
         from lab.hearing.measure import measured_lines
 
         label(self.tray, "Measured", size=8, color=DIM).pack(fill="x", pady=(10, 0))
         for line in measured_lines(sound.heard):
             label(self.tray, line, size=9, color=SOFT, wrap=400).pack(fill="x", pady=1)
-        button(self.tray, "Nano Cortex sheet", lambda: self.nano_sheet(sound)).pack(anchor="w", pady=(8, 4))
+        nano = tk.Label(self.tray, text="Nano Cortex sheet ▴" if self.show_nano else "Nano Cortex sheet ▾", bg=DARK,
+                        fg=ACCENT, font=(FONT, 9), cursor="hand2")
+        nano.pack(anchor="w", pady=(8, 2))
+        nano.bind("<ButtonRelease-1>", lambda _: self.toggle_nano())
+        if self.show_nano:
+            from lab.gear.nano import sheet
+
+            for line in sheet(sound.chain).lines():
+                label(self.tray, line, size=9, color=SOFT, wrap=400).pack(fill="x")
         for note in sound.notes[-4:]:
             label(self.tray, f"You: {note['text']}", size=9, color=SUBTLE, wrap=400).pack(fill="x")
 
-    def nano_sheet(self, sound):
-        """How to set this sound up on the Nano Cortex: what to capture, the IR, and the effects by hand."""
-        from lab.gear.nano import sheet
+    def expand(self, place):
+        self.expanded ^= {place}
+        self.fill_panel()
 
-        top = tk.Toplevel(self.root, bg=PAPER)
-        top.title(f"Nano Cortex · {sound.name}")
-        text = tk.Text(top, bg=DARK, fg=INK, font=(FONT, 10), relief="flat", wrap="word", padx=14, pady=12,
-                       width=70, height=30)
-        text.insert("1.0", "\n".join(sheet(sound.chain).lines()))
-        text.configure(state="disabled")
-        text.pack(fill="both", expand=True)
+    def toggle_nano(self):
+        self.show_nano = not self.show_nano
+        self.fill_panel()
 
     def panel_difference(self):
         for line in self.studio.difference():
             label(self.tray, line, size=10, wrap=400).pack(fill="x", pady=2)
 
     def panel_phrase(self):
-        """The phrase as a waveform; drag the edges to choose the part that loops."""
+        """The phrases recorded, recording a new one with its pickup setting, and the loop: drag its edges."""
         import numpy as np
 
+        current = self.studio.phrase[0] if self.studio.phrase else None
+        for item in self.studio.recorded_phrases()[:8]:
+            chosen = item["id"] == current
+            row = tk.Label(self.tray, text=f"{item['instrument']} · {item['setting']} · {item['recorded'][5:16]}",
+                           bg=TILE if chosen else DARK, fg=INK if chosen else SOFT, font=(FONT, 9), anchor="w",
+                           padx=6, pady=2, cursor="hand2")
+            row.pack(fill="x")
+            row.bind("<ButtonRelease-1>", lambda _, item=item: (self.choose_recorded(item), self.fill_panel()))
+        self.recording_controls()
         whole = getattr(self.studio, "phrase_whole", None)
         if whole is None:
-            label(self.tray, "Choose or record a phrase first.", color=SUBTLE).pack(fill="x")
             return
         audio, start, end = whole
         width, height = 400, 120
         canvas = tk.Canvas(self.tray, width=width, height=height, bg=TILE, highlightthickness=0, cursor="sb_h_double_arrow")
-        canvas.pack(fill="x")
+        canvas.pack(fill="x", pady=(10, 0))
         columns = np.array_split(np.abs(audio[:, 0]), width)
         peak = max(float(audio.max()), 1e-6)
         for x, part in enumerate(columns):
@@ -602,6 +649,16 @@ class Desk:
         if kind == "ir":
             button(actions, "Put in B's cab", lambda: chosen() and self.studio.use_asset(chosen())).pack(side="left")
         else:
+            versions = tk.Frame(self.tray, bg=DARK)
+            versions.pack(fill="x", pady=(6, 0))
+            label(versions, "If the unit does not say, the capture is", size=9, color=SUBTLE).pack(side="left")
+            for value in (1, 2):
+                chosen_version = value == self.capture_version
+                chip = tk.Label(versions, text=f"V{value}", bg=TILE if chosen_version else DARK,
+                                fg=INK if chosen_version else SOFT, font=(FONT, 9), padx=6, cursor="hand2")
+                chip.pack(side="left", padx=(6, 0))
+                chip.bind("<ButtonRelease-1>", lambda _, value=value: (setattr(self, "capture_version", value),
+                                                                       self.fill_panel()))
             button(actions, "Instead of B's amp", lambda: self.try_capture(chosen(), False)).pack(side="left")
             button(actions, "Instead of amp and cab", lambda: self.try_capture(chosen(), True)).pack(
                 side="left", padx=6)
@@ -609,16 +666,7 @@ class Desk:
     def try_capture(self, asset, has_cab):
         if asset is None:
             return
-        version = asset.capture_version
-        if version is None:
-            from tkinter import messagebox
-
-            answer = messagebox.askyesnocancel("Capture version", f"Is {asset.name} a V2 capture? "
-                                               "(No means V1. Cortex Control shows it.)", parent=self.root)
-            if answer is None:
-                return
-            version = 2 if answer else 1
-        self.studio.use_asset(asset, has_cab=has_cab, version=version)
+        self.studio.use_asset(asset, has_cab=has_cab, version=asset.capture_version or self.capture_version)
 
     def read_directory(self):
         self.studio.set(working="Reading the presets on the Quad Cortex…")
@@ -637,7 +685,16 @@ class Desk:
             self.studio.work_on(slot, name)
 
     def panel_history(self):
-        # What the player's marks and choices say about what they keep, in measured quantities.
+        # Songs and their parts, collected from requests for songs; then what the player's choices say.
+        for song in self.studio.store.songs()[-6:]:
+            parts = []
+            for part in song.get("parts", []):
+                try:
+                    parts.append(f"{part['name']}: {self.studio.store.sound(part['sound']).name}")
+                except (OSError, ValueError, KeyError):
+                    continue
+            if parts:
+                label(self.tray, f"{song['name']} · " + ", ".join(parts), size=9, wrap=400).pack(fill="x", pady=1)
         for line in self.studio.taste_lines():
             label(self.tray, line, size=9, color=SOFT, wrap=400).pack(fill="x", pady=1)
         sounds = self.studio.store.sounds()[::-1][:60]
@@ -653,72 +710,7 @@ class Desk:
                    lambda side=side: box.curselection() and self.studio.put(side, sounds[box.curselection()[0]])
                    ).pack(side="left", padx=(0, 6))
 
-    def panel_song(self):
-        studio = self.studio
-        name = tk.Entry(self.tray, font=(FONT, 11), bg=TILE, fg=INK, relief="flat", insertbackground=INK)
-        name.insert(0, studio.state.song or "")
-        name.pack(fill="x", ipady=6)
-        name.bind("<Return>", lambda _: studio.set(song=name.get().strip() or None))
-        label(self.tray, "The song this sound is for. Enter to set.", size=8, color=DIM).pack(fill="x")
-        if studio.state.song:
-            song = studio.store.song(studio.state.song)
-            for part in song["parts"]:
-                sound = studio.store.sound(part["sound"])
-                where = f", scene {'ABCDEFGH'[part['scene']]}" if part.get("scene") is not None else ""
-                label(self.tray, f"{part['name']}: {sound.name}{where}", size=10).pack(fill="x", pady=1)
-            row = tk.Frame(self.tray, bg=DARK)
-            row.pack(fill="x", pady=(8, 0))
-            label(row, "Make what is on show the", size=9, color=SUBTLE).pack(side="left", padx=(0, 6))
-            for part in ("Clean", "Rhythm", "Lead"):
-                button(row, part, lambda part=part: studio.add_part(part, self.part_scene())).pack(side="left",
-                                                                                                    padx=(0, 5))
-            scenes = tk.Frame(self.tray, bg=DARK)
-            scenes.pack(fill="x", pady=(6, 0))
-            label(scenes, "of", size=9, color=SUBTLE).pack(side="left", padx=(0, 6))
-            self.scene_choice = tk.StringVar(value="the whole sound")
-            tk.OptionMenu(scenes, self.scene_choice, "the whole sound",
-                          *[f"scene {letter}" for letter in "ABCDEFGH"]).pack(side="left")
-
     # ---- actions ----
-
-    def tile_menu(self, event, side):
-        studio = self.studio
-        sound = studio.sound(side)
-        menu = tk.Menu(self.root, tearoff=False, bg="#252834", fg=INK)
-        if sound is not None and not studio.state.blind:
-            for word, key in (("keeper", "K"), ("not this", "D")):
-                menu.add_checkbutton(label=f"{word.capitalize()}  ·  {key}", onvalue=True, offvalue=False,
-                                     variable=tk.BooleanVar(value=word in sound.marks),
-                                     command=lambda word=word: studio.mark(word, side))
-            menu.add_command(label="Mark with a word…", command=lambda: self.mark_with_word(side))
-            menu.add_separator()
-        menu.add_command(label="Copy B to A", command=studio.copy_to_a)
-        menu.add_command(label=("Show which was which" if studio.state.blind else "Compare blind") + "  ·  X",
-                         command=studio.blind)
-        menu.tk_popup(event.x_root, event.y_root)
-
-    def mark_with_word(self, side=None):
-        word = simpledialog.askstring("Mark", "A word for this sound (it is yours, not the app's):", parent=self.root)
-        if word:
-            self.studio.mark(word, side)
-
-    def key(self, event):
-        if self.root.focus_get() is self.request:
-            return None
-        name = event.keysym.lower()
-        actions = {"a": lambda: self.studio.select("a"), "b": lambda: self.studio.select("b"),
-                   "g": lambda: self.toggle_play("guitar"), "p": lambda: self.toggle_play("phrase"),
-                   "space": self.studio.stop, "z": self.studio.undo, "slash": self.request.focus_set,
-                   "1": lambda: self.studio.step(0), "2": lambda: self.studio.step(1), "3": lambda: self.studio.step(2),
-                   "escape": self.studio.cancel, "0": self.studio.base,
-                   "k": lambda: self.studio.mark("keeper"), "d": lambda: self.studio.mark("not this"),
-                   "t": self.mark_with_word, "x": self.studio.blind, "n": self.studio.round_forward,
-                   "bracketright": self.studio.round_forward, "bracketleft": self.studio.round_back,
-                   "s": lambda: self.toggle("Shape"), "c": lambda: self.toggle("Chain"), "h": lambda: self.toggle("History")}
-        if name in actions:
-            actions[name]()
-            return "break"
-        return None
 
     def toggle_play(self, mode):
         seat = getattr(self, "seat", None)
@@ -744,32 +736,40 @@ class Desk:
         self.studio.ask(text)
 
     def save(self):
+        """Show the name to save under, in place, filled in with the sound's own."""
         sound = self.studio.sound(self.studio.state.side)
         if sound is None:
             return
-        name = simpledialog.askstring("Save to the Quad Cortex", "Name (up to 24 letters):", initialvalue=sound.name,
-                                      parent=self.root)
+        self.save_name.delete(0, "end")
+        self.save_name.insert(0, sound.name[:24])
+        self.save_row.pack(fill="x", pady=(8, 0), after=self.save_row_after)
+        self.save_name.focus_set()
+
+    def saved(self):
+        name = self.save_name.get().strip()[:24]
+        self.save_row.pack_forget()
         if name:
-            self.studio.save(name.strip())
+            self.studio.save(name)
 
-    def list_phrases(self, menu):
-        menu.delete(0, "end")
-        menu.add_command(label="Record a phrase…", command=self.record)
-        menu.add_separator()
-        for item in self.studio.recorded_phrases()[:20]:
-            menu.add_command(label=f"{item['instrument']} · {item['setting']} · {item['recorded'][5:16]}",
-                             command=lambda item=item: self.choose_recorded(item))
-
-    def record(self):
+    def recording_controls(self):
+        """Record a phrase: the pickup setting it is played on, then Record (eight seconds, from the guitar)."""
         instrument = self.studio.store.instrument(self.studio.state.instrument) or {}
-        settings = [f"{position} · {wiring}" for position in instrument.get("settings") or ["Pickup"]
+        settings = [f"{position} · {wiring}".rstrip(" ·") for position in instrument.get("settings") or ["Pickup"]
                     for wiring in (instrument.get("wiring") or [""])]
-        settings = [setting.rstrip(" ·") for setting in settings]
-        choice = simpledialog.askstring(
-            "Record a phrase", f"Pickup setting on the {self.studio.state.instrument}?\n" + "\n".join(settings),
-            initialvalue=settings[0], parent=self.root)
-        if choice:
-            self.studio.record(choice.strip())
+        label(self.tray, f"Record a phrase on the {self.studio.state.instrument}, played on:", size=9,
+              color=SUBTLE).pack(fill="x", pady=(10, 2))
+        grid = tk.Frame(self.tray, bg=DARK)
+        grid.pack(fill="x")
+        for index, setting in enumerate(settings):
+            chosen = setting == self.record_setting
+            chip = tk.Label(grid, text=setting, bg=TILE if chosen else DARK, fg=INK if chosen else SOFT, font=(FONT, 8),
+                            padx=6, pady=2, cursor="hand2")
+            chip.grid(row=index // 3, column=index % 3, sticky="w", padx=(0, 4), pady=1)
+            chip.bind("<ButtonRelease-1>", lambda _, setting=setting: (setattr(self, "record_setting", setting),
+                                                                       self.fill_panel()))
+        go = button(self.tray, f"Record {RECORD_SECONDS:g} s" if self.record_setting else "Choose the setting first",
+                    lambda: self.record_setting and self.studio.record(self.record_setting, RECORD_SECONDS))
+        go.pack(anchor="w", pady=(4, 0))
 
     def choose_recorded(self, item, start=None, end=None):
         path = self.studio.folder / "phrases" / item["id"] / "dry.wav"
@@ -780,14 +780,44 @@ class Desk:
         self.studio.phrase = (item["id"], whole[start:end].copy())
         self.studio.phrase_whole = (whole, start, end)
         self.studio.remember()
-        self.phrase_menu.configure(text=f"Phrase · {item.get('instrument', '')} · {item['setting']}")
+        self.phrase_link.configure(text=f"Phrase · {item.get('instrument', '')} · {item['setting']}")
 
     def panel_guitar(self):
+        row = tk.Frame(self.tray, bg=DARK)
+        row.pack(fill="x", pady=(0, 8))
+        button(row, "Guitar Learner", self.open_learner).pack(side="left")
+        button(row, "Input calibration", self.open_calibration).pack(side="left", padx=6)
+        from lab.learner import gestures
+
+        button(row, "Gestures off" if gestures.running() else "Gestures on",
+               lambda: (self.toggle_gestures(), self.fill_panel())).pack(side="left")
         _, lines = self.studio.guitar_profile()
         label(self.tray, f"What the {self.studio.state.instrument} puts out", size=10, bold=True).pack(fill="x")
         for line in lines:
             label(self.tray, line, size=9, wrap=400).pack(fill="x", pady=2)
-        button(self.tray, "Record a phrase", self.record).pack(fill="x", pady=(8, 0))
+        self.recording_controls()
+
+    def panel_more(self):
+        """The side tools, the instrument, and measuring the USB round trip."""
+        from lab.tools.menu import TOOLS, opener
+
+        label(self.tray, "Tools", size=9, color=SUBTLE).pack(fill="x")
+        grid = tk.Frame(self.tray, bg=DARK)
+        grid.pack(fill="x", pady=(2, 10))
+        for index, (title, name) in enumerate(TOOLS):
+            chip = tk.Label(grid, text=title, bg=TILE, fg=INK, font=(FONT, 9), padx=8, pady=4, cursor="hand2")
+            chip.grid(row=index // 2, column=index % 2, sticky="we", padx=(0, 4), pady=2)
+            chip.bind("<ButtonRelease-1>", lambda _, name=name: opener(name)(self))
+        label(self.tray, "Instrument", size=9, color=SUBTLE).pack(fill="x")
+        row = tk.Frame(self.tray, bg=DARK)
+        row.pack(fill="x", pady=(2, 10))
+        for item in self.studio.store.instruments():
+            chosen = item["name"] == self.studio.state.instrument
+            chip = tk.Label(row, text=item["name"], bg=TILE if chosen else DARK, fg=INK if chosen else SOFT,
+                            font=(FONT, 9), padx=8, pady=3, cursor="hand2")
+            chip.pack(side="left", padx=(0, 4))
+            chip.bind("<ButtonRelease-1>", lambda _, name=item["name"]: self.studio.set(instrument=name))
+        button(self.tray, "Measure the USB round trip", self.calibrate).pack(anchor="w")
 
     def calibrate(self):
         self.studio.set(working="Measuring the USB round trip…")
@@ -823,6 +853,11 @@ class Desk:
         if self.learner is None:
             self.learner = GuitarLearner(self.learner_seat())
         self.learner.show()
+
+    def failed(self, kind, error, trace):
+        """A fault in a click: logged with its trace, and said on the line."""
+        self.studio.log_error(error, trace)
+        self.studio.say(f"Something went wrong: {error}. The details are in errors.log in the data folder.")
 
     def tick(self):
         try:
@@ -942,10 +977,11 @@ def main(arguments):
     folder = home() / ("simulated" if simulated else "")
     folder.mkdir(parents=True, exist_ok=True)
     root = tk.Tk()
-    if not simulated:
-        first_run(root, folder)
+    notice = first_run(folder) if not simulated else ""
     host = Host(folder, simulated=simulated)
-    desk = Desk(root, Studio(host, folder))
+    studio = Studio(host, folder)
+    studio.notice = notice
+    desk = Desk(root, studio)
     if not simulated:
         desk.answer_second_launch()
     root.mainloop()
@@ -967,14 +1003,12 @@ def only_desk():
         return True
 
 
-def first_run(root, folder):
-    """Once: check what the app needs, bring the earlier app's history in, and say what is missing."""
-    from tkinter import messagebox
-
+def first_run(folder):
+    """Once: check what the app needs, bring the earlier app's history in, and return what to say about it."""
     from lab import migrate, setup
 
     if not setup.first_run_needed(folder):
-        return
+        return ""
     findings = setup.checks(folder)
     try:
         moved = migrate.summary(migrate.migrate(folder))[0]
@@ -982,10 +1016,7 @@ def first_run(root, folder):
         moved = f"The earlier app's history could not be brought in: {error}"
     setup.record(folder, findings)
     missing = [item["say"] for item in findings if not item["ok"]]
-    text = ("\n\n".join(missing) if missing else "Everything the app needs is here.") + "\n\n" + moved
-    root.withdraw()
-    (messagebox.showwarning if missing else messagebox.showinfo)("Tone Lab · first run", text, parent=root)
-    root.deiconify()
+    return " ".join(missing) + " " + moved if missing else moved
 
 
 if __name__ == "__main__":

@@ -187,7 +187,9 @@ class Loop:
             self.cursor = (self.cursor + frames) % len(self.riff)
 
     def start(self):
-        sd = self.audio.sd
+        sd = getattr(self.audio, "sd", None)
+        if sd is None:          # the simulated unit has no audio driver: the loop is silent
+            return self
         self.stream = sd.Stream(device=self.audio.device, samplerate=RATE, dtype="float32", channels=(2, 2),
                                 latency="high", extra_settings=(sd.AsioSettings(USB_PAIR), sd.AsioSettings(USB_PAIR)),
                                 callback=self._process)

@@ -428,3 +428,34 @@ class StudioTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SongPartTest(unittest.TestCase):
+    """A sound kept from a round the assistant understood as a song's part becomes that part, with no naming."""
+
+    def test_a_kept_sound_from_a_song_round_is_filed_under_the_song_and_part(self):
+        import json
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+
+        from lab.desk.studio import Studio
+        from lab.qc.host import Host
+        from lab.sound.chain import Block, Chain, Row
+        from lab.sound.sounds import Sound
+
+        folder = TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        home = Path(folder.name)
+        host = Host(home / "unit", simulated=True, local=True)
+        studio = Studio(host, home)
+        self.addCleanup(studio.close)
+        sound = studio.store.save(Sound("Gilmour Lead", Chain((Row((Block(GREENBACK),), inlet=1, outlet=19),)), {"kind": "designed"}))
+        (home / "rounds").mkdir(exist_ok=True)
+        (home / "rounds" / "r1.json").write_text(json.dumps({
+            "id": "r1", "request": "comfortably numb second solo", "candidates": [{"sound": sound.id, "differs": ""}],
+            "aim": {"song": {"artist": "Pink Floyd", "title": "Comfortably Numb", "part": "solo"}}}), encoding="utf-8")
+        studio.set(b=sound.id, side="b")
+        studio.mark("keeper")
+        song = studio.store.song("Pink Floyd - Comfortably Numb")
+        self.assertEqual(song["parts"], [{"name": "Solo", "sound": sound.id}])
+        self.assertEqual(studio.state.song, "Pink Floyd - Comfortably Numb")

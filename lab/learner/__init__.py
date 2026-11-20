@@ -27,7 +27,7 @@ __all__ = ["GuitarLearner"]
 def __getattr__(name):
     # The window brings in Tk; the worker process and the analysis do not need it.
     if name == "GuitarLearner":
-        from lab.learner.__init__.window import GuitarLearner
+        from lab.learner.window import GuitarLearner
 
         return GuitarLearner
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

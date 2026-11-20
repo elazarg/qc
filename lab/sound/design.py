@@ -251,8 +251,10 @@ def design_schema(model_ids):
 
 def round_schema(model_ids):
     word = lambda kind: {"type": "string", "enum": list(AIM[kind])}
+    text = {"type": "string"}
     return _fields(aim=_fields(distortion=word("distortion"), brightness=word("brightness"), tail=word("tail"),
-                               note={"type": "string"}),
+                               note=text),
+                   song=_fields(artist=text, title=text, part=text),
                    designs={"type": "array", "items": design_schema(model_ids)})
 
 
@@ -534,7 +536,7 @@ def round_of_three(assistant, text, instrument, *, phrase=None, earlier=None, re
     irs = player_irs(text, known=assets_known)
     models = _with_irs(offered(text, kind), irs)
     names = ("task", "chain", craft_for(kind), *(("input",) if guitar else ()),
-             *(("listening",) if listening else ()), "scenes", "paths", "budget", "round")
+             *(("listening",) if listening else ()), "scenes", "paths", "budget", "round", "song")
     prompt = sections(*names) + "\n\n" + json.dumps(
         facts(text, instrument, phrase=phrase, earlier=earlier, models=models, irs=irs, guitar=guitar,
               listening=listening),
@@ -547,6 +549,10 @@ def round_of_three(assistant, text, instrument, *, phrase=None, earlier=None, re
         try:
             aim = {key: reply["aim"][key] for key in AIM}
             aim["note"] = str(reply["aim"].get("note", ""))[:300]
+            song = reply.get("song") or {}
+            if str(song.get("title") or "").strip():
+                # The song and part the request is for, as the assistant understood it.
+                aim["song"] = {key: str(song.get(key) or "").strip()[:60] for key in ("artist", "title", "part")}
         except (KeyError, TypeError):
             return None, ["The aim is missing."]
         designs, problems, seen = [], [], set()
