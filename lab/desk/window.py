@@ -94,9 +94,18 @@ class Desk:
         studio.listeners.append(lambda state: self.draw())
         root.bind("<Key>", self.key)
         root.protocol("WM_DELETE_WINDOW", self.close)
+        session = studio.restore() or {}
         recorded = studio.recorded_phrases()
-        if recorded:
+        kept = session.get("phrase") or {}
+        item = next((item for item in recorded if item["id"] == kept.get("id")), None)
+        if item is not None:
+            self.choose_recorded(item, kept.get("start"), kept.get("end"))
+        elif recorded:
             self.choose_recorded(recorded[0])
+        panel = (session.get("desk") or {}).get("panel")
+        if panel in PANELS:
+            self.toggle(panel)
+        self.draw()
         studio.open()
         self.tick()
 
@@ -308,9 +317,11 @@ class Desk:
     def toggle(self, name):
         if self.panel == name:
             self.panel = None
+            self.studio.remember(panel=None)
             self.tray.grid_remove()
             return
         self.panel = name
+        self.studio.remember(panel=name)
         self.tray.grid(row=0, column=1, sticky="ns", padx=(14, 0))
         self.fill_panel()
 
@@ -498,6 +509,7 @@ class Desk:
         def done(_):
             self.studio.phrase = (self.studio.phrase[0], audio[edges["start"]:edges["end"]].copy())
             self.studio.phrase_whole = (audio, edges["start"], edges["end"])
+            self.studio.remember()
             if self.studio.state.mode == "phrase":
                 self.studio.play("phrase")
 
@@ -759,12 +771,15 @@ class Desk:
         if choice:
             self.studio.record(choice.strip())
 
-    def choose_recorded(self, item):
+    def choose_recorded(self, item, start=None, end=None):
         path = self.studio.folder / "phrases" / item["id"] / "dry.wav"
         whole = read_wave(path)[:, :1]
-        start, length = loudest_at(whole)
-        self.studio.phrase = (item["id"], whole[start:start + length].copy())
-        self.studio.phrase_whole = (whole, start, start + length)
+        if start is None or end is None or not 0 <= start < end <= len(whole):
+            start, length = loudest_at(whole)
+            end = start + length
+        self.studio.phrase = (item["id"], whole[start:end].copy())
+        self.studio.phrase_whole = (whole, start, end)
+        self.studio.remember()
         self.phrase_menu.configure(text=f"Phrase · {item.get('instrument', '')} · {item['setting']}")
 
     def panel_guitar(self):

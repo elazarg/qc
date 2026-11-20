@@ -52,6 +52,11 @@ class State:
     scene: int = 0                    # the scene heard, 0 to 7
 
 
+SESSION = "session.json"
+# What is on show, kept so that the next start puts it back: never playing, never blind.
+KEPT = ("a", "b", "side", "round", "scene", "song", "instrument")
+
+
 class Studio:
     def __init__(self, host, folder=None, *, assistant=None, phrase=None):
         self.folder = Path(folder or knowledge.home())
@@ -73,9 +78,52 @@ class Studio:
     # ---- state ----
 
     def set(self, **changes):
+        before = self.state
         self.state = replace(self.state, **changes)
+        if any(getattr(before, key) != getattr(self.state, key) for key in KEPT):
+            self.remember()
         for listener in self.listeners:
             listener(self.state)
+
+    # ---- the session, kept between starts ----
+
+    def remember(self, **desk):
+        """Keep what is on show (and anything the desk adds, such as the open panel) for the next start."""
+        record = {key: getattr(self.state, key) for key in KEPT}
+        whole = getattr(self, "phrase_whole", None)
+        if self.phrase:
+            record["phrase"] = {"id": self.phrase[0], **({"start": int(whole[1]), "end": int(whole[2])}
+                                                         if whole else {})}
+        record["desk"] = {**getattr(self, "desk_session", {}), **desk}
+        self.desk_session = record["desk"]
+        path = self.folder / SESSION
+        try:
+            part = path.with_suffix(".part")
+            part.write_text(json.dumps(record, indent=1), encoding="utf-8")
+            part.replace(path)
+        except OSError:
+            pass
+
+    def restore(self):
+        """Put back what was on show when the app last closed, as far as it still exists. Returns the record (the
+        phrase and the desk's part are the desk's to use), or None. The unit is made ready when it opens."""
+        try:
+            record = json.loads((self.folder / SESSION).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+
+        def exists(sound_id):
+            return bool(sound_id) and (self.folder / "sounds" / f"{sound_id}.json").exists()
+
+        changes = {key: record[key] for key in ("side", "scene", "song", "instrument") if record.get(key) is not None}
+        changes.update(a=record.get("a") if exists(record.get("a")) else None,
+                       b=record.get("b") if exists(record.get("b")) else None)
+        if record.get("round") and self.round(record["round"]) is not None:
+            changes["round"] = record["round"]
+        self.desk_session = record.get("desk") or {}
+        self.state = replace(self.state, **changes)
+        self.restored = bool(self.state.a or self.state.b)
+        return record
 
     def say(self, text):
         self.set(status=text)
@@ -124,6 +172,13 @@ class Studio:
             note = " Gave back the preset a crash had left borrowed." if result.get("recovered") else ""
             self.set(working="", status="Ready." + note + (" Some measured tables were made on another firmware."
                                                             if stale else ""))
+            if getattr(self, "restored", False):
+                self.restored = False
+                shown = [f"{side.upper()} {self.sound(side).name}" for side in ("a", "b") if self.sound(side)]
+                found = self.round()
+                self.say("Back where you left off: " + ", ".join(shown)
+                         + (f"; round: {found['request']}" if found else "") + "." + note)
+                self._show()
 
         self.later(self.host.call("open"), opened)
         # The player's presets, for the Sounds panel and for requests that name one: read again when the last
@@ -153,6 +208,8 @@ class Studio:
             if self.state.revision != revision:
                 return
             self.set(working="", shown=how)
+            if self.state.scene:
+                self.later(self.host.call("scene", self.state.scene), lambda result: None)
             if self.state.mode:
                 self.play(self.state.mode)
             self.listen_when_free()
@@ -249,6 +306,7 @@ class Studio:
         self.set(mode=None, status="Stopped.")
 
     def close(self):
+        self.remember()
         self.host.close()
         self.thinking.shutdown(wait=False, cancel_futures=True)
 

@@ -64,3 +64,43 @@ class PadPanelTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SessionDeskTest(unittest.TestCase):
+    """The real desk on the simulated unit, its windows kept off the screen: what was open comes back."""
+
+    def test_the_desk_reopens_the_panel_and_the_phrase_loop_it_was_left_with(self):
+        import json
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+
+        import numpy as np
+
+        from lab.desk.studio import Studio
+        from lab.hearing.audio import write_wave
+        from lab.qc.host import Host
+
+        folder = TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        home = Path(folder.name)
+        take = home / "phrases" / "take1"
+        take.mkdir(parents=True)
+        write_wave(take / "dry.wav", (np.sin(np.arange(48000 * 4) / 48000 * 2 * np.pi * 196) * .2)[:, None])
+        (take / "phrase.json").write_text(json.dumps({"id": "take1", "instrument": "Charvel", "setting": "Neck",
+                                                      "recorded": "2026-11-20T10:00:00+00:00"}), encoding="utf-8")
+        (home / "session.json").write_text(json.dumps({"side": "a", "phrase": {"id": "take1", "start": 4800,
+                                                                                 "end": 52800},
+                                                       "desk": {"panel": "Chain"}}), encoding="utf-8")
+        root = tk.Tk()
+        host = Host(home / "unit", simulated=True, local=True)
+        host.ready.result(10)
+        studio = Studio(host, home)
+        desk = Desk(root, studio)
+        try:
+            self.assertEqual(desk.panel, "Chain")
+            self.assertEqual(studio.state.side, "a")
+            self.assertEqual(len(studio.phrase[1]), 48000)
+            self.assertEqual(studio.phrase_whole[1:], (4800, 52800))
+        finally:
+            studio.close()
+            root.destroy()

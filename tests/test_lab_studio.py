@@ -389,5 +389,42 @@ class StudioTest(unittest.TestCase):
         self.assertIn('"player_listening"', self.script.asked[-1][0])
 
 
+    def test_the_next_start_comes_back_to_what_was_on_show(self):
+        self.script.answers.append(self.three("One", "Two", "Three"))
+        self.studio.ask("make a classic rock crunch")
+        settle(self.studio, 20)
+        self.studio.copy_to_a()
+        settle(self.studio)
+        self.studio.step(2)
+        settle(self.studio)
+        self.studio.set(song="Time", side="a")
+        self.studio.phrase_whole = (self.studio.phrase[1], 100, 2000)
+        self.studio.remember(panel="Chain")
+        before = self.studio.state
+        self.studio.close()
+
+        host = Host(self.folder / "unit", simulated=True, local=True)
+        host.ready.result(10)
+        again = Studio(host, self.folder, assistant=Assistant(self.folder, automatic=False, run=self.script))
+        self.addCleanup(again.close)
+        record = again.restore()
+        for key in ("a", "b", "side", "round", "song", "instrument", "scene"):
+            self.assertEqual(getattr(again.state, key), getattr(before, key), key)
+        self.assertEqual(record["phrase"], {"id": "take", "start": 100, "end": 2000})
+        self.assertEqual(record["desk"]["panel"], "Chain")
+        again.open()
+        settle(again, 20)
+        self.assertEqual(again.state.shown, "pair")                 # A and B made ready on the unit again
+        self.assertIn("Back where you left off", again.state.status)
+        self.assertEqual(again.round()["candidates"][2]["sound"], again.state.b)
+
+    def test_sounds_that_no_longer_exist_are_not_put_back(self):
+        import json
+        (self.folder / "session.json").write_text(json.dumps({"a": "gone", "b": "gone too", "side": "a"}),
+                                                  encoding="utf-8")
+        self.studio.restore()
+        self.assertEqual((self.studio.state.a, self.studio.state.b, self.studio.state.side), (None, None, "a"))
+
+
 if __name__ == "__main__":
     unittest.main()
