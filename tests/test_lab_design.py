@@ -145,6 +145,59 @@ class DesignTest(unittest.TestCase):
         self.assertAlmostEqual(revised.chain.block(0, 0).display(0), 10., places=1)
         self.assertEqual(differences(revised.chain.with_block(0, 0, saved.chain.block(0, 0)), saved.chain), [])
 
+    def test_the_guitar_profile_reaches_a_round_and_its_sounds_carry_the_input(self):
+        from lab import profile
+
+        summary = {"Bridge Series": {"takes": 1, "peak_db": -17., "lufs": -30., "centroid_hz": 1800,
+                                     "bands": {"lows": -6.}},
+                   "Neck Parallel": {"takes": 1, "peak_db": -33., "lufs": -45., "centroid_hz": 2600,
+                                     "bands": {"lows": -10.}}}
+        guitar = profile.facts(summary, "Neck Parallel")
+        good = answer("Fuzz", [block(FUZZ, 0, fuzz=10), block(HIWATT, 1), block(V30, 2)])
+        other = answer("Plexi", [block(PLEXI, 0, gain=8), block(GREENBACK, 1)])
+        assistant, script = self.assistant(reply(good, other))
+        _, designs = design.round_of_three(assistant, "Gilmour Time solo", CHARVEL, guitar=guitar)
+        prompt = script.asked[0][0]
+        self.assertIn(design.sections("input"), prompt)
+        sent = json.loads(prompt[prompt.index("{\"request\""):])
+        self.assertEqual(sent["guitar_profile"], guitar)
+        self.assertIn("15 dB weaker", sent["guitar_profile"]["settings"]["Neck Parallel"]["implies"])
+        for sound, _ in designs:
+            self.assertEqual(sound.origin["input"], {"instrument": "Charvel", "setting": "Neck Parallel"})
+            self.assertEqual(sound.origin["kind"], "designed")
+        self.assertEqual(Sound.from_record(json.loads(json.dumps(designs[0][0].to_record()))).origin["input"],
+                         {"instrument": "Charvel", "setting": "Neck Parallel"})
+
+    def test_without_a_profile_nothing_about_it_is_said(self):
+        good = answer("Fuzz", [block(FUZZ, 0, fuzz=10), block(HIWATT, 1), block(V30, 2)])
+        other = answer("Plexi", [block(PLEXI, 0, gain=8), block(GREENBACK, 1)])
+        assistant, script = self.assistant(reply(good, other))
+        _, designs = design.round_of_three(assistant, "Gilmour Time solo", CHARVEL, setting="Bridge")
+        self.assertNotIn("guitar_profile", script.asked[0][0])
+        self.assertEqual(designs[0][0].origin["input"], {"instrument": "Charvel", "setting": "Bridge"})
+        assistant, script = self.assistant(reply(good, other))
+        _, designs = design.round_of_three(assistant, "Gilmour Time solo", None)
+        self.assertNotIn("input", designs[0][0].origin)
+
+    def test_a_revision_hears_of_the_guitar_and_carries_the_input(self):
+        saved = Sound("Fuzz", Chain((Row((Block(FUZZ), Block(HIWATT), Block(V30)), inlet=1, outlet=16),)),
+                      {"kind": "preset"})
+        changed = {**design.as_form(saved.chain), "name": "x", "target": "t", "explanation": "e", "differs": "",
+                   "blend": {"level_db": 0, "spread": 0}, "sources": []}
+        guitar = {"recorded_on": "Bridge Series", "reference": "Bridge Series",
+                  "settings": {"Bridge Series": {"peak_db": -30., "peak_against_typical_humbucker_db": -12.,
+                                                 "implies": "about 12 dB weaker than presets assume."}}}
+        assistant, script = self.assistant(changed)
+        revised = design.revise(assistant, saved, "more gain", CHARVEL, guitar=guitar)
+        prompt = script.asked[0][0]
+        self.assertIn(design.sections("input"), prompt)
+        self.assertIn("12 dB weaker", prompt)
+        self.assertEqual(revised.origin["input"], {"instrument": "Charvel", "setting": "Bridge Series"})
+        self.assertEqual(revised.origin["from"], saved.id)
+        assistant, script = self.assistant(changed)
+        design.revise(assistant, saved, "more gain", CHARVEL)
+        self.assertNotIn(design.sections("input"), script.asked[0][0])
+
     def test_no_call_is_made_that_nobody_stands_behind(self):
         assistant, script = self.assistant()
         assistant.automatic = False

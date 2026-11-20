@@ -1,0 +1,207 @@
+"""What a listening history says that can inform tone work. Generic: this module holds no one's data.
+
+It reads a Spotify account export (the extended streaming history, or the
+short one) and keeps, of each play, only the artist, title, album, how long
+it played, when, and how it started and ended. Everything else in the export
+(IP address, country, device, ...) is never read into memory past parsing.
+
+From that it works out:
+
+- how much each artist and song was listened to, over all and recently;
+- which songs were chosen deliberately (started by a click, not by shuffle or
+  autoplay, and played through) and how often they were come back to,
+  which says more about liking than time alone;
+- which songs were listened to in a live version as well as a studio one,
+  since a recorded tone differs between them;
+- which songs already have a preset or a sound of the player's, by name;
+- with the assistant, for the most listened artists: whether the music is
+  guitar-led, who plays guitar, the families of guitar tone used, and songs
+  that would make good presets.
+
+`report(...)` returns plain lines and a JSON-able record. Where they are kept
+is the caller's business: Tone Lab writes them to the player's data folder
+(`knowledge.home() / "personal"`), never into the project, because they are
+personal.
+"""
+
+from collections import Counter, defaultdict
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+import json
+from pathlib import Path
+import re
+import zipfile
+
+from .spotify import song_key
+
+DELIBERATE_STARTS = {"clickrow", "playbtn", "backbtn"}
+COMPLETE_ENDS = {"trackdone"}
+MINIMUM_MS = 30_000
+LIVE = re.compile(r"\blive\b|\(live|- live|unplugged|in concert", re.I)
+
+
+@dataclass(frozen=True)
+class Play:
+    artist: str
+    title: str
+    album: str
+    ms: int
+    ts: str
+    deliberate: bool      # started by the listener's own click, not shuffle, autoplay or the next track
+    complete: bool        # played to the end
+    skipped: bool
+
+
+def _history_file(name):
+    """A streaming-history file of music: the extended export's audio files or the short export's files."""
+    name = Path(name).name.lower()
+    return name.endswith(".json") and ("streaming_history_audio" in name or name.startswith("streaminghistory"))
+
+
+def _rows(paths):
+    for path in paths:
+        path = Path(path)
+        if path.is_dir():
+            yield from _rows(sorted(path.rglob("*.json")))
+        elif path.suffix.lower() == ".zip":
+            with zipfile.ZipFile(path) as archive:
+                for name in archive.namelist():
+                    if _history_file(name):
+                        yield from json.loads(archive.read(name).decode("utf-8"))
+        elif _history_file(path.name):
+            yield from json.loads(path.read_text(encoding="utf-8"))
+
+
+def plays(paths):
+    """The music plays in an export: files, folders or the zip. Podcasts, audiobooks and video are left out."""
+    found = []
+    for row in _rows(paths):
+        if not isinstance(row, dict):
+            continue
+        artist = row.get("master_metadata_album_artist_name") or row.get("artistName")
+        title = row.get("master_metadata_track_name") or row.get("trackName")
+        if not artist or not title:
+            continue
+        found.append(Play(artist=str(artist), title=str(title), album=str(row.get("master_metadata_album_album_name") or ""),
+                          ms=int(row.get("ms_played", row.get("msPlayed", 0)) or 0),
+                          ts=str(row.get("ts") or row.get("endTime") or ""),
+                          deliberate=row.get("reason_start") in DELIBERATE_STARTS and not row.get("shuffle"),
+                          complete=row.get("reason_end") in COMPLETE_ENDS,
+                          skipped=bool(row.get("skipped"))))
+    return found
+
+
+def _when(text):
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def summarize(found, *, recent_days=365, now=None, limit=40):
+    """Totals by year, top artists over all and recently, and the songs chosen and come back to most."""
+    heard = [play for play in found if play.ms >= MINIMUM_MS]
+    stamps = [_when(play.ts) for play in heard]
+    latest = now or max((stamp for stamp in stamps if stamp), default=datetime.now(timezone.utc))
+    cutoff = latest - timedelta(days=recent_days)
+    years, artists, recent_artists = Counter(), Counter(), Counter()
+    songs = defaultdict(lambda: {"ms": 0, "plays": 0, "chosen": 0, "complete": 0, "skipped": 0, "live": False,
+                                 "studio": False, "days": set(), "artist": "", "title": ""})
+    for play, stamp in zip(heard, stamps):
+        hours = play.ms / 3.6e6
+        if stamp:
+            years[stamp.year] += hours
+        artists[play.artist] += hours
+        if stamp and stamp >= cutoff:
+            recent_artists[play.artist] += hours
+        key = (play.artist.casefold(), song_key(play.title))
+        song = songs[key]
+        song["artist"], song["title"] = song["artist"] or play.artist, song["title"] or play.title
+        song["ms"] += play.ms
+        song["plays"] += 1
+        song["chosen"] += play.deliberate
+        song["complete"] += play.complete
+        song["skipped"] += play.skipped
+        live = bool(LIVE.search(play.title) or LIVE.search(play.album))
+        song["live" if live else "studio"] = True
+        if stamp:
+            song["days"].add(stamp.date())
+    ranked = []
+    for song in songs.values():
+        ranked.append({"artist": song["artist"], "title": song["title"], "hours": round(song["ms"] / 3.6e6, 1),
+                       "plays": song["plays"], "chosen": song["chosen"], "days": len(song["days"]),
+                       "completion": round(song["complete"] / song["plays"], 2) if song["plays"] else 0,
+                       "both_versions": song["live"] and song["studio"]})
+    # Coming back on many different days, by choice, is the strongest sign of liking a song.
+    ranked.sort(key=lambda song: (song["chosen"] + song["days"], song["hours"]), reverse=True)
+    return {"hours": round(sum(play.ms for play in heard) / 3.6e6), "plays": len(heard),
+            "years": {year: round(hours) for year, hours in sorted(years.items())},
+            "artists": [(artist, round(hours, 1)) for artist, hours in artists.most_common(limit)],
+            "recent_artists": [(artist, round(hours, 1)) for artist, hours in recent_artists.most_common(limit)],
+            "songs": ranked[:limit * 2]}
+
+
+def with_presets(songs, names):
+    """Which songs already have a preset or sound of the player's, matched on the song's name."""
+    def words(text):
+        return {word for word in re.findall(r"[^\W_]+", song_key(text).casefold()) if word not in FILLER}
+
+    named = [(words(name), name) for name in names]
+    out = []
+    for song in songs:
+        title = words(song["title"])
+        # Whole words: every word of the shorter name appears in the longer ("Brothers" in "Brothers In Arms"),
+        # never part of a word ("Gold" is not in "Goldtop").
+        match = next((name for found, name in named if found and title
+                      and (found <= title or title <= found) and max(map(len, found & title or {""})) >= 4), None)
+        out.append({**song, "preset": match})
+    return out
+
+
+FILLER = {"the", "a", "an", "of", "in", "and", "to", "my", "solo", "lead", "rhythm", "clean", "tone", "preset",
+          "remastered", "live", "version", "feat"}
+
+
+GUITAR_SCHEMA = {"type": "object", "additionalProperties": False, "required": ["artists"], "properties": {
+    "artists": {"type": "array", "items": {"type": "object", "additionalProperties": False,
+                "required": ["artist", "guitar_led", "guitarists", "tones", "songs_for_presets", "note"],
+                "properties": {"artist": {"type": "string"}, "guitar_led": {"type": "boolean"},
+                               "guitarists": {"type": "array", "items": {"type": "string"}},
+                               "tones": {"type": "array", "items": {"type": "string", "enum": [
+                                   "clean", "edge of breakup", "crunch", "overdriven", "saturated", "fuzz",
+                                   "acoustic", "ambient", "modulated", "bass-led", "none"]}},
+                               "songs_for_presets": {"type": "array", "items": {"type": "string"}},
+                               "note": {"type": "string"}}}}}}
+
+
+def guitar_context(assistant, artists, songs, *, by="player", cancel=None):
+    """Ask the assistant, once, what kind of guitar music the most listened artists make. Facts it is unsure of
+    it should leave out; the answer is a prior for designing, not a measurement."""
+    prompt = ("For each artist below, say whether their music is guitar-led, who plays guitar, which families of "
+              "guitar tone they mostly use (from the listed words only), and up to three of the listed songs "
+              "that would make good presets to build for a guitarist who listens to them. Use only what is well "
+              "documented; leave a field empty rather than guess. note: one short line on the guitar sound.\n\n"
+              + json.dumps({"artists": [artist for artist, _ in artists],
+                            "songs": [f"{song['artist']} - {song['title']}" for song in songs]}, ensure_ascii=False))
+    return assistant.ask("listening", prompt, GUITAR_SCHEMA, by=by, web=False, seconds=180, cancel=cancel)["artists"]
+
+
+def report(summary, context=None, presets=None):
+    """Plain lines for the player, and nothing that is not already in the summary or the context."""
+    lines = [f"{summary['hours']} hours of music over {len(summary['years'])} years "
+             f"({', '.join(f'{year}: {hours} h' for year, hours in summary['years'].items())})."]
+    lines.append("Most listened artists: " + ", ".join(f"{a} ({h} h)" for a, h in summary["artists"][:15]) + ".")
+    lines.append("In the last year: " + ", ".join(f"{a} ({h} h)" for a, h in summary["recent_artists"][:10]) + ".")
+    if context:
+        led = [item for item in context if item.get("guitar_led")]
+        tones = Counter(tone for item in led for tone in item.get("tones", []))
+        lines.append(f"Of the top {len(context)} artists, {len(led)} make guitar-led music; their guitar tones lean "
+                     f"to {', '.join(f'{tone} ({n})' for tone, n in tones.most_common(6))}.")
+    songs = presets if presets is not None else summary["songs"]
+    lines.append("Songs chosen and come back to most:")
+    for song in songs[:25]:
+        extra = f"; you have a preset: {song['preset']}" if song.get("preset") else ""
+        both = "; heard live and studio" if song.get("both_versions") else ""
+        lines.append(f"  {song['artist']} - {song['title']}: chosen {song['chosen']} times on "
+                     f"{song['days']} days, {song['hours']} h{both}{extra}")
+    return lines

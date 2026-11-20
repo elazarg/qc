@@ -448,13 +448,14 @@ def _block(spec, count, kept=None, *, names=None, label=None):
 
 # ---- Asking ----
 
-def facts(text, instrument, *, phrase=None, chain=None, earlier=None, models=(), irs=None):
+def facts(text, instrument, *, phrase=None, chain=None, earlier=None, models=(), irs=None, guitar=None):
     notes = knowledge.guitar_notes(instrument.get("name")) if instrument else None
     recipe = _recipe(text) if chain is None else None
     irs = irs or {}
     return {"request": text,
             "instrument": {key: instrument.get(key) for key in ("name", "kind", "about")} if instrument else None,
             **({"instrument_notes": notes} if notes else {}),
+            **({"guitar_profile": guitar} if guitar else {}),
             **({"phrase": phrase} if phrase else {}),
             **({"community_recipe": recipe} if recipe else {}),
             **({"current_chain": as_form(chain, irs)} if chain is not None else {}),
@@ -506,18 +507,31 @@ def _sound(item, chain, origin):
                           for s in item.get("sources") or [] if str(s.get("url", "")).startswith("https://")][:6])
 
 
+def played_on(instrument, setting=None, guitar=None):
+    """What a sound was made for: the instrument, and the pickup setting of the phrase used when it is known."""
+    if not instrument:
+        return None
+    setting = setting or (guitar or {}).get("recorded_on")
+    return {"instrument": instrument.get("name"), **({"setting": setting} if setting else {})}
+
+
 def round_of_three(assistant, text, instrument, *, phrase=None, earlier=None, research=False, by="player",
-                   cancel=None, assets_known=None):
+                   cancel=None, assets_known=None, guitar=None, setting=None):
     """An aim and up to three sounds that reach it by different routes.
 
     `assets_known` are the IRs and captures read from the unit (None: those last read, `assets.cached`); the
-    player's IRs the request names are offered as models."""
+    player's IRs the request names are offered as models. `guitar` is what the instrument puts out
+    (`profile.facts`), given to the assistant as guitar_profile; `setting` is the pickup setting of the phrase in
+    use. Each sound's origin carries the input it was made for under "input" (`played_on`)."""
     kind = (instrument or {}).get("kind", "electric")
     irs = player_irs(text, known=assets_known)
     models = _with_irs(offered(text, kind), irs)
-    names = ("task", "chain", craft_for(kind), "scenes", "paths", "budget", "round")
+    names = ("task", "chain", craft_for(kind), *(("input",) if guitar else ()), "scenes", "paths", "budget", "round")
     prompt = sections(*names) + "\n\n" + json.dumps(
-        facts(text, instrument, phrase=phrase, earlier=earlier, models=models, irs=irs), ensure_ascii=False)
+        facts(text, instrument, phrase=phrase, earlier=earlier, models=models, irs=irs, guitar=guitar),
+        ensure_ascii=False)
+    source = played_on(instrument, setting, guitar)
+    origin = {"kind": "designed", "request": text, **({"input": source} if source else {})}
     physical = (instrument or {}).get("input", 1)
 
     def check(reply):
@@ -536,7 +550,7 @@ def round_of_three(assistant, text, instrument, *, phrase=None, earlier=None, re
                 problems.append(f"Design {number} is the same chain as an earlier one.")
                 continue
             seen.add(chain.digest())
-            designs.append((_sound(item, chain, {"kind": "designed", "request": text}),
+            designs.append((_sound(item, chain, dict(origin)),
                             str(item.get("differs") or "")[:160]))
         # Two good designs are worth keeping; a repair is asked for only when fewer came back.
         return (aim, designs), (problems if len(designs) < 2 else [])
@@ -545,14 +559,19 @@ def round_of_three(assistant, text, instrument, *, phrase=None, earlier=None, re
                         seconds=240 if research else 180, cancel=cancel)
 
 
-def revise(assistant, sound, text, instrument, *, phrase=None, by="player", cancel=None, assets_known=None):
+def revise(assistant, sound, text, instrument, *, phrase=None, by="player", cancel=None, assets_known=None,
+           guitar=None, setting=None):
     """A new sound: `sound` changed as the request asks, everything else kept. The player's IRs the sound
-    holds or the request names are offered as models (`assets_known` as for `round_of_three`)."""
+    holds or the request names are offered as models (`assets_known`, `guitar` and `setting` as for
+    `round_of_three`)."""
     kind = (instrument or {}).get("kind", "electric")
     irs = player_irs(text, sound.chain, known=assets_known)
     models = _with_irs(offered(text, kind, sound.chain), irs, sound.chain)
-    prompt = sections("task", "chain", "revise", craft_for(kind), "scenes", "paths", "budget") + "\n\n" + json.dumps(
-        facts(text, instrument, phrase=phrase, chain=sound.chain, models=models, irs=irs), ensure_ascii=False)
+    names = ("task", "chain", "revise", craft_for(kind), *(("input",) if guitar else ()), "scenes", "paths", "budget")
+    prompt = sections(*names) + "\n\n" + json.dumps(
+        facts(text, instrument, phrase=phrase, chain=sound.chain, models=models, irs=irs, guitar=guitar),
+        ensure_ascii=False)
+    source = played_on(instrument, setting, guitar)
 
     def check(reply):
         chain, problems = to_chain(reply, offered_ids=set(models), base=sound.chain,
@@ -562,6 +581,6 @@ def revise(assistant, sound, text, instrument, *, phrase=None, by="player", canc
     chain = _ask_checked(assistant, "revise", prompt, design_schema(models), check, by=by, web=False, seconds=120,
                          cancel=cancel)
     revised = _sound({"name": sound.name, "explanation": ""}, chain,
-                     {"kind": "revised", "request": text, "from": sound.id})
+                     {"kind": "revised", "request": text, "from": sound.id, **({"input": source} if source else {})})
     revised.parent = sound.id
     return revised
