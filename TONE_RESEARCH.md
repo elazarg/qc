@@ -139,3 +139,81 @@ second run aimed at these would fill the largest gaps.
 5. **The guitar in the design.** Give the designer the guitar profile (output per pickup setting, brightness)
    and ask for gain and EQ suited to it; record the input and pickup in recipes.
 6. **Second research run** on comparison, context and manufacturer documentation.
+
+---
+
+# Second run: comparing, recording craft, mistakes, the unit
+
+Also on 20 November 2026, aimed at the first run's gaps: 20 claims verified, 5 refuted. The strongest come from
+ITU standards for formal listening tests of codecs; they apply to comparing guitar tones by analogy.
+
+## Comparing
+
+**12. Match loudness before comparing, and keep it fixed.** *(high)* Levels are set before a comparison, never
+adjusted per option, and never change within one. ITU-R BS.1534-3, sections 7.1 and 8.
+- **For the app:** A and B are matched before playing and stay matched; the listening level is the player's,
+  one setting for both.
+
+**13. Match by loudness, not by a plain level.** *(medium)* A-weighted level is not a reliable loudness match,
+especially between options of different bandwidth (a fizzy tone against a dark one). Integrated loudness
+(ITU-R BS.1770, K-weighted and gated) with the louder turned down is a workable metered method; a small bias can
+remain between tonally different signals, and very short loops can mislead the gating. ITU-R BS.1284-1, 7.1-7.2.
+- **For the app:** match A and B by integrated loudness (now recorded with each measurement), not by RMS;
+  measure on the whole phrase, not a fragment.
+
+**14. Timing.** *(high)* Excerpts of at most about 15 to 20 s that do not cut a phrase; half to one second between
+paired items; sessions of 15 to 20 minutes with breaks at least as long. ITU-R BS.1284-1, 4.2; the ODAQ dataset.
+- **For the app:** the loop should end on a phrase boundary (the Phrase panel's edges); after about twenty
+  minutes of comparing, say so once.
+
+**15. How many at once.** *(medium)* Formal tests show at most 12 signals per trial, 8 in recent practice.
+ITU-R BS.1534-3, 5.3; ODAQ.
+- **For the app:** three per round is well inside this.
+
+## Recording craft (consensus of engineers and a microphone maker, not measurements)
+
+**16. Close-mic position.** *(medium)* At the dust-cap centre: brightest, most direct, most presence; toward the
+cone edge: progressively darker, fuller, softer. Royer Labs; Premier Guitar.
+- **For the app:** matches how Brightness and Texture move the cab microphones.
+
+**17. Angle and distance.** *(medium)* Straight on: widest range, most impact; angled: highs roll off, a harsh
+edge softens; beyond about a foot: more room and possibly more low end, though directional microphones gain bass
+up close (proximity), so distance does not always add bass. Premier Guitar; Royer Labs.
+
+**18. Two microphones.** *(medium)* Equal distance from the cone avoids phase cancellation; in the Fredman setup
+the on-axis microphone is bright and the off-axis one mids and lows, so the blend acts as a brightness control.
+Sound On Sound.
+
+## Mistakes (gear-press rules of thumb, labelled as such)
+
+**19.** *(medium)* Too much gain is among the most common mistakes: it compresses and hides articulation; start
+lower than seems needed. When a tone feels weak or lost, raise mids before bass or treble (unless it is already
+honky). Guitar World, with Premier Guitar, Craig Anderton and Sweetwater agreeing.
+- **For the app:** already in the designer's craft; the remark lexicon's "thin" and "lost in the mix" offer mids
+  first.
+
+## The unit (manufacturer documentation)
+
+**20. Inputs and outputs.** *(high)* Each Quad Cortex input has its own impedance, mic or instrument type, phantom
+power and gain; each output its own level. Neural DSP documentation (2021).
+
+**21. Scenes.** *(medium)* Scene mode switches parameters and bypass of any number of blocks in one rig; preset mode
+switches between eight different rigs. Same documentation.
+
+**22. Neural Capture V2.** *(high)* For touch-sensitive gear (amps, amp and cab, combos, cabs, overdrive, fuzz,
+compressors), no time-based effects; compressors with aggressive thresholds and long release times may differ
+from the hardware. Created only on Quad Cortex; Nano Cortex plays them. Neural DSP, November 2025.
+- **For the app:** the Nano sheet already captures only amp and drives; it should leave compressors with long
+  release out of the capture.
+
+## Refuted in this run
+
+That ODAQ normalised to −23 LUFS; that Nano and Quad captures are equal in quality and take five minutes; that a
+ribbon and SM57 blend is the most popular; fixed tonal signatures per microphone type; that 0.5 dB is the level
+difference that decides a comparison (no source).
+
+## Still without evidence
+
+Context (band mix against alone, listening level and equal-loudness curves, headphones, monitors, FRFR and cabs),
+cab IR choice, effect order, parallel paths, level matching between scenes, fizz and excess low end as
+diagnoses, presets moved between guitars, and how Kemper, Fractal, Helix and ToneX describe tone matching.
