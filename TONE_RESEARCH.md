@@ -217,3 +217,29 @@ difference that decides a comparison (no source).
 Context (band mix against alone, listening level and equal-loudness curves, headphones, monitors, FRFR and cabs),
 cab IR choice, effect order, parallel paths, level matching between scenes, fizz and excess low end as
 diagnoses, presets moved between guitars, and how Kemper, Fractal, Helix and ToneX describe tone matching.
+
+---
+
+# What was built from this (20 November 2026)
+
+1. **Texture as a measure and a control.** Each harmonic of the test tone, low against high orders, an
+   order-weighted figure, harmonic centroid, tristimulus 3 and harmonic-to-noise (`lab/probe.py`). Calibrated on
+   the unit: real amps differ in the *balance* of high and low orders (−6 dB on a Plexi at low gain to +4 dB on a
+   Soldano lead), not in the share of high orders; words round, warm, even, edged, rough
+   (`research/measurements/distortion-ladder.md`). Warmth and Smoothness are replaced by **Brightness** and
+   **Texture**, shown together as one pad on the Shape panel; old positions carry over with their sign.
+2. **Attack** (10–90 % rise of the notes, played firmly and softer) and energy by band against the dry guitar are
+   measured. Attack reads long on sustaining driven sounds and is shown but not yet used for words.
+3. **Knobs that check themselves.** After a turn the shaped sound is listened to silently and compared with the
+   unshaped one; at most one correction. On the unit: Brightness +0.6 moved the spectral centre +0.31 octave
+   (as intended); Texture +0.6 on an amp with no drive pedal moved the order balance only +0.7 dB (too small) and
+   was turned further once. On an amp alone Texture has few controls to move; amp gain moves the balance most but
+   is Distortion's.
+4. **The player's weights** (`lab/taste.py`): choices from comparison, marks, saves and rounds, fitted by a
+   regularised pairwise logistic regression; nothing claimed below eight usable choices.
+5. **The guitar in the design**: the profile of the pickup setting in use reaches the designer, with a section on
+   compensating a weak or hot, dark or bright input; designed sounds record the input they were made for.
+6. **Second research run** (above). From it: A and B are now matched by integrated loudness (BS.1770).
+
+Personal results (the owner's listening analysis, taste model, guitar profile) live in the data folder, never in
+this repository.
