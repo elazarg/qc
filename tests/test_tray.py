@@ -1,5 +1,8 @@
 """The tray of panels beside the tones: every open panel stays in reach, however small the window."""
 
+
+import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
+import hidden_tk  # noqa: E402,F401  (keeps every window off the screen)
 import tkinter as tk
 import unittest
 from unittest.mock import patch

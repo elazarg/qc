@@ -1,5 +1,8 @@
 """The seat the Guitar Learner takes on the new desk: its jobs run on a worker and report back on the desk's clock."""
 
+
+import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
+import hidden_tk  # noqa: E402,F401  (keeps every window off the screen)
 from types import SimpleNamespace
 import unittest
 
