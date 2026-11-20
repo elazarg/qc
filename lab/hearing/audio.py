@@ -113,14 +113,17 @@ class Audio:
             raise RuntimeError("The replay was interrupted or dropped audio. Check the ASIO driver.")
         return result[PAD:]
 
-    def record(self, seconds, channels, *, cancel=None):
-        """Record the unit's inputs (1-based ASIO channels) for a number of seconds."""
+    def record(self, seconds, channels, *, cancel=None, started=None):
+        """Record the unit's inputs (1-based ASIO channels) for a number of seconds. `started` is called once the
+        driver delivers the first audio. A take with dropped audio, or shorter than asked, raises."""
         samples = np.zeros((round(RATE * seconds), len(channels)), dtype=np.float32)
-        state = {"cursor": 0}
+        state = {"cursor": 0, "issues": [], "told": False}
         sd = self.sd
 
         def process(indata, frames, timing, status):
             cursor = state["cursor"]
+            if status:
+                state["issues"].append(str(status))
             count = min(frames, len(samples) - cursor)
             samples[cursor:cursor + count] = indata[:count]
             state["cursor"] = cursor + count
@@ -134,9 +137,17 @@ class Audio:
             while stream.active and time.monotonic() < deadline:
                 if cancel is not None and cancel.is_set():
                     stream.abort()
-                    break
+                    raise Cancelled("The recording was stopped.")
+                if started is not None and not state["told"] and state["cursor"] > 0:
+                    state["told"] = True
+                    started()
                 sd.sleep(50)
-        return samples[:state["cursor"]]
+        if state["issues"]:
+            raise RuntimeError("The recording dropped audio (" + state["issues"][0] + "). Record it again.")
+        if state["cursor"] < len(samples):
+            raise RuntimeError(f"The recording stopped after {state['cursor'] / RATE:.1f} s of {seconds:g} s. "
+                               "Record it again.")
+        return samples
 
 
 def click(seconds=.5):

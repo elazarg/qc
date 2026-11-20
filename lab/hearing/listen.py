@@ -19,6 +19,21 @@ from lab.hearing.measure import SOFTER, heard
 from lab.qc.rig import USB
 
 TAIL = 1.5
+SILENT = 1e-4      # a return quieter than this at its peak carried nothing
+CLIPPED = .999
+
+
+def usable(audio, what):
+    """Refuse a return that cannot be measured: silent (nothing came back) or clipped (it hit full scale). Measured
+    anyway it would teach the app, and the player's taste model, something untrue."""
+    import numpy as np
+
+    peak = float(np.max(np.abs(audio))) if len(audio) else 0.
+    if peak < SILENT:
+        raise RuntimeError(f"Nothing came back from the Quad Cortex for {what}. Check that the chain passes USB 5/6 "
+                           "through; nothing was measured.")
+    if peak >= CLIPPED:
+        raise RuntimeError(f"The return of {what} clipped, so it was not measured. Turn the sound's level down.")
 
 
 def calibration(folder, firmware):
@@ -63,4 +78,7 @@ def listen(rig, audio, chain, dry, offset, *, stop=None):
     rig.unit.guard()
     if len(loud) < len(dry) or len(soft) < len(dry) or len(returned) < len(tones):
         raise RuntimeError("The unit returned less audio than was sent.")
+    usable(loud, "the phrase")
+    usable(soft, "the softer phrase")
+    usable(returned, "the test tones")
     return heard(dry, loud, soft, tail, probe=probe.analyse(returned).to_record())

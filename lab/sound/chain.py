@@ -490,4 +490,3 @@ def routed(chain, inlet, outlet):
         first = next((r for r, row in enumerate(chain.rows) if row.blocks), 0)
         routes[first] = (inlet, routes[first][1] if routes[first][1] not in (0,) else outlet)
     return chain.with_routes(routes)
-

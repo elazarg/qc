@@ -178,7 +178,11 @@ class StudioTest(unittest.TestCase):
         self.assertEqual(self.studio.sound("b").marks, ["not this"])
         self.studio.copy_to_a()
         settle(self.studio)
-        self.assertEqual(self.studio.sound("a").id, self.studio.sound("b").id)
+        a, b = self.studio.sound("a"), self.studio.sound("b")
+        self.assertNotEqual(a.id, b.id)                  # a sound of its own
+        self.assertEqual((a.chain.digest(), a.knobs, a.parent), (b.chain.digest(), b.knobs, b.id))
+        self.studio.turn({"drive": .4}, "b")
+        self.assertEqual(self.studio.sound("a").knobs, a.knobs)   # turning B leaves A as it was
         self.studio.step(2)
         settle(self.studio)
         names = {self.studio.sound("a").name, self.studio.sound("b").name}

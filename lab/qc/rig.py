@@ -45,6 +45,7 @@ class Rig:
 
     def ready(self, chain, *, stop=None):
         """A slot holding `chain`, recalled from the cache or built once. Returns (slot, what it holds)."""
+        self.slots.may_leave()
         digest = chain.digest()
         slot = self.slots.cached(digest)
         if slot is not None:
@@ -58,6 +59,7 @@ class Rig:
         return self.build(chain, stop=stop)
 
     def build(self, chain, *, stop=None):
+        self.slots.may_leave()
         digest = chain.digest()
         self.slots.claim(BUILD, BUILD_NAME)
         self.unit.slot = None

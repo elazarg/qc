@@ -70,10 +70,13 @@ def plays(paths):
 
 
 def _when(text):
+    """A play's time, always with its time zone. The standard export writes "2024-03-01 21:05" (UTC, unmarked) and
+    the extended one "2024-03-01T21:05:11Z"; both are read as UTC, so a mixed export compares."""
     try:
-        return datetime.fromisoformat(text.replace("Z", "+00:00"))
+        stamp = datetime.fromisoformat(text.replace("Z", "+00:00"))
     except ValueError:
         return None
+    return stamp.replace(tzinfo=timezone.utc) if stamp.tzinfo is None else stamp.astimezone(timezone.utc)
 
 
 def summarize(found, *, recent_days=365, now=None, limit=40):

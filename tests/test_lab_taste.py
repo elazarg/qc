@@ -127,9 +127,28 @@ class EvidenceTest(unittest.TestCase):
         found = {(pair["kept"], pair["over"]): (pair["how"], pair["weight"]) for pair in taste.comparisons(self.folder)}
         self.assertEqual(found, {
             ("keeper", "saved"): ("blind", 1.),
-            ("keeper", "rejected"): ("mark", 1.), ("saved", "rejected"): ("mark", 1.),
-            ("keeper", "passed"): ("round", .5), ("saved", "passed"): ("round", .5),
+            # One keeper is one decision: its pairs share it (a not-this pair at twice a passed-over one).
+            ("keeper", "rejected"): ("mark", .5), ("saved", "rejected"): ("mark", .5),
+            ("keeper", "passed"): ("round", .25), ("saved", "passed"): ("round", .25),
             ("passed", "rejected"): ("round", .5)})
+
+    def test_one_keeper_among_many_designs_counts_as_one_choice(self):
+        store = Store(self.folder)
+        rounds = self.folder / "rounds"
+        rounds.mkdir()
+        names = [f"s{index}" for index in range(9)]
+        for index, name in enumerate(names):
+            store.save(Sound(name, Chain(), {"kind": "designed"}, id=name, heard=record(brightness_oct=index / 10),
+                             played=True, marks=["keeper"] if index == 0 else []))
+        (rounds / "r1.json").write_text(json.dumps({"id": "r1", "request": "Crunch", "candidates": [
+            {"sound": name} for name in names]}), encoding="utf-8")
+        pairs = taste.comparisons(self.folder)
+        self.assertEqual(len(pairs), 8)
+        self.assertEqual(len({pair["decision"] for pair in pairs}), 1)
+        self.assertAlmostEqual(sum(pair["weight"] for pair in pairs), .5)
+        model = taste.fit(*taste.evidence(self.folder), minimum=2)
+        self.assertFalse(model["enough"])
+        self.assertEqual(model["n"], 1)
 
     def test_marks_outside_rounds_are_compared_only_between_related_sounds(self):
         store = Store(self.folder)

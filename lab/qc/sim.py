@@ -303,8 +303,10 @@ class SimAudio:
         out = np.concatenate([np.zeros(self.LATENCY), out])[:len(signal)]
         return np.stack([out, out], axis=1).astype(np.float32)
 
-    def record(self, seconds, channels, *, cancel=None):
+    def record(self, seconds, channels, *, cancel=None, started=None):
         """A plucked note, as if the player had played one."""
+        if started is not None:
+            started()
         time = np.arange(round(48000 * seconds)) / 48000
         note = .2 * np.sin(2 * np.pi * 196 * time) * np.exp(-2 * time)
         return np.repeat(note[:, None], len(channels), axis=1).astype(np.float32)
@@ -521,4 +523,3 @@ SimUnit.list_directory = _list_directory_with_assets
 SimUnit.set_param_typed = _set_param_typed_naming
 SimUnit.set_ir = _set_ir
 SimUnit.set_capture = _set_capture
-

@@ -23,7 +23,7 @@ from dataclasses import replace
 from qc_mcp import leveling
 
 from lab.sound import catalog
-from lab.sound.chain import COLUMNS, Chain, Row, routed
+from lab.sound.chain import COLUMNS, INTERNAL, Chain, Row, routed
 from lab.hearing.listen import calibrate, calibration, listen
 from lab.qc.rig import Rig
 from lab.qc.unit import same_slot
@@ -67,6 +67,7 @@ class Engine:
         self.levels = {"a": PREVIEW_DB, "b": PREVIEW_DB}
         self.shown = None                       # what is on the unit now: ("pair", chain) or ("single", side, chain)
         self.active, self.mode, self.loop = "a", None, None
+        self.loop_phrase = None                 # the audio the loop is playing
         self.borrowed = None
         self.offset = None
         self.asked, self.listening = {}, None      # see `level`
@@ -77,6 +78,7 @@ class Engine:
         """Give back anything a crash left borrowed, then note the player's preset before anything else is loaded."""
         recovered = self.slots.recover()
         self.slots.refresh()
+        self.slots.may_leave()                  # unsaved edits on the player's preset: wait, touch nothing
         self.borrowed = self.slots.note_borrowed()
         self.offset = calibration(self.slots.folder, self.unit.firmware)
         return {"recovered": recovered, "borrowed": self.borrowed, "calibrated": self.offset is not None}
@@ -143,14 +145,24 @@ class Engine:
             return {"side": side, "mode": mode}
         wanted = held
         for name in ("a", "b"):
-            if self.shown[0] != "pair" and name != side:
+            if self.sides[name] is None:
                 continue
+            # Each side with its own routing over its two rows (a row feeding the next stays joined); the side
+            # not heard has no input and its outputs muted.
             first = self._first_row(name)
             on = name == side
             level = leveling.norm_of(self.levels[name])
-            row = replace(wanted.rows[first], inlet=port if on else 0, outlet=MULTI_OUT,
-                          output=tuple({**dict(wanted.rows[first].output), VOLUME: level, MUTE: 0. if on else 1.}.items()))
-            wanted = wanted.with_row(first, row)
+            routes = routed(self.sides[name], port if on else 0, MULTI_OUT).routes
+            for offset in (0, 1):
+                inlet, outlet = routes[offset] if offset < len(routes) else (0, 0)
+                if not on and inlet not in INTERNAL:
+                    inlet = 0
+                row = wanted.rows[first + offset]
+                output = dict(row.output)
+                if outlet not in INTERNAL:
+                    output.update({VOLUME: level, MUTE: 0. if on else 1.})
+                wanted = wanted.with_row(first + offset, replace(row, inlet=inlet, outlet=outlet,
+                                                                 output=tuple(output.items())))
         self.unit.apply(wanted)
         self._keep_scene()
         self._loop(mode, phrase)
@@ -158,13 +170,39 @@ class Engine:
         return {"side": side, "mode": mode}
 
     def _loop(self, mode, phrase):
-        if mode == "phrase" and self.loop is None and phrase is not None:
-            from lab.hearing.audio import Loop
+        """Keep the phrase looping while switching sides; start it again when the phrase itself changed."""
+        import numpy as np
 
-            self.loop = Loop(self.audio, phrase).start()
+        if mode == "phrase" and phrase is not None:
+            same = (self.loop is not None and self.loop_phrase is not None and self.loop_phrase.shape == phrase.shape
+                    and np.array_equal(self.loop_phrase, phrase))
+            if not same:
+                from lab.hearing.audio import Loop
+
+                if self.loop is not None:
+                    self.loop.stop()
+                self.loop = Loop(self.audio, phrase).start()
+                self.loop_phrase = phrase
         if mode != "phrase" and self.loop is not None:
             self.loop.stop()
-            self.loop = None
+            self.loop = self.loop_phrase = None
+
+    def _on_ours(self):
+        """Whether the unit is still on the slot the app made ready (the player may have chosen another)."""
+        return self.unit.slot is not None and same_slot(self.unit.position(), self.unit.slot)
+
+    def watch(self):
+        """While something plays: if the player chose another preset on the unit, stop sending audio at once and
+        leave that preset alone. Returns {"moved": True} when that happened."""
+        if self.mode is None:
+            return {"moved": False}
+        if self._on_ours():
+            return {"moved": False}
+        if self.loop is not None:
+            self.loop.stop()
+            self.loop = self.loop_phrase = None
+        self.mode, self.shown = None, None
+        return {"moved": True}
 
     def _recall_side(self, side):
         chain = self.sides[side]
@@ -175,7 +213,7 @@ class Engine:
     def scene(self, scene):
         """Choose the scene heard (0 to 7). It is kept when A and B are made ready again or recalled."""
         self.chosen_scene = scene
-        if self.shown is not None:
+        if self.shown is not None and self._on_ours():
             self.unit.select_scene(scene)
         return scene
 
@@ -188,7 +226,7 @@ class Engine:
         """Disconnect every input, keeping the place in the phrase."""
         if self.loop is not None:
             self.loop.stop()
-            self.loop = None
+            self.loop = self.loop_phrase = None
         if self.shown is not None and self.mode is not None and self.slots.ours(self.unit.position()):
             held = self.unit.read()
             self.unit.apply(held.with_routes([(0, row.outlet) for row in held.rows]))
@@ -283,6 +321,7 @@ class Engine:
     def read(self, slot):
         """The chain and name of a preset saved on the unit."""
         self.quiet()
+        self.slots.may_leave()
         self.unit.slot = None
         held = self.unit.recall(slot)
         name = self.unit.name()
@@ -314,18 +353,26 @@ class Engine:
                 {**dict(playable.rows[0].output), VOLUME: leveling.norm_of(0.), MUTE: 0.}.items())),)
                                + playable.rows[1:])
         self.unit.apply(playable)          # then connected as it will be played
+        # Building took a while: the slot must still be empty (or the app's own) just before writing it.
+        self.slots.refresh()
+        self.slots.claim(target, name)
         stored = self.unit.store(target, name)
         self.shown = None
         return target, stored
 
-    def record(self, seconds, *, stop=None):
-        """Record the dry guitar from its input, as it reaches the unit before any processing."""
+    def record(self, seconds, side=None, *, stop=None, progress=None):
+        """Record the guitar: its dry input, as it reaches the unit before any processing, and the processed stereo
+        return. With `side`, the player hears (and the wet take holds) that side's sound while playing. Returns
+        the audio as (dry, wet left, wet right) columns. `progress("open")` says when the input is open."""
         self.quiet()
-        dry_channel = self.physical_input
-        if hasattr(self.unit.device, "read_message"):
-            from lab.qc.device import recording_channels
+        if side is not None and self.sides.get(side) is not None:
+            self.play(side, "guitar")
+        from lab.qc.device import recording_channels
 
-            # Which USB channels carry the dry input depends on the unit's USB Dry/Wet setting.
-            dry_channel = recording_channels(self.unit.device, self.physical_input)[0]
-        return self.audio.record(seconds, [dry_channel], cancel=stop)
-
+        # Which USB channels carry the dry input depends on the unit's USB Dry/Wet setting.
+        channels = list(recording_channels(self.unit.device, self.physical_input))
+        try:
+            return self.audio.record(seconds, channels, cancel=stop,
+                                     started=(lambda: progress("open")) if progress else None)
+        finally:
+            self.quiet()

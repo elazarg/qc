@@ -141,8 +141,11 @@ class Probe:
 
 
 def _mono(returned):
+    """The louder channel of the return. Averaging the channels would cancel a sound whose sides are in opposite
+    phase (a wide stereo effect) and measure it as clean."""
     returned = np.asarray(returned, dtype=np.float64)
-    return returned.reshape(len(returned), -1).mean(axis=1)
+    sides = returned.reshape(len(returned), -1)
+    return sides[:, int(np.argmax(np.mean(np.square(sides), axis=0)))]
 
 
 def _spectrum(part):

@@ -69,7 +69,10 @@ class Studio:
         self.jobs = []                    # (future, done, failed)
         self.preparing = None             # the round whose next three are being designed
         self.remark = None                # (text, sound id, remedies, the one applied) of the last remark
-        self.cancel_signal = None         # set to drop the request the assistant is working on
+        self.requests = set()             # the player's requests in flight, each its own cancel signal
+        self.progress = []                # (handler, value) reported by the unit's worker, handled by `poll`
+        self.retry_open_at = None         # when to try opening the unit again after it refused
+        self.watched_at = 0.              # when the unit was last asked whether the player moved it
         self.phrase = phrase              # (name, mono dry audio) or None
         self.listeners = []
         self.shaping = None               # (sound id, knobs turned, when) waiting to be checked by listening
@@ -133,16 +136,39 @@ class Studio:
         return self.store.sound(sound_id) if sound_id else None
 
     def checkpoint(self):
-        self.history = (self.history + [self.state])[-40:]
+        """Keep what is on show and the knob positions of both sounds, for undo."""
+        knob_values = {}
+        for side in ("a", "b"):
+            sound = self.sound(side)
+            if sound is not None:
+                knob_values[sound.id] = dict(sound.knobs)
+        self.history = (self.history + [(self.state, knob_values)])[-40:]
 
     def undo(self):
+        """Put back the sounds on show and their knob positions as they were. Playing is not undone: what plays
+        (or not) stays as it is."""
         if not self.history:
             self.say("Nothing to undo.")
             return
-        before = self.history.pop()
-        self.state = before
-        self._show()
-        self.say("Undone.")
+        before, knob_values = self.history.pop()
+        for sound_id, values in knob_values.items():
+            try:
+                sound = self.store.sound(sound_id)
+            except (OSError, ValueError):
+                continue
+            if sound.knobs != values:
+                sound.knobs = dict(values)
+                self.store.save(sound)
+        same_pair = (before.a, before.b) == (self.state.a, self.state.b)
+        self.set(a=before.a, b=before.b, side=before.side, round=before.round, scene=before.scene,
+                 blind=False, revision=self.state.revision + (0 if same_pair else 1), status="Undone.")
+        if same_pair and self.state.shown:
+            for side in ("a", "b"):
+                sound = self.sound(side)
+                if sound is not None:
+                    self.later(self.host.call("turn", side, sound.knobs), lambda moves: None)
+        else:
+            self._show()
 
     # ---- work done elsewhere ----
 
@@ -154,8 +180,13 @@ class Studio:
         written with its trace to errors.log in the data folder."""
         import traceback
 
-        finished = [job for job in self.jobs if job[0].done()]
-        self.jobs = [job for job in self.jobs if not job[0].done()]
+        finished, waiting = [], []
+        for job in self.jobs:                  # each future looked at once: one that finishes now waits a tick
+            (finished if job[0].done() else waiting).append(job)
+        self.jobs = waiting
+        while self.progress:
+            handler, value = self.progress.pop(0)
+            handler(value)
         for future, done, failed in finished:
             try:
                 result = future.result()
@@ -170,6 +201,19 @@ class Studio:
                 self.set(working="", status=f"Something went wrong: {error}. The details are in errors.log in the "
                                             "data folder.")
         self._check_shaping()
+        now = time.monotonic()
+        if self.retry_open_at is not None and now >= self.retry_open_at:
+            self.retry_open_at = None
+            self.open()
+        if self.state.mode and not self.host.busy and now - self.watched_at > 1.5:
+            self.watched_at = now
+            self.later(self.host.call("watch"), self._watched, lambda error: None)
+
+    def _watched(self, result):
+        if result.get("moved") and self.state.mode:
+            self.set(mode=None, shown=None, status="Another preset was chosen on the Quad Cortex, so Tone Lab stopped "
+                                                   "sending sound and leaves it alone. Press Guitar or Phrase to "
+                                                   "come back.")
 
     def log_error(self, error, trace):
         try:
@@ -199,11 +243,14 @@ class Studio:
                          + (f"; round: {found['request']}" if found else "") + "." + note)
                 self._show()
 
-        self.later(self.host.call("open"), opened)
+        def refused(error):
+            self.set(working="", status=f"{error}")
+            if getattr(self.host, "failed", None) is None:
+                self.retry_open_at = time.monotonic() + 5     # tried again until the unit lets it
+
+        self.later(self.host.call("open"), opened, refused)
         # The player's presets, for the Sounds panel and for requests that name one: read again when the last
         # read is over half a day old (it holds the unit about ten seconds). Quiet if it fails.
-        import time
-
         listing = self.folder / "directory.json"
         if not listing.exists() or time.time() - listing.stat().st_mtime > 12 * 3600:
             self.later(self.host.call("lab.qc.library.directory", folder=str(self.folder)), lambda entries: None,
@@ -239,6 +286,8 @@ class Studio:
         side = side or self.state.side
         if self.state.shown is None:
             self.set(mode=mode, side=side, status="Getting ready. It plays as soon as it is.")
+            if not self.state.working:
+                self._show()
             return
         sound = self.sound(side)
         if sound is None:
@@ -259,7 +308,7 @@ class Studio:
                 self.store.save(sound)
             if sound and sound.knobs:
                 self.later(self.host.call("turn", side, sound.knobs), lambda moves: None)
-            self.say(f"{side.upper()} · {sound.name} · {mode}")
+            self.say(f"{side.upper()} · {mode}" if self.state.blind else f"{side.upper()} · {sound.name} · {mode}")
 
         self.later(self.host.call("play", side, mode, phrase), playing)
 
@@ -272,16 +321,38 @@ class Studio:
         from lab.qc.engine import PREVIEW_DB
 
         sounds = {side: self.sound(side) for side in ("a", "b")}
-        heard = {side: sound.heard for side, sound in sounds.items()
-                 if sound and sound.heard and sound.heard.get("level_db", -200) > -90}
+        heard = {side: self.evidence(sound) for side, sound in sounds.items() if sound}
+        heard = {side: record for side, record in heard.items()
+                 if record and record.get("level_db") is not None and record["level_db"] > -90}
         key = "loudness_lufs" if all(record.get("loudness_lufs") is not None for record in heard.values()) \
             else "level_db"
         levels = {side: record[key] for side, record in heard.items()}
-        if len(levels) < 2:
+        if len(levels) < 2 or len([sound for sound in sounds.values() if sound]) < 2:
+            # Nothing fair to match by: both play at the preview level, and no earlier trim stays on either.
+            for side, sound in sounds.items():
+                if sound is not None:
+                    self.later(self.host.call("level", side, PREVIEW_DB), lambda result: None)
             return
         quietest = min(levels.values())
         for side, level in levels.items():
             self.later(self.host.call("level", side, PREVIEW_DB + quietest - level), lambda result: None)
+
+    def phrase_key(self):
+        """Which phrase, and which part of it, a measurement was made on: a measurement holds only for that."""
+        if not self.phrase:
+            return None
+        whole = getattr(self, "phrase_whole", None)
+        return f"{self.phrase[0]}@{whole[1]}-{whole[2]}" if whole else self.phrase[0]
+
+    def evidence(self, sound):
+        """What was measured of `sound` as it plays now (this phrase, this chain, these knobs), or None."""
+        heard = sound.heard
+        if not heard or heard.get("phrase") != self.phrase_key() or heard.get("digest") != sound.chain.digest():
+            return None
+        if not sound.knobs:
+            return heard
+        shaped = heard.get("shaped") or {}
+        return shaped if shaped.get("knobs") == sound.knobs and shaped.get("phrase") == self.phrase_key() else None
 
     def scene(self, scene):
         """Hear another scene of the sounds on show."""
@@ -299,19 +370,26 @@ class Studio:
         count = sound.chain.scenes_in_use()
         return [(scene, sound.chain.labels[scene]) for scene in range(count)] if count > 1 else []
 
+    def cancellable(self):
+        return any(not signal.is_set() for signal in self.requests)
+
     def cancel(self):
-        """Drop the request the assistant is working on; its answer, if it still comes, is ignored."""
-        if self.cancel_signal is None or self.cancel_signal.is_set():
+        """Drop every request the assistant is working on for the player; answers that still come are ignored."""
+        active = [signal for signal in self.requests if not signal.is_set()]
+        if not active:
             return False
-        self.cancel_signal.set()
+        for signal in active:
+            signal.set()
+        self.requests.clear()
         self.set(working="", status="Request cancelled.")
         return True
 
     def _request(self):
         from threading import Event
 
-        self.cancel_signal = Event()
-        return self.cancel_signal
+        signal = Event()
+        self.requests.add(signal)
+        return signal
 
     def select(self, side):
         if self.state.mode:
@@ -326,6 +404,8 @@ class Studio:
 
     def close(self):
         self.remember()
+        for signal in self.requests:
+            signal.set()
         self.host.close()
         self.thinking.shutdown(wait=False, cancel_futures=True)
 
@@ -373,8 +453,9 @@ class Studio:
             return
         if not sound.knobs:
             return
-        phrase_id = self.phrase[0]
-        if sound.heard and "probe" in sound.heard and sound.heard.get("phrase") == phrase_id:
+        phrase_id = self.phrase_key()
+        if sound.heard and "probe" in sound.heard and sound.heard.get("phrase") == phrase_id \
+                and sound.heard.get("digest") == sound.chain.digest():
             self._hear_shaped(sound, turned)
             return
         # The sound without its knobs has not been heard on this phrase: that first.
@@ -395,7 +476,7 @@ class Studio:
             self._show()
 
     def _hear_shaped(self, sound, turned):
-        sound_id, values, phrase_id = sound.id, dict(sound.knobs), self.phrase[0]
+        sound_id, values, phrase_id = sound.id, dict(sound.knobs), self.phrase_key()
         self.set(working=f"Listening to {sound.name} as shaped, silently…")
 
         def heard(result):
@@ -643,12 +724,13 @@ class Studio:
         stop = self._request() if not quietly else None
         future = self.thinking.submit(design.round_of_three, self.assistant, text, instrument, earlier=earlier, by=by,
                                       cancel=stop, assets_known=self._assets(), guitar=self._guitar(),
-                                      setting=self._setting(), listening=self._listening())
+                                      setting=self._setting(), listening=None if quietly else self._listening())
         revision = self.state.revision
         self.preparing = after
 
         def arrived(result):
             self.preparing = None
+            self.requests.discard(stop)
             if stop is not None and stop.is_set():
                 return
             aim, designs = result
@@ -684,6 +766,7 @@ class Studio:
 
         def failed(error):
             self.preparing = None
+            self.requests.discard(stop)
             if stop is not None and stop.is_set():
                 return
             if not quietly:
@@ -764,7 +847,12 @@ class Studio:
             sound.marks = [item for item in sound.marks if item != opposite] + [word]
             self._choice(sound, word)
         self.store.save(sound)
-        self.say(f"{sound.name}: " + (", ".join(sound.marks) if sound.marks else "no marks"))
+        if self.state.blind and word in ("keeper", "not this"):
+            # The choice is made: now say which was which.
+            side = (side or self.state.side).upper()
+            self.set(blind=False, status=f"{side}: {word}. A was {self.sound('a').name}, B was {self.sound('b').name}.")
+        else:
+            self.say(f"{sound.name}: " + (", ".join(sound.marks) if sound.marks else "no marks"))
         if word == "keeper" and word in sound.marks:
             self._into_song(sound)
         self._learn()
@@ -810,7 +898,10 @@ class Studio:
         if other is None or other.id == sound.id or word not in ("keeper", "not this"):
             return
         kept, over = (sound, other) if word == "keeper" else (other, sound)
-        taste.record_choice(self.folder, kept.id, over.id, "blind" if self.state.blind else "a/b")
+        context = {"phrase": self.phrase_key(), "scene": self.state.scene,
+                   "knobs": {kept.id: dict(kept.knobs), over.id: dict(over.knobs)}}
+        taste.record_choice(self.folder, kept.id, over.id, "blind" if self.state.blind else "a/b",
+                            round_id=self.state.round, context=context)
 
     def _learn(self):
         """Fit the taste model again from everything chosen so far; cheap, and quiet if it fails."""
@@ -829,10 +920,13 @@ class Studio:
         return taste.describe(model) if model else ["No choices yet: marks and A/B choices teach it."]
 
     def copy_to_a(self):
+        """A copy of B, as it is now, on A: a sound of its own, so turning B's knobs leaves it as it is."""
         b = self.sound("b")
         if b is None:
             return
-        self.put("a", b)
+        copy = Sound(b.name, b.chain, {"kind": "revised", "from": b.id, "request": "a copy to compare against"},
+                     parent=b.id, knobs=dict(b.knobs), explanation=b.explanation, heard=b.heard)
+        self.put("a", copy)
         self.set(side="b")
         self.say(f"{b.name} is on A too, to compare the next change on B against.")
 
@@ -860,6 +954,7 @@ class Studio:
         revision = self.state.revision
 
         def revised(result):
+            self.requests.discard(stop)
             if stop.is_set():
                 return
             self.set(working="")
@@ -899,18 +994,21 @@ class Studio:
         found = self.round()
         if not found or self.state.mode or self.host.busy or self.phrase is None:
             return
+        key = self.phrase_key()
         for candidate in found["candidates"]:
             sound = self.store.sound(candidate["sound"])
-            if sound.heard is None or "probe" not in sound.heard:     # never heard, or heard before test tones
+            heard = sound.heard or {}
+            # Never heard, heard before the test tones, or heard on another phrase or part of it.
+            if "probe" not in heard or heard.get("phrase") != key or heard.get("digest") != sound.chain.digest():
                 self.set(working=f"Listening to {sound.name}, silently…")
 
-                def heard(result, sound=sound):
-                    sound.heard = {"phrase": self.phrase[0], "digest": sound.chain.digest(), **result.to_record()}
-                    self.store.save(sound)
+                def heard(result, sound_id=sound.id, key=key, digest=sound.chain.digest()):
+                    fresh = self.store.sound(sound_id)        # knobs or marks may have changed meanwhile
+                    fresh.heard = {"phrase": key, "digest": digest, **result.to_record()}
                     if result.level_db is not None and result.level_db > -90:
-                        sound.tags = [tag for tag in sound.tags if not tag.startswith("heard:")] + [
+                        fresh.tags = [tag for tag in fresh.tags if not tag.startswith("heard:")] + [
                             f"heard: {result.said()}"]
-                        self.store.save(sound)
+                    self.store.save(fresh)
                     self.set(working="")
                     self._show() if self.state.shown is None else None
                     self.listen_when_free()
@@ -938,10 +1036,13 @@ class Studio:
 
         self.later(self.host.call("read", slot), read)
 
-    def save(self, name=None):
-        sound = self.sound(self.state.side)
+    def save(self, name=None, sound_id=None, knob_values=None):
+        """Save a sound to the unit. `sound_id` and `knob_values` are the sound and knobs the name was confirmed
+        for; by default the sound on the selected side as it is now."""
+        sound = self.store.sound(sound_id) if sound_id else self.sound(self.state.side)
         if sound is None:
             return
+        knob_values = dict(sound.knobs if knob_values is None else knob_values)
         name = (name or sound.name)[:24]
         self.stop()
         self.set(working=f"Saving {name} to the Tone Lab setlist…")
@@ -949,41 +1050,70 @@ class Studio:
 
         def saved(result):
             slot, _ = result
-            sound.saved = {"slot": slot, "name": name}
-            self.store.save(sound)
-            self._into_song(sound)
+            fresh = self.store.sound(sound.id)
+            fresh.saved = {"slot": slot, "name": name, "knobs": knob_values}
+            self.store.save(fresh)
+            self._into_song(fresh)
             self._learn()
             self.set(working="", shown=None, status=f"Saved · Tone Lab {slot['position'] + 1} · {name}")
             self._show()
 
-        self.later(self.host.call("save", chain, name, sound.knobs or None), saved)
+        self.later(self.host.call("save", chain, name, knob_values or None), saved)
 
     # ---- phrases and the guitar ----
 
     def record(self, setting, seconds=8.):
-        """Record a phrase on the current instrument, noting the pickup setting it was played on."""
-        self.stop()
-        self.set(working=f"Recording {seconds:g} s · play now…")
+        """Record a phrase on the current instrument, noting the pickup setting it was played on: the dry input and,
+        when a sound is on show, the selected sound's stereo return as it was heard while playing."""
+        import math
 
-        def recorded(dry):
+        self.stop()
+        side = self.state.side if self.sound(self.state.side) is not None and self.state.shown else None
+        heard_through = self.sound(side) if side else None
+        self.set(working="Opening the input… wait for “play now”.")
+
+        def opened(_):
+            self.set(working=f"Recording {seconds:g} s · play now" + (f" (you hear {side.upper()})" if side else "")
+                     + "…")
+
+        def recorded(audio):
             from lab.hearing.audio import write_wave
             from lab.sound.sounds import new_id
 
+            dry = audio[:, :1]
+            peak = float(abs(dry).max()) if len(dry) else 0.
+            level = 20 * math.log10(max(peak, 1e-9))
+            if peak < .003:
+                self.set(working="", status=f"Nothing came in on the guitar input (peak {level:.0f} dBFS). The take "
+                                            "was not kept.")
+                return
+            if peak >= .999:
+                self.set(working="", status="The take clipped at the input. Turn the input gain down and record "
+                                            "again; it was not kept.")
+                return
             phrase_id = new_id()
             folder = self.folder / "phrases" / phrase_id
             folder.mkdir(parents=True)
             write_wave(folder / "dry.wav", dry)
             info = {"id": phrase_id, "instrument": self.state.instrument, "setting": setting, "recorded": _now(),
                     "seconds": round(len(dry) / 48000, 2)}
+            wet = audio[:, 1:3]
+            if wet.shape[1] == 2 and float(abs(wet).max()) > 1e-4:
+                write_wave(folder / "wet.wav", wet)
+                info["wet"] = ({"sound": heard_through.id, "name": heard_through.name} if heard_through
+                               else {"sound": None, "name": "the preset on the unit"})
             (folder / "phrase.json").write_text(json.dumps(info, indent=1), encoding="utf-8")
-            self.phrase = (phrase_id, dry[:, :1])
-            self.phrase_whole = (dry[:, :1], 0, len(dry))
-            peak = float(abs(dry).max()) if len(dry) else 0.
-            level = 20 * __import__("math").log10(max(peak, 1e-9))
+            self.phrase = (phrase_id, dry.copy())
+            self.phrase_whole = (dry.copy(), 0, len(dry))
+            self.remember()
             self.set(working="", status=f"Recorded {info['seconds']:g} s on {setting}, peaking at {level:.0f} dBFS. "
                                         "It is now the phrase.")
 
-        self.later(self.host.call("record", seconds), recorded)
+        def failed(error):
+            self.set(working="", status=f"Recording: {error}")
+
+        self.later(self.host.call("record", seconds, side,
+                                  progress=lambda value: self.progress.append((opened, value))), recorded, failed)
 
     def recorded_phrases(self):
         found = []

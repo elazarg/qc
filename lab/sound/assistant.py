@@ -20,9 +20,13 @@ from pathlib import Path
 import shutil
 import subprocess
 from tempfile import TemporaryDirectory
+import threading
 import time
 
 DAILY = 80
+# Calls begun and not yet in the ledger, per ledger: counted against the allowance from the moment they start, so two
+# calls started together cannot both take the last place.
+_IN_FLIGHT, _LOCK = {}, threading.Lock()
 
 
 class Cancelled(RuntimeError):
@@ -79,8 +83,11 @@ class Assistant:
             raise ValueError("Say who stands behind the call.")
         if by == "app" and not self.automatic:
             raise Refused("Automatic calls to the assistant are off.")
-        if self.spent_today() >= DAILY:
-            raise Refused(f"Today's {DAILY} calls to the assistant are spent.")
+        key = str(self.ledger)
+        with _LOCK:
+            if self.spent_today() + _IN_FLIGHT.get(key, 0) >= DAILY:
+                raise Refused(f"Today's {DAILY} calls to the assistant are spent.")
+            _IN_FLIGHT[key] = _IN_FLIGHT.get(key, 0) + 1
         started, outcome = time.monotonic(), "ok"
         try:
             return self.run(prompt, schema, web=web, seconds=seconds, cancel=cancel)
@@ -91,11 +98,16 @@ class Assistant:
             outcome = f"failed: {error}"[:200]
             raise
         finally:
-            self.ledger.parent.mkdir(parents=True, exist_ok=True)
-            with self.ledger.open("a", encoding="utf-8") as ledger:
-                ledger.write(json.dumps({"at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "kind": kind,
-                                         "by": by, "web": web, "characters": len(prompt),
-                                         "seconds": round(time.monotonic() - started, 1), "outcome": outcome}) + "\n")
+            with _LOCK:
+                try:
+                    self.ledger.parent.mkdir(parents=True, exist_ok=True)
+                    with self.ledger.open("a", encoding="utf-8") as ledger:
+                        ledger.write(json.dumps({"at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                                                 "kind": kind, "by": by, "web": web, "characters": len(prompt),
+                                                 "seconds": round(time.monotonic() - started, 1),
+                                                 "outcome": outcome}) + "\n")
+                finally:
+                    _IN_FLIGHT[key] -= 1
 
     @staticmethod
     def _codex(prompt, schema, *, web, seconds, cancel):

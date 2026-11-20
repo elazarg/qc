@@ -36,6 +36,10 @@ CACHE_SLOTS = range(222, 254)
 CACHE_PREFIX = "TL "
 
 
+UNSAVED = ("The preset on the Quad Cortex has unsaved changes (or the unit did not say). Save or discard them on "
+           "the unit; Tone Lab leaves it alone until then.")
+
+
 class NotOurs(RuntimeError):
     """The slot holds something the app did not put there. It was left untouched."""
 
@@ -78,7 +82,11 @@ class Slots:
         if folder is None:
             raise RuntimeError("The Quad Cortex did not list that setlist.")
         files = {row["index"]: row for row in folder.get("files", [])}
-        return files.get(slot["position"], {}).get("name", "") or ""
+        # The unit lists every slot of a setlist, empty ones too. A slot missing from the listing is not known to
+        # be empty, so nothing is written there.
+        if slot["position"] not in files:
+            raise RuntimeError("The Quad Cortex listed the setlist incompletely. Nothing was written; try again.")
+        return files[slot["position"]].get("name", "") or ""
 
     def claim(self, slot, name):
         """Refuse unless the slot is empty or already holds a preset the app named `name`."""
@@ -158,6 +166,14 @@ class Slots:
         self.marker.write_text(json.dumps(record), encoding="utf-8")
         return record
 
+    def may_leave(self):
+        """Refuse to move away from a preset of the player's that has unsaved edits, or whose state the unit did
+        not tell: recalling another preset would discard them."""
+        if self.ours(self.unit.position()):
+            return
+        if self.unit.dirty() is not False:
+            raise RuntimeError(UNSAVED)
+
     def ours(self, slot):
         """Whether a slot is one the app works in: the build slot, or any slot of the Tone Lab setlist,
         which is the app's (the player said so on 2026-11-19), saved sounds included."""
@@ -194,8 +210,7 @@ class Slots:
     @contextmanager
     def borrowed(self):
         """Work on the app's slots, and leave the player's preset selected afterwards."""
-        if self.unit.dirty() and not self.ours(self.unit.position()):
-            raise RuntimeError("The preset on the Quad Cortex has unsaved changes. Save or discard them first.")
+        self.may_leave()
         record = self.note_borrowed()
         try:
             yield record

@@ -26,7 +26,8 @@ import time
 from qc_mcp import leveling
 
 from lab.sound import catalog
-from lab.sound.chain import Chain, Op, differences, from_preset, plan_levels, plan_routes, plan_structure, plan_values
+from lab.sound.chain import (Chain, Op, differences, from_preset, plan_levels, plan_routes, plan_structure, plan_values,
+                             same)
 
 CEILING_DB = 6.        # a row's output volume, in dB, never goes above this
 SETTLE = 3.            # seconds to wait for the unit to show a change before giving up
@@ -105,8 +106,13 @@ class Unit:
         return int(state.selected_scene)
 
     def dirty(self):
-        state = self.device.read_state("PresetDirty")
-        return bool(getattr(state, "dirty", getattr(state, "is_dirty", False))) if state is not None else False
+        """Whether the selected preset has unsaved edits: True, False, or None when the unit did not say (asked
+        twice). Callers treat None as edits that must not be lost."""
+        for _ in range(2):
+            state = self.device.read_state("PresetDirty")
+            if state is not None:
+                return bool(getattr(state, "is_dirty", getattr(state, "dirty", False)))
+        return None
 
     def until(self, test, what):
         """Read until `test()` is true. Raise when the unit has not shown it within `settle` seconds."""
@@ -235,10 +241,38 @@ class Unit:
             self.run(ops, stop)
             current = self.read()
         self.run(plan_levels(current, wanted), stop)
-        self.run(plan_routes(current, wanted), stop)
-        self.guard()
-        held = self.read()
-        wrong = differences(held, wanted)
-        if wrong:
-            raise Mismatch("The Quad Cortex did not confirm the chain: " + "; ".join(wrong[:3]))
+        routes = plan_routes(current, wanted)
+        if routes:
+            # Every row's level and mute must be on the unit before any input is connected: a level the unit
+            # did not take would play the sound at whatever the preset holds.
+            held = self.read()
+            for r, want in enumerate(wanted.rows):
+                have = dict(held.rows[r].output)
+                for index, value in want.output:
+                    if index not in have or not same(have[index], value):
+                        raise Mismatch(f"The Quad Cortex did not take the level of row {r + 1}, so nothing was "
+                                       "connected.")
+        try:
+            self.run(routes, stop)
+            self.guard()
+            held = self.read()
+            wrong = differences(held, wanted)
+            if wrong:
+                raise Mismatch("The Quad Cortex did not confirm the chain: " + "; ".join(wrong[:3]))
+        except Exception:
+            self._disconnect([op.args[0] for op in routes])
+            raise
         return held
+
+    def _disconnect(self, rows):
+        """After a failure: take the input off every row this change was connecting, as far as the unit lets."""
+        if not rows:
+            return
+        try:
+            self.guard()
+            held = self.read()
+            for r in rows:
+                if held.rows[r].inlet not in (0, 16, 17, 18):
+                    self.device.set_routing(r, in_portid=0, out_portid=held.rows[r].outlet)
+        except Exception:  # noqa: BLE001
+            pass

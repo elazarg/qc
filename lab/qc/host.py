@@ -1,8 +1,13 @@
 """The engine in a process of its own, holding the unit for the whole session.
 
 The desk sends one command at a time and gets a `Future` back. Commands run
-in order. `stop()` sets a flag that a long command (a build, a listen)
-checks between two writes, and clears the queue of commands not yet begun.
+in order. `stop()` ends the command running at its next safe point (a long
+command checks a flag between two writes) and drops the commands sent before
+it that have not begun. A command sent after `stop()`, such as the one that
+disconnects the inputs, always runs.
+
+A command may report progress while it runs (`progress=` on `call`), which
+recording uses to say when the input is actually open.
 
 Running the engine in its own process means a failure of the audio driver
 cannot take the desk down. When that process ends unexpectedly, the next one
@@ -42,7 +47,7 @@ def _engine(simulated, folder, physical_input):
     return Engine(unit, Slots(unit, folder), audio, physical_input=physical_input), context
 
 
-def _serve(commands, replies, stop, simulated, folder, physical_input):
+def _serve(commands, replies, stop, stopped_before, simulated, folder, physical_input):
     try:
         engine, context = _engine(simulated, folder, physical_input)
     except Exception as error:  # noqa: BLE001
@@ -54,11 +59,16 @@ def _serve(commands, replies, stop, simulated, folder, physical_input):
             ticket, name, args, options = commands.get()
             if name == "quit":
                 break
-            if stop.is_set():
+            # A stop covers the commands sent before it. Clear the flag first, then look: a stop that comes in
+            # between is then either seen here or leaves the flag set for this command.
+            stop.clear()
+            if ticket <= stopped_before.value:
                 replies.put((ticket, False, "Stopped before it began."))
                 continue
+            if options.pop("_progress", False):
+                options = {**options, "progress": lambda value, ticket=ticket: replies.put((ticket, "progress", value))}
             try:
-                if name in ("show", "hear", "record"):
+                if name in ("show", "hear", "hear_shaped", "record"):
                     options = {**options, "stop": stop}
                 if "." in name:
                     # A side tool's own operation, `lab.tools.x.function(engine, ...)`, run where the unit is held.
@@ -82,22 +92,33 @@ def _serve(commands, replies, stop, simulated, folder, physical_input):
                 context.__exit__(None, None, None)
 
 
+class _Number:
+    """A shared integer for the worker on a thread, as `multiprocessing.Value` is for one in a process."""
+
+    def __init__(self):
+        self.value = 0
+
+
 class Host:
     def __init__(self, folder, *, simulated=False, local=False, physical_input=1):
         self.futures, self.ticket, self.lock = {}, 0, threading.Lock()
+        self.progress = {}                  # ticket -> what to call with a command's progress
+        self.failed = None                  # why the worker could not start or stopped, once it has
         if local:
             from queue import Queue
 
             self.commands, self.replies, self.stop_flag = Queue(), Queue(), threading.Event()
+            self.stopped_before = _Number()
             self.worker = threading.Thread(target=_serve, daemon=True,
-                                           args=(self.commands, self.replies, self.stop_flag, simulated, str(folder),
-                                                 physical_input))
+                                           args=(self.commands, self.replies, self.stop_flag, self.stopped_before,
+                                                 simulated, str(folder), physical_input))
         else:
             context = multiprocessing.get_context("spawn")
             self.commands, self.replies, self.stop_flag = context.Queue(), context.Queue(), context.Event()
+            self.stopped_before = context.Value("q", 0, lock=False)
             self.worker = context.Process(target=_serve, daemon=True,
-                                          args=(self.commands, self.replies, self.stop_flag, simulated, str(folder),
-                                                physical_input))
+                                          args=(self.commands, self.replies, self.stop_flag, self.stopped_before,
+                                                simulated, str(folder), physical_input))
         self.worker.start()
         self.ready = Future()
         self.reader = threading.Thread(target=self._read, daemon=True)
@@ -116,39 +137,54 @@ class Host:
                 self._fail_all("The part of the app that holds the Quad Cortex stopped.")
                 return
             if ticket is None:
-                (self.ready.set_result if ok else self.ready.set_exception)(
-                    value if ok else RuntimeError(value))
-                if not ok:
-                    return
+                if ok:
+                    self.ready.set_result(value)
+                    continue
+                # The worker could not start: every command waiting, and every one sent from now on, fails.
+                self._fail_all(f"The Quad Cortex could not be opened: {value}")
+                return
+            if ok == "progress":
+                listener = self.progress.get(ticket)
+                if listener is not None:
+                    listener(value)
                 continue
             with self.lock:
                 future = self.futures.pop(ticket, None)
-                idle = not self.futures
-            if idle:
-                self.stop_flag.clear()
+                self.progress.pop(ticket, None)
             if future is not None:
                 future.set_result(value) if ok else future.set_exception(RuntimeError(value))
 
     def _fail_all(self, message):
         with self.lock:
+            self.failed = message
             pending, self.futures = list(self.futures.values()), {}
         for future in pending:
             future.set_exception(RuntimeError(message))
         if not self.ready.done():
             self.ready.set_exception(RuntimeError(message))
 
-    def call(self, name, *args, **options):
+    def call(self, name, *args, progress=None, **options):
+        """Send a command; its `Future` holds the result. `progress`, if given, is called (on another thread) with
+        whatever the command reports while it runs."""
         future = Future()
         with self.lock:
+            if self.failed is not None:
+                future.set_exception(RuntimeError(self.failed))
+                return future
             self.ticket += 1
             self.futures[self.ticket] = future
             ticket = self.ticket
+            if progress is not None:
+                self.progress[ticket] = progress
+                options = {**options, "_progress": True}
         self.commands.put((ticket, name, args, options))
         return future
 
     def stop(self):
-        """End the running command at its next safe point, and drop the ones waiting."""
+        """End the running command at its next safe point, and drop the ones sent before now that have not begun.
+        Commands sent after this run as usual."""
         with self.lock:
+            self.stopped_before.value = self.ticket
             if self.futures:
                 self.stop_flag.set()
 

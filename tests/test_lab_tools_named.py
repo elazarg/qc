@@ -93,6 +93,7 @@ class NamedTest(unittest.TestCase):
         self.device.dirty = True
         with self.assertRaisesRegex(RuntimeError, "unsaved changes"):
             named.harvest(self.engine, path=self.path)
+        self.device.dirty = False
         self.engine.open()
         self.device.dirty = True
         with self.assertRaisesRegex(RuntimeError, "unsaved changes"):

@@ -113,10 +113,11 @@ def _now():
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def record_choice(folder, kept_id, over_id, how, *, round_id=None):
+def record_choice(folder, kept_id, over_id, how, *, round_id=None, context=None):
     """Note that the player kept one sound over another. `how`: "blind" (picked with the names hidden), "a/b"
     (picked with the names shown), "mark" (marked one keeper or the other not this), "round" (kept or saved one
-    design of a round over another). Appended to `choices.jsonl`; nothing is ever rewritten."""
+    design of a round over another). `context` is what the audition was: the phrase and the part of it, the scene,
+    and each sound's knob positions. Appended to `choices.jsonl`; nothing is ever rewritten."""
     if how not in HOW:
         raise ValueError(f"how must be one of {', '.join(HOW)}")
     if not kept_id or not over_id or kept_id == over_id:
@@ -124,6 +125,8 @@ def record_choice(folder, kept_id, over_id, how, *, round_id=None):
     entry = {"at": _now(), "kept": kept_id, "over": over_id, "how": how}
     if round_id:
         entry["round"] = round_id
+    if context:
+        entry["context"] = context
     path = Path(folder) / CHOICES
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as file:
@@ -187,15 +190,15 @@ def comparisons(folder, sounds=None):
     by_id = {sound.id: sound for sound in sounds}
     pairs = {}
 
-    def add(kept, over, how, weight):
+    def add(kept, over, how, weight, decision):
         if kept == over:
             return
         key = (kept, over)
         if key not in pairs or pairs[key]["weight"] < weight:
-            pairs[key] = {"kept": kept, "over": over, "how": how, "weight": weight}
+            pairs[key] = {"kept": kept, "over": over, "how": how, "weight": weight, "decision": decision}
 
-    for entry in choices(folder):
-        add(entry["kept"], entry["over"], entry.get("how", "a/b"), 1.)
+    for number, entry in enumerate(choices(folder)):
+        add(entry["kept"], entry["over"], entry.get("how", "a/b"), 1., f"choice {number}")
 
     requests, in_rounds = {}, set()
     for record in _rounds(folder):
@@ -209,14 +212,15 @@ def comparisons(folder, sounds=None):
         chosen = [sound for sound in group if _chosen(sound)]
         rejected = [sound for sound in group if _rejected(sound)]
         passed = [sound for sound in group if sound.played and not _chosen(sound) and not _rejected(sound)]
+        # A keeper among several designs is one decision: its pairs share one decision's weight.
         for kept in chosen:
-            for over in rejected:
-                add(kept.id, over.id, "mark", 1.)
-            for over in passed:
-                add(kept.id, over.id, "round", .5)
-        for kept in passed:
-            for over in rejected:
-                add(kept.id, over.id, "round", .5)
+            others = [(over, "mark", 1.) for over in rejected] + [(over, "round", .5) for over in passed]
+            for over, how, weight in others:
+                add(kept.id, over.id, how, weight / len(others), f"keeper {kept.id}")
+        for over in rejected:
+            if passed:
+                for kept in passed:
+                    add(kept.id, over.id, "round", .5 / len(passed), f"not this {over.id}")
 
     loose = [sound for sound in sounds if sound.id not in in_rounds]
     for kept in (sound for sound in loose if _chosen(sound)):
@@ -224,7 +228,7 @@ def comparisons(folder, sounds=None):
             related = (kept.parent == over.id or over.parent == kept.id
                        or (kept.parent is not None and kept.parent == over.parent))
             if related:
-                add(kept.id, over.id, "mark", 1.)
+                add(kept.id, over.id, "mark", 1., f"keeper {kept.id}")
     return list(pairs.values())
 
 
@@ -279,9 +283,14 @@ def fit(comparisons, feature_rows, *, minimum=MINIMUM, l2=L2, bootstrap=BOOTSTRA
     comparisons, the model says "not enough evidence yet" and claims nothing."""
     usable = [pair for pair in comparisons
               if feature_rows.get(pair["kept"]) and feature_rows.get(pair["over"])]
-    if len(usable) < minimum:
-        return _not_enough(len(usable), minimum)
-    shared = {name: sum(1 for pair in usable if name in feature_rows[pair["kept"]] and name in feature_rows[pair["over"]])
+    # Comparisons implied by one decision of the player's count once, together.
+    decision_of = [pair.get("decision", f"pair {index}") for index, pair in enumerate(usable)]
+    decisions = sorted(set(decision_of))
+    members = {decision: [i for i, d in enumerate(decision_of) if d == decision] for decision in decisions}
+    if len(decisions) < minimum:
+        return _not_enough(len(decisions), minimum)
+    shared = {name: len({decision_of[i] for i, pair in enumerate(usable)
+                         if name in feature_rows[pair["kept"]] and name in feature_rows[pair["over"]]})
               for name in FEATURES}
     names = [name for name in FEATURES if shared[name] >= minimum]
     ids = sorted({pair[side] for pair in usable for side in ("kept", "over")})
@@ -293,7 +302,7 @@ def fit(comparisons, feature_rows, *, minimum=MINIMUM, l2=L2, bootstrap=BOOTSTRA
             continue
         means[name], stds[name] = float(values.mean()), float(values.std())
     if not names:
-        return _not_enough(len(usable), minimum, "no measured quantity differs between the sounds compared")
+        return _not_enough(len(decisions), minimum, "no measured quantity differs between the sounds compared")
 
     def z(key):
         row = feature_rows[key]
@@ -306,7 +315,8 @@ def fit(comparisons, feature_rows, *, minimum=MINIMUM, l2=L2, bootstrap=BOOTSTRA
     rng = np.random.default_rng(seed)
     samples = []
     for _ in range(bootstrap):
-        pick = rng.integers(0, len(usable), len(usable))
+        chosen = rng.integers(0, len(decisions), len(decisions))
+        pick = np.array([i for d in chosen for i in members[decisions[d]]])
         samples.append(_solve(diffs[pick], weights[pick], l2)[0])
     samples = np.array(samples)
     spread = samples.std(axis=0)
@@ -315,18 +325,23 @@ def fit(comparisons, feature_rows, *, minimum=MINIMUM, l2=L2, bootstrap=BOOTSTRA
     found = {}
     for i, name in enumerate(names):
         higher = lower = 0
-        for pair in usable:
-            kept, over = feature_rows[pair["kept"]], feature_rows[pair["over"]]
-            if name in kept and name in over and abs(kept[name] - over[name]) > .05 * stds[name]:
-                higher += kept[name] > over[name]
-                lower += kept[name] < over[name]
+        for decision in decisions:
+            # Which way this decision leans on the quantity: its pairs, by their weights.
+            lean = 0.
+            for index in members[decision]:
+                pair = usable[index]
+                kept, over = feature_rows[pair["kept"]], feature_rows[pair["over"]]
+                if name in kept and name in over and abs(kept[name] - over[name]) > .05 * stds[name]:
+                    lean += weights[index] * np.sign(kept[name] - over[name])
+            higher += lean > 0
+            lower += lean < 0
         boot_z = float(w[i] / spread[i]) if spread[i] > 1e-12 else 0.
         found[name] = {"weight": round(float(w[i]), 4), "se": round(float(se[i]), 4),
                        "spread": round(float(spread[i]), 4),
                        "agree": round(float(np.mean(np.sign(samples[:, i]) == np.sign(w[i]))), 3),
                        "strength": _strength(boot_z, len(names)), "mean": means[name], "std": stds[name],
                        "n": shared[name], "kept_higher": int(higher), "kept_lower": int(lower)}
-    return {"version": 1, "enough": True, "message": None, "n": len(usable), "minimum": minimum, "fitted": _now(),
+    return {"version": 1, "enough": True, "message": None, "n": len(decisions), "minimum": minimum, "fitted": _now(),
             "l2": l2, "right": round(right, 3), "features": found,
             "samples": [[round(float(value), 4) for value in row] for row in samples[:KEPT_SAMPLES]],
             "sample_names": names}

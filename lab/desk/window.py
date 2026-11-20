@@ -226,7 +226,7 @@ class Desk:
     def draw(self):
         state = self.studio.state
         self.working.configure(text=state.working)
-        if state.working and self.studio.cancel_signal is not None and not self.studio.cancel_signal.is_set():
+        if state.working and self.studio.cancellable():
             self.cancel_link.pack(side="left")
         else:
             self.cancel_link.pack_forget()
@@ -237,10 +237,12 @@ class Desk:
             hidden = state.blind and sound is not None
             name.configure(text="?" if hidden else (sound.name if sound else "Empty"))
             caption.configure(text="Hidden while you compare" if hidden else self.caption(sound))
+            # Keep and Not this stay available while comparing blind (choosing shows the names); a mark already
+            # given is not shown then, since it would tell which sound is which.
             for chip, word in zip(marks.winfo_children(), ("keeper", "not this")):
                 marked = sound is not None and not hidden and word in sound.marks
                 chip.configure(bg=mix(SIDE[side], DARK, .35) if marked else tile["bg"], fg=INK if marked else SUBTLE)
-            if sound is None or hidden:
+            if sound is None:
                 marks.pack_forget()
             elif not marks.winfo_ismapped():
                 marks.pack(side="bottom", fill="x", pady=(6, 0), before=caption)
@@ -740,6 +742,8 @@ class Desk:
         sound = self.studio.sound(self.studio.state.side)
         if sound is None:
             return
+        # The name is for this sound with these knobs, whatever is selected by the time it is confirmed.
+        self.save_target = (sound.id, dict(sound.knobs))
         self.save_name.delete(0, "end")
         self.save_name.insert(0, sound.name[:24])
         self.save_row.pack(fill="x", pady=(8, 0), after=self.save_row_after)
@@ -748,8 +752,10 @@ class Desk:
     def saved(self):
         name = self.save_name.get().strip()[:24]
         self.save_row.pack_forget()
-        if name:
-            self.studio.save(name)
+        target = getattr(self, "save_target", None)
+        self.save_target = None
+        if name and target:
+            self.studio.save(name, sound_id=target[0], knob_values=target[1])
 
     def recording_controls(self):
         """Record a phrase: the pickup setting it is played on, then Record (eight seconds, from the guitar)."""
@@ -780,6 +786,8 @@ class Desk:
         self.studio.phrase = (item["id"], whole[start:end].copy())
         self.studio.phrase_whole = (whole, start, end)
         self.studio.remember()
+        if self.studio.state.mode == "phrase":
+            self.studio.play("phrase")          # the new take replaces the one looping
         self.phrase_link.configure(text=f"Phrase · {item.get('instrument', '')} · {item['setting']}")
 
     def panel_guitar(self):
