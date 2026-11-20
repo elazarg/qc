@@ -220,5 +220,13 @@ class WorkerSideTest(unittest.TestCase):
             gestures.run({"physical_input": 3}, Event(), Queue(), Mock())
 
 
+
+class RenamedKnobTest(unittest.TestCase):
+    def test_a_mapping_saved_for_warmth_moves_brightness_the_other_way(self):
+        from lab.learner.gestures import GestureMapping
+        found = GestureMapping.from_dict({"home": "neck", "excursion": "bridge", "control": "warmth", "step": .1})
+        self.assertEqual((found.control, found.step), ("brightness", -.1))
+
+
 if __name__ == "__main__":
     unittest.main()

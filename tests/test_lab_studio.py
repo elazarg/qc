@@ -360,5 +360,34 @@ class StudioTest(unittest.TestCase):
         self.assertNotIn(PLEXI, models)
 
 
+    def test_a_keeper_given_while_comparing_is_a_choice_over_the_other_side(self):
+        import json
+        self.script.answers.append(self.three("One", "Two", "Three"))
+        self.studio.ask("make a classic rock crunch")
+        settle(self.studio, 20)
+        self.studio.copy_to_a()
+        settle(self.studio)
+        self.studio.step(1)
+        settle(self.studio)
+        a, b = self.studio.sound("a"), self.studio.sound("b")
+        self.studio.mark("keeper", "b")
+        lines = (self.folder / "choices.jsonl").read_text(encoding="utf-8").splitlines()
+        choice = json.loads(lines[-1])
+        self.assertEqual((choice["kept"], choice["over"], choice["how"]), (b.id, a.id, "a/b"))
+        self.assertTrue(self.studio.taste_lines())
+
+    def test_what_the_player_listens_to_reaches_an_open_request(self):
+        import json
+        (self.folder / "personal").mkdir(exist_ok=True)
+        (self.folder / "personal" / "listening.json").write_text(json.dumps({
+            "summary": {"artists": [["Band A", 10.0]]},
+            "guitar_context": [{"artist": "Band A", "guitar_led": True, "guitarists": ["Y"], "tones": ["crunch"]}]}),
+            encoding="utf-8")
+        self.script.answers.append(self.three("One", "Two", "Three"))
+        self.studio.ask("make a lead tone")
+        settle(self.studio, 20)
+        self.assertIn('"player_listening"', self.script.asked[-1][0])
+
+
 if __name__ == "__main__":
     unittest.main()

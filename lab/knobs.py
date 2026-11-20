@@ -536,7 +536,9 @@ def available(chain, *, scene=None):
 # attack turned up lets the pick through (a slower compressor attack), so the onset gets quicker: attack_ms down.
 EXPECTED = {
     "brightness": (("brightness_oct", 1, .15, "octave"),),
-    "texture": (("probe.tristimulus3", 1, .03, ""), ("probe.weighted_distortion_db", 1, 2., "dB")),
+    # Texture moves the balance of high harmonic orders against low ones (measured on the unit, from -6 dB on a
+    # Plexi at low gain to +4 dB on a Soldano lead), and, near hard clipping, their share.
+    "texture": (("probe.order_balance_db", 1, 2., "dB"), ("probe.tristimulus3", 1, .03, "")),
     "drive": (("probe.distortion_db", 1, 3., "dB"), ("probe.distortion_soft_db", 1, 3., "dB")),
     "body": (("low_end_db", 1, 1.5, "dB"),),
     "tightness": (("low_end_db", -1, 1.5, "dB"),),
@@ -550,6 +552,7 @@ EXPECTED = {
 }
 # What each measurement is, in words for the status line.
 MEASURES = {"brightness_oct": "spectral centre", "tristimulus3": "share of harmonics 5 and up",
+            "order_balance_db": "high harmonic orders against low ones",
             "weighted_distortion_db": "order-weighted harmonics", "distortion_db": "harmonics played firmly",
             "distortion_soft_db": "harmonics 12 dB softer", "low_end_db": "low end", "tail_db": "tail",
             "compression": "compression", "attack_ms": "onset time"}
@@ -558,6 +561,9 @@ VERDICTS = ("as intended", "too small", "opposite", "not measurable")
 
 
 def _reading(record, path):
+    if path == "probe.order_balance_db":       # derived: 5th-10th against 2nd-3rd
+        high, low = _reading(record, "probe.high_order_db"), _reading(record, "probe.low_order_db")
+        return None if high is None or low is None else high - low
     value = record or {}
     for part in path.split("."):
         value = value.get(part) if isinstance(value, dict) else None

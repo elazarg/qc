@@ -625,6 +625,9 @@ class Desk:
             self.studio.work_on(slot, name)
 
     def panel_history(self):
+        # What the player's marks and choices say about what they keep, in measured quantities.
+        for line in self.studio.taste_lines():
+            label(self.tray, line, size=9, color=SOFT, wrap=400).pack(fill="x", pady=1)
         sounds = self.studio.store.sounds()[::-1][:60]
         box = tk.Listbox(self.tray, bg=DARK, fg=INK, selectbackground=TILE, relief="flat", highlightthickness=0,
                          font=(FONT, 9), height=24)

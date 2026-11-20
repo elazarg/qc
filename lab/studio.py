@@ -187,12 +187,19 @@ class Studio:
         self.later(self.host.call("play", side, mode, phrase), playing)
 
     def _match_levels(self):
-        """Play A and B equally loud, when both have been measured: the louder is turned down to the quieter."""
+        """Play A and B equally loud, when both have been measured: the louder is turned down to the quieter.
+
+        Matched by integrated loudness (ITU-R BS.1770, LUFS), which follows perceived loudness across sounds of
+        different brightness better than a plain level does (TONE_RESEARCH.md, 13); by RMS level only when one of
+        the two was measured before loudness was recorded."""
         from .engine import PREVIEW_DB
 
         sounds = {side: self.sound(side) for side in ("a", "b")}
-        levels = {side: sound.heard["level_db"] for side, sound in sounds.items()
-                  if sound and sound.heard and sound.heard.get("level_db", -200) > -90}
+        heard = {side: sound.heard for side, sound in sounds.items()
+                 if sound and sound.heard and sound.heard.get("level_db", -200) > -90}
+        key = "loudness_lufs" if all(record.get("loudness_lufs") is not None for record in heard.values()) \
+            else "level_db"
+        levels = {side: record[key] for side, record in heard.items()}
         if len(levels) < 2:
             return
         quietest = min(levels.values())
@@ -519,6 +526,35 @@ class Studio:
     def _instrument(self):
         return self.store.instrument(self.state.instrument)
 
+    def _setting(self):
+        """The pickup setting the phrase in use was recorded on, if it was noted."""
+        if not self.phrase:
+            return None
+        found = next((item for item in self.recorded_phrases() if item["id"] == self.phrase[0]), None)
+        setting = (found or {}).get("setting")
+        return None if not setting or setting == "unknown" else setting
+
+    def _guitar(self):
+        """What the instrument puts out, for the designer (`profile.facts`), worked out once per instrument."""
+        from .profile import facts
+
+        cached = getattr(self, "guitar_cache", None)
+        if cached is None or cached[0] != self.state.instrument:
+            cached = (self.state.instrument, self.guitar_profile()[0])
+            self.guitar_cache = cached
+        return facts(cached[1], self._setting()) if cached[1] else None
+
+    def _listening(self):
+        """What guitar music the player listens to most, if the listening history was analysed (personal; kept in
+        the data folder)."""
+        from .listening import prior
+
+        try:
+            record = json.loads((self.folder / "personal" / "listening.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        return prior(record)
+
     def new_round(self, text, *, earlier=None, by="player", after=None):
         """Three designs for `text`. `after` is the round these follow, whose designs and what was heard of them
         (`earlier`) inform these."""
@@ -528,7 +564,8 @@ class Studio:
         instrument = self._instrument()
         stop = self._request() if not quietly else None
         future = self.thinking.submit(design.round_of_three, self.assistant, text, instrument, earlier=earlier, by=by,
-                                      cancel=stop, assets_known=self._assets())
+                                      cancel=stop, assets_known=self._assets(), guitar=self._guitar(),
+                                      setting=self._setting(), listening=self._listening())
         revision = self.state.revision
         self.preparing = after
 
@@ -642,8 +679,38 @@ class Studio:
         else:
             opposite = {"keeper": "not this", "not this": "keeper"}.get(word)
             sound.marks = [item for item in sound.marks if item != opposite] + [word]
+            self._choice(sound, word)
         self.store.save(sound)
         self.say(f"{sound.name}: " + (", ".join(sound.marks) if sound.marks else "no marks"))
+        self._learn()
+
+    def _choice(self, sound, word):
+        """A keeper or a not-this given while A and B are both on show is a choice between them (blind when names
+        are hidden), recorded for the taste model."""
+        from . import taste
+
+        side = "a" if self.state.a == sound.id else "b" if self.state.b == sound.id else None
+        other = self.sound("b" if side == "a" else "a") if side else None
+        if other is None or other.id == sound.id or word not in ("keeper", "not this"):
+            return
+        kept, over = (sound, other) if word == "keeper" else (other, sound)
+        taste.record_choice(self.folder, kept.id, over.id, "blind" if self.state.blind else "a/b")
+
+    def _learn(self):
+        """Fit the taste model again from everything chosen so far; cheap, and quiet if it fails."""
+        from . import taste
+
+        try:
+            self.taste = taste.learn(self.folder)
+        except Exception:  # noqa: BLE001
+            self.taste = None
+
+    def taste_lines(self):
+        """What the player's choices so far say, in measured quantities, or that there is not enough yet."""
+        from . import taste
+
+        model = getattr(self, "taste", None) or taste.load(self.folder)
+        return taste.describe(model) if model else ["No choices yet: marks and A/B choices teach it."]
 
     def copy_to_a(self):
         b = self.sound("b")
@@ -673,7 +740,7 @@ class Studio:
         self.set(working=f"Revising {sound.name}…")
         stop = self._request()
         future = self.thinking.submit(design.revise, self.assistant, sound, text, self._instrument(), cancel=stop,
-                                      assets_known=self._assets())
+                                      assets_known=self._assets(), guitar=self._guitar(), setting=self._setting())
         revision = self.state.revision
 
         def revised(result):
@@ -768,6 +835,7 @@ class Studio:
             slot, _ = result
             sound.saved = {"slot": slot, "name": name}
             self.store.save(sound)
+            self._learn()
             self.set(working="", shown=None, status=f"Saved · Tone Lab {slot['position'] + 1} · {name}")
             self._show()
 

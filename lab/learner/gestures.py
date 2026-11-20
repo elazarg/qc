@@ -29,7 +29,7 @@ from threading import Event, Thread
 import time
 
 from .. import audio
-from ..knobs import KNOBS
+from ..knobs import KNOBS, RENAMED
 from . import folders, inputs, state as guitar_state
 from .folders import LOG
 from .live import DryWindow
@@ -70,7 +70,13 @@ class GestureMapping:
 
     @classmethod
     def from_dict(cls, data):
-        return cls(data.get("home"), data.get("excursion"), data.get("control"), data.get("step", 0.1))
+        # A mapping saved for a knob since renamed for what it does (Warmth is now Brightness turned down) moves the
+        # knob that does that job, with the step's sign carried over.
+        control, step = data.get("control"), data.get("step", 0.1)
+        if control in RENAMED:
+            control, sign = RENAMED[control]
+            step = step * sign if isinstance(step, (int, float)) else step
+        return cls(data.get("home"), data.get("excursion"), control, step)
 
 
 @dataclass(frozen=True)
