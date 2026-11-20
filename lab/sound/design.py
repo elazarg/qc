@@ -16,9 +16,11 @@ import json
 from pathlib import Path
 import re
 
-from . import assets, catalog, knowledge
-from .chain import Block, Chain, Row, SCENES
-from .sounds import Sound, settings as stated
+from lab.qc import assets
+from lab.sound import catalog
+from lab import knowledge
+from lab.sound.chain import Block, Chain, Row, SCENES
+from lab.sound.sounds import Sound, settings as stated
 
 INSTRUCTIONS = Path(__file__).with_name("designer.md")
 EVERYDAY = (16003, 5005, 1, 4, 5, 10, 11, 15, 18, 22, 25, 29, 1011, 1018, 1045, 1079, 1081, 1084, 1093, 1095, 1100,
@@ -34,7 +36,7 @@ ALWAYS = ("Equalizer", "Compressor", "Delay", "Reverb", "Modulation", "Filter", 
 NUMBERS = {"float", "fader"}
 SWITCHES = {"switch", "rotarySwitch", "comboBox"}
 SKIP = {"MUTE TRIG", "OUTPUT"}                 # the amp's OUTPUT is the app's to set
-# The aim, on the scales listening measures (lab/measure.py): distortion from test tones, brightness against
+# The aim, on the scales listening measures (lab/hearing/measure.py): distortion from test tones, brightness against
 # the dry guitar, and the tail that rings on after the playing stops.
 AIM = {"distortion": ("clean", "edge of breakup", "crunch", "overdriven", "saturated"),
        "brightness": ("dark", "balanced", "bright"),
@@ -521,7 +523,7 @@ def round_of_three(assistant, text, instrument, *, phrase=None, earlier=None, re
                    cancel=None, assets_known=None, guitar=None, setting=None, listening=None):
     """An aim and up to three sounds that reach it by different routes.
 
-    `listening` (`lab.listening.prior`) says what guitar music the player listens to most; the assistant uses
+    `listening` (`lab.player.listening.prior`) says what guitar music the player listens to most; the assistant uses
     it only for requests that name no artist, song or sound (designer.md, "listening").
 
     `assets_known` are the IRs and captures read from the unit (None: those last read, `assets.cached`); the

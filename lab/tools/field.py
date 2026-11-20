@@ -6,7 +6,7 @@ where the knobs stood when the field was centred; the centre is exactly that pos
 marked A and B, jumped between, and swept from one to the other. Only knobs the selected sound has blocks
 for move; a direction with none is greyed.
 
-The knobs are the desk's own (`lab.knobs`), turned on the selected side through the studio, so the field and
+The knobs are the desk's own (`lab.sound.knobs`), turned on the selected side through the studio, so the field and
 the Shape panel always agree. "Measure A and B" plays the phrase silently through both sounds on the unit and
 says how B differs from A, level aside: octave-band balance, brightness, how much the level moves, stereo
 sides and what rings on.
@@ -16,10 +16,10 @@ from dataclasses import dataclass
 import math
 import tkinter as tk
 
-from ..knobs import KNOBS
-from ..theme import ACCENT, DARK, DIM, FONT, PAPER, RULE, SUBTLE, TONE_A
-from .common import Window, button, heard_chain, label, menu_choice, phrase, render_many, section
-from .search import BANDS, describe
+from lab.sound.knobs import KNOBS
+from lab.desk.theme import ACCENT, DARK, DIM, FONT, PAPER, RULE, SUBTLE, TONE_A
+from lab.tools.common import Window, button, heard_chain, label, menu_choice, phrase, render_many, section
+from lab.tools.search import BANDS, describe
 
 
 @dataclass(frozen=True)

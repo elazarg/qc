@@ -5,11 +5,12 @@ from tempfile import TemporaryDirectory
 import json
 import unittest
 
-from lab import assets, catalog, design
-from lab.assets import Asset
-from lab.assistant import Assistant, Refused
-from lab.chain import Block, Chain, Row, differences
-from lab.sounds import Sound, describe
+from lab.qc import assets
+from lab.sound import catalog, design
+from lab.qc.assets import Asset
+from lab.sound.assistant import Assistant, Refused
+from lab.sound.chain import Block, Chain, Row, differences
+from lab.sound.sounds import Sound, describe
 
 RECTIFIER, PLEXI, V30, GREENBACK, FUZZ, HIWATT, DELAY = 1018, 1081, 12001, 12006, 22, 1063, 6011
 CHARVEL = {"name": "Charvel", "kind": "electric", "input": 1, "about": "DK24"}
@@ -146,7 +147,7 @@ class DesignTest(unittest.TestCase):
         self.assertEqual(differences(revised.chain.with_block(0, 0, saved.chain.block(0, 0)), saved.chain), [])
 
     def test_the_guitar_profile_reaches_a_round_and_its_sounds_carry_the_input(self):
-        from lab import profile
+        from lab.hearing import profile
 
         summary = {"Bridge Series": {"takes": 1, "peak_db": -17., "lufs": -30., "centroid_hz": 1800,
                                      "bands": {"lows": -6.}},

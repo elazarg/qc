@@ -1,6 +1,6 @@
 """POD Go presets as starting points.
 
-The player's POD Go backup is read once (`lab.podgo`), and each of its presets
+The player's POD Go backup is read once (`lab.gear.podgo`), and each of its presets
 is listed with how it came across. A preset whose amps and effects have
 counterparts on the Quad Cortex arrives as a chain: **Put on B** to play it.
 One that does not arrives as a description of the original chain: **Ask for
@@ -15,7 +15,7 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog
 
-from .common import Window, button, label, listbox
+from lab.tools.common import Window, button, label, listbox
 
 REMEMBERED = "podgo.json"
 
@@ -61,7 +61,7 @@ class PodWindow(Window):
             self.load(path)
 
     def load(self, path):
-        from .. import podgo
+        from lab.gear import podgo
 
         try:
             self.items = podgo.import_backup(path)

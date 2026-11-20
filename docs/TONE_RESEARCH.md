@@ -223,7 +223,7 @@ diagnoses, presets moved between guitars, and how Kemper, Fractal, Helix and Ton
 # What was built from this (20 November 2026)
 
 1. **Texture as a measure and a control.** Each harmonic of the test tone, low against high orders, an
-   order-weighted figure, harmonic centroid, tristimulus 3 and harmonic-to-noise (`lab/probe.py`). Calibrated on
+   order-weighted figure, harmonic centroid, tristimulus 3 and harmonic-to-noise (`lab/hearing/probe.py`). Calibrated on
    the unit: real amps differ in the *balance* of high and low orders (−6 dB on a Plexi at low gain to +4 dB on a
    Soldano lead), not in the share of high orders; words round, warm, even, edged, rough
    (`research/measurements/distortion-ladder.md`). Warmth and Smoothness are replaced by **Brightness** and
@@ -235,7 +235,7 @@ diagnoses, presets moved between guitars, and how Kemper, Fractal, Helix and Ton
    (as intended); Texture +0.6 on an amp with no drive pedal moved the order balance only +0.7 dB (too small) and
    was turned further once. On an amp alone Texture has few controls to move; amp gain moves the balance most but
    is Distortion's.
-4. **The player's weights** (`lab/taste.py`): choices from comparison, marks, saves and rounds, fitted by a
+4. **The player's weights** (`lab/player/taste.py`): choices from comparison, marks, saves and rounds, fitted by a
    regularised pairwise logistic regression; nothing claimed below eight usable choices.
 5. **The guitar in the design**: the profile of the pickup setting in use reaches the designer, with a section on
    compensating a weak or hot, dark or bright input; designed sounds record the input they were made for.

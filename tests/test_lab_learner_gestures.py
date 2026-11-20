@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
-from lab import knobs
+from lab.sound import knobs
 from lab.learner import folders, gestures, inputs
 from lab.learner.gestures import GestureDetector, GestureEvent, GestureMapping, replay
 

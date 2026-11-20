@@ -25,12 +25,12 @@ import random
 import tkinter as tk
 from uuid import uuid4
 
-from .. import knobs, words
-from ..audio import read_wave
-from ..measure import match, measure
-from ..sounds import Sound
-from ..theme import FONT, INK, SUBTLE, TILE, WHITE
-from .common import (SCENE_LETTERS, Window, button, gained, heard_chain, label, listbox, menu_choice, phrase, play,
+from lab.sound import knobs, words
+from lab.hearing.audio import read_wave
+from lab.hearing.measure import match, measure
+from lab.sound.sounds import Sound
+from lab.desk.theme import FONT, INK, SUBTLE, TILE, WHITE
+from lab.tools.common import (SCENE_LETTERS, Window, button, gained, heard_chain, label, listbox, menu_choice, phrase, play,
                      section, with_knobs, write_pcm16)
 
 STRENGTHS = (.4, .85)
@@ -187,7 +187,7 @@ def notes(target):
 
 def as_sound(record, letter, parent):
     """A kept version as a sound of its own, revised from the one it was made from."""
-    from ..chain import Chain
+    from lab.sound.chain import Chain
 
     audition = record["auditions"][letter]
     if "chain" not in audition:
@@ -342,7 +342,7 @@ class WorkbenchWindow(Window):
         self.list_earlier()
 
     def show(self):
-        from ..audio import read_wave as read
+        from lab.hearing.audio import read_wave as read
 
         self.auditions = {letter: read(self.target / row["file"]) for letter, row in self.record["auditions"].items()}
         self.last = None
@@ -367,7 +367,7 @@ class WorkbenchWindow(Window):
         self.say(f"Playing {letter}")
 
     def stop(self):
-        from .common import silence
+        from lab.tools.common import silence
 
         silence()
 

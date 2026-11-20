@@ -41,11 +41,12 @@ import re
 import struct
 import zlib
 
-from . import catalog, knowledge
-from .chain import Block, Chain, Row, SCENES
-from .sounds import Sound
+from lab.sound import catalog
+from lab import knowledge
+from lab.sound.chain import Block, Chain, Row, SCENES
+from lab.sound.sounds import Sound
 
-RESEARCH = Path(__file__).resolve().parents[1] / "research" / "podgo-models.json"
+RESEARCH = Path(__file__).resolve().parents[2] / "research" / "podgo-models.json"
 DEVICE_LIST = "https://neuraldsp.com/device-list"
 INPUT, MULTI_OUT, SCENE_NAME = 1, 19, 12
 SNAPSHOT_CONTROLLER = 11          # the controller number that assigns a value to snapshots

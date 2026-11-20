@@ -9,10 +9,10 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from lab import library
-from lab.host import Host
-from lab.sim import FACTORY, MY_PRESETS, TONE_LAB, SimUnit
-from lab.slots import CACHE_SLOTS
+from lab.qc import library
+from lab.qc.host import Host
+from lab.qc.sim import FACTORY, MY_PRESETS, TONE_LAB, SimUnit
+from lab.qc.slots import CACHE_SLOTS
 
 PLEXI = 1001
 
@@ -148,7 +148,7 @@ class DirectoryTest(unittest.TestCase):
             host = Host(self.folder / "engine", simulated=True, local=True)
             try:
                 self.assertEqual(host.ready.result(10), "ready")
-                self.assertEqual(host.call("lab.library.directory").result(10), [])
+                self.assertEqual(host.call("lab.qc.library.directory").result(10), [])
                 self.assertEqual(library.cached(), [])
             finally:
                 host.close()

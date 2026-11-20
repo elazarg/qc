@@ -36,9 +36,10 @@ from pathlib import Path
 import re
 import shutil
 
-from . import catalog, knowledge
-from .chain import Block, Chain, Row, SCENES
-from .sounds import Sound, Store
+from lab.sound import catalog
+from lab import knowledge
+from lab.sound.chain import Block, Chain, Row, SCENES
+from lab.sound.sounds import Sound, Store
 
 OLD = Path(__file__).resolve().parents[1] / "tone_sessions"
 MULTI_OUT = 19
@@ -270,7 +271,7 @@ def preset_sound(old_id, info, chain):
 
 def _read_preset(blob):
     from qc_mcp import preset as wire
-    from .chain import from_preset
+    from lab.sound.chain import from_preset
 
     message = wire.BinaryPreset()
     message.ParseFromString(blob)

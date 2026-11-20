@@ -12,12 +12,12 @@ import sys
 import tkinter as tk
 from tkinter import simpledialog
 
-from . import knobs as knob_table
-from .audio import read_wave
-from .knowledge import REPO, home
-from .measure import summary
-from .studio import Studio
-from .theme import (ACCENT, DARK, DIM, FONT, INK, LIVE, PAPER, RULE, SIDE, SOFT, SUBTLE, TILE, Tooltip, mix)
+from lab.sound import knobs as knob_table
+from lab.hearing.audio import read_wave
+from lab.knowledge import REPO, home
+from lab.hearing.measure import summary
+from lab.desk.studio import Studio
+from lab.desk.theme import (ACCENT, DARK, DIM, FONT, INK, LIVE, PAPER, RULE, SIDE, SOFT, SUBTLE, TILE, Tooltip, mix)
 
 PANELS = ("Shape", "Chain", "Difference", "Phrase", "Sounds", "History", "Song", "Guitar")
 PHRASE_SECONDS = 3.5
@@ -118,7 +118,7 @@ class Desk:
         menu.add_command(label="Guitar input calibration", command=self.open_calibration)
         menu.add_command(label="Gestures on / off", command=self.toggle_gestures)
         menu.add_separator()
-        from .tools.menu import TOOLS, opener
+        from lab.tools.menu import TOOLS, opener
 
         for title, name in TOOLS:
             menu.add_command(label=title, command=lambda name=name: opener(name)(self))
@@ -407,8 +407,8 @@ class Desk:
         label(self.tray, f"{studio.state.side.upper()} · {sound.name}", size=12, bold=True, wrap=400).pack(fill="x")
         if sound.explanation:
             label(self.tray, sound.explanation, size=9, color=SOFT, wrap=400).pack(fill="x", pady=(2, 6))
-        from .knowledge import named_settings
-        from .sounds import settings as stated
+        from lab.knowledge import named_settings
+        from lab.sound.sounds import settings as stated
 
         for r, row in enumerate(sound.chain.rows):
             if not row.blocks:
@@ -434,7 +434,7 @@ class Desk:
                     choose.configure(menu=options)
                     choose.pack(side="right")
                     Tooltip(choose, "Its named settings, Neural DSP's own")
-        from .measure import measured_lines
+        from lab.hearing.measure import measured_lines
 
         label(self.tray, "Measured", size=8, color=DIM).pack(fill="x", pady=(10, 0))
         for line in measured_lines(sound.heard):
@@ -445,7 +445,7 @@ class Desk:
 
     def nano_sheet(self, sound):
         """How to set this sound up on the Nano Cortex: what to capture, the IR, and the effects by hand."""
-        from .nano import sheet
+        from lab.gear.nano import sheet
 
         top = tk.Toplevel(self.root, bg=PAPER)
         top.title(f"Nano Cortex · {sound.name}")
@@ -519,7 +519,7 @@ class Desk:
         if self.sounds_kind != "Presets":
             self.panel_assets("ir" if self.sounds_kind == "IRs" else "capture")
             return
-        from .library import cached, place
+        from lab.qc.library import cached, place
 
         entries = cached(self.studio.folder)
         top = tk.Frame(self.tray, bg=DARK)
@@ -549,7 +549,7 @@ class Desk:
         button(self.tray, "Work on this", lambda: self.work_on(box, rows)).pack(fill="x", pady=(6, 0))
 
     def panel_assets(self, kind):
-        from .assets import cached
+        from lab.qc.assets import cached
 
         found = [item for item in cached(self.studio.folder) or [] if item.kind == kind]
         top = tk.Frame(self.tray, bg=DARK)
@@ -616,7 +616,7 @@ class Desk:
             if self.panel == "Sounds":
                 self.fill_panel()
 
-        self.studio.later(self.studio.host.call("lab.library.directory", folder=str(self.studio.folder)), read)
+        self.studio.later(self.studio.host.call("lab.qc.library.directory", folder=str(self.studio.folder)), read)
 
     def work_on(self, box, rows):
         chosen = box.curselection()
@@ -718,7 +718,7 @@ class Desk:
             return
         if mode == "phrase":
             # The phrase loop and gesture listening would both want the audio driver.
-            from .learner import gestures
+            from lab.learner import gestures
 
             if gestures.running():
                 gestures.stop()
@@ -783,12 +783,12 @@ class Desk:
         return getattr(self, "seat", None) or LearnerSeat(self)
 
     def open_calibration(self):
-        from .learner import calibration
+        from lab.learner import calibration
 
         calibration.open(self.learner_seat())
 
     def toggle_gestures(self):
-        from .learner import gestures
+        from lab.learner import gestures
 
         if gestures.running():
             gestures.stop()
@@ -803,7 +803,7 @@ class Desk:
 
     def open_learner(self):
         """The Guitar Learner, in a window of its own, seated on this desk."""
-        from .learner import GuitarLearner
+        from lab.learner import GuitarLearner
 
         if self.learner is None:
             self.learner = GuitarLearner(self.learner_seat())
@@ -919,7 +919,7 @@ class LearnerSeat:
 
 
 def main(arguments):
-    from .host import Host
+    from lab.qc.host import Host
 
     simulated = "--simulated" in arguments
     if not simulated and not only_desk():
@@ -956,7 +956,7 @@ def first_run(root, folder):
     """Once: check what the app needs, bring the earlier app's history in, and say what is missing."""
     from tkinter import messagebox
 
-    from . import migrate, setup
+    from lab import migrate, setup
 
     if not setup.first_run_needed(folder):
         return

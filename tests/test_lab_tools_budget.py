@@ -9,12 +9,12 @@ import unittest
 from unittest import mock
 
 from lab import knowledge
-from lab.engine import Engine
-from lab.host import Host
-from lab.sim import SimAudio, SimUnit
-from lab.slots import Slots
+from lab.qc.engine import Engine
+from lab.qc.host import Host
+from lab.qc.sim import SimAudio, SimUnit
+from lab.qc.slots import Slots
 from lab.tools import budget
-from lab.unit import Unit
+from lab.qc.unit import Unit
 
 
 def engine_on(device, folder):

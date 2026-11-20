@@ -4,17 +4,18 @@ Each word carries its remedies in the order the community tries them. The first
 one the loaded chain can perform is applied, and the rest stay one step away as
 other ways to get there. docs/TONE_KNOWLEDGE.md gives the reasoning and the sources.
 
-A remedy is a set of Shape knob moves (`lab.knobs.KNOBS`). `read` takes a short
+A remedy is a set of Shape knob moves (`lab.sound.knobs.KNOBS`). `read` takes a short
 remark such as "the low end gets muddy when I palm mute" or "no fizz";
 `usable` keeps the remedies a chain can perform; `brief` tells the assistant
 about the loaded gear and the words a longer request uses. Plain requests for
-more or less of a knob ("a bit tighter") are `lab.knobs.direction`'s.
+more or less of a knob ("a bit tighter") are `lab.sound.knobs.direction`'s.
 """
 
 from dataclasses import dataclass
 import re
 
-from . import catalog, knobs, knowledge
+from lab.sound import catalog, knobs
+from lab import knowledge
 
 
 @dataclass(frozen=True)

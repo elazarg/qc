@@ -4,7 +4,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from lab.host import Host
+from lab.qc.host import Host
 
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -35,7 +35,7 @@ class HostTest(unittest.TestCase):
 
     def test_a_side_tool_runs_its_own_operation_where_the_unit_is_held(self):
         from tempfile import TemporaryDirectory
-        from lab.host import Host
+        from lab.qc.host import Host
 
         with TemporaryDirectory() as folder:
             host = Host(folder, simulated=True, local=True)

@@ -15,7 +15,7 @@ from pathlib import Path
 import re
 from uuid import uuid4
 
-from ..knowledge import REPO
+from lab.knowledge import REPO
 
 SESSIONS = REPO / "tone_sessions"
 LOG = logging.getLogger("lab.learner")

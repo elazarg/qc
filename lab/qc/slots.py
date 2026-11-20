@@ -25,7 +25,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 
-from .unit import Moved, same_slot
+from lab.qc.unit import Moved, same_slot
 
 MY_PRESETS = "/media/p4/Presets/My Presets"
 TONE_LAB_NAME = "Tone Lab"

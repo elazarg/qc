@@ -6,8 +6,8 @@ import math
 import numpy as np
 from scipy import signal
 
-from .. import audio
-from . import configuration as guitar_configuration, state as guitar_state
+from lab.hearing import audio
+from lab.learner import configuration as guitar_configuration, state as guitar_state
 
 WINDOW_SECONDS = 3.0
 ESTIMATE_SECONDS = 1.15

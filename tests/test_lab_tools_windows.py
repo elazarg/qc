@@ -6,8 +6,8 @@ from tempfile import TemporaryDirectory
 import tkinter as tk
 import unittest
 
-from lab import catalog
-from lab.sounds import Sound
+from lab.sound import catalog
+from lab.sound.sounds import Sound
 from lab.tools.menu import TOOLS, opener
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))

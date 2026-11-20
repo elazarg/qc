@@ -63,7 +63,7 @@ class Refused(RuntimeError):
 def data_folder(simulated=False):
     """The folder the desk keeps its records in: the same for the commands, so the cache and calibration are
     shared. The simulated unit has its own."""
-    from .knowledge import home
+    from lab.knowledge import home
 
     folder = home() / "simulated" if simulated else home()
     folder.mkdir(parents=True, exist_ok=True)
@@ -74,7 +74,7 @@ def desk_open():
     """Whether a desk is open on this computer. Asking brings it forward, which is what the player wants."""
     import socket
 
-    from .desk import PORT
+    from lab.desk.window import PORT
 
     try:
         with socket.create_connection(("127.0.0.1", PORT), timeout=.5):
@@ -92,7 +92,7 @@ def session(simulated=False, *, open_session=False, physical_input=1, host_class
     if not simulated and desk_open():
         raise Refused("The desk is open and holds the Quad Cortex. Close it, or use the desk for this.")
     if host_class is None:
-        from .host import Host as host_class
+        from lab.qc.host import Host as host_class
     host = host_class(data_folder(simulated), simulated=simulated, local=True, physical_input=physical_input)
     try:
         host.ready.result(60)
@@ -129,8 +129,8 @@ def call(simulated, name, *args, open_session=False, physical_input=1, **options
 
 def connection(engine, *, stop=None):
     """What the unit says about itself and the app's place on it. Reads only."""
-    from .device import recording_channels
-    from .listen import calibration
+    from lab.qc.device import recording_channels
+    from lab.hearing.listen import calibration
 
     unit = engine.unit
     found = {"firmware": unit.firmware, "preset": unit.name(), "position": unit.position(), "scene": unit.scene(),
@@ -157,7 +157,7 @@ def inspect(engine, *, stop=None):
 
 def find_slot(engine, place, setlist="My Presets"):
     """A saved preset's slot from its setlist name and its place on the footswitches ("12B")."""
-    from . import library
+    from lab.qc import library
 
     rows = library.directory(engine, folder=engine.slots.folder)
     wanted = place.strip().upper().lstrip("0")
@@ -174,7 +174,7 @@ def renders(engine, place, setlist, dry, variants, *, stop=None):
     """
     import numpy as np
 
-    from .tools.common import render
+    from lab.tools.common import render
 
     slot = find_slot(engine, place, setlist)
     chain, name = engine.read(slot)
@@ -201,7 +201,7 @@ def renders(engine, place, setlist, dry, variants, *, stop=None):
 # ---- the commands ----
 
 def doctor(args):
-    from . import setup
+    from lab import setup
 
     findings = setup.checks(data_folder())
     if args.unit:
@@ -228,7 +228,7 @@ def doctor(args):
 
 
 def migrate(args):
-    from . import migrate as moving
+    from lab import migrate as moving
 
     return moving.summary(moving.migrate(data_folder(), dry_run=args.dry_run))
 
@@ -241,7 +241,7 @@ def _pod_slot(text):
 
 
 def _piece(piece):
-    from . import catalog
+    from lab.sound import catalog
 
     found = {"position": piece.position, "name": piece.name, "category": piece.category, "based_on": piece.based_on,
              "relation": piece.relation, "why": piece.why, "on": list(piece.on), "params": piece.params}
@@ -251,8 +251,8 @@ def _piece(piece):
 
 
 def pod(args):
-    from . import podgo
-    from .sounds import describe
+    from lab.gear import podgo
+    from lab.sound.sounds import describe
 
     presets = podgo.import_backup(args.backup, args.setlist)
     if args.user_slot:
@@ -270,10 +270,10 @@ def pod(args):
 
 
 def history(args):
-    from . import spotify
+    from lab.player import spotify
 
     if args.missing:
-        from .sounds import Store
+        from lab.sound.sounds import Store
 
         tracks = spotify.proposals(args.files, Store(data_folder()), limit=args.limit)
     else:
@@ -294,7 +294,7 @@ def latest_clip(args):
     if found:
         _, _, info, dry = max(found, key=lambda item: (item[0], item[1]))
         return {**info, "dry": str(dry)}
-    from .knowledge import REPO
+    from lab.knowledge import REPO
 
     takes = sorted((take for take in (REPO / "tone_sessions" / "recordings").glob("clip-*")
                     if (take / "dry.wav").is_file()), reverse=True)
@@ -304,15 +304,15 @@ def latest_clip(args):
 
 
 def presets(args):
-    from .sounds import Store
+    from lab.sound.sounds import Store
 
     return [{"id": sound.id, "name": sound.name, "created": sound.created, "slot": sound.origin.get("slot")}
             for sound in Store(data_folder(args.simulated)).sounds() if sound.origin.get("kind") == "preset"]
 
 
 def test_compensation(args):
-    from .audio import read_wave, write_wave
-    from .learner import compensation
+    from lab.hearing.audio import read_wave, write_wave
+    from lab.learner import compensation
 
     if args.output.suffix.lower() != ".wav" or args.output.exists():
         raise ValueError("Choose a new WAV path for the compensation result.")
@@ -323,14 +323,14 @@ def test_compensation(args):
 
 
 def directory(args):
-    from .library import place
+    from lab.qc.library import place
 
-    rows = call(args.simulated, "lab.library.directory", factory=args.factory, folder=str(data_folder(args.simulated)))
+    rows = call(args.simulated, "lab.qc.library.directory", factory=args.factory, folder=str(data_folder(args.simulated)))
     return [{"place": place(row["slot"]["position"]), **row} for row in rows]
 
 
 def _chain_rows(chain):
-    from .sounds import settings
+    from lab.sound.sounds import settings
 
     rows = []
     for r, row in enumerate(chain.rows):
@@ -354,7 +354,7 @@ def _chain_rows(chain):
 
 
 def inspect_command(args):
-    from .sounds import describe
+    from lab.sound.sounds import describe
 
     found = call(args.simulated, "lab.cli.inspect")
     chain = found.pop("chain")
@@ -363,7 +363,7 @@ def inspect_command(args):
 
 
 def snapshot(args):
-    from .sounds import Sound, Store
+    from lab.sound.sounds import Sound, Store
 
     found = call(args.simulated, "lab.cli.inspect")
     sound = Sound(name=(found["name"] or "Preset")[:32], chain=found["chain"],
@@ -377,8 +377,8 @@ def snapshot(args):
 def record(args):
     import numpy as np
 
-    from .audio import db, write_wave
-    from .sounds import new_id
+    from lab.hearing.audio import db, write_wave
+    from lab.sound.sounds import new_id
 
     if args.output is not None and (args.output.suffix.lower() != ".wav" or args.output.exists()):
         raise ValueError("Choose a new .wav filename for the DI.")
@@ -406,8 +406,8 @@ def calibrate(args):
 
 
 def _write_renders(args, found, labels, extra):
-    from .audio import write_wave
-    from .measure import measure
+    from lab.hearing.audio import write_wave
+    from lab.hearing.measure import measure
 
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     target = args.out or data_folder(args.simulated) / "renders" / f"{stamp}-{args.action}"
@@ -426,7 +426,7 @@ def _write_renders(args, found, labels, extra):
 
 
 def _dry(path):
-    from .audio import read_wave
+    from lab.hearing.audio import read_wave
 
     dry = read_wave(path)[:, :1]
     if not len(dry):
@@ -480,7 +480,7 @@ APP_ID = "ToneLab.QuadCortex.Desktop"
 
 
 def _root():
-    from .knowledge import REPO
+    from lab.knowledge import REPO
 
     return REPO
 
@@ -656,7 +656,7 @@ def main(arguments=None, *, desk=None):
     arguments = list(sys.argv[1:] if arguments is None else arguments)
     if wants_desk(arguments):
         if desk is None:
-            from .desk import main as desk
+            from lab.desk.window import main as desk
         desk(arguments)
         return 0
     args = parser().parse_args(arguments)

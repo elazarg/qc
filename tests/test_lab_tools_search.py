@@ -11,7 +11,7 @@ import unittest
 import numpy as np
 from scipy.io import wavfile
 
-from lab.audio import RATE, write_wave
+from lab.hearing.audio import RATE, write_wave
 from lab.tools import search
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))

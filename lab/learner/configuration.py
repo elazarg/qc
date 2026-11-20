@@ -10,8 +10,8 @@ import numpy as np
 from scipy.interpolate import LinearNDInterpolator
 from scipy.spatial import QhullError
 
-from . import state as guitar_state
-from .folders import write_json
+from lab.learner import state as guitar_state
+from lab.learner.folders import write_json
 
 SCHEMA = 1
 SIGNATURE_SIZE = guitar_state.HARMONICS + 1

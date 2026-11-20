@@ -11,7 +11,7 @@ import math
 import numpy as np
 from scipy import signal
 
-from .. import audio
+from lab.hearing import audio
 
 CENTERS = np.array([280, 400, 560, 800, 1120, 1600, 2240, 3200, 4480, 6400])
 

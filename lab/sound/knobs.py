@@ -52,8 +52,9 @@ from dataclasses import replace
 import math
 import re
 
-from . import catalog, knowledge
-from .chain import in_scene
+from lab.sound import catalog
+from lab import knowledge
+from lab.sound.chain import in_scene
 
 AMP, PEDAL, CAPTURE = "Guitar Amplifier", "Guitar Overdrive", "Neural Capture"
 GATE = 16003            # Simple Gate, the only Utility whose THRESHOLD the Gate knob moves
@@ -530,7 +531,7 @@ def available(chain, *, scene=None):
 
 # ---- Checking a knob against what listening measures ----
 
-# What each knob turned up should do to a measurement of `lab.measure.Heard`'s record ("probe.x" is in its test-tone
+# What each knob turned up should do to a measurement of `lab.hearing.measure.Heard`'s record ("probe.x" is in its test-tone
 # record): (measurement, sign, the change a full turn must make at least, units). A knob with several measurements
 # has alternative measures of one quality: it did as intended when any of them moved enough the intended way. Pick
 # attack turned up lets the pick through (a slower compressor attack), so the onset gets quicker: attack_ms down.

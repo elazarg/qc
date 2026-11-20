@@ -30,7 +30,7 @@ from datetime import datetime, timedelta, timezone
 import json
 import re
 
-from .spotify import entries, song_key
+from lab.player.spotify import entries, song_key
 
 DELIBERATE_STARTS = {"clickrow", "playbtn", "backbtn"}
 COMPLETE_ENDS = {"trackdone"}

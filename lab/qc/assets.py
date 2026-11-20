@@ -1,7 +1,7 @@
 """The player's impulse responses and Neural Captures on the unit, and putting one into a sound.
 
 `listing(engine)` reads them where the unit is held (a host command:
-`host.call("lab.assets.listing")`) and remembers them in `assets.json` in the
+`host.call("lab.qc.assets.listing")`) and remembers them in `assets.json` in the
 app's home for `cached` to read without the unit.
 
 What the unit's directory says about them (CorOS 4.1, the same `File` read
@@ -35,8 +35,9 @@ import os
 from pathlib import Path
 import re
 
-from . import catalog, knowledge
-from .chain import Block
+from lab.sound import catalog
+from lab import knowledge
+from lab.sound.chain import Block
 
 FILE = "assets.json"
 IR_KEY = re.compile(r"CIR_[0-9a-f]+", re.IGNORECASE)

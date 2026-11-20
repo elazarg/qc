@@ -21,9 +21,9 @@ from tempfile import TemporaryDirectory
 from threading import Event, Thread
 import time
 
-from ..knowledge import REPO
-from . import folders
-from .folders import LOG
+from lab.knowledge import REPO
+from lab.learner import folders
+from lab.learner.folders import LOG
 
 START_TIMEOUT = 18.0
 HEARTBEAT_TIMEOUT = 6.0
@@ -157,7 +157,7 @@ def read_commands(stop, commands):
 
 
 def main(arguments):
-    from . import live
+    from lab.learner import live
 
     if len(arguments) != 1:
         emit({"event": "error", "text": "Give the live listening settings."})
@@ -179,7 +179,7 @@ def main(arguments):
 
             config = json.loads(Path(arguments[0]).read_text(encoding="utf-8"))
             if config.get("mode") == "gestures":
-                from . import gestures
+                from lab.learner import gestures
 
                 result = gestures.run(config, stop, commands, events)
             else:

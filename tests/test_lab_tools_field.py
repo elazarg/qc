@@ -9,7 +9,7 @@ import unittest
 
 import numpy as np
 
-from lab.knobs import KNOBS
+from lab.sound.knobs import KNOBS
 from lab.tools import field
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))

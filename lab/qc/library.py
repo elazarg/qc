@@ -1,7 +1,7 @@
 """The presets saved on the unit: which setlist, which slot, under what name.
 
 `directory(engine)` reads the unit's directory where the unit is held (it is
-a host command: `host.call("lab.library.directory")`), keeps what the player
+a host command: `host.call("lab.qc.library.directory")`), keeps what the player
 saved, and writes it to `directory.json` in the app's home for `cached` to
 read without the unit.
 
@@ -25,8 +25,8 @@ import os
 from pathlib import Path
 import re
 
-from . import knowledge
-from .slots import BUILD, BUILD_NAME, CACHE_PREFIX, CACHE_SLOTS, MY_PRESETS, OLD_APP, TONE_LAB_NAME
+from lab import knowledge
+from lab.qc.slots import BUILD, BUILD_NAME, CACHE_PREFIX, CACHE_SLOTS, MY_PRESETS, OLD_APP, TONE_LAB_NAME
 
 FILE = "directory.json"
 SCENES = "ABCDEFGH"

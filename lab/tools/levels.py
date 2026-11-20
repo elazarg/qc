@@ -22,12 +22,12 @@ import numpy as np
 import pyloudnorm
 from scipy import signal
 
-from .. import catalog
-from ..audio import RATE, db
-from ..chain import Block, COLUMNS, INTERNAL
-from ..theme import DIM, INK, PAPER
-from ..unit import CEILING_DB
-from .common import (Window, button, heard_chain, label, listbox, menu_choice, phrase, render_many, section)
+from lab.sound import catalog
+from lab.hearing.audio import RATE, db
+from lab.sound.chain import Block, COLUMNS, INTERNAL
+from lab.desk.theme import DIM, INK, PAPER
+from lab.qc.unit import CEILING_DB
+from lab.tools.common import (Window, button, heard_chain, label, listbox, menu_choice, phrase, render_many, section)
 
 FLOOR_DB = -40.
 DIGITAL_NOTE = ("These are levels of the sound returned over USB. Check the Quad Cortex input meter with your "
@@ -78,7 +78,7 @@ def side_level(asked_db, settings):
         return FLOOR_DB
     if settings["match"]:
         return max(FLOOR_DB, min(CEILING_DB, asked_db + settings["loudness_db"]))
-    from ..engine import PREVIEW_DB
+    from lab.qc.engine import PREVIEW_DB
 
     return max(FLOOR_DB, min(CEILING_DB, PREVIEW_DB + settings["master_db"]))
 
@@ -435,7 +435,7 @@ class LevelsWindow(Window):
             return
         trims = {row["name"]: row["trim_db"] for row in self.planned["rows"] if row.get("trim_db") is not None}
         if self.what.get() == "A and B":
-            from ..engine import PREVIEW_DB
+            from lab.qc.engine import PREVIEW_DB
 
             for name, trim in trims.items():
                 self.call("level", name.lower(), PREVIEW_DB + trim, done=lambda _: None, working="Matching A and B…")
@@ -447,7 +447,7 @@ class LevelsWindow(Window):
             if part["name"] not in trims:
                 continue
             _, sound = self.targets_measured[part["name"]]
-            from ..sounds import Sound
+            from lab.sound.sounds import Sound
 
             try:
                 chain, applied = with_trim(sound.chain, trims[part["name"]])

@@ -31,7 +31,7 @@ from hashlib import sha256
 import json
 import struct
 
-from . import catalog
+from lab.sound import catalog
 
 ROWS, COLUMNS, SCENES = 4, 8, 8
 TOLERANCE = .006        # stored values within this of each other are the same (the unit rounds to about 1/256)

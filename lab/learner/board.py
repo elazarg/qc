@@ -2,15 +2,15 @@
 
 The learner has its own palette, a cool green on near-black, kept from the
 earlier app so the window looks as it did; it never used the desk's colours.
-The type is the desk's (`lab.theme.FONT`).
+The type is the desk's (`lab.desk.theme.FONT`).
 """
 
 import math
 from pathlib import Path
 import tkinter as tk
 
-from ..theme import FONT
-from .dataset import LAYOUTS
+from lab.desk.theme import FONT
+from lab.learner.dataset import LAYOUTS
 
 
 BG = "#141518"

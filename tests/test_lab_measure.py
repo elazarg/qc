@@ -5,8 +5,8 @@ import unittest
 import numpy as np
 from scipy import signal as dsp
 
-from lab import measure, probe
-from lab.audio import RATE, onset, click
+from lab.hearing import measure, probe
+from lab.hearing.audio import RATE, onset, click
 
 
 def note(seconds=1.5, pitch=196.):

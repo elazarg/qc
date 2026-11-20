@@ -9,12 +9,12 @@ import unittest
 from unittest import mock
 
 from lab import knowledge
-from lab.engine import Engine
-from lab.host import Host
-from lab.sim import MY_PRESETS, SimAudio, SimUnit
-from lab.slots import BUILD, Slots
+from lab.qc.engine import Engine
+from lab.qc.host import Host
+from lab.qc.sim import MY_PRESETS, SimAudio, SimUnit
+from lab.qc.slots import BUILD, Slots
 from lab.tools import named
-from lab.unit import Unit, same_slot
+from lab.qc.unit import Unit, same_slot
 
 AMP, DELAY, EQ = 1001, 6011, 4002
 
@@ -166,7 +166,7 @@ class NamedTest(unittest.TestCase):
 
 class ValuesTest(unittest.TestCase):
     def test_a_stock_cab_of_another_shape_is_not_read_by_index(self):
-        from lab import catalog
+        from lab.sound import catalog
 
         cab = catalog.model(12001)
         cell = mock.Mock(params=[object()] * 3)

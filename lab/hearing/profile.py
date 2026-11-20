@@ -15,7 +15,7 @@ humbucker played firmly peaks around -18 dBFS.
 
 import numpy as np
 
-from .measure import CENTRES, measure
+from lab.hearing.measure import CENTRES, measure
 
 TYPICAL_PEAK_DB = -18.     # a medium-hot passive humbucker, firm playing, at the unit's input level 0
 BANDS = ((60, 200, "lows"), (200, 800, "low mids"), (800, 3000, "mids"), (3000, 6000, "presence"),

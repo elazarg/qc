@@ -1,6 +1,6 @@
 # Distortion ladder, measured on the unit
 
-Measured on 2026-11-20, CorOS 4.1.1, with `lab/probe.py`'s test signal played over USB at the level of a firmly
+Measured on 2026-11-20, CorOS 4.1.1, with `lab/hearing/probe.py`'s test signal played over USB at the level of a firmly
 held note in one of the player's recorded phrases (Charvel, pickup setting not noted). Each chain was built from
 empty, so every value it does not state is the unit's own default. Silent in the room.
 
@@ -58,7 +58,7 @@ and the same ladder at each pickup setting, would make it firmer.
 
 ## Texture, measured on the same ladder
 
-Measured again on 2026-11-20 with the harmonic orders (`lab/probe.py`): low orders are the 2nd and 3rd harmonics
+Measured again on 2026-11-20 with the harmonic orders (`lab/hearing/probe.py`): low orders are the 2nd and 3rd harmonics
 against the tone, high orders the 5th to 10th, weighted is Shorter's n²/4 weighting, T3 the share of the power
 in the 5th to 10th.
 

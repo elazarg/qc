@@ -7,8 +7,8 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 import unittest
 
-from lab.assistant import DAILY, Assistant
-from lab.sounds import Sound
+from lab.sound.assistant import DAILY, Assistant
+from lab.sound.sounds import Sound
 from lab.tools import usage
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))

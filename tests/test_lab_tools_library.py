@@ -6,7 +6,7 @@ import sys
 from tempfile import TemporaryDirectory
 import unittest
 
-from lab.sim import FACTORY, MY_PRESETS
+from lab.qc.sim import FACTORY, MY_PRESETS
 from lab.tools import library, search
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -57,10 +57,10 @@ class OnTheUnitTest(unittest.TestCase):
                 unit.close()
 
     def test_a_preset_left_on_the_unit_is_the_one_given_back(self):
-        from lab.engine import Engine
-        from lab.sim import SimAudio, SimUnit
-        from lab.slots import Slots
-        from lab.unit import Unit
+        from lab.qc.engine import Engine
+        from lab.qc.sim import SimAudio, SimUnit
+        from lab.qc.slots import Slots
+        from lab.qc.unit import Unit
 
         with TemporaryDirectory() as folder:
             device = SimUnit()

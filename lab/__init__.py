@@ -1,22 +1,33 @@
-"""Tone Lab, rewritten.
+"""Tone Lab.
 
-The new implementation lives beside the old one (`tone_lab`) until it can
-replace it. Its core idea: everything the app works on is a chain as the
-Quad Cortex holds it. A design written by the assistant, a preset saved on
-the unit and a preset imported from elsewhere are the same kind of thing, so
-everything the app can do applies to all of them.
+Everything the app works on is a chain as the Quad Cortex holds it: a design
+written by the assistant, a preset saved on the unit and a preset imported from
+elsewhere are the same kind of thing, so everything the app can do applies to
+all of them.
 
-Layers, from the bottom:
+Packages, from the bottom:
 
-- `catalog`: the unit's models and their parameters, the only place that knows
-  how display values map to what the unit stores.
-- `chain`: the chain model, reading it from a preset, and planning the writes
-  that turn one chain into another.
-- `measure`: one measurement of a piece of audio, used for everything.
+- `qc`: everything that talks to the Quad Cortex. The connection (`device`),
+  the guarded unit (`unit`), the app's slots and the cache of built chains
+  (`slots`, `rig`), the engine that holds the unit in a process of its own
+  (`engine`, `host`), a simulated unit (`sim`), the unit's presets (`library`)
+  and the player's IRs and captures (`assets`).
+- `sound`: what a sound is and how it changes. The unit's models (`catalog`),
+  the chain and planning the writes between two chains (`chain`), the Shape
+  knobs (`knobs`), the player's words (`words`), the designer and its
+  instructions (`design`, `designer.md`), sounds, songs and phrases (`sounds`)
+  and the assistant (`assistant`).
+- `hearing`: listening without speakers. Audio over USB (`audio`), one
+  measurement for everything (`measure`), test signals (`probe`), listening to
+  a chain (`listen`) and what the player's guitar puts out (`profile`).
+- `player`: what is learned about the player, from their choices (`taste`)
+  and their listening history (`listening`, `spotify`). Generic code; what it
+  works out from someone's data stays in their data folder.
+- `desk`: the window (`window`), the studio behind it (`studio`) and the look
+  (`theme`).
+- `tools`, `learner`: the side windows and the Guitar Learner.
+- `gear`: POD Go presets (`podgo`) and the Nano Cortex sheet (`nano`).
 - `knowledge`: tables learned from research and from the unit, with where each
-  came from.
-- `sim`: a simulated Quad Cortex, so that everything runs without hardware.
-- `unit`: the real or simulated unit behind one guarded interface.
-- `slots`: which slots are the app's, and the cache of built chains.
-- `sounds`: sounds, songs, instruments and phrases, and where they are kept.
+  came from; `cli`, `setup`, `migrate`: the command line, first run, and
+  bringing in the earlier app's history.
 """

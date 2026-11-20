@@ -21,20 +21,20 @@ import traceback
 
 
 def _engine(simulated, folder, physical_input):
-    from .engine import Engine
-    from .slots import Slots
-    from .unit import Unit
+    from lab.qc.engine import Engine
+    from lab.qc.slots import Slots
+    from lab.qc.unit import Unit
 
     if simulated:
-        from .sim import SimAudio, SimUnit
+        from lab.qc.sim import SimAudio, SimUnit
 
         device = SimUnit()
         unit = Unit(device, settle=.05, sleep=lambda seconds: None)
         audio = SimAudio(device)
         context = None
     else:
-        from . import device as qc_device
-        from .audio import Audio
+        from lab.qc import device as qc_device
+        from lab.hearing.audio import Audio
 
         context = qc_device.connect(write=True)
         unit = Unit(context.__enter__())

@@ -6,8 +6,8 @@ import json
 import unittest
 import zipfile
 
-from lab import spotify
-from lab.sounds import Store
+from lab.player import spotify
+from lab.sound.sounds import Store
 
 MINUTE = 60_000
 

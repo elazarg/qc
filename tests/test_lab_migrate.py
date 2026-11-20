@@ -9,10 +9,11 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from lab import catalog, migrate
-from lab.chain import SCENES
-from lab.sim import SimUnit
-from lab.sounds import Store
+from lab.sound import catalog
+from lab import migrate
+from lab.sound.chain import SCENES
+from lab.qc.sim import SimUnit
+from lab.sound.sounds import Store
 
 MY_PRESETS = "/media/p4/Presets/My Presets"
 

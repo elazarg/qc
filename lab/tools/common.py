@@ -20,10 +20,10 @@ import tkinter as tk
 
 import numpy as np
 
-from ..audio import RATE
-from ..chain import routed
-from ..rig import USB
-from ..theme import DARK, DIM, FONT, INK, PAPER, RULE, SOFT, SUBTLE, TILE, WHITE
+from lab.hearing.audio import RATE
+from lab.sound.chain import routed
+from lab.qc.rig import USB
+from lab.desk.theme import DARK, DIM, FONT, INK, PAPER, RULE, SOFT, SUBTLE, TILE, WHITE
 
 SCENE_LETTERS = "ABCDEFGH"
 
@@ -77,7 +77,7 @@ def stated(chain):
     """
     from dataclasses import replace
 
-    from .. import catalog
+    from lab.sound import catalog
 
     for row, column, block in chain.blocks:
         defaults = catalog.defaults(block.model)
@@ -87,7 +87,7 @@ def stated(chain):
 
 
 def with_knobs(chain, values):
-    from ..knobs import apply
+    from lab.sound.knobs import apply
 
     return apply(stated(chain), values) if values else chain
 
@@ -226,7 +226,7 @@ class Window:
         label(outer, variable=self.status, size=9, color=SOFT, wrap=560).pack(side="bottom", fill="x", pady=(6, 0))
         self.body = tk.Frame(outer, bg=PAPER)
         self.body.pack(fill="both", expand=True)
-        from . import usage
+        from lab.tools import usage
 
         usage.record(self.folder, "open", self.TITLE)
         self.build()
@@ -273,7 +273,7 @@ class Window:
             self.studio.set(working="")
 
     def close(self):
-        from . import usage
+        from lab.tools import usage
 
         usage.record(self.folder, "close", self.TITLE)
         silence()

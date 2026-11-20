@@ -2,7 +2,7 @@
 
 A gesture is a stable A → B → A return between two states of one control
 (pickup, volume or tone) that the guitar-input calibration has learned
-(`lab.learner.calibration`). Its mapping names a Shape knob of `lab.knobs`
+(`lab.learner.calibration`). Its mapping names a Shape knob of `lab.sound.knobs`
 and a step. It is recognised only within an armed window, about 20 seconds
 from the start of listening.
 
@@ -14,7 +14,7 @@ on show with `studio.turn`, provided that knob is available on its chain.
 `stop()` ends it.
 
     from lab.learner import gestures
-    gestures.start(seat)        # the seat of lab.desk.LearnerSeat, or the desk
+    gestures.start(seat)        # the seat of lab.desk.window.LearnerSeat, or the desk
     gestures.stop()
 """
 
@@ -28,11 +28,11 @@ from queue import Empty, Queue
 from threading import Event, Thread
 import time
 
-from .. import audio
-from ..knobs import KNOBS, RENAMED
-from . import folders, inputs, state as guitar_state
-from .folders import LOG
-from .live import DryWindow
+from lab.hearing import audio
+from lab.sound.knobs import KNOBS, RENAMED
+from lab.learner import folders, inputs, state as guitar_state
+from lab.learner.folders import LOG
+from lab.learner.live import DryWindow
 
 CONTROLS = ("pickup", "volume", "tone")
 WINDOW_SECONDS = .48
@@ -382,7 +382,7 @@ class Session:
             self._schedule()
 
     def _supervise(self):
-        from . import worker
+        from lab.learner import worker
 
         try:
             worker.run(self.config, self.signal, Queue(), self.events.put)

@@ -11,10 +11,10 @@ import unittest
 import numpy as np
 from qc_mcp import leveling
 
-from lab import catalog
-from lab.chain import Chain, Row
+from lab.sound import catalog
+from lab.sound.chain import Chain, Row
 from lab.tools import levels
-from lab.unit import CEILING_DB
+from lab.qc.unit import CEILING_DB
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_lab_tools_support import PLEXI, V30, chain, host, phrase  # noqa: E402

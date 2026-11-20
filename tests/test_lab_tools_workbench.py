@@ -1,8 +1,8 @@
 """The two workbenches: versions of a sound compared blind, and every knob with the versions of a sound.
 
 The old tests of the workbenches (test_iterate, test_draft_forms) checked how the old app copied presets
-into working slots and built drafts on them. On the new core that is `lab.rig`, `lab.slots` and
-`lab.unit`, tested in test_lab_*; what is ported here is what the workbenches did with it: a request at two
+into working slots and built drafts on them. On the new core that is `lab.qc.rig`, `lab.qc.slots` and
+`lab.qc.unit`, tested in test_lab_*; what is ported here is what the workbenches did with it: a request at two
 strengths next to the original, scenes, a sweep, a level-matched blind comparison, a kept preference."""
 
 import json
@@ -11,10 +11,10 @@ import sys
 from tempfile import TemporaryDirectory
 import unittest
 
-from lab import knobs
-from lab.chain import Chain, Row
-from lab.measure import measure
-from lab.sounds import Sound, Store
+from lab.sound import knobs
+from lab.sound.chain import Chain, Row
+from lab.hearing.measure import measure
+from lab.sound.sounds import Sound, Store
 from lab.tools import controls, workbench
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -64,7 +64,7 @@ class VersionsTest(unittest.TestCase):
             store.save(sound)
             target, record = workbench.comparison(folder, versions, [quiet, loud], sound=sound, phrase_name="p",
                                                   kind="Strengths", seed=3)
-            from lab.audio import read_wave
+            from lab.hearing.audio import read_wave
 
             loudness = [measure(read_wave(target / row["file"])).lufs for row in record["auditions"].values()]
             self.assertLess(max(loudness) - min(loudness), .2)

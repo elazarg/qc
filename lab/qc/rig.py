@@ -15,10 +15,10 @@ from dataclasses import replace
 
 from qc_mcp import leveling
 
-from . import catalog
-from .chain import differences
-from .slots import BUILD, BUILD_NAME, cache_name
-from .unit import Mismatch
+from lab.sound import catalog
+from lab.sound.chain import differences
+from lab.qc.slots import BUILD, BUILD_NAME, cache_name
+from lab.qc.unit import Mismatch
 
 USB = (12, 14)   # the phrase from the computer in, the processed sound back to the computer
 

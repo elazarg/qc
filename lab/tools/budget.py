@@ -16,7 +16,7 @@ import json
 import os
 from pathlib import Path
 
-from .. import knowledge
+from lab import knowledge
 
 FIELDS = {"cpu": "cpu_percent", "dm": "dm_heap_bytes", "pm": "pm_heap_bytes", "dmda": "dmda_bytes",
           "pmda": "pmda_bytes", "memory": "edma_percent", "latency": "latency"}

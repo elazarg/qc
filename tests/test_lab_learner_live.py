@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 
 import numpy as np
 
-from lab import audio
+from lab.hearing import audio
 from lab.learner import dataset as guitar_dataset, folders, inputs, live as guitar_live, worker
 from lab.learner.live import DryWindow
 

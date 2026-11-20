@@ -3,7 +3,7 @@
 import json
 import unittest
 
-from lab import profile
+from lab.hearing import profile
 
 
 def setting(peak, lufs, centroid, lows=-6.):

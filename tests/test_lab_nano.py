@@ -2,8 +2,8 @@
 
 import unittest
 
-from lab import nano
-from lab.chain import Block, Chain, Row
+from lab.gear import nano
+from lab.sound.chain import Block, Chain, Row
 
 GATE, OPTO, GREEN_808, MYTH, BRIT_2203, CAB_MESA_OS_A, VINTAGE_CHORUS, TAPE, PLATE = \
     16003, 5007, 5, 1, 1001, 12031, 7000, 6004, 8013

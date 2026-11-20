@@ -22,11 +22,11 @@ from dataclasses import replace
 
 from qc_mcp import leveling
 
-from . import catalog
-from .chain import COLUMNS, Chain, Row, routed
-from .listen import calibrate, calibration, listen
-from .rig import Rig
-from .unit import same_slot
+from lab.sound import catalog
+from lab.sound.chain import COLUMNS, Chain, Row, routed
+from lab.hearing.listen import calibrate, calibration, listen
+from lab.qc.rig import Rig
+from lab.qc.unit import same_slot
 
 MULTI_OUT, USB_IN, USB_OUT = 19, 12, 14
 PREVIEW_DB = -12.     # the level of a sound nobody has measured yet
@@ -159,7 +159,7 @@ class Engine:
 
     def _loop(self, mode, phrase):
         if mode == "phrase" and self.loop is None and phrase is not None:
-            from .audio import Loop
+            from lab.hearing.audio import Loop
 
             self.loop = Loop(self.audio, phrase).start()
         if mode != "phrase" and self.loop is not None:
@@ -198,7 +198,7 @@ class Engine:
 
     def turn(self, side, values, scene=None):
         """Set one side's Shape knobs. Returns the edits made, in display units, for the desk to show."""
-        from . import knobs
+        from lab.sound import knobs
 
         # The knobs work on the side as the unit holds it, where every value is stated.
         chain = self.bases[side]
@@ -269,7 +269,7 @@ class Engine:
 
         As `save` does, the knobs are applied to the chain as the unit holds it once built, where every value is
         stated; the shaped chain is then listened to like any other (built once and cached)."""
-        from .knobs import apply as with_knobs
+        from lab.sound.knobs import apply as with_knobs
 
         self.quiet()
         if self.offset is None:
@@ -306,7 +306,7 @@ class Engine:
         self.unit.slot = None
         self.rig.build(playable)            # assembled and cached silent
         if knobs:
-            from .knobs import apply as with_knobs
+            from lab.sound.knobs import apply as with_knobs
 
             held = self.unit.read()
             playable = with_knobs(held.with_routes(playable.routes), knobs)
@@ -323,7 +323,7 @@ class Engine:
         self.quiet()
         dry_channel = self.physical_input
         if hasattr(self.unit.device, "read_message"):
-            from .device import recording_channels
+            from lab.qc.device import recording_channels
 
             # Which USB channels carry the dry input depends on the unit's USB Dry/Wet setting.
             dry_channel = recording_channels(self.unit.device, self.physical_input)[0]

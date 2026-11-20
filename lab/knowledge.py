@@ -20,7 +20,7 @@ import json
 import os
 from pathlib import Path
 
-from . import catalog
+from lab.sound import catalog
 
 REPO = Path(__file__).resolve().parents[1]
 SHARED = REPO / "tone_lab" / "knowledge"
@@ -40,7 +40,7 @@ def home():
         base = os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local"
         folder = Path(base) / "Tone Lab"
         if not folder.exists():
-            from .setup import move_old_home
+            from lab.setup import move_old_home
 
             move_old_home(REPO / "tone_sessions" / "lab", folder)
     folder.mkdir(parents=True, exist_ok=True)

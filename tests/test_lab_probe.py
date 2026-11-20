@@ -6,8 +6,8 @@ import numpy as np
 from numpy.polynomial.chebyshev import chebval
 from scipy import signal
 
-from lab.audio import RATE
-from lab.probe import analyse, held_note_peak, test_signal
+from lab.hearing.audio import RATE
+from lab.hearing.probe import analyse, held_note_peak, test_signal
 
 TONES = test_signal(.25)[:, 0].astype(np.float64)
 

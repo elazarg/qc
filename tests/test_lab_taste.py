@@ -7,13 +7,13 @@ import unittest
 
 import numpy as np
 
-from lab import taste
-from lab.chain import Chain
-from lab.sounds import Sound, Store
+from lab.player import taste
+from lab.sound.chain import Chain
+from lab.sound.sounds import Sound, Store
 
 
 def record(**values):
-    """A heard record shaped like lab.measure.Heard.to_record, with a probe record."""
+    """A heard record shaped like lab.hearing.measure.Heard.to_record, with a probe record."""
     top = {key: values.pop(key) for key in list(values) if taste.FEATURES.get(key, ("probe",))[0] == ""}
     return {"compression": .3, "crest_db": 12., "brightness_oct": 0., "low_end_db": 0., "tail_db": -50.,
             "level_db": -20., **top, "probe": {"distortion_db": -30., "distortion_soft_db": -40., **values},

@@ -69,7 +69,7 @@ import math
 import numpy as np
 from scipy import signal
 
-from .audio import RATE
+from lab.hearing.audio import RATE
 
 F1, F2 = 196., 246.94
 TONE_S, GAP_S, LEAD_S, TAIL_S = 1.0, .2, .3, 2.0

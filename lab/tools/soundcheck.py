@@ -24,11 +24,11 @@ from uuid import uuid4
 import numpy as np
 from scipy import signal
 
-from ..audio import RATE, db
-from ..measure import match, measure as measure_audio
-from .common import (Window, button, gained, heard_chain, label, menu_choice, phrase, play, render, section,
+from lab.hearing.audio import RATE, db
+from lab.hearing.measure import match, measure as measure_audio
+from lab.tools.common import (Window, button, gained, heard_chain, label, menu_choice, phrase, play, render, section,
                      write_pcm16)
-from .levels import measure
+from lab.tools.levels import measure
 
 CONTEXTS = {
     "frfr": {"name": "Full-range speaker or PA", "high_pass_hz": 65, "shelf_hz": 4200, "shelf_db": -2.0},
@@ -163,7 +163,7 @@ def check(engine, chain=None, dry=None, seconds=6., *, stop=None):
 
 def unit_check(engine, *, stop=None):
     """What the app can say about the unit without changing anything."""
-    from ..slots import CACHE_SLOTS
+    from lab.qc.slots import CACHE_SLOTS
 
     found = {"firmware": engine.unit.firmware, "calibrated": engine.offset is not None,
              "cached": len(engine.slots.index()), "cache_slots": len(CACHE_SLOTS)}

@@ -4,7 +4,7 @@ import unittest
 
 import numpy as np
 
-from lab import audio
+from lab.hearing import audio
 from lab.learner import state as guitar_state
 
 

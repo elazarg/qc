@@ -26,8 +26,8 @@ from types import SimpleNamespace
 import numpy as np
 from qc_mcp import preset as wire
 
-from . import catalog
-from .chain import COLUMNS, ROWS, SCENES
+from lab.sound import catalog
+from lab.sound.chain import COLUMNS, ROWS, SCENES
 
 MY_PRESETS = "/media/p4/Presets/My Presets"
 TONE_LAB = "/media/p4/Presets/Tone Lab"

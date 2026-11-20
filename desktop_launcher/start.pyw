@@ -63,7 +63,7 @@ def chosen_desk(arguments, environ=os.environ):
 
 
 def open_new_desk(arguments):
-    from lab.desk import main as desk
+    from lab.desk.window import main as desk
 
     desk([argument for argument in arguments if argument not in ("--new", "--old")])
 

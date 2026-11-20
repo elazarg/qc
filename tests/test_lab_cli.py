@@ -17,11 +17,11 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))   # for the POD Go test's fixtures
 
 from lab import cli
-from lab.audio import read_wave, write_wave
-from lab.engine import Engine
-from lab.sim import MY_PRESETS, SimAudio, SimUnit
-from lab.slots import Slots
-from lab.unit import Unit
+from lab.hearing.audio import read_wave, write_wave
+from lab.qc.engine import Engine
+from lab.qc.sim import MY_PRESETS, SimAudio, SimUnit
+from lab.qc.slots import Slots
+from lab.qc.unit import Unit
 
 
 def run(*arguments):
@@ -277,7 +277,7 @@ class LocalTest(Home):
                         encoding="utf-8")
         ranked = result("history", str(path))
         self.assertEqual([item["title"] for item in ranked], ["For the Love of God", "Limelight"])
-        from lab.sounds import Store
+        from lab.sound.sounds import Store
 
         Store(self.home).save_song({"name": "Steve Vai – For the Love of God"})
         missing = result("history", str(path), "--missing")

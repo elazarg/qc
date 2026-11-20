@@ -3,7 +3,7 @@
 `GuitarLearner(desk)` opens on whatever desk seats it. The desk provides:
 root, read_state(path), set_status(text), submit(task, message, work, *args,
 done), job, task_if_active(name), stop(), stop_signal, ready, live_is_ready,
-leaving, takes and input_channel (see `lab.desk.LearnerSeat`).
+leaving, takes and input_channel (see `lab.desk.window.LearnerSeat`).
 """
 
 from concurrent.futures import ThreadPoolExecutor
@@ -18,10 +18,10 @@ from uuid import uuid4
 
 import numpy as np
 
-from . import configuration as model, dataset as data, folders, gestures, takes as recorder, worker
-from .board import (ACCENT, ACTIVE_INK, ALERT, BG, FONT, INK, LINE, MUTED, PANEL, SURFACE,
+from lab.learner import configuration as model, dataset as data, folders, gestures, takes as recorder, worker
+from lab.learner.board import (ACCENT, ACTIVE_INK, ALERT, BG, FONT, INK, LINE, MUTED, PANEL, SURFACE,
                     GuitarBoard, LAYOUTS_SHOWN, button, mark_button, setting, word)
-from .folders import LOG
+from lab.learner.folders import LOG
 
 
 GUITAR = "Charvel"

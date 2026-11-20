@@ -65,7 +65,7 @@ def _wanted(name):
 
 def entries(paths):
     """Every entry of the listening-history files in the given files, folders or zip archives, as dicts.
-    The one place an export is read; `history` here and `lab.listening.plays` both use it."""
+    The one place an export is read; `history` here and `lab.player.listening.plays` both use it."""
     for path in map(Path, paths):
         if path.is_dir():
             files = sorted(p for p in path.rglob("*.json") if _wanted(p.name))

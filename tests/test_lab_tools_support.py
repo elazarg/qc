@@ -6,10 +6,10 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from lab import catalog
-from lab.chain import Block, Chain, Row
-from lab.engine import MULTI_OUT
-from lab.host import Host
+from lab.sound import catalog
+from lab.sound.chain import Block, Chain, Row
+from lab.qc.engine import MULTI_OUT
+from lab.qc.host import Host
 
 PLEXI, HIWATT, V30, GREENBACK, DELAY = 1081, 1063, 12001, 12006, 6011
 
@@ -41,7 +41,7 @@ def host(folder):
 
 def desk(folder, root=None):
     """A desk as a tool sees it: a root window and a studio over a simulated host."""
-    from lab.studio import Studio
+    from lab.desk.studio import Studio
 
     studio = Studio(host(folder), folder)
     return SimpleNamespace(root=root, studio=studio)

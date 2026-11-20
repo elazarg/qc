@@ -1,6 +1,6 @@
 import unittest
 
-from lab import knobs, words
+from lab.sound import knobs, words
 
 
 def said(text):

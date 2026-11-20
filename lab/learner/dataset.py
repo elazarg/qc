@@ -13,9 +13,9 @@ from uuid import uuid4
 
 import numpy as np
 
-from .. import audio
-from . import folders
-from .folders import write_json
+from lab.hearing import audio
+from lab.learner import folders
+from lab.learner.folders import write_json
 
 SCHEMA = 1
 ROLES = ("example", "test")

@@ -33,11 +33,12 @@ import json
 from pathlib import Path
 import re
 
-from . import catalog, knowledge
-from .chain import Chain
-from .sounds import settings as stated
+from lab.sound import catalog
+from lab import knowledge
+from lab.sound.chain import Chain
+from lab.sound.sounds import settings as stated
 
-RESEARCH = Path(__file__).resolve().parents[1] / "research" / "nano-cortex.json"
+RESEARCH = Path(__file__).resolve().parents[2] / "research" / "nano-cortex.json"
 PRE, POST = ("Pre 1", "Pre 2"), ("Post 1", "Post 2", "Post 3")
 FIXED_POST = {"modulation": "Post 1", "doubler": "Post 1", "delay": "Post 2", "reverb": "Post 3"}
 PRE_ORDER = ("drive", "bass_drive", "wah", "pitch", "compressor_mono", "filter", "utility", "eq")

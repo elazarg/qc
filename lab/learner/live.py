@@ -15,9 +15,9 @@ from uuid import uuid4
 
 import numpy as np
 
-from .. import audio
-from . import configuration as guitar_configuration, continuous, dataset as guitar_dataset, inputs
-from .folders import write_json
+from lab.hearing import audio
+from lab.learner import configuration as guitar_configuration, continuous, dataset as guitar_dataset, inputs
+from lab.learner.folders import write_json
 
 WINDOW_SECONDS = 3.
 RECENT_SECONDS = 12.

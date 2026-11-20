@@ -2,7 +2,7 @@
 
 - **Usage** is a local log of tool windows opened and closed (`ui-usage.jsonl` in the data folder), as the
   old desk kept for its panels, with `companions` counting what was open together.
-- **The assistant's ledger** (`ledger.jsonl`, written by `lab.assistant`) is read back day by day: how many
+- **The assistant's ledger** (`ledger.jsonl`, written by `lab.sound.assistant`) is read back day by day: how many
   calls, whose (the player's or the app's own), of which kind, how long they took, how much was sent, how
   they ended, against the daily allowance.
 - **Feedback** is a note the player leaves about what is on the desk: it is kept with the sounds on A and
@@ -17,8 +17,8 @@ from pathlib import Path
 import tkinter as tk
 from uuid import uuid4
 
-from ..theme import FONT, INK, PAPER, SOFT, SUBTLE
-from .common import Window, button, label, listbox, section
+from lab.desk.theme import FONT, INK, PAPER, SOFT, SUBTLE
+from lab.tools.common import Window, button, label, listbox, section
 
 LOG = "ui-usage.jsonl"
 
@@ -79,7 +79,7 @@ def daily(folder, *, days=14, today=None):
     Each day: {"day", "calls", "player", "app", "web", "kinds": {kind: n}, "seconds", "characters",
     "ok", "cancelled", "failed", "refused"}. A call refused before it was made is not in the ledger.
     """
-    from ..assistant import DAILY
+    from lab.sound.assistant import DAILY
 
     found = defaultdict(lambda: {"calls": 0, "player": 0, "app": 0, "web": 0, "kinds": Counter(), "seconds": 0.,
                                  "characters": 0, "ok": 0, "cancelled": 0, "failed": 0})
@@ -106,7 +106,7 @@ def daily(folder, *, days=14, today=None):
 
 
 def today_line(folder, today=None):
-    from ..assistant import DAILY
+    from lab.sound.assistant import DAILY
 
     today = today or _now().date().isoformat()
     entry = next((row for row in daily(folder, today=today) if row["day"] == today), None)
@@ -159,7 +159,7 @@ def feedback_notes(folder):
 
 def unit_state(engine, *, stop=None):
     """What the app keeps on the unit: firmware, whether the round trip is measured, chains in the cache."""
-    from ..slots import CACHE_SLOTS
+    from lab.qc.slots import CACHE_SLOTS
 
     return {"firmware": engine.unit.firmware, "calibrated": engine.offset is not None,
             "cached": len(engine.slots.index()), "cache_slots": len(CACHE_SLOTS)}

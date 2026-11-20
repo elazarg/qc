@@ -22,10 +22,11 @@ import json
 from pathlib import Path
 import time
 
-from . import design, knobs, knowledge, words
-from .assistant import Assistant
-from .measure import summary
-from .sounds import Sound, Store, describe
+from lab.sound import design, knobs, words
+from lab import knowledge
+from lab.sound.assistant import Assistant
+from lab.hearing.measure import summary
+from lab.sound.sounds import Sound, Store, describe
 
 SETTLE_SECONDS = 4.     # a turn is checked by listening once no knob has moved for this long
 # The one correction a check may make to a knob, as a factor on its position: further when it did too little,
@@ -131,7 +132,7 @@ class Studio:
 
         listing = self.folder / "directory.json"
         if not listing.exists() or time.time() - listing.stat().st_mtime > 12 * 3600:
-            self.later(self.host.call("lab.library.directory", folder=str(self.folder)), lambda entries: None,
+            self.later(self.host.call("lab.qc.library.directory", folder=str(self.folder)), lambda entries: None,
                        lambda error: None)
 
     def put(self, side, sound):
@@ -192,7 +193,7 @@ class Studio:
         Matched by integrated loudness (ITU-R BS.1770, LUFS), which follows perceived loudness across sounds of
         different brightness better than a plain level does (docs/TONE_RESEARCH.md, 13); by RMS level only when one of
         the two was measured before loudness was recorded."""
-        from .engine import PREVIEW_DB
+        from lab.qc.engine import PREVIEW_DB
 
         sounds = {side: self.sound(side) for side in ("a", "b")}
         heard = {side: sound.heard for side, sound in sounds.items()
@@ -361,8 +362,8 @@ class Studio:
 
     def named(self, row, column, setting, side=None):
         """A copy of the sound with one block set to one of its model's named settings, put on the same side."""
-        from . import catalog
-        from .sounds import Sound
+        from lab.sound import catalog
+        from lab.sound.sounds import Sound
 
         side = side or self.state.side
         sound = self.sound(side)
@@ -475,7 +476,7 @@ class Studio:
     def _preset_named(self, text):
         """A request that is exactly the name of one of the player's presets on the unit means that preset."""
         try:
-            from .library import cached
+            from lab.qc.library import cached
         except ImportError:
             return None
         wanted = text.strip().casefold()
@@ -484,7 +485,7 @@ class Studio:
         return (found[0]["slot"], found[0]["name"]) if len(found) == 1 else None
 
     def _assets(self):
-        from .assets import cached
+        from lab.qc.assets import cached
 
         return cached(self.folder) or []
 
@@ -497,13 +498,13 @@ class Studio:
             if done:
                 done(records)
 
-        self.later(self.host.call("lab.assets.listing", folder=str(self.folder)), read)
+        self.later(self.host.call("lab.qc.assets.listing", folder=str(self.folder)), read)
 
     def use_asset(self, asset, *, has_cab=None, version=None):
         """A copy of the sound on B with one of the player's IRs in place of its cab, or a capture in place of
         its amp (and cab, when the capture has one)."""
-        from . import assets
-        from .sounds import Sound
+        from lab.qc import assets
+        from lab.sound.sounds import Sound
 
         sound = self.sound("b") or self.sound("a")
         if sound is None:
@@ -536,7 +537,7 @@ class Studio:
 
     def _guitar(self):
         """What the instrument puts out, for the designer (`profile.facts`), worked out once per instrument."""
-        from .profile import facts
+        from lab.hearing.profile import facts
 
         cached = getattr(self, "guitar_cache", None)
         if cached is None or cached[0] != self.state.instrument:
@@ -547,7 +548,7 @@ class Studio:
     def _listening(self):
         """What guitar music the player listens to most, if the listening history was analysed (personal; kept in
         the data folder)."""
-        from .listening import prior
+        from lab.player.listening import prior
 
         try:
             record = json.loads((self.folder / "personal" / "listening.json").read_text(encoding="utf-8"))
@@ -687,7 +688,7 @@ class Studio:
     def _choice(self, sound, word):
         """A keeper or a not-this given while A and B are both on show is a choice between them (blind when names
         are hidden), recorded for the taste model."""
-        from . import taste
+        from lab.player import taste
 
         side = "a" if self.state.a == sound.id else "b" if self.state.b == sound.id else None
         other = self.sound("b" if side == "a" else "a") if side else None
@@ -698,7 +699,7 @@ class Studio:
 
     def _learn(self):
         """Fit the taste model again from everything chosen so far; cheap, and quiet if it fails."""
-        from . import taste
+        from lab.player import taste
 
         try:
             self.taste = taste.learn(self.folder)
@@ -707,7 +708,7 @@ class Studio:
 
     def taste_lines(self):
         """What the player's choices so far say, in measured quantities, or that there is not enough yet."""
-        from . import taste
+        from lab.player import taste
 
         model = getattr(self, "taste", None) or taste.load(self.folder)
         return taste.describe(model) if model else ["No choices yet: marks and A/B choices teach it."]
@@ -849,8 +850,8 @@ class Studio:
         self.set(working=f"Recording {seconds:g} s · play now…")
 
         def recorded(dry):
-            from .audio import write_wave
-            from .sounds import new_id
+            from lab.hearing.audio import write_wave
+            from lab.sound.sounds import new_id
 
             phrase_id = new_id()
             folder = self.folder / "phrases" / phrase_id
@@ -881,8 +882,8 @@ class Studio:
 
     def guitar_profile(self):
         """What the current instrument puts out at each pickup setting, from the phrases recorded on it."""
-        from .audio import read_wave
-        from .profile import profile
+        from lab.hearing.audio import read_wave
+        from lab.hearing.profile import profile
 
         takes = [(item["setting"], read_wave(self.folder / "phrases" / item["id"] / "dry.wav")[:, :1])
                  for item in self.recorded_phrases()
@@ -967,7 +968,7 @@ def _now():
 
 
 def knowledge_id():
-    from .sounds import new_id
+    from lab.sound.sounds import new_id
 
     return new_id()
 

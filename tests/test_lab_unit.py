@@ -6,12 +6,12 @@ import unittest
 
 from qc_mcp import leveling
 
-from lab import catalog
-from lab.chain import Block, Chain, Row, differences, from_preset, plan_structure
-from lab.rig import Rig
-from lab.sim import FACTORY, MY_PRESETS, TONE_LAB, SimUnit
-from lab.slots import BUILD, CACHE_SLOTS, NotOurs, Slots
-from lab.unit import Moved, Refused, Unit
+from lab.sound import catalog
+from lab.sound.chain import Block, Chain, Row, differences, from_preset, plan_structure
+from lab.qc.rig import Rig
+from lab.qc.sim import FACTORY, MY_PRESETS, TONE_LAB, SimUnit
+from lab.qc.slots import BUILD, CACHE_SLOTS, NotOurs, Slots
+from lab.qc.unit import Moved, Refused, Unit
 
 RECTIFIER, PLEXI, V30, GREENBACK, EQ, DELAY, GOVERNOR = 1018, 1081, 12001, 12006, 4005, 6011, 11
 
@@ -191,7 +191,7 @@ class SlotsTest(unittest.TestCase):
 
 class RoutingTest(unittest.TestCase):
     def test_a_preset_spread_over_rows_keeps_its_inner_routing_when_fed_from_elsewhere(self):
-        from lab.chain import routed
+        from lab.sound.chain import routed
         # As the player's Pink Floyd Time: row 1 from the guitar into row 2 inside the preset, rows 3 and 4 out.
         floyd = Chain((Row((Block(PLEXI),), inlet=1, outlet=16), Row((Block(PLEXI),), inlet=1, outlet=0),
                        Row((Block(DELAY),), inlet=0, outlet=19), Row((Block(DELAY),))))

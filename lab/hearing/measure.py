@@ -9,7 +9,7 @@ measures: compression (the phrase played again 12 dB quieter: a chain that
 follows the playing returns it 12 dB quieter, a compressing one less), how
 bright and how much low end against the dry phrase, and the tail that rings
 on after the phrase ends. Distortion is not inferred from compression: it is
-measured with test tones (`lab.probe`), whose record `heard` carries.
+measured with test tones (`lab.hearing.probe`), whose record `heard` carries.
 
 Also from the phrase:
 
@@ -46,13 +46,13 @@ import numpy as np
 import pyloudnorm
 from scipy import ndimage, signal
 
-from .audio import RATE, db
+from lab.hearing.audio import RATE, db
 
 CENTRES = tuple(round(1000 * 2 ** (step / 3), 1) for step in range(-13, 12))   # 50 Hz to 12.7 kHz
 STEP_DB = 12.
 SOFTER = 10 ** (-STEP_DB / 20)
 EARLY, LATE = (.04, .40), (.40, 1.5)     # seconds after the phrase stops
-# Distortion words, from the harmonics a pure tone gains (lab.probe), in dB against the tone. Set from a ladder of
+# Distortion words, from the harmonics a pure tone gains (lab.hearing.probe), in dB against the tone. Set from a ladder of
 # chains measured on the unit on 2026-11-20 (research/measurements/distortion-ladder.md). Played firmly, a driven
 # amp's harmonics level off near -18 to -20 dB, so how far in it is shows in the same tone 12 dB softer: a crunchy
 # amp cleans up, a saturated one stays distorted.
@@ -71,7 +71,7 @@ def distortion_word(distortion_db, soft_db):
     return "overdriven" if soft_db < OVERDRIVEN_SOFT_BELOW else "saturated"
 
 
-# Texture words, from how the test tone's harmonics are spread (lab.probe): round, even, edged, rough. Energy in the
+# Texture words, from how the test tone's harmonics are spread (lab.hearing.probe): round, even, edged, rough. Energy in the
 # high orders (5th to 10th) is heard as rough far more than the same energy in the 2nd and 3rd (docs/TONE_RESEARCH.md
 # findings 2 and 7), so the words follow tristimulus 3 (the share of the power in harmonics 5..10) and the
 # order-weighted distortion (Shorter's n^2/4). PROVISIONAL: set from synthetic chains only (tanh and hard clipping
@@ -202,7 +202,7 @@ class Heard:
     came back), crest (peak over average of the return), brightness and low
     end against the dry phrase, the tail (what still sounds after the phrase
     stops), the level, the attack (loud and soft passes) and the energy by
-    band against the dry phrase. From the test signals (`lab.probe`):
+    band against the dry phrase. From the test signals (`lab.hearing.probe`):
     distortion, the harmonic spread and the rest, in `probe`. Fields added
     later default to None, so records made before them still load.
 
@@ -379,7 +379,7 @@ def band_energy_db(samples):
 
 
 def heard(dry, loud, soft, tail, probe=None):
-    """What a chain did to a phrase. `tail` starts where the phrase stopped; `probe` is `lab.probe`'s record."""
+    """What a chain did to a phrase. `tail` starts where the phrase stopped; `probe` is `lab.hearing.probe`'s record."""
     loud_m, dry_m = measure(loud), measure(dry)
     starts = onsets(dry)
     dry_bands, loud_bands = band_energy_db(dry), band_energy_db(loud)

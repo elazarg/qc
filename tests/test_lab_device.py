@@ -4,9 +4,9 @@ from threading import RLock
 from types import SimpleNamespace
 import unittest
 
-from lab import device
-from lab.sim import SimUnit
-from lab.unit import Unit
+from lab.qc import device
+from lab.qc.sim import SimUnit
+from lab.qc.unit import Unit
 
 
 class Library:

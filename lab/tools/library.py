@@ -1,6 +1,6 @@
 """The library: presets saved on the Quad Cortex, searched by name, setlist or slot.
 
-Carried over from the old saved-preset panel (`preset_library_ui`), on `lab.library` (`directory(engine)`
+Carried over from the old saved-preset panel (`preset_library_ui`), on `lab.qc.library` (`directory(engine)`
 reads the unit's directory, `cached(folder)` gives back the last one read, as rows {"slot", "name",
 "setlist"}). For a chosen preset:
 
@@ -17,8 +17,8 @@ import json
 import tkinter as tk
 from uuid import uuid4
 
-from ..theme import FONT, INK, SUBTLE, TILE
-from .common import SCENE_LETTERS, Window, button, label, listbox, menu_choice, phrase, render, section
+from lab.desk.theme import FONT, INK, SUBTLE, TILE
+from lab.tools.common import SCENE_LETTERS, Window, button, label, listbox, menu_choice, phrase, render, section
 
 SCENES = ("Default scene", *(f"Scene {letter}" for letter in SCENE_LETTERS))
 
@@ -46,7 +46,7 @@ def ordered(rows):
 
 def cached(folder):
     try:
-        from .. import library
+        from lab.qc import library
     except ImportError:
         return []
     try:
@@ -59,7 +59,7 @@ def cached(folder):
 
 def directory(engine, *, stop=None):
     """Every preset in the unit's user setlists, read now."""
-    from .. import library
+    from lab.qc import library
 
     engine.quiet()
     # Kept beside the engine's own records, which is the desk's data folder, for `cached` to read there.
@@ -86,7 +86,7 @@ def leave(engine, slot, *, stop=None):
 
 
 def keep_reference(folder, row, scene, captured, phrase_name):
-    from ..audio import write_wave
+    from lab.hearing.audio import write_wave
 
     stamp = datetime.now(timezone.utc)
     target = folder / "references" / f"{stamp:%Y%m%d-%H%M%S}-{uuid4().hex[:6]}"

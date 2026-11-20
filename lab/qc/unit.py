@@ -25,8 +25,8 @@ import time
 
 from qc_mcp import leveling
 
-from . import catalog
-from .chain import Chain, Op, differences, from_preset, plan_levels, plan_routes, plan_structure, plan_values
+from lab.sound import catalog
+from lab.sound.chain import Chain, Op, differences, from_preset, plan_levels, plan_routes, plan_structure, plan_values
 
 CEILING_DB = 6.        # a row's output volume, in dB, never goes above this
 SETTLE = 3.            # seconds to wait for the unit to show a change before giving up

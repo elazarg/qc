@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 from scipy import signal
 
-from lab import audio
+from lab.hearing import audio
 from lab.learner import compensation as guitar_compensation
 
 

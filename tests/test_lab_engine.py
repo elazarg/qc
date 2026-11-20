@@ -6,12 +6,12 @@ import unittest
 
 import numpy as np
 
-from lab import catalog
-from lab.chain import Block, Chain, Row
-from lab.engine import MULTI_OUT, USB_IN, Engine, pair
-from lab.sim import FACTORY, MY_PRESETS, TONE_LAB, SimAudio, SimUnit
-from lab.slots import Slots
-from lab.unit import Unit
+from lab.sound import catalog
+from lab.sound.chain import Block, Chain, Row
+from lab.qc.engine import MULTI_OUT, USB_IN, Engine, pair
+from lab.qc.sim import FACTORY, MY_PRESETS, TONE_LAB, SimAudio, SimUnit
+from lab.qc.slots import Slots
+from lab.qc.unit import Unit
 
 PLEXI, HIWATT, V30, GREENBACK, DELAY, FUZZ = 1081, 1063, 12001, 12006, 6011, 22
 
@@ -97,10 +97,10 @@ class EngineTest(unittest.TestCase):
         self.assertAlmostEqual(self.unit.read().block(2, 0).get(gain), held.block(0, 0).get(gain), places=3)
 
     def test_the_phrase_plays_from_the_computer_and_stops_with_the_session(self):
-        import lab.audio
-        original = lab.audio.Loop
-        lab.audio.Loop = Phrase
-        self.addCleanup(setattr, lab.audio, "Loop", original)
+        import lab.hearing.audio
+        original = lab.hearing.audio.Loop
+        lab.hearing.audio.Loop = Phrase
+        self.addCleanup(setattr, lab.hearing.audio, "Loop", original)
         self.engine.show(sound(PLEXI, V30), None)
         self.engine.play("a", "phrase", phrase=np.zeros((4800, 1), dtype=np.float32))
         self.assertEqual(self.routes()[0][0], USB_IN)

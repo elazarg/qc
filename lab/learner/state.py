@@ -10,7 +10,7 @@ from uuid import uuid4
 import numpy as np
 from scipy import signal
 
-from .. import audio
+from lab.hearing import audio
 
 CONTROLS = ("pickup", "tone", "volume")
 MIN_SECONDS = .24

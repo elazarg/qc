@@ -6,7 +6,7 @@ from tempfile import TemporaryDirectory
 import unittest
 import zipfile
 
-from lab import listening
+from lab.player import listening
 
 
 def row(artist, title, ms=200_000, ts="2026-05-01T20:00:00Z", start="clickrow", end="trackdone", shuffle=False,

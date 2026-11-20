@@ -124,7 +124,7 @@ def check_audio(devices=None):
 
 def check_codex(*, locate=None, run=None):
     """The `codex` program is found and signed in. `locate` returns its path or raises; `run` runs a command."""
-    from .assistant import codex
+    from lab.sound.assistant import codex
 
     locate = locate or codex
     run = run or _run

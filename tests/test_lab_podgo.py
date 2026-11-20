@@ -7,8 +7,9 @@ import struct
 import unittest
 import zlib
 
-from lab import catalog, podgo
-from lab.chain import SCENES
+from lab.sound import catalog
+from lab.gear import podgo
+from lab.sound.chain import SCENES
 
 GREEN_808, JTM45_NORMAL, TWIN_VIBRATO = "Green 808", "Brit TM45 Normal", "US TWN Vibrato"
 

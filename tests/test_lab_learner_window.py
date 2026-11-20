@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import numpy as np
 
-from lab import audio
+from lab.hearing import audio
 from lab.learner import dataset as data, folders
 from lab.learner.window import GuitarLearner, report_score, training_coverage
 

@@ -4,7 +4,7 @@ Stop, and which USB channels carry the dry guitar.
 The desk's engine holds the unit for writing in a process of its own. The
 learner only reads: a shared connection, for the USB dry/wet setting and the
 preset a take was played through, and the ASIO inputs, which it opens after
-the desk has stopped playing (see `lab.desk.LearnerSeat.submit`).
+the desk has stopped playing (see `lab.desk.window.LearnerSeat.submit`).
 """
 
 from contextlib import contextmanager
@@ -17,8 +17,8 @@ import time
 
 import numpy as np
 
-from ..audio import MAX_SECONDS, RATE, Audio
-from .folders import LOG
+from lab.hearing.audio import MAX_SECONDS, RATE, Audio
+from lab.learner.folders import LOG
 
 SCENES = "ABCDEFGH"
 

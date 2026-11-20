@@ -9,12 +9,13 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from lab import assets, catalog
-from lab.assets import Asset
-from lab.chain import Block, Chain, Row, agrees, differences
-from lab.host import Host
-from lab.sim import SIM_CAPTURES, SIM_IRS, SimUnit
-from lab.unit import Unit
+from lab.qc import assets
+from lab.sound import catalog
+from lab.qc.assets import Asset
+from lab.sound.chain import Block, Chain, Row, agrees, differences
+from lab.qc.host import Host
+from lab.qc.sim import SIM_CAPTURES, SIM_IRS, SimUnit
+from lab.qc.unit import Unit
 
 PLEXI, RECTIFIER, V30, GREENBACK, STEREO_CAB, DELAY = 1081, 1018, 12001, 12006, 32000, 6011
 IR = Asset("ir", SIM_IRS[0][0], SIM_IRS[0][1])
@@ -88,7 +89,7 @@ class ListingTest(unittest.TestCase):
             host = Host(self.folder / "engine", simulated=True, local=True)
             try:
                 self.assertEqual(host.ready.result(10), "ready")
-                records = host.call("lab.assets.listing").result(10)
+                records = host.call("lab.qc.assets.listing").result(10)
                 self.assertEqual(len(records), len(SIM_IRS) + len(SIM_CAPTURES))
                 self.assertEqual(len(assets.cached()), len(records))
             finally:

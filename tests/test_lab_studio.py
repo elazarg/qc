@@ -10,11 +10,11 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from lab.assistant import Assistant
-from lab.host import Host
-from lab.sim import MY_PRESETS
-from lab import catalog
-from lab.studio import Studio
+from lab.sound.assistant import Assistant
+from lab.qc.host import Host
+from lab.qc.sim import MY_PRESETS
+from lab.sound import catalog
+from lab.desk.studio import Studio
 from test_lab_design import CHARVEL, FUZZ, GREENBACK, HIWATT, PLEXI, V30, Scripted, answer, block, reply
 
 
@@ -83,7 +83,7 @@ class StudioTest(unittest.TestCase):
     def test_a_saved_preset_is_brought_in_revised_and_saved_back(self):
         unit = None
         # Put a preset of the player's on the simulated unit, as if saved there.
-        from lab import sim
+        from lab.qc import sim
         device = self.host  # local host: reach the engine's simulated unit through a command
         self.host.call("read", {"folder_key": sim.FACTORY, "position": 0, "is_factory": True}).result(10)
         self.studio.work_on({"folder_key": sim.FACTORY, "position": 0, "is_factory": True}, "Brit 2203")
@@ -195,7 +195,7 @@ class StudioTest(unittest.TestCase):
         (self.folder / "directory.json").write_text(json.dumps([
             {"slot": {"folder_key": "/opt/neuraldsp/Factory Library", "position": 0, "is_factory": False},
              "name": "Brit 2203", "setlist": "My Presets"}]), encoding="utf-8")
-        import lab.studio as studio_module
+        import lab.desk.studio as studio_module
         original = studio_module.Studio._preset_named
 
         def named(studio, text):
@@ -221,8 +221,8 @@ class StudioTest(unittest.TestCase):
 
 
     def test_a_scene_is_chosen_and_kept_when_a_and_b_are_made_ready_again(self):
-        from lab.chain import Block, Chain, Row
-        from lab.sounds import Sound
+        from lab.sound.chain import Block, Chain, Row
+        from lab.sound.sounds import Sound
         drive = Block(PLEXI).set(0, (.2, .2, .9) + (.2,) * 5)
         chain = Chain((Row((drive, Block(GREENBACK)), inlet=1, outlet=19),))
         self.assertEqual(chain.scenes_in_use(), 3)
@@ -342,7 +342,7 @@ class StudioTest(unittest.TestCase):
         found = []
         self.studio.read_assets(found.extend)
         settle(self.studio)
-        from lab.assets import cached
+        from lab.qc.assets import cached
         irs = [item for item in cached(self.studio.folder) if item.kind == "ir" and item.source == "user"]
         captures = [item for item in cached(self.studio.folder) if item.kind == "capture"]
         self.assertTrue(found and irs and captures)

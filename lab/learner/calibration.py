@@ -1,7 +1,7 @@
 """Guitar input calibration: teach one control's settings from dry takes, check what is heard, map a gesture.
 
     from lab.learner import calibration
-    calibration.open(seat)      # the seat of lab.desk.LearnerSeat: the same protocol as the Guitar Learner
+    calibration.open(seat)      # the seat of lab.desk.window.LearnerSeat: the same protocol as the Guitar Learner
 
 One control at a time (pickup selector, volume or tone) is taught from takes
 recorded at two or more of its settings, with the others held fixed
@@ -27,12 +27,13 @@ from tkinter import filedialog, ttk
 import numpy as np
 from scipy.io import wavfile
 
-from .. import audio, theme as palette
-from ..knobs import KNOBS
-from ..measure import measure
-from ..sounds import INSTRUMENTS
-from . import folders, gestures as guitar_gestures, state as guitar_state, takes
-from .folders import LOG
+from lab.hearing import audio
+from lab.desk import theme as palette
+from lab.sound.knobs import KNOBS
+from lab.hearing.measure import measure
+from lab.sound.sounds import INSTRUMENTS
+from lab.learner import folders, gestures as guitar_gestures, state as guitar_state, takes
+from lab.learner.folders import LOG
 
 GUITARS = tuple(instrument["name"] for instrument in INSTRUMENTS if instrument["kind"] == "electric")
 
@@ -1064,7 +1065,7 @@ class CalibrationWindow:
         self.panel = GuitarInputPanel(self.bench, body, self.worker)
 
     def show(self):
-        from .window import dark_title
+        from lab.learner.window import dark_title
 
         self.window.deiconify()
         dark_title(self.window)

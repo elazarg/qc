@@ -1,8 +1,8 @@
 import unittest
 from unittest import mock
 
-from lab import catalog, knobs
-from lab.chain import Block, Chain, Row
+from lab.sound import catalog, knobs
+from lab.sound.chain import Block, Chain, Row
 
 
 def block(model, chosen=None, *, every=True):

@@ -2,7 +2,7 @@
 
 Reads a Spotify account export (Spotify → Privacy → Download your data; the
 zip, or the `Streaming_History_Audio_*.json` / `StreamingHistory_music_*.json`
-files) with `lab.listening`, and lists the songs you chose and came back to
+files) with `lab.player.listening`, and lists the songs you chose and came back to
 most, which says more than time alone. Songs that already have a preset or a
 sound of yours are marked. **Ask about the artists** asks the assistant once
 what kind of guitar music the most listened artists make; its answer is kept
@@ -19,7 +19,7 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog
 
-from .common import Window, button, label, listbox
+from lab.tools.common import Window, button, label, listbox
 
 REMEMBERED = "spotify.json"
 
@@ -83,7 +83,7 @@ class ListeningWindow(Window):
     def preset_names(self):
         names = {sound.name for sound in self.studio.store.sounds()}
         try:
-            from ..library import cached
+            from lab.qc.library import cached
 
             names |= {entry["name"] for entry in cached(self.folder) or []}
         except ImportError:
@@ -91,7 +91,7 @@ class ListeningWindow(Window):
         return sorted(names)
 
     def load(self, paths):
-        from .. import listening
+        from lab.player import listening
 
         try:
             summary = listening.summarize(listening.plays(paths))
@@ -104,7 +104,7 @@ class ListeningWindow(Window):
         self.show(record)
 
     def save(self, record):
-        from .. import listening
+        from lab.player import listening
 
         out = personal(self.folder)
         (out / "listening.json").write_text(json.dumps(record, indent=1, ensure_ascii=False, default=str),
@@ -144,7 +144,7 @@ class ListeningWindow(Window):
         self.note.configure(text=" ".join(parts))
 
     def ask_about_artists(self):
-        from .. import listening
+        from lab.player import listening
 
         record = saved_analysis(self.folder)
         if not record:

@@ -7,7 +7,7 @@ processed sound on input pair 5/6. Its guitar inputs arrive on inputs 1 and
 
 Only one stream can hold the driver at a time.
 
-`Audio` is the real driver. `lab.sim.SimAudio` stands in for it in tests.
+`Audio` is the real driver. `lab.qc.sim.SimAudio` stands in for it in tests.
 """
 
 import math

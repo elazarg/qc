@@ -21,8 +21,8 @@ from pathlib import Path
 import re
 from uuid import uuid4
 
-from . import catalog
-from .chain import Chain
+from lab.sound import catalog
+from lab.sound.chain import Chain
 
 INSTRUMENTS = (
     {"name": "Charvel", "kind": "electric", "input": 1,
@@ -70,7 +70,7 @@ class Sound:
 
     @classmethod
     def from_record(cls, record):
-        from .knobs import normalize      # knobs once named for a mechanism are carried to their quality
+        from lab.sound.knobs import normalize  # knobs once named for a mechanism are carried to their quality
 
         return cls(**{**record, "chain": Chain.from_record(record["chain"]),
                       "knobs": normalize(record.get("knobs") or {})})

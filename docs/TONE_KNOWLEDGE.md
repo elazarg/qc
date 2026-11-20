@@ -211,7 +211,7 @@ Drives have not been swept the way amps were.
 
 ### Listening to a draft
 
-The app builds a sound silently and measures it, each value named for what it measures (`lab/measure.py`, `lab/probe.py`).
+The app builds a sound silently and measures it, each value named for what it measures (`lab/hearing/measure.py`, `lab/hearing/probe.py`).
 
 **Compression**, from the phrase: it is replayed at its own level and again 12 dB quieter, and the share of that 12 dB step the chain swallows is measured: 0 for a chain that only follows the playing, near 1 for one that is flat out. Until 2026-11-20 this was called drive and its words (edge of breakup at 0.18, crunch 0.40, overdriven 0.62, saturated 0.82) were read as distortion. That was an inference, and a compressor alone breaks it: the Legendary 87 compresses 0.61 and adds no harmonics. The same thresholds now give compression's own words (light, moderate, heavy, squashed). Measured on 2026-11-19 on the saved drafts: the clean Twin drafts 0.00, a Plexi at gain 2.3 0.18, the "Time" draft 0.35 as written and 0.99 with Drive at full, a crunch solo 0.50, the Timmons lead 0.80, the Rectifier rhythm 0.87, the Santana lead 0.92.
 

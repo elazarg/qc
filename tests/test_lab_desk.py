@@ -3,7 +3,7 @@
 from types import SimpleNamespace
 import unittest
 
-from lab.desk import LearnerSeat
+from lab.desk.window import LearnerSeat
 
 
 class Studio:

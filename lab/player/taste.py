@@ -5,8 +5,8 @@ weight the dimensions of timbre differently, and that an automatic ranking
 should be corrected by the player's own choices. This module does that and
 nothing more:
 
-- `features` turns a heard record (`lab.measure.Heard.to_record`, with the
-  test-signal record from `lab.probe` under "probe") into numbers, each named
+- `features` turns a heard record (`lab.hearing.measure.Heard.to_record`, with the
+  test-signal record from `lab.hearing.probe` under "probe") into numbers, each named
   for the quantity measured. Level is left out: sounds are compared at matched
   loudness. Words ("crunch", "bright") are left out: they are derived from the
   same numbers.
@@ -181,7 +181,7 @@ def comparisons(folder, sounds=None):
     ways (the player changed their mind) keeps both, and they cancel.
     """
     if sounds is None:
-        from .sounds import Store
+        from lab.sound.sounds import Store
 
         sounds = Store(folder).sounds()
     by_id = {sound.id: sound for sound in sounds}
@@ -231,7 +231,7 @@ def comparisons(folder, sounds=None):
 def evidence(folder, sounds=None):
     """(comparisons, feature rows by sound id) from the data folder, ready for `fit`."""
     if sounds is None:
-        from .sounds import Store
+        from lab.sound.sounds import Store
 
         sounds = Store(folder).sounds()
     rows = {sound.id: features(sound.heard) for sound in sounds}

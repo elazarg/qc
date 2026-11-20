@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import numpy as np
 
-from lab import audio
+from lab.hearing import audio
 from lab.learner import dataset as data, folders
 
 

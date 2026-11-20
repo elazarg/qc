@@ -9,10 +9,10 @@ from uuid import uuid4
 
 import numpy as np
 
-from .. import audio
-from ..measure import measure
-from . import folders, inputs
-from .folders import LOG, write_json
+from lab.hearing import audio
+from lab.hearing.measure import measure
+from lab.learner import folders, inputs
+from lab.learner.folders import LOG, write_json
 
 
 def clip_paths():

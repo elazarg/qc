@@ -20,10 +20,10 @@ same control the Shape panel uses.
 import tkinter as tk
 import webbrowser
 
-from .. import knobs
-from ..sounds import describe
-from ..theme import ACCENT, ACCENT_INK, DARK, DIM, FONT, INK, PAPER, SUBTLE, TILE
-from .common import Window, button, label, section, stated
+from lab.sound import knobs
+from lab.sound.sounds import describe
+from lab.desk.theme import ACCENT, ACCENT_INK, DARK, DIM, FONT, INK, PAPER, SUBTLE, TILE
+from lab.tools.common import Window, button, label, section, stated
 
 GROUPS = {"Main": knobs.PRIMARY, **knobs.GROUPS}
 

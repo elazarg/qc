@@ -31,10 +31,10 @@ from uuid import uuid4
 import numpy as np
 from scipy import signal, stats
 
-from ..audio import RATE, read_wave
-from ..sounds import describe as describe_chain
-from ..theme import FONT, INK, SOFT, SUBTLE, TILE, WHITE
-from .common import (Window, button, heard_chain, label, listbox, menu_choice, phrase, play, render, section,
+from lab.hearing.audio import RATE, read_wave
+from lab.sound.sounds import describe as describe_chain
+from lab.desk.theme import FONT, INK, SOFT, SUBTLE, TILE, WHITE
+from lab.tools.common import (Window, button, heard_chain, label, listbox, menu_choice, phrase, play, render, section,
                      write_pcm16)
 
 BANDS = (65, 125, 250, 500, 1_000, 2_000, 4_000, 8_000, 12_000)
@@ -306,7 +306,7 @@ def references(folder):
 
 def audition(path, folder, selection=None):
     """A level-normalized 16-bit copy of a recording for playing on the computer, made once."""
-    from .levels import measure
+    from lab.tools.levels import measure
 
     path = Path(path)
     stamp = path.stat()

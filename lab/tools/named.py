@@ -34,11 +34,12 @@ import json
 import os
 from pathlib import Path
 
-from .. import catalog, knowledge
-from ..chain import Chain
-from ..rig import held_silent
-from ..slots import BUILD, BUILD_NAME
-from ..unit import Mismatch
+from lab.sound import catalog
+from lab import knowledge
+from lab.sound.chain import Chain
+from lab.qc.rig import held_silent
+from lab.qc.slots import BUILD, BUILD_NAME
+from lab.qc.unit import Mismatch
 
 DEFAULT_ID = "SpecialFactoryModelPresetID"
 CATEGORIES = ("Guitar Amplifier", "Guitar Overdrive", "Cabsim Guitar (M)", "Equalizer", "Compressor", "Utility",

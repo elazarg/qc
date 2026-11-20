@@ -10,8 +10,8 @@ import unittest
 
 import numpy as np
 
-from lab.audio import RATE, read_wave
-from lab.measure import measure
+from lab.hearing.audio import RATE, read_wave
+from lab.hearing.measure import measure
 from lab.tools import soundcheck
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))

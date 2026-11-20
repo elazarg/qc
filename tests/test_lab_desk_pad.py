@@ -4,9 +4,9 @@ from types import SimpleNamespace
 import tkinter as tk
 import unittest
 
-from lab import desk as desk_module
-from lab.desk import Desk, pad_point, pad_values
-from lab.theme import DARK
+from lab.desk import window as desk_module
+from lab.desk.window import Desk, pad_point, pad_values
+from lab.desk.theme import DARK
 
 
 class PadGeometryTest(unittest.TestCase):

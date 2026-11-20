@@ -12,11 +12,11 @@ measured on and measured again when that changes.
 import json
 from pathlib import Path
 
-from .audio import RATE, click, onset
-from .chain import Chain, Row, routed
-from . import probe
-from .measure import SOFTER, heard
-from .rig import USB
+from lab.hearing.audio import RATE, click, onset
+from lab.sound.chain import Chain, Row, routed
+from lab.hearing import probe
+from lab.hearing.measure import SOFTER, heard
+from lab.qc.rig import USB
 
 TAIL = 1.5
 
