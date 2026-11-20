@@ -32,9 +32,38 @@ What each part shows, by what is measured:
 Only harmonics are counted, not noise, so a noisy high-gain amp's hiss does
 not read as distortion; a harmonic lost in the noise counts as the noise
 floor, which limits the smallest distortion measured to about -70 dB.
+
+How the harmonics are spread, all from the tone at the player's level. P_n is
+the power at the n-th harmonic (P_1 the tone itself), with the noise floor
+taken off each harmonic above the first:
+
+- harmonics_db: each of the 2nd to 10th harmonics against the tone, in dB,
+  floor -70.
+- low_order_db: the 2nd and 3rd together against the tone; high_order_db: the
+  5th to 10th together against the tone. The ear hears energy in the high
+  orders far more than the same energy in the 2nd and 3rd, which the tone
+  masks (Moore and Tan, JAES 2003/04; Geddes and Lee, AES 2003; TONE_RESEARCH.md
+  finding 7).
+- weighted_distortion_db: the harmonics weighted by order before they are
+  added, sum of P_n * n^2 / 4 over n = 2..10, against the tone. The weighting
+  is Shorter's (D. E. L. Shorter, "The influence of high-order products in
+  non-linear distortion", Electronic Engineering 22, 1950), which counts the
+  2nd as it is and the 10th 25 times over. A square wave reads 0 dB.
+- harmonic_centroid: the normalised harmonic centroid, the power-weighted mean
+  harmonic number over n = 1..10, sum n P_n / sum P_n; 1.0 is a pure tone.
+- tristimulus3: the power in harmonics 5..10 against the power in 1..10, as a
+  ratio from 0 to 1 (the third tristimulus value of Pollard and Jansson, Acustica
+  51, 1982, here on power). A square wave reads about 0.06.
+- hnr_db: the power in harmonics 1..10 against the noise in 60 Hz to 4 kHz
+  (the median power per bin away from any harmonic, divided by ln 2 to give the
+  mean of noise, over the whole band), in dB, at most 120.
+
+The centroid and tristimulus 3 follow how harsh a sound is heard, separately
+from how bright it is (Zacharakis, Pastiadis and Reiss, Music Perception 2014
+and 2015; TONE_RESEARCH.md finding 2).
 """
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 import math
 
 import numpy as np
@@ -94,9 +123,21 @@ class Probe:
     echo_ms: float | None       # delay of the first repeat of the click, if one stands out
     echo_db: float | None       # its level against the click
     decay_s: float              # time to fall 60 dB after the click, estimated from the first 20 dB
+    # How the harmonics of the tone at playing level are spread (see the module docstring).
+    harmonics_db: list = field(default_factory=list)   # 2nd to 10th harmonic, each against the tone; floor -70
+    low_order_db: float = -70.            # 2nd and 3rd against the tone
+    high_order_db: float = -70.           # 5th to 10th against the tone
+    weighted_distortion_db: float = -70.  # harmonics weighted by n^2/4 (Shorter), against the tone
+    harmonic_centroid: float = 1.         # power-weighted mean harmonic number over 1..10; 1.0 is a pure tone
+    tristimulus3: float = 0.              # power in harmonics 5..10 against power in 1..10 (0 to 1)
+    hnr_db: float = 0.                    # harmonics 1..10 against the noise in 60 Hz to 4 kHz
 
     def to_record(self):
-        return {key: (round(value, 3) if isinstance(value, float) else value) for key, value in asdict(self).items()}
+        def rounded(value):
+            if isinstance(value, float):
+                return round(value, 4 if abs(value) < 1 else 3)
+            return [rounded(item) for item in value] if isinstance(value, list) else value
+        return {key: rounded(value) for key, value in asdict(self).items()}
 
 
 def _mono(returned):
@@ -127,12 +168,30 @@ def _db(ratio):
 
 
 def _harmonics(part):
+    """The power at harmonics 1..10 (index 0 is the tone, not floored; the rest with the noise floor taken off),
+    and the noise per harmonic's width."""
     freq, spectrum = _spectrum(part)
     floor = _floor(freq, spectrum)
-    fundamental = _power(freq, spectrum, F1)
-    even = sum(max(_power(freq, spectrum, k * F1) - floor, 0.) for k in range(2, 11, 2))
-    odd = sum(max(_power(freq, spectrum, k * F1) - floor, 0.) for k in range(3, 11, 2))
-    return fundamental, even, odd
+    powers = [_power(freq, spectrum, F1)] + [max(_power(freq, spectrum, k * F1) - floor, 0.) for k in range(2, 11)]
+    return powers, floor
+
+
+def _spread(powers, floor):
+    """How the harmonics are spread: the fields of `Probe` from harmonics_db on (see the module docstring)."""
+    tone = max(powers[0], 1e-20)
+    each = [round(_db(power / tone), 2) for power in powers[1:]]
+    low = _db(sum(powers[1:3]) / tone)
+    high = _db(sum(powers[4:10]) / tone)
+    weighted = _db(sum(power * n * n / 4 for n, power in enumerate(powers[1:], start=2)) / tone)
+    total = max(sum(powers), 1e-20)
+    centroid = sum(n * power for n, power in enumerate(powers, start=1)) / total
+    tristimulus3 = sum(powers[4:10]) / total
+    # The floor per harmonic's width, over 60 Hz to 4 kHz; a median of noise power per bin is ln 2 of its mean.
+    noise = floor / (2 * BIN_HZ) * (4000 - 60) / math.log(2)
+    hnr = min(10 * math.log10(total / noise), 120.) if noise > 0 else 120.
+    return {"harmonics_db": each, "low_order_db": round(low, 2), "high_order_db": round(high, 2),
+            "weighted_distortion_db": round(weighted, 2), "harmonic_centroid": round(centroid, 4),
+            "tristimulus3": round(tristimulus3, 5), "hnr_db": round(hnr, 2)}
 
 
 def analyse(returned):
@@ -145,8 +204,10 @@ def analyse(returned):
         start = places[name] + settle
         return mono[start:start + width]
 
-    loud_f, loud_even, loud_odd = _harmonics(part("tone"))
-    soft_f, soft_even, soft_odd = _harmonics(part("soft"))
+    loud_powers, loud_floor = _harmonics(part("tone"))
+    soft_powers, _ = _harmonics(part("soft"))
+    loud_f, loud_even, loud_odd = loud_powers[0], sum(loud_powers[1::2]), sum(loud_powers[2::2])
+    soft_f, soft_even, soft_odd = soft_powers[0], sum(soft_powers[1::2]), sum(soft_powers[2::2])
     gated = soft_f < loud_f * 10 ** (-(SOFTER_DB + 30) / 10)
     distortion = _db((loud_even + loud_odd) / max(loud_f, 1e-20))
     soft = _db((soft_even + soft_odd) / max(soft_f, 1e-20)) if not gated else -70.
@@ -201,4 +262,5 @@ def analyse(returned):
         elif curve.min() > -25:
             decay = TAIL_S * 3                                            # still ringing at the end
     return Probe(round(distortion, 2), round(soft, 2), round(even_odd, 2), round(intermod, 2), bool(gated),
-                 round(level_wobble, 2), round(pitch_wobble, 2), echo_ms, echo_db, round(decay, 3))
+                 round(level_wobble, 2), round(pitch_wobble, 2), echo_ms, echo_db, round(decay, 3),
+                 **_spread(loud_powers, loud_floor))

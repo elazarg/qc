@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 from scipy import signal as dsp
 
-from lab import measure
+from lab import measure, probe
 from lab.audio import RATE, onset, click
 
 
@@ -85,6 +85,118 @@ class HeardTest(unittest.TestCase):
         self.assertEqual(measure.summary({"distortion": "crunch", "brightness": "bright", "tail": "dry"}),
                          "crunch, bright, dry")
         self.assertEqual(measure.summary({"drive": "crunch", "tone": "bright", "space": "dry"}), "crunch, bright, dry")
+
+
+NOTE_STARTS = (.25, .75, 1.25, 1.75, 2.25, 2.75)
+
+
+def phrase(ramp_s=0., partials=60):
+    """Notes of a bright, many-partial tone starting at NOTE_STARTS, each decaying, each reaching full level along a
+    straight ramp of `ramp_s` (0 for at once): a 10%-90% rise of 0.8 * ramp_s."""
+    total = round(3.5 * RATE)
+    out = np.zeros(total)
+    for start in NOTE_STARTS:
+        begin = round(start * RATE)
+        time = np.arange(total - begin) / RATE
+        rise = np.minimum(1, time / ramp_s) if ramp_s else 1
+        tone = sum(np.sin(2 * np.pi * 196 * k * time) / k for k in range(1, partials + 1))
+        out[begin:] += .15 * tone * np.exp(-3 * time) * rise
+    return out[:, None]
+
+
+def silence():
+    return np.full((RATE // 2, 1), 1e-7)
+
+
+class AttackAndBandsTest(unittest.TestCase):
+    """How fast notes reach full level, and the energy by band, against the dry phrase."""
+
+    def test_notes_are_found_in_the_dry_phrase(self):
+        found = [index * measure.ENVELOPE_HOP_S for index in measure.onsets(phrase())]
+        self.assertEqual(len(found), len(NOTE_STARTS))
+        for at, start in zip(found, NOTE_STARTS):
+            self.assertAlmostEqual(at, start, delta=.005)
+
+    def test_a_slower_rise_reads_as_a_slower_attack(self):
+        dry = phrase()
+        found = measure.heard(dry, phrase(.04), phrase(.08) * measure.SOFTER, silence())
+        self.assertAlmostEqual(found.attack_ms, 32, delta=4)
+        self.assertAlmostEqual(found.attack_soft_ms, 64, delta=6)
+        same = measure.heard(*through(lambda sound: sound * .5, dry))
+        self.assertLess(same.attack_ms, 4)
+        self.assertLess(same.attack_soft_ms, 4)
+
+    def test_attack_is_timed_on_the_dry_phrases_notes_even_through_an_echo(self):
+        dry = phrase(.04)
+        late = round(.12 * RATE)
+        echo = lambda sound: sound + .5 * np.vstack([np.zeros((late, 1)), sound[:-late]])
+        found = measure.heard(*through(echo, dry))
+        self.assertAlmostEqual(found.attack_ms, 32, delta=4)
+
+    def test_a_silent_phrase_has_no_attack(self):
+        quiet = np.zeros((RATE, 1))
+        self.assertEqual(measure.onsets(quiet), [])
+        self.assertIsNone(measure.attack_ms(quiet, []))
+
+    def test_energy_by_band_follows_a_low_pass_and_ignores_level(self):
+        dry = phrase()
+        lows = dsp.butter(4, 2500, "low", fs=RATE, output="sos")
+        found = measure.heard(*through(lambda sound: dsp.sosfilt(lows, sound, axis=0), dry)).brightness_bands_db
+        self.assertEqual(set(found), {"1-3 kHz", "3-6 kHz", "6-12 kHz"})
+        self.assertGreater(found["1-3 kHz"], -3)
+        self.assertLess(found["3-6 kHz"], -10)
+        self.assertLess(found["6-12 kHz"], found["3-6 kHz"] - 10)
+        louder = measure.heard(*through(lambda sound: sound * 3, dry)).brightness_bands_db
+        self.assertLess(max(map(abs, louder.values())), .05)
+
+    def test_the_record_carries_the_new_values(self):
+        record = measure.heard(*through(lambda sound: sound, phrase())).to_record()
+        for key in ("attack_ms", "attack_soft_ms", "brightness_bands_db", "texture", "compression", "probe"):
+            self.assertIn(key, record)
+        lines = measure.measured_lines(record)
+        self.assertTrue(any(line.startswith("Attack: notes reach full level in") for line in lines))
+        self.assertTrue(any(line.startswith("Energy by band") for line in lines))
+
+
+class TextureTest(unittest.TestCase):
+    """Round to rough from the probe's harmonic spread: an inference, with provisional thresholds."""
+
+    def test_texture_follows_how_far_the_harmonics_spread(self):
+        tones = probe.test_signal(.25)[:, 0].astype(np.float64)
+        chains = (lambda s: s, lambda s: np.tanh(4 * s), lambda s: np.tanh(10 * s), lambda s: np.clip(30 * s, -.5, .5))
+        words = [measure.heard(*through(lambda sound: sound, note()),
+                               probe=probe.analyse(chain(tones)[:, None]).to_record()).texture for chain in chains]
+        self.assertEqual(words, list(measure.TEXTURE))
+        self.assertEqual(measure.WORDS["texture"], measure.TEXTURE)
+
+    def test_no_probe_or_an_old_probe_gives_no_texture(self):
+        self.assertIsNone(measure.heard(*through(lambda sound: sound, note())).texture)
+        old = {"distortion_db": -18., "distortion_soft_db": -39.}
+        found = measure.heard(*through(lambda sound: sound, note()), probe=old)
+        self.assertIsNone(found.texture)
+        self.assertIn("texture", found.words())
+        self.assertEqual(found.distortion, "crunch")
+
+    def test_records_made_before_the_new_values_still_display(self):
+        old = {"compression": .5, "crest_db": 12., "brightness_oct": .1, "low_end_db": 0., "tail_db": -40.,
+               "level_db": -20., "probe": {"distortion_db": -18., "distortion_soft_db": -39., "even_odd_db": 1.,
+                                           "intermod_db": -12., "gated": False, "level_wobble": 0., "pitch_wobble": 0.,
+                                           "echo_ms": None, "echo_db": None, "decay_s": 0.},
+               "distortion": "crunch", "compressed": "moderate", "brightness": "balanced", "tail": "a touch of room"}
+        lines = measure.measured_lines(old)
+        self.assertTrue(lines[0].startswith("Distortion:"))
+        self.assertFalse(any(line.startswith(("Attack", "Harmonic", "Energy by band")) for line in lines))
+        self.assertEqual(measure.summary(old), "crunch, balanced, a touch of room")
+
+    def test_new_records_show_harmonic_orders_and_the_texture_word(self):
+        tones = probe.test_signal(.25)[:, 0].astype(np.float64)
+        found = measure.heard(*through(lambda sound: sound, phrase()),
+                              probe=probe.analyse(np.tanh(10 * tones)[:, None]).to_record())
+        lines = measure.measured_lines(found.to_record())
+        orders = next(line for line in lines if line.startswith("Harmonic orders:"))
+        self.assertIn("low 2nd-3rd", orders)
+        self.assertIn("high 5th-10th", orders)
+        self.assertTrue(any("texture edged" in line for line in lines))
 
 
 class MatchTest(unittest.TestCase):
