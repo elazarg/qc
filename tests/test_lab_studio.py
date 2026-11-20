@@ -247,6 +247,47 @@ class StudioTest(unittest.TestCase):
         self.assertNotEqual(first, second)
         self.assertEqual(len(self.script.asked), 1)
 
+    def test_after_a_turn_settles_the_shaped_sound_is_heard_and_a_knob_that_did_too_little_is_corrected_once(self):
+        self.script.answers.append(self.three("One", "Two", "Three"))
+        self.studio.ask("make a classic rock crunch")
+        settle(self.studio, 20)
+        self.studio.settle_seconds = 0.
+        # The simulated unit's sound follows only an amp's gain, so turning the treble up measures as nothing.
+        self.studio.ask("brighter")
+        settle(self.studio, 30)
+        sound = self.studio.sound("b")
+        shaped = sound.heard["shaped"]
+        self.assertEqual(shaped["knobs"], {"brightness": .3})
+        self.assertEqual(shaped["check"]["brightness"]["verdict"], "too small")
+        self.assertEqual(shaped["corrected"], ["brightness", .3, .48])
+        self.assertEqual(sound.knobs, {"brightness": .48})
+        status = self.studio.state.status
+        self.assertIn("Measured with the knobs", status)
+        self.assertIn("Brightness: spectral centre", status)
+        self.assertIn("from +0.30 to +0.48, once; not measured again", status)
+        self.assertIsNone(self.studio.shaping)           # the correction is not checked again: no loop
+        self.assertEqual(self.studio.state.shown, "pair")  # A and B are back on the unit
+
+    def test_a_knob_that_did_its_job_is_left_alone_and_nothing_is_heard_while_playing(self):
+        self.script.answers.append(self.three("One", "Two", "Three"))
+        self.studio.ask("make a classic rock crunch")
+        settle(self.studio, 20)
+        self.studio.settle_seconds = 0.
+        self.studio.play("guitar")
+        settle(self.studio)
+        self.studio.ask("more gain")
+        settle(self.studio)
+        self.assertNotIn("shaped", self.studio.sound("b").heard)   # never while playing
+        self.assertIsNotNone(self.studio.shaping)
+        self.studio.stop()
+        settle(self.studio, 30)
+        sound = self.studio.sound("b")
+        self.assertEqual(sound.heard["shaped"]["check"]["drive"]["verdict"], "as intended")
+        self.assertIsNone(sound.heard["shaped"]["corrected"])
+        self.assertEqual(sound.knobs, {"drive": .3})
+        self.assertIn("Distortion: harmonics", self.studio.state.status)
+        self.assertNotIn("turned", self.studio.state.status)
+
     def test_a_cancelled_request_leaves_b_alone(self):
         import threading
         release = threading.Event()

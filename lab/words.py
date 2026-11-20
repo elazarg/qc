@@ -66,7 +66,7 @@ LEXICON = {
     "fat": Word(toward=(
         r("more bass and low-end weight in the amp", body=.3),
         r("more midrange", mids=.2),
-        r("a slightly darker top", warmth=.2)),
+        r("a slightly darker top", brightness=-.2)),
         away=(r("less bass in the amp", body=-.3), r("leaner lows in the drive and amp", tightness=.3))),
     "tight": Word(toward=(
         r("leaner lows in the drive and amp", tightness=.3),
@@ -90,41 +90,44 @@ LEXICON = {
     # Top end
     "harsh": Word(region="2–5 kHz", away=(
         r("less presence, which is where harshness sits", presence=-.3),
-        r("a softer top across the amp and drive", warmth=.25),
-        r("a smoother top: the cab's low-pass lower", smoothness=.3),
+        r("a rounder top: fewer high harmonics from the drive, the cab's low-pass lower", texture=-.3),
+        r("a darker top across the amp and drive", brightness=-.25),
         r("less gain, which adds upper harmonics", drive=-.15)),
+        toward=(r("a rougher top: more high harmonics from the drive, the cab's low-pass higher", texture=.3),),
+        fault=True,
         when={"leads": (r("less presence and more midrange, so high notes sing instead of pierce",
                           presence=-.3, mids=.2),),
               "hard": (r("more even dynamics, so hard picking does not spike", compression=.3, presence=-.15),)},
         tips={"leads": "On the guitar, the neck pickup or the tone knob at 7 tames high notes without dulling the rest."}),
     "fizzy": Word(region="5–10 kHz", away=(
-        r("a smoother top: the cab's low-pass lower and its microphones off the centre of the speaker, where fizz lives", smoothness=.4),
+        r("a rounder top: the cab's low-pass lower and its microphones off the centre of the speaker, "
+          "where fizz lives", texture=-.4),
         r("less gain, the usual source of fizz", drive=-.2),
         r("less presence", presence=-.3))),
     "bright": Word(toward=(
-        r("a brighter top across the amp and drive", warmth=-.3),
-        r("more presence", presence=.3),
-        r("an open top: the cab's low-pass higher", smoothness=-.5)),
-        away=(r("a warmer tone across the amp, drive and cab microphones", warmth=.3),
+        r("a brighter top across the amp, drive and cab", brightness=.3),
+        r("more presence", presence=.3)),
+        away=(r("a darker tone across the amp, drive and cab microphones", brightness=-.3),
               r("less presence", presence=-.3),
-              r("a smoother top: the cab's low-pass lower", smoothness=.3))),
+              r("a rounder top: the cab's low-pass lower", texture=-.3))),
     "dark": Word(toward=(
-        r("a softer top across the amp and drive", warmth=.35),
+        r("a darker top across the amp and drive", brightness=-.35),
         r("less presence", presence=-.3)),
-        away=(r("a brighter tone across the amp, drive and cab microphones", warmth=-.3),
-              r("more presence", presence=.3),
-              r("an open top: the cab's low-pass higher", smoothness=-.5)),
+        away=(r("a brighter tone across the amp, drive and cab microphones", brightness=.3),
+              r("more presence", presence=.3)),
         tips={"": "Check the listening level first: quiet monitoring makes any tone sound dull."}),
+    # Warm is round against rough, not dark against bright (TONE_RESEARCH.md, finding 1).
     "warm": Word(toward=(
-        r("a softer top across the amp and drive", warmth=.3),
+        r("a rounder top: fewer high harmonics, less presence, the cab's low-pass lower", texture=-.3),
+        r("a darker top across the amp and drive", brightness=-.2),
         r("more bass and low mids", body=.2, mids=.1)),
-        away=(r("a brighter top across the amp and drive", warmth=-.3),)),
+        away=(r("a rougher top: more high harmonics, more presence, the cab's low-pass higher", texture=.3),)),
     "glassy": Word(region="3–8 kHz", toward=(
         r("more presence and less gain, for a clean edge", presence=.3, drive=-.15),
-        r("a brighter top across the amp and drive", warmth=-.25)),
-        away=(r("less presence", presence=-.3), r("a softer top", warmth=.25))),
+        r("a brighter top across the amp and drive", brightness=.25)),
+        away=(r("less presence", presence=-.3), r("a darker top", brightness=-.25))),
     "airy": Word(region="above 8 kHz", toward=(
-        r("an open top and more presence", smoothness=-.5, presence=.2),
+        r("an open top and more presence", brightness=.4, presence=.2),
         r("a little more room", space=.2))),
     # Pick and dynamics
     "punchy": Word(toward=(
@@ -167,7 +170,7 @@ LEXICON = {
         r("less ambience", space=-.25))),
     # Gain and sustain
     "smooth": Word(toward=(
-        r("more bloom and a softer top", bloom=.3, warmth=.2),
+        r("more bloom and a rounder top", bloom=.3, texture=-.2),
         r("less presence", presence=-.25),
         r("more sustain", sustain=.25))),
     "singing": Word(toward=(
@@ -215,7 +218,7 @@ SYNONYMS = {
     "muddy": "mud murky muddled", "boomy": "boom woofy tubby bassy bloated", "flubby": "flub farty flabby floppy",
     "thin": "weak small anemic tinny weedy", "fat": "thick full big huge beefy meaty heavy massive",
     "tight": "focused", "loose": "saggy", "boxy": "cardboard congested", "honky": "honk nasal",
-    "scooped": "hollow", "harsh": "shrill piercing spiky brittle strident abrasive icepick",
+    "scooped": "hollow", "harsh": "shrill piercing spiky brittle strident abrasive icepick rough",
     "fizzy": "fizz buzzy sizzly grainy raspy", "bright": "trebly", "dark": "dull muffled wooly woolly veiled",
     "warm": "round mellow", "glassy": "chimey sparkly jangly", "airy": "open", "punchy": "punch",
     "bite": "cut attack", "plinky": "clicky clanky", "stiff": "hard sterile lifeless",
@@ -228,7 +231,8 @@ SYNONYMS = {
 COMPARATIVES = {
     "tighter": "tight", "looser": "loose", "fatter": "fat", "thicker": "fat", "fuller": "fat", "bigger": "fat",
     "heavier": "fat", "thinner": "thin", "brighter": "bright", "darker": "dark", "warmer": "warm",
-    "rounder": "warm", "duller": "dark", "punchier": "punchy", "smoother": "smooth", "creamier": "smooth",
+    "rounder": "warm", "rougher": "harsh", "harsher": "harsh", "duller": "dark", "punchier": "punchy",
+    "smoother": "smooth", "creamier": "smooth",
     "clearer": "clear", "dirtier": "dirty", "grittier": "dirty", "crunchier": "dirty", "cleaner": "clean",
     "drier": "dry", "dryer": "dry", "wetter": "wet", "roomier": "spacious", "wider": "wide", "glassier": "glassy",
     "chunkier": "chunky", "jazzier": "jazzy", "airier": "airy", "stiffer": "stiff",
@@ -351,7 +355,7 @@ def read(text):
 
 def _inverse(say):
     swaps = (("less ", "more "), ("leaner ", "fuller "), ("softer ", "brighter "), ("lower ", "higher "),
-             ("shorter ", "longer "), ("narrower ", "wider "))
+             ("shorter ", "longer "), ("narrower ", "wider "), ("rounder ", "rougher "), ("darker ", "brighter "))
     for first, second in swaps:
         if say.startswith(first):
             return second + say[len(first):]

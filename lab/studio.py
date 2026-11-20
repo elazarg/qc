@@ -20,11 +20,18 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import time
 
 from . import design, knobs, knowledge, words
 from .assistant import Assistant
 from .measure import summary
 from .sounds import Sound, Store, describe
+
+SETTLE_SECONDS = 4.     # a turn is checked by listening once no knob has moved for this long
+# The one correction a check may make to a knob, as a factor on its position: further when it did too little,
+# back when it did the opposite of what it is for.
+CORRECTION = {"too small": 1.6, "opposite": .5}
+CORRECTION_LIMIT = .4   # never more than this much of a knob's travel
 
 
 @dataclass(frozen=True)
@@ -59,6 +66,8 @@ class Studio:
         self.cancel_signal = None         # set to drop the request the assistant is working on
         self.phrase = phrase              # (name, mono dry audio) or None
         self.listeners = []
+        self.shaping = None               # (sound id, knobs turned, when) waiting to be checked by listening
+        self.settle_seconds = SETTLE_SECONDS
 
     # ---- state ----
 
@@ -102,6 +111,7 @@ class Studio:
                 (failed or (lambda error: self.set(status=str(error), working="")))(error)
                 continue
             done(result)
+        self._check_shaping()
 
     # ---- the session ----
 
@@ -242,10 +252,94 @@ class Studio:
         if sound is None:
             return
         self.checkpoint()
+        before = dict(sound.knobs)
         sound.knobs = {key: value for key, value in values.items() if value}
         self.store.save(sound)
         if self.state.shown:
             self.later(self.host.call("turn", side, sound.knobs), lambda moves: None)
+        turned = {key for key in set(before) | set(sound.knobs) if before.get(key, 0) != sound.knobs.get(key, 0)}
+        if turned:
+            # Checked by listening once the turning has stopped (`_check_shaping`).
+            earlier = self.shaping[1] if self.shaping and self.shaping[0] == sound.id else set()
+            self.shaping = (sound.id, turned | earlier, time.monotonic())
+
+    # ---- knobs that check themselves ----
+
+    def _check_shaping(self):
+        """Once the knobs of a sound have not been turned for a few seconds, the unit is idle and nothing plays,
+        listen to the sound as shaped, silently, and compare it with the sound heard without its knobs.
+
+        A knob can do something else on this amp than the table says (amp controls interact: TONE_RESEARCH.md,
+        finding 8). One knob that measured the wrong way, or too little, is corrected once; nothing is measured
+        again for that correction, so this never loops."""
+        if self.shaping is None:
+            return
+        sound_id, turned, at = self.shaping
+        if time.monotonic() - at < self.settle_seconds:
+            return
+        if self.state.mode or self.state.working or self.host.busy or self.phrase is None:
+            return                                  # wait: never interrupt playing or other work
+        self.shaping = None
+        if sound_id not in (self.state.a, self.state.b):
+            return                                  # no longer on show
+        try:
+            sound = self.store.sound(sound_id)
+        except (OSError, ValueError):
+            return
+        if not sound.knobs:
+            return
+        phrase_id = self.phrase[0]
+        if sound.heard and "probe" in sound.heard and sound.heard.get("phrase") == phrase_id:
+            self._hear_shaped(sound, turned)
+            return
+        # The sound without its knobs has not been heard on this phrase: that first.
+        self.set(working=f"Listening to {sound.name} without its Shape knobs, silently…")
+
+        def heard(result):
+            fresh = self.store.sound(sound_id)
+            fresh.heard = {"phrase": phrase_id, "digest": fresh.chain.digest(), **result.to_record()}
+            self.store.save(fresh)
+            self.set(working="")
+            self._hear_shaped(fresh, turned)
+
+        self.later(self.host.call("hear", sound.chain, self.phrase[1]), heard, self._shaping_failed)
+
+    def _shaping_failed(self, error):
+        self.set(working="", status=f"Could not listen to the shaped sound: {error}")
+        if not self.state.mode:
+            self._show()
+
+    def _hear_shaped(self, sound, turned):
+        sound_id, values, phrase_id = sound.id, dict(sound.knobs), self.phrase[0]
+        self.set(working=f"Listening to {sound.name} as shaped, silently…")
+
+        def heard(result):
+            fresh = self.store.sound(sound_id)
+            self.set(working="")
+            if fresh.knobs != values or not fresh.heard:
+                # Turned again meanwhile: that turn is checked in its turn.
+                if not self.state.mode:
+                    self._show()
+                return
+            after = result.to_record()
+            found = knobs.check(fresh.heard, after, values)
+            correction = _correction(found, turned, values)
+            fresh.heard = {**fresh.heard, "shaped": {"phrase": phrase_id, "knobs": values, **after, "check": found,
+                                                     "corrected": correction}}
+            if correction:
+                key, old, new = correction
+                fresh.knobs = {name: value for name, value in {**values, key: new}.items() if value}
+            self.store.save(fresh)
+            if not self.state.mode:
+                self._show()        # listening used the unit; A and B go back, with the knobs as they now stand
+            elif correction and self.state.shown:
+                # Playing began meanwhile, which made A and B ready again: the corrected knobs go on as it plays.
+                for side in ("a", "b"):
+                    if getattr(self.state, side) == sound_id:
+                        self.later(self.host.call("turn", side, fresh.knobs), lambda moves: None)
+            self.say(_checked_words(found, turned, correction))
+
+        self.later(self.host.call("hear_shaped", sound.chain, values, self.phrase[1]), heard, self._shaping_failed)
 
     def base(self):
         """Hear the sound on show without its Shape knobs, or with them again (the 0 key)."""
@@ -753,6 +847,51 @@ class Studio:
     def chain_text(self, side=None):
         sound = self.sound(side or self.state.side)
         return describe(sound.chain) if sound else []
+
+
+def _correction(found, turned, values):
+    """The one correction a check allows: the knob turned that measured the wrong way or too little and is turned
+    furthest, its position scaled (further for too little, back for the wrong way), never past its limits or by
+    more than `CORRECTION_LIMIT`. Returns (knob, old position, new position) or None."""
+    wrong = [key for key in turned if key in found and found[key]["verdict"] in CORRECTION and values.get(key)]
+    for key in sorted(wrong, key=lambda key: -abs(values[key])):
+        old = values[key]
+        wanted = old * CORRECTION[found[key]["verdict"]]
+        wanted = old + max(-CORRECTION_LIMIT, min(CORRECTION_LIMIT, wanted - old))
+        new = round(max(knobs.KNOBS[key][1], min(1., wanted)), 2)
+        if new != old:
+            return key, old, new
+    return None
+
+
+def _measured(entry):
+    change, units = entry["change"], entry["units"]
+    digits = 2 if units == "octave" else 0 if units == "ms" else 1 if units == "dB" else 3
+    return f"{knobs.MEASURES.get(entry['measure'], entry['measure'])} {change:+.{digits}f}{' ' + units if units else ''}"
+
+
+def _checked_words(found, turned, correction):
+    """What listening measured of the knobs just turned, in one line for the status."""
+    parts, unmeasured = [], []
+    for key in sorted(turned, key=lambda key: list(knobs.KNOBS).index(key) if key in knobs.KNOBS else 99):
+        entry = found.get(key)
+        if entry is None:
+            continue
+        title = knobs.KNOBS[key][0]
+        if entry["verdict"] == "not measurable":
+            unmeasured.append(title)
+            continue
+        parts.append(f"{title}: {_measured(entry)}, {entry['verdict']}")
+    line = "Measured with the knobs, against without: " + ("; ".join(parts) if parts else "nothing that listening "
+                                                                                           "measures") + "."
+    if unmeasured:
+        line += f" Not measured: {', '.join(unmeasured)}."
+    if correction:
+        key, old, new = correction
+        how = "further" if abs(new) > abs(old) else "back"
+        line += (f" {knobs.KNOBS[key][0]} turned {how}, from {old:+.2f} to {new:+.2f}, once; "
+                 "not measured again.")
+    return line
 
 
 def _now():

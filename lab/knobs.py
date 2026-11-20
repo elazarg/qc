@@ -6,11 +6,20 @@ value the positions would change, `apply` writes them into a new chain, and
 `moves` says the same in the units the unit shows. Nothing here talks to
 the unit.
 
-Every knob is a quality the player hears (warmth, body, smoothness, echoes),
+Every knob is a quality the player hears (brightness, texture, body, echoes),
 never one control or one device: each reaches for whichever controls this
 chain has that do that job. A cab's microphone position is one of the ways
-Warmth and Smoothness work, its low cut one of the ways Tightness and Body
+Brightness and Texture work, its low cut one of the ways Tightness and Body
 work; none of them is a knob of its own.
+
+Brightness (dark to bright) and Texture (round to rough) are the two axes tone
+words collapse onto (TONE_RESEARCH.md, findings 1 and 2); the desk shows them
+together as one pad. "Warm" sits on the texture axis, not opposite "bright".
+
+A knob's effect cannot be assumed from the table (amp controls interact:
+TONE_RESEARCH.md, finding 8), so `EXPECTED` says what each knob should do to
+what listening measures, and `check` compares a sound heard with its knobs
+against the same sound heard without them.
 
 A knob's rules name a control by the kind of block and the control's name,
 so one rule reaches every model that has such a control. `ROLES` gathers the
@@ -80,10 +89,14 @@ AUDIBLE_SPAN = (45., 14000.)
 JAZZ = [*role(PEDAL, "gain", -4), *role(PEDAL, "treble", -2), (AMP, "GAIN", -3), *role(AMP, "treble", -2),
         (CAPTURE, "GAIN", -5), (CAPTURE, "TREBLE", -2.5), (CAPTURE, "MID", 1.2), ("Delay", "MIX", -18),
         ("Delay", "FEEDBACK", -12), ("Reverb", "MIX", -8)]
-DARKER = [*role(PEDAL, "treble", -2), *role(AMP, "treble", -2), *role(AMP, "presence", -2), (CAPTURE, "TREBLE", -3)]
+BRIGHTER = [*role(PEDAL, "treble", 2), *role(AMP, "treble", 2), *role(AMP, "presence", 2), (CAPTURE, "TREBLE", 3)]
 # A cab microphone toward the speaker's edge (POSITION up, measured on the unit) is darker and fuller; nearer the
-# speaker (DISTANCE down) has more low end. Those are means to Warmth, Smoothness and Body, not knobs.
+# speaker (DISTANCE down) has more low end. Those are means to Brightness, Texture and Body, not knobs.
 MIC_TO_EDGE = [(category, "POSITION", 1.0) for category in CABS]
+# Rough is more energy in the high harmonic orders (TONE_RESEARCH.md, findings 2 and 7): more gain and a more open
+# top in the drive pedal, more presence, the cab's low-pass opened and the microphones toward the centre. Round is
+# the opposite, the microphones off centre.
+ROUGHER = [*role(PEDAL, "gain", 2.5), *role(PEDAL, "treble", 1.5), *role(AMP, "presence", 1.5)]
 MIC_CLOSER = [(category, "DISTANCE", -1.0) for category in CABS]
 
 
@@ -95,8 +108,8 @@ def scaled(rules, factor):
 KNOBS = {
     "jazz": ("Jazz", 0, JAZZ),
     "drive": ("Distortion", -1, []),  # Worked out by `_drive_delta`, not by rules.
-    "warmth": ("Warmth", -1, [*DARKER, *scaled(MIC_TO_EDGE, 2.5)]),
-    "smoothness": ("Smoothness", -1, [*HIGH_CUT, *scaled(MIC_TO_EDGE, 1.5)]),
+    "brightness": ("Brightness", -1, [*BRIGHTER, *scaled(MIC_TO_EDGE, -2.5), *scaled(HIGH_CUT, -.8)]),
+    "texture": ("Texture", -1, [*ROUGHER, *scaled(HIGH_CUT, -1.), *scaled(MIC_TO_EDGE, -1.5)]),
     "space": ("Space", -1, [("Delay", "MIX", 18.0), ("Delay", "FEEDBACK", 12.0),
                             ("Reverb", "MIX", 12.0), ("IRLoaders", "ROOM MIX", 10.0)]),
     "tightness": ("Tightness", -1, [*role(AMP, "bass", -2.0), *role(AMP, "thump", -2.5),
@@ -132,27 +145,36 @@ KNOBS = {
                                 ("Equalizer", "125Hz", -1.6), ("Equalizer", "1kHz", 1.4)]),
 }
 
-PRIMARY = ("drive", "warmth", "punch", "space", "jazz")
+PRIMARY = ("drive", "brightness", "texture", "punch", "space", "jazz")
+PAD = ("brightness", "texture")    # shown together on the Shape panel as one plane: across, then up
 GROUPS = {
-    "Tone": ("body", "tightness", "mids", "presence", "smoothness"),
+    "Tone": ("body", "tightness", "mids", "presence"),
     "Response": ("attack", "sustain", "compression", "gate"),
     "Effects": ("delay", "delay_time", "reverb", "tail", "modulation", "motion", "width"),
     "Character": ("jazz", "bloom", "band_fit"),
 }
-# Knobs that were named for a mechanism, and the quality that now does their job. Positions stored on a
-# sound under the old name are carried over, so a shaped sound keeps its shape.
-RENAMED = {"low_cut": "tightness", "soft_top": "smoothness", "repeats": "tail", "mic": "warmth"}
+# Knobs that were named for a mechanism or a word that turned out to lie on another axis, the quality that now
+# does their job, and which way: Warmth turned up was darker (Brightness down), Smoothness turned up was rounder
+# (Texture down). Positions stored on a sound under the old name are carried over, so a shaped sound keeps its shape.
+RENAMED = {"low_cut": ("tightness", 1), "soft_top": ("texture", -1), "repeats": ("tail", 1),
+           "mic": ("brightness", -1), "warmth": ("brightness", -1), "smoothness": ("texture", -1)}
 
 
 def normalize(values):
-    """Knob positions with any old, mechanism-named knob carried over to the quality that now does its job.
+    """Knob positions with any old knob carried over to the quality that now does its job, in its direction.
     Everything else is left as it is, for `targets` to check."""
     found = dict(values or {})
-    for old, new in RENAMED.items():
+    for old, (new, sign) in RENAMED.items():
         if old in found:
             moved = found.pop(old)
-            merged = found.get(new, 0.) + moved
-            found[new] = round(max(KNOBS[new][1], min(1., merged)), 3) if isinstance(merged, (int, float)) else merged
+            held = found.get(new, 0.)
+            def position(value):
+                return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+            if not (position(moved) and position(held)):
+                found[new] = held if position(moved) else moved     # not a position: left for `targets` to refuse
+                continue
+            found[new] = round(max(KNOBS[new][1], min(1., held + sign * moved)), 3)
     return found
 
 DRIVE_CATEGORIES = {"Guitar Overdrive", "Bass Overdrive", "Guitar Amplifier", "Bass Amplifier", "Neural Capture"}
@@ -506,33 +528,110 @@ def available(chain, *, scene=None):
     return list(controls(chain, scene=scene))
 
 
+# ---- Checking a knob against what listening measures ----
+
+# What each knob turned up should do to a measurement of `lab.measure.Heard`'s record ("probe.x" is in its test-tone
+# record): (measurement, sign, the change a full turn must make at least, units). A knob with several measurements
+# has alternative measures of one quality: it did as intended when any of them moved enough the intended way. Pick
+# attack turned up lets the pick through (a slower compressor attack), so the onset gets quicker: attack_ms down.
+EXPECTED = {
+    "brightness": (("brightness_oct", 1, .15, "octave"),),
+    "texture": (("probe.tristimulus3", 1, .03, ""), ("probe.weighted_distortion_db", 1, 2., "dB")),
+    "drive": (("probe.distortion_db", 1, 3., "dB"), ("probe.distortion_soft_db", 1, 3., "dB")),
+    "body": (("low_end_db", 1, 1.5, "dB"),),
+    "tightness": (("low_end_db", -1, 1.5, "dB"),),
+    "space": (("tail_db", 1, 3., "dB"),),
+    "reverb": (("tail_db", 1, 3., "dB"),),
+    "delay": (("tail_db", 1, 3., "dB"),),
+    "tail": (("tail_db", 1, 3., "dB"),),
+    "sustain": (("compression", 1, .05, ""),),
+    "compression": (("compression", 1, .05, ""),),
+    "attack": (("attack_ms", -1, 2., "ms"),),
+}
+# What each measurement is, in words for the status line.
+MEASURES = {"brightness_oct": "spectral centre", "tristimulus3": "share of harmonics 5 and up",
+            "weighted_distortion_db": "order-weighted harmonics", "distortion_db": "harmonics played firmly",
+            "distortion_soft_db": "harmonics 12 dB softer", "low_end_db": "low end", "tail_db": "tail",
+            "compression": "compression", "attack_ms": "onset time"}
+SMALLEST_TURN = .25    # a turn smaller than this is held to the change a quarter turn must make
+VERDICTS = ("as intended", "too small", "opposite", "not measurable")
+
+
+def _reading(record, path):
+    value = record or {}
+    for part in path.split("."):
+        value = value.get(part) if isinstance(value, dict) else None
+    return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) \
+        else None
+
+
+def check(before, after, values):
+    """Did each knob do what it is for? `before` is the sound heard without its knobs, `after` with them at
+    `values`, both `Heard` records.
+
+    Returns {knob: {"measure", "change", "sign", "verdict", "units"}} for every knob turned: the measured change
+    (after minus before), the sign it should have, and "as intended", "too small" (the right way but less than
+    the knob's share of a full turn's minimum, or the wrong way by less than that), "opposite" (the wrong way by
+    at least that) or "not measurable" (no measurement for that knob, or one missing from either record)."""
+    found = {}
+    for key, value in (values or {}).items():
+        if not isinstance(value, (int, float)) or not value:
+            continue
+        intended = 1 if value > 0 else -1
+        readings = []
+        for path, sign, full, units in EXPECTED.get(key, ()):
+            first, second = _reading(before, path), _reading(after, path)
+            if first is None or second is None:
+                continue
+            change = second - first
+            least = full * max(abs(value), SMALLEST_TURN)
+            towards = change * sign * intended
+            verdict = "as intended" if towards >= least else "opposite" if towards <= -least else "too small"
+            readings.append((towards / least, {"measure": path.removeprefix("probe."), "change": round(change, 3),
+                                               "sign": sign * intended, "verdict": verdict, "units": units}))
+        if not readings:
+            expected = EXPECTED.get(key)
+            found[key] = {"measure": None, "change": None, "sign": expected[0][1] * intended if expected else None,
+                          "verdict": "not measurable", "units": ""}
+            continue
+        # The measure that moved furthest the intended way speaks for the knob.
+        found[key] = max(readings, key=lambda pair: pair[0])[1]
+    return found
+
+
 # ---- Plain words as knob moves ----
 
 AMOUNTS = {"a touch": .5, "a tad": .5, "a bit": .5, "a little bit": .5, "a little": .5, "slightly": .5,
            "just a bit": .5, "somewhat": .7, "a lot": 1.7, "much": 1.7, "way": 2., "far": 1.7, "really": 1.5,
            "very": 1.5, "so much": 1.7}
 COMPARATIVES = {
-    "brighter": ("warmth", -.3), "darker": ("warmth", .35), "warmer": ("warmth", .3), "duller": ("warmth", .3),
+    "brighter": ("brightness", .3), "darker": ("brightness", -.35), "duller": ("brightness", -.3),
+    # Warm is round against rough, not dark against bright (TONE_RESEARCH.md, finding 1).
+    "warmer": ("texture", -.3), "rounder": ("texture", -.3), "smoother": ("texture", -.3),
+    "rougher": ("texture", .3), "harsher": ("texture", .3),
     "tighter": ("tightness", .3), "looser": ("tightness", -.3),
     "dirtier": ("drive", .3), "heavier": ("drive", .3), "crunchier": ("drive", .25), "cleaner": ("drive", -.3),
     "drier": ("space", -.3), "dryer": ("space", -.3), "wetter": ("space", .3), "roomier": ("space", .3),
     "fuller": ("body", .3), "thicker": ("body", .3), "fatter": ("body", .3), "thinner": ("body", -.3),
     "punchier": ("punch", .3), "wider": ("width", .3), "narrower": ("width", -.3), "jazzier": ("jazz", .4),
 }
+# A quantity is a knob, or (knob, -1) for one whose "more" turns the knob down ("more warmth" is rounder).
 QUANTITIES = {
     "gain": "drive", "drive": "drive", "distortion": "drive", "dirt": "drive", "saturation": "drive",
     "crunch": "drive", "reverb": "reverb", "delay": "delay", "echo": "delay", "echoes": "delay", "repeats": "tail",
-    "fizz": "smoothness", "smoothness": "smoothness", "movement": "modulation",
+    "fizz": "texture", "roughness": "texture", "texture": "texture", "brightness": "brightness",
+    "smoothness": ("texture", -1), "warmth": ("texture", -1), "movement": "modulation",
     "sustain": "sustain", "mids": "mids", "midrange": "mids", "body": "body", "bass": "body", "low end": "body",
     "lows": "body", "bite": "punch", "punch": "punch", "attack": "attack", "presence": "presence",
     "treble": "presence", "highs": "presence", "top end": "presence", "space": "space", "room": "space",
     "ambience": "space", "compression": "compression", "modulation": "modulation", "tremolo": "modulation",
-    "chorus": "modulation", "width": "width", "jazz": "jazz", "warmth": "warmth", "tightness": "tightness",
+    "chorus": "modulation", "width": "width", "jazz": "jazz", "tightness": "tightness",
     "gate": "gate",
 }
 COMPLAINTS = {
-    "bright": ("warmth", .3), "harsh": ("warmth", .3), "shrill": ("warmth", .3), "fizzy": ("smoothness", .35),
-    "dark": ("warmth", -.3), "dull": ("warmth", -.3), "muddy": ("tightness", .3), "boomy": ("tightness", .3),
+    "bright": ("brightness", -.3), "shrill": ("brightness", -.3), "harsh": ("texture", -.3),
+    "rough": ("texture", -.3), "fizzy": ("texture", -.35), "dark": ("brightness", .3), "dull": ("brightness", .3),
+    "round": ("texture", .3), "muddy": ("tightness", .3), "boomy": ("tightness", .3),
     "thin": ("body", .3), "dry": ("space", .3), "wet": ("space", -.3), "washy": ("space", -.3),
     "dirty": ("drive", -.3), "distorted": ("drive", -.3), "clean": ("drive", .3), "noisy": ("gate", .3),
     "compressed": ("compression", -.3),
@@ -542,6 +641,11 @@ _AMOUNT = "|".join(sorted(map(re.escape, AMOUNTS), key=len, reverse=True))
 _QUANTITY = "|".join(sorted(map(re.escape, QUANTITIES), key=len, reverse=True))
 _LEAD = (r"(?:(?:can you |could you |please )?(?:make (?:it|this|that|the tone|the sound) "
          r"|it(?:'s| is| sounds| feels) |sounds |needs |i need |i want |give (?:me|it) )?)")
+
+
+def _quantity(word):
+    found = QUANTITIES[word]
+    return found if isinstance(found, tuple) else (found, 1)
 
 
 def direction(text):
@@ -558,13 +662,13 @@ def direction(text):
         return {key: round(step * AMOUNTS.get(simple[1], 1.), 2)}
     measured = re.fullmatch(rf"{_LEAD}(?:({_AMOUNT}) )?(more|less) ({_QUANTITY})", words)
     if measured:
-        key = QUANTITIES[measured[3]]
-        step = STEPS.get(key, .3) * AMOUNTS.get(measured[1], 1.)
+        key, sign = _quantity(measured[3])
+        step = STEPS.get(key, .3) * AMOUNTS.get(measured[1], 1.) * sign
         return {key: round(step if measured[2] == "more" else -step, 2)}
     lacking = re.fullmatch(rf"{_LEAD}(too much|not enough|too little) ({_QUANTITY})", words)
     if lacking:
-        key = QUANTITIES[lacking[2]]
-        return {key: round(STEPS.get(key, .3) * (-1 if lacking[1] == "too much" else 1), 2)}
+        key, sign = _quantity(lacking[2])
+        return {key: round(STEPS.get(key, .3) * sign * (-1 if lacking[1] == "too much" else 1), 2)}
     complaint = re.fullmatch(rf"{_LEAD}(?:({_AMOUNT}) )?too (\w+)", words)
     if complaint and complaint[2] in COMPLAINTS:
         key, step = COMPLAINTS[complaint[2]]

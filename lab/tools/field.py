@@ -39,14 +39,14 @@ class Plane:
 PLANES = {
     "Gain & color": Plane(
         Dimension("Cleaner", "Saturated", (("drive", .9), ("sustain", .18))),
-        Dimension("Rounded", "Cutting", (("warmth", -.72), ("presence", .63))),
+        Dimension("Rounded", "Cutting", (("brightness", .72), ("presence", .63))),
         "Find the edge of breakup, then move the bite without moving the gain."),
     "Under the fingers": Plane(
         Dimension("Giving", "Immediate", (("attack", .78), ("sustain", -.48))),
         Dimension("Loose lows", "Tight lows", (("tightness", .9),)),
         "Play the same figure softly and firmly while you explore response and low-end control."),
     "Depth & width": Plane(
-        Dimension("Close", "Distant", (("space", .72), ("warmth", .23))),
+        Dimension("Close", "Distant", (("space", .72), ("brightness", -.23))),
         Dimension("Focused", "Wide", (("width", .92), ("modulation", .12))),
         "Move the sound back into a room, or spread it to the sides."),
     "Inside a mix": Plane(

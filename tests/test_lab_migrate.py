@@ -183,7 +183,7 @@ class MigrateTest(unittest.TestCase):
         self.assertEqual([item["sound"] for item in record["candidates"]],
                          [migrate.new_id("draft", "aaaaaaaaaaaa"), migrate.new_id("draft", "cccccccccccc")])
         sound = self.sound_from("draft", "aaaaaaaaaaaa")
-        self.assertEqual(sound.knobs, {"warmth": .8})
+        self.assertEqual(sound.knobs, {"brightness": -.8})   # Warmth carried over: up was darker
         self.assertEqual(sound.marks, ["keeper"])
         self.assertEqual([note["text"] for note in sound.notes], ["Lovely bends"])
         self.assertTrue(sound.played)

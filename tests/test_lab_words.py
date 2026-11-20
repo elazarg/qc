@@ -18,13 +18,20 @@ class LexiconTest(unittest.TestCase):
                 self.assertTrue(all(knobs.KNOBS[knob][1] <= step <= 1 for knob, step in remedy.moves.items()))
         self.assertTrue(set(words.ALIASES.values()) <= set(words.LEXICON))
 
-    def test_microphones_serve_warmth_and_smoothness_in_the_measured_direction(self):
-        # Measured on the unit: a higher POSITION is toward the edge, darker and smoother. Warmth and Smoothness
-        # turned up raise it; no knob is the microphone itself.
-        for knob in ("warmth", "smoothness"):
+    def test_microphones_serve_brightness_and_texture_in_the_measured_direction(self):
+        # Measured on the unit: a higher POSITION is toward the edge, darker and smoother. Brightness and Texture
+        # turned up lower it (toward the centre); no knob is the microphone itself.
+        for knob in ("brightness", "texture"):
             moves = [delta for _, name, delta in knobs.KNOBS[knob][2] if name == "POSITION"]
-            self.assertTrue(moves and all(delta > 0 for delta in moves), knob)
+            self.assertTrue(moves and all(delta < 0 for delta in moves), knob)
         self.assertNotIn("mic", knobs.KNOBS)
+
+    def test_warm_is_round_against_rough_and_bright_is_its_own_axis(self):
+        self.assertEqual(said("warmer"), ("Warmer", {"texture": -.3}))
+        self.assertEqual(said("rougher"), ("Rougher", {"texture": .3}))
+        self.assertEqual(said("too harsh")[1], {"presence": -.3})
+        self.assertEqual(words.read("too harsh").remedies[1].moves, {"texture": -.3})
+        self.assertEqual(said("darker"), ("Darker", {"brightness": -.35}))
 
     def test_nothing_from_the_old_package_is_imported(self):
         source = words.__file__
@@ -43,8 +50,8 @@ class ReadTest(unittest.TestCase):
         self.assertEqual(said("muddy"), ("Muddy", {"tightness": .3}))
 
     def test_wanting_and_complaining_point_opposite_ways(self):
-        self.assertEqual(said("bright"), ("Brighter", {"warmth": -.3}))
-        self.assertEqual(said("it sounds bright"), ("Bright", {"warmth": .3}))
+        self.assertEqual(said("bright"), ("Brighter", {"brightness": .3}))
+        self.assertEqual(said("it sounds bright"), ("Bright", {"brightness": -.3}))
         self.assertEqual(said("too tight"), ("Tight", {"tightness": -.3}))
         self.assertEqual(said("not tight enough"), ("Tighter", {"tightness": .3}))
         self.assertEqual(said("thin"), ("Thin", {"body": .3}))
@@ -58,11 +65,11 @@ class ReadTest(unittest.TestCase):
         self.assertEqual(said("the notes die too fast"), ("More sustain", {"sustain": .3}))
         self.assertEqual(said("make it sing"), ("More singing", {"sustain": .3, "mids": .2}))
         self.assertEqual(said("needs more clarity"), ("Clearer", {"drive": -.2}))
-        self.assertEqual(said("too much fizz"), ("Fizzy", {"smoothness": .4}))
+        self.assertEqual(said("too much fizz"), ("Fizzy", {"texture": -.4}))
 
     def test_amounts_scale_the_step(self):
-        self.assertEqual(said("a bit fizzy"), ("Fizzy", {"smoothness": .2}))
-        self.assertEqual(said("way too dark"), ("Dark", {"warmth": -.6}))
+        self.assertEqual(said("a bit fizzy"), ("Fizzy", {"texture": -.2}))
+        self.assertEqual(said("way too dark"), ("Dark", {"brightness": .6}))
 
     def test_questions_and_longer_requests_are_left_to_the_assistant(self):
         for text in ("why is it muddy", "play something muddy for me", "muddy but only in the second verse",
@@ -70,7 +77,7 @@ class ReadTest(unittest.TestCase):
             self.assertIsNone(words.read(text), text)
 
     def test_no_of_a_fault_asks_for_less_and_no_of_a_quality_says_it_is_missing(self):
-        for text, name, move in (("no fizz", "Fizzy", {"smoothness": .4}), ("no mud", "Muddy", {"tightness": .3}),
+        for text, name, move in (("no fizz", "Fizzy", {"texture": -.4}), ("no mud", "Muddy", {"tightness": .3}),
                                  ("no boom", "Boomy", {"body": -.3}), ("no bite", "More bite", {"punch": .3}),
                                  ("no sustain", "More sustain", {"sustain": .3})):
             reading = words.read(text)
@@ -93,7 +100,7 @@ class RemedyOrderTest(unittest.TestCase):
     def test_only_remedies_the_chain_can_perform_are_offered(self):
         reading = words.read("fizzy")
         self.assertEqual([tuple(remedy.moves) for remedy in words.usable(reading, None)],
-                         [("smoothness",), ("drive",), ("presence",)])
+                         [("texture",), ("drive",), ("presence",)])
         self.assertEqual([tuple(remedy.moves) for remedy in words.usable(reading, {"drive", "presence"})],
                          [("drive",), ("presence",)])
         self.assertEqual(words.usable(reading, {"reverb"}), ())

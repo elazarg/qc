@@ -45,8 +45,8 @@ class EvenAmps(unittest.TestCase):
 
 
 class ControlRolesTest(EvenAmps):
-    def test_warmth_turns_backward_controls_the_other_way(self):
-        edits = moves(chain(block(4), block(1011)), {"warmth": .5})
+    def test_brightness_turns_backward_controls_the_other_way(self):
+        edits = moves(chain(block(4), block(1011)), {"brightness": -.5})
         self.assertEqual(edits, {("Rodent Drive", "FILTER"): 1., ("UK C30 TopBoost", "TREBLE"): -1.,
                                  ("UK C30 TopBoost", "TONE CUT"): 1.})
         self.assertEqual(moves(chain(block(1011)), {"presence": .4}), {("UK C30 TopBoost", "TONE CUT"): -1.})
@@ -72,7 +72,7 @@ class ControlRolesTest(EvenAmps):
         self.assertEqual(moves(chain(block(1093)), {"mids": .5}), {("Brit Plexi 100 Normal", "MID"): 1.})
 
     def test_a_move_scales_to_the_range_of_the_control(self):
-        self.assertEqual(moves(chain(block(42, {"CUT": 20.})), {"warmth": .5}), {("81 Creations Drive", "CUT"): 10.})
+        self.assertEqual(moves(chain(block(42, {"CUT": 20.})), {"brightness": -.5}), {("81 Creations Drive", "CUT"): 10.})
 
     def test_the_gate_knob_moves_only_the_simple_gate(self):
         self.assertEqual(moves(chain(block(16003, {"THRESHOLD": -60.})), {"gate": .4}),
@@ -146,7 +146,7 @@ class FiltersTest(EvenAmps):
     def test_owned_ir_filters_participate_in_musical_directions(self):
         model, at = 29001, index(29001, "LOW PASS")
         source = chain(Block(model, {**{i: .25 for i in range(at)}, at: catalog.to_norm(model, at, 8000.)}))
-        edits = knobs.moves(source, {"smoothness": .5})
+        edits = knobs.moves(source, {"texture": -.5})
         self.assertTrue(any(edit["index"] == at and edit["to"] < edit["from"] for edit in edits))
 
     def test_each_row_moves_only_the_filter_doing_the_work(self):
@@ -156,16 +156,16 @@ class FiltersTest(EvenAmps):
         first = [block(cab, {"HPF": 20., "LPF": 9000.}), block(eq, {"HPF": 85., "LPF": 20001.})]
         second = [block(cab, {"HPF": 120., "LPF": 20000.}), block(eq, {"HPF": 19., "LPF": 6000.})]
         source = chain(rows=[first, second])
-        # Tightness reaches the low cut, Smoothness the low-pass (it also moves the cab microphones).
+        # Tightness reaches the low cut, Texture the low-pass (it also moves the cab microphones).
         low = {(edit["row"], edit["column"]) for edit in knobs.moves(source, {"tightness": .5})
                if edit["name"] in ("HPF", "HPF FREQ")}
         self.assertEqual(low, {(0, 1), (1, 0)})
-        high = {(edit["row"], edit["column"]) for edit in knobs.moves(source, {"smoothness": .5})
+        high = {(edit["row"], edit["column"]) for edit in knobs.moves(source, {"texture": -.5})
                 if edit["name"] in ("LPF", "LPF FREQ")}
         self.assertEqual(high, {(0, 0), (1, 1)})
 
     def test_a_filter_parked_outside_the_audible_span_starts_from_its_edge(self):
-        edits = knobs.moves(chain(block(4005, {"LPF": 20001.})), {"smoothness": 1.})
+        edits = knobs.moves(chain(block(4005, {"LPF": 20001.})), {"texture": -1.})
         self.assertAlmostEqual(edits[0]["to"], 14000 * 2 ** -1.5, places=2)
 
     def test_a_bypassed_filter_owns_nothing(self):
@@ -252,7 +252,7 @@ class MeasuredStrengthTest(unittest.TestCase):
         source = chain(block(1011))
         with mock.patch.object(knobs, "_effect", return_value=None):
             with mock.patch.object(knobs, "_scale", return_value=1.):
-                plain = moves(source, {"warmth": .5})["UK C30 TopBoost", "TREBLE"]
+                plain = moves(source, {"brightness": -.5})["UK C30 TopBoost", "TREBLE"]
             asked = []
 
             def scale(model_id, name, rising=True):
@@ -260,7 +260,7 @@ class MeasuredStrengthTest(unittest.TestCase):
                 return 2. if name == "TREBLE" else 1.
 
             with mock.patch.object(knobs, "_scale", scale):
-                scaled = moves(source, {"warmth": .5})
+                scaled = moves(source, {"brightness": -.5})
         self.assertEqual(scaled["UK C30 TopBoost", "TREBLE"], 2 * plain)
         self.assertIn((1011, "TREBLE", False), asked)
 
@@ -286,8 +286,8 @@ class AvailableTest(unittest.TestCase):
         found = knobs.controls(source)
         self.assertIn(("Brit Plexi 50 Normal", "Gain"), found["drive"])
         self.assertIn(("Graphic-9", "Hpf"), found["tightness"])
-        self.assertIn(("412 Brit 60B GB 71 (M)", "Lpf"), found["smoothness"])
-        self.assertIn(("412 Brit 60B GB 71 (M)", "Position"), found["warmth"])
+        self.assertIn(("412 Brit 60B GB 71 (M)", "Lpf"), found["texture"])
+        self.assertIn(("412 Brit 60B GB 71 (M)", "Position"), found["brightness"])
         self.assertIn(("Tremolo", "Rate"), found["motion"])
         self.assertNotIn("gate", found)
         self.assertNotIn("delay", found)
@@ -295,8 +295,8 @@ class AvailableTest(unittest.TestCase):
 
     def test_a_guitar_amp_offers_its_tone_knobs(self):
         found = knobs.available(chain(block(1093)))
-        self.assertTrue({"drive", "warmth", "body", "mids", "presence", "tightness", "sustain"} <= set(found))
-        self.assertFalse({"delay", "reverb", "gate", "smoothness"} & set(found))
+        self.assertTrue({"drive", "brightness", "texture", "body", "mids", "presence", "tightness", "sustain"} <= set(found))
+        self.assertFalse({"delay", "reverb", "gate"} & set(found))
 
     def test_a_bass_amp_offers_drive_through_whatever_it_calls_its_gain(self):
         found = knobs.controls(chain(block(2011)))
@@ -313,12 +313,12 @@ class AvailableTest(unittest.TestCase):
 class DirectionTest(unittest.TestCase):
     def test_plain_directions_become_bounded_knob_moves(self):
         for words, move in (("tighter", {"tightness": .3}), ("A bit tighter.", {"tightness": .15}),
-                            ("much brighter", {"warmth": -.51}), ("more jazz", {"jazz": .4}),
-                            ("less delay", {"delay": -.3}), ("darker", {"warmth": .35}),
-                            ("a little less reverb", {"reverb": -.15}), ("too bright", {"warmth": .3}),
-                            ("it's too harsh", {"warmth": .3}), ("too much gain", {"drive": -.3}),
-                            ("not enough mids", {"mids": .3}), ("make it warmer", {"warmth": .3}),
-                            ("needs more sustain", {"sustain": .3}), ("brighter please", {"warmth": -.3})):
+                            ("much brighter", {"brightness": .51}), ("more jazz", {"jazz": .4}),
+                            ("less delay", {"delay": -.3}), ("darker", {"brightness": -.35}),
+                            ("a little less reverb", {"reverb": -.15}), ("too bright", {"brightness": -.3}),
+                            ("it's too harsh", {"texture": -.3}), ("too much gain", {"drive": -.3}),
+                            ("not enough mids", {"mids": .3}), ("make it warmer", {"texture": -.3}),
+                            ("needs more sustain", {"sustain": .3}), ("brighter please", {"brightness": .3})):
             self.assertEqual(knobs.direction(words), move, words)
         for words in ("Less bite, keep the attack.", "the low end gets muddy when I palm mute", "tighter and brighter",
                       "more Andy Timmons", "more", "too", "John Mayer Gravity", "undo"):
@@ -335,9 +335,74 @@ class DirectionTest(unittest.TestCase):
 
     def test_a_sound_shaped_with_an_old_knob_keeps_its_shape(self):
         self.assertEqual(knobs.normalize({"low_cut": .3, "tightness": .2, "soft_top": .4, "repeats": .5}),
-                         {"tightness": .5, "smoothness": .4, "tail": .5})
+                         {"tightness": .5, "texture": -.4, "tail": .5})
         with self.assertRaises(ValueError):
             knobs.targets(chain(block(1045)), knobs.normalize({"nonsense": .2}))
+
+    def test_warmth_and_smoothness_carry_over_to_the_pad_the_other_way_round(self):
+        # Warmth up was darker, Smoothness up was rounder: both are the new knobs turned down.
+        self.assertEqual(knobs.normalize({"warmth": .3, "smoothness": .4, "drive": .2}),
+                         {"brightness": -.3, "texture": -.4, "drive": .2})
+        self.assertEqual(knobs.normalize({"mic": .2, "warmth": .3, "brightness": .1}), {"brightness": -.4})
+        self.assertEqual(knobs.normalize({"warmth": -1., "brightness": .5}), {"brightness": 1.})
+        source = chain(block(4), block(1011))
+        self.assertEqual(knobs.targets(source, {"warmth": .5}), knobs.targets(source, {"brightness": -.5}))
+        with self.assertRaises(ValueError):
+            knobs.targets(source, {"warmth": float("nan")})
+
+    def test_brightness_and_texture_reach_their_own_controls(self):
+        source = chain(block(5), block(1093), block(12006, {"LPF": 9000.}))
+        bright = {(edit["model"], edit["name"]): edit["to"] - edit["from"]
+                  for edit in knobs.moves(source, {"brightness": .5})}
+        rough = {(edit["model"], edit["name"]): edit["to"] - edit["from"]
+                 for edit in knobs.moves(source, {"texture": .5})}
+        cab = catalog.model(12006).name
+        self.assertGreater(bright["Brit Plexi 100 Normal", "TREBLE"], 0)
+        self.assertGreater(bright[cab, "LPF"], 0)
+        self.assertLess(bright[cab, "POSITION"], 0)             # microphones toward the centre
+        self.assertGreater(rough["Green 808", "OVERDRIVE"], 0)  # more high-order harmonics from the pedal
+        self.assertGreater(rough["Brit Plexi 100 Normal", "PRESENCE"], 0)
+        self.assertGreater(rough[cab, "LPF"], 0)
+        self.assertNotIn(("Brit Plexi 100 Normal", "TREBLE"), rough)
+        round_ = {(edit["model"], edit["name"]): edit["to"] - edit["from"]
+                  for edit in knobs.moves(source, {"texture": -.5})}
+        self.assertGreater(round_[cab, "POSITION"], 0)          # off centre
+        self.assertEqual(knobs.PAD, ("brightness", "texture"))
+
+
+class CheckTest(unittest.TestCase):
+    BEFORE = {"brightness_oct": .1, "low_end_db": 0., "tail_db": -40., "compression": .2,
+              "probe": {"distortion_db": -30., "distortion_soft_db": -40., "tristimulus3": .1}}
+
+    def test_each_knob_is_judged_by_its_own_measurement(self):
+        after = {"brightness_oct": .3, "low_end_db": -.5, "tail_db": -45., "compression": .2,
+                 "probe": {"distortion_db": -29.5, "distortion_soft_db": -39., "tristimulus3": .2}}
+        found = knobs.check(self.BEFORE, after, {"brightness": .5, "texture": .5, "body": .5, "space": .5,
+                                                 "drive": .5, "mids": .4, "attack": .3, "sustain": 0.})
+        self.assertEqual(found["brightness"], {"measure": "brightness_oct", "change": .2, "sign": 1,
+                                               "verdict": "as intended", "units": "octave"})
+        self.assertEqual(found["texture"]["verdict"], "as intended")       # tristimulus 3 rose
+        self.assertEqual(found["body"]["verdict"], "too small")
+        self.assertEqual(found["space"]["verdict"], "opposite")
+        self.assertEqual(found["drive"]["verdict"], "too small")
+        self.assertEqual(found["mids"]["verdict"], "not measurable")       # no measurement for it
+        self.assertEqual(found["attack"]["verdict"], "not measurable")     # attack_ms in neither record
+        self.assertEqual(found["attack"]["sign"], -1)
+        self.assertNotIn("sustain", found)                                # not turned
+
+    def test_a_knob_turned_down_is_meant_to_lower_its_measurement(self):
+        after = {**self.BEFORE, "brightness_oct": -.1, "low_end_db": 2.}
+        found = knobs.check(self.BEFORE, after, {"brightness": -.5, "tightness": .5})
+        self.assertEqual((found["brightness"]["sign"], found["brightness"]["verdict"]), (-1, "as intended"))
+        self.assertEqual((found["tightness"]["sign"], found["tightness"]["verdict"]), (-1, "opposite"))
+
+    def test_a_small_turn_is_held_to_a_quarter_turn_and_missing_records_are_not_measurable(self):
+        after = {**self.BEFORE, "brightness_oct": .13}
+        self.assertEqual(knobs.check(self.BEFORE, after, {"brightness": .05})["brightness"]["verdict"], "too small")
+        self.assertEqual(knobs.check(None, after, {"brightness": .5})["brightness"]["verdict"], "not measurable")
+        self.assertEqual(knobs.check(self.BEFORE, {"brightness_oct": None}, {"brightness": .5})["brightness"]["verdict"],
+                         "not measurable")
+        self.assertEqual(set(knobs.EXPECTED) <= set(knobs.KNOBS), True)
 
 
 if __name__ == "__main__":

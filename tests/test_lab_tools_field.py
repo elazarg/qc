@@ -25,7 +25,7 @@ class FieldTest(unittest.TestCase):
         vertical = field.position_values(anchor, plane, 0, 1)
         self.assertGreater(horizontal["drive"], anchor["drive"])
         self.assertEqual(vertical["drive"], anchor["drive"])
-        self.assertLess(vertical["warmth"], 0)
+        self.assertGreater(vertical["brightness"], 0)
         self.assertEqual(vertical["attack"], .4)
 
     def test_corners_stay_within_each_knob_and_unavailable_knobs_stay_put(self):

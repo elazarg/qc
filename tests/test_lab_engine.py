@@ -135,6 +135,18 @@ class EngineTest(unittest.TestCase):
         self.assertEqual(self.unit.position()["position"], 5)
 
 
+    def test_a_sound_is_heard_with_its_knobs_applied_to_every_value_the_unit_states(self):
+        dry = (np.sin(np.arange(48000) / 48000 * 2 * np.pi * 196) * .2)[:, None].astype(np.float32)
+        design = sound(PLEXI, V30)                       # states no GAIN: the knob moves the unit's own value
+        plain = self.engine.hear(design, dry)
+        same = self.engine.hear_shaped(design, {}, dry)
+        driven = self.engine.hear_shaped(design, {"drive": .8}, dry)
+        self.assertAlmostEqual(same.probe["distortion_db"], plain.probe["distortion_db"], places=3)
+        self.assertGreater(driven.probe["distortion_db"], plain.probe["distortion_db"] + 1)
+        self.assertIsNone(self.engine.shown)
+        self.engine.close()
+        self.assertEqual(self.unit.position()["position"], 5)
+
     def test_a_saved_design_keeps_its_knob_moves_on_values_it_left_to_the_unit(self):
         design = sound(PLEXI, V30)                       # states no GAIN
         gain = catalog.model(PLEXI).index("GAIN")

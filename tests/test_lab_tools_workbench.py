@@ -34,7 +34,7 @@ class VersionsTest(unittest.TestCase):
         self.assertEqual(versions[0]["chain"], sound.chain)
         digests = {version["chain"].digest() for version in versions}
         self.assertEqual(len(digests), 3)
-        softer, stronger = versions[1]["knobs"]["warmth"], versions[2]["knobs"]["warmth"]
+        softer, stronger = versions[1]["knobs"]["brightness"], versions[2]["knobs"]["brightness"]
         self.assertLess(abs(softer), abs(stronger))
         self.assertEqual(sound.knobs, {})      # the sound itself is left as it was
         with self.assertRaisesRegex(ValueError, "nothing that answers"):

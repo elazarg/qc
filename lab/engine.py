@@ -264,6 +264,22 @@ class Engine:
         self.shown = None
         return found
 
+    def hear_shaped(self, chain, knobs, dry, *, stop=None):
+        """What `chain` with its Shape knobs at `knobs` does to the phrase, measured silently, as `hear` does.
+
+        As `save` does, the knobs are applied to the chain as the unit holds it once built, where every value is
+        stated; the shaped chain is then listened to like any other (built once and cached)."""
+        from .knobs import apply as with_knobs
+
+        self.quiet()
+        if self.offset is None:
+            self.measure_round_trip()
+        slot, held = self.rig.ready(chain, stop=stop)
+        shaped = with_knobs(held, knobs) if knobs else held
+        found = listen(self.rig, self.audio, shaped, dry, self.offset, stop=stop)
+        self.shown = None
+        return found
+
     def read(self, slot):
         """The chain and name of a preset saved on the unit."""
         self.quiet()

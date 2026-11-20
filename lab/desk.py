@@ -21,6 +21,20 @@ from .theme import (ACCENT, DARK, DIM, FONT, INK, LIVE, PAPER, RULE, SIDE, SOFT,
 
 PANELS = ("Shape", "Chain", "Difference", "Phrase", "Sounds", "History", "Song", "Guitar")
 PHRASE_SECONDS = 3.5
+PAD_SIZE = 200      # the Brightness x Texture pad, in pixels a side
+
+
+def pad_point(across, up, size=PAD_SIZE):
+    """Where knob positions (-1 to 1 each) sit on the pad: across from the left edge, up from the bottom."""
+    return (across + 1) / 2 * size, (1 - up) / 2 * size
+
+
+def pad_values(x, y, size=PAD_SIZE):
+    """The knob positions at a point on the pad, kept on the pad and on steps of .05."""
+    def position(fraction):
+        return round(round(max(-1., min(1., fraction)) * 20) / 20, 2)
+
+    return position(2 * x / size - 1), position(1 - 2 * y / size)
 
 
 def label(parent, text="", *, size=10, color=INK, bold=False, wrap=0):
@@ -313,7 +327,12 @@ class Desk:
             label(self.tray, "Nothing to shape yet.", color=SUBTLE).pack(fill="x")
             return
         values = dict(sound.knobs)
-        for key in studio.available():
+        available = studio.available()
+        if set(knob_table.PAD) & set(available):
+            self.shape_pad(values, [key for key in knob_table.PAD if key in available])
+        for key in available:
+            if key in knob_table.PAD:
+                continue
             title, low, _ = knob_table.KNOBS[key]
             row = tk.Frame(self.tray, bg=DARK)
             row.pack(fill="x")
@@ -323,6 +342,49 @@ class Desk:
             scale.set(values.get(key, 0.))
             scale.pack(side="right")
             scale.bind("<ButtonRelease-1>", lambda _, key=key, scale=scale: self.turned(key, scale.get()))
+
+    def shape_pad(self, values, usable):
+        """Brightness and Texture as one point on a square: dark to bright across, round to rough up. Drag the
+        point; letting go turns both knobs. An axis the sound has nothing for stays at its centre, dimmed."""
+        size = PAD_SIZE
+        across, up = knob_table.PAD
+        point = {key: float(values.get(key, 0.)) for key in knob_table.PAD}
+        canvas = tk.Canvas(self.tray, width=size, height=size, bg=TILE, highlightthickness=0, cursor="crosshair")
+        canvas.pack(pady=(2, 4))
+        canvas.create_line(size / 2, 0, size / 2, size, fill=RULE)
+        canvas.create_line(0, size / 2, size, size / 2, fill=RULE)
+        for text, x, y, anchor, key in (("dark", 6, size / 2 - 4, "sw", across),
+                                        ("bright", size - 6, size / 2 - 4, "se", across),
+                                        ("rough", size / 2 + 6, 6, "nw", up),
+                                        ("round", size / 2 + 6, size - 6, "sw", up)):
+            canvas.create_text(x, y, text=text, anchor=anchor, fill=SUBTLE if key in usable else DIM, font=(FONT, 8))
+        radius = 6
+        x, y = pad_point(point[across], point[up], size)
+        dot = canvas.create_oval(x - radius, y - radius, x + radius, y + radius, fill=ACCENT, outline="")
+        note = label(self.tray, size=9, color=SUBTLE)
+        note.pack(fill="x", pady=(0, 8))
+
+        def show():
+            note.configure(text=f"{knob_table.KNOBS[across][0]} {point[across]:+.2f} · "
+                                f"{knob_table.KNOBS[up][0]} {point[up]:+.2f}")
+
+        def drag(event):
+            found = dict(zip(knob_table.PAD, pad_values(event.x, event.y, size)))
+            point.update({key: found[key] for key in usable})
+            x, y = pad_point(point[across], point[up], size)
+            canvas.coords(dot, x - radius, y - radius, x + radius, y + radius)
+            show()
+
+        def done(event):
+            drag(event)
+            sound = self.studio.sound(self.studio.state.side)
+            if sound is not None:
+                self.studio.turn({**sound.knobs, **{key: point[key] for key in usable}})
+
+        canvas.bind("<Button-1>", drag)
+        canvas.bind("<B1-Motion>", drag)
+        canvas.bind("<ButtonRelease-1>", done)
+        show()
 
     def part_scene(self):
         chosen = getattr(self, "scene_choice", None)
