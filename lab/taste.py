@@ -1,6 +1,6 @@
 """What the player keeps, learned from their own choices.
 
-Research (TONE_RESEARCH.md, findings 3, 4 and 11, proposal 4) says listeners
+Research (docs/TONE_RESEARCH.md, findings 3, 4 and 11, proposal 4) says listeners
 weight the dimensions of timbre differently, and that an automatic ranking
 should be corrected by the player's own choices. This module does that and
 nothing more:

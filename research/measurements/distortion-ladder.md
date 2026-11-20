@@ -78,7 +78,7 @@ in the 5th to 10th.
 
 Real amps through a cab never approach hard clipping's share of high orders (0.06): the share alone cannot tell
 them apart. The balance between high and low orders does, from −6 dB (a Plexi at low gain) to +4 dB (a Soldano
-lead), which is the research's texture axis (TONE_RESEARCH.md, findings 2 and 7). The words:
+lead), which is the research's texture axis (docs/TONE_RESEARCH.md, findings 2 and 7). The words:
 
 | Word | Rule |
 |---|---|

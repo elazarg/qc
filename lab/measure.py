@@ -22,11 +22,11 @@ Also from the phrase:
   instant onset reads 0 to a few ms (the wave's first peak). attack_soft_ms is the same on the pass
   played 12 dB softer, which shows whether the chain softens or sharpens a
   lighter pick. Attack time is one of the robust correlates of timbre
-  (McAdams 2017; Zacharakis et al. 2015; TONE_RESEARCH.md findings 4 and 5).
+  (McAdams 2017; Zacharakis et al. 2015; docs/TONE_RESEARCH.md findings 4 and 5).
 - brightness_bands_db: each of 1-3, 3-6 and 6-12 kHz's share of the energy
   against the dry phrase's share, in dB, keyed "1-3 kHz", "3-6 kHz",
   "6-12 kHz". Brightness is measured from band energy, never from the spectral
-  centre alone, which mis-ranks distorted guitar (TONE_RESEARCH.md finding 3).
+  centre alone, which mis-ranks distorted guitar (docs/TONE_RESEARCH.md finding 3).
 
 Texture (round, warm, even, edged, rough) is an inference, a word from the
 probe's harmonics: how much there is (order-weighted distortion), and the
@@ -72,7 +72,7 @@ def distortion_word(distortion_db, soft_db):
 
 
 # Texture words, from how the test tone's harmonics are spread (lab.probe): round, even, edged, rough. Energy in the
-# high orders (5th to 10th) is heard as rough far more than the same energy in the 2nd and 3rd (TONE_RESEARCH.md
+# high orders (5th to 10th) is heard as rough far more than the same energy in the 2nd and 3rd (docs/TONE_RESEARCH.md
 # findings 2 and 7), so the words follow tristimulus 3 (the share of the power in harmonics 5..10) and the
 # order-weighted distortion (Shorter's n^2/4). PROVISIONAL: set from synthetic chains only (tanh and hard clipping
 # of a pure tone; a square wave reads tristimulus 3 = 0.06 and weighted 0 dB), not yet calibrated on the unit.

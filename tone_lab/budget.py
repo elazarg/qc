@@ -3,7 +3,7 @@
 Each pair of rows runs on two processors. A block lives on one of them and
 cannot be split, so the question is whether the blocks can be shared out, not
 whether their total is small enough. Delay memory is one pool for the pair.
-TONE_KNOWLEDGE.md records how the limits were found on the unit.
+docs/TONE_KNOWLEDGE.md records how the limits were found on the unit.
 
 Run `python -m tone_lab.budget` with the unit connected to read the table again
 after a firmware update.

@@ -190,7 +190,7 @@ class Studio:
         """Play A and B equally loud, when both have been measured: the louder is turned down to the quieter.
 
         Matched by integrated loudness (ITU-R BS.1770, LUFS), which follows perceived loudness across sounds of
-        different brightness better than a plain level does (TONE_RESEARCH.md, 13); by RMS level only when one of
+        different brightness better than a plain level does (docs/TONE_RESEARCH.md, 13); by RMS level only when one of
         the two was measured before loudness was recorded."""
         from .engine import PREVIEW_DB
 
@@ -276,7 +276,7 @@ class Studio:
         """Once the knobs of a sound have not been turned for a few seconds, the unit is idle and nothing plays,
         listen to the sound as shaped, silently, and compare it with the sound heard without its knobs.
 
-        A knob can do something else on this amp than the table says (amp controls interact: TONE_RESEARCH.md,
+        A knob can do something else on this amp than the table says (amp controls interact: docs/TONE_RESEARCH.md,
         finding 8). One knob that measured the wrong way, or too little, is corrected once; nothing is measured
         again for that correction, so this never loops."""
         if self.shaping is None:

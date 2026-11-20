@@ -5,7 +5,7 @@ model it can load needs, and what each of its processors offers. This writes
 that table where `knowledge.table("costs")` reads it (`costs.json`, beside the
 shared knowledge), with the firmware it was read on, so that `knowledge.stale`
 notices a firmware update. `knowledge.weigh` turns it into whether a chain
-fits; TONE_KNOWLEDGE.md records how the limits per processor were found.
+fits; docs/TONE_KNOWLEDGE.md records how the limits per processor were found.
 
 Carried over from `tone_lab.budget.refresh`. It is an operation run where the
 unit is held: `host.call("lab.tools.budget.measure")`, or

@@ -2,7 +2,7 @@
 
 Each word carries its remedies in the order the community tries them. The first
 one the loaded chain can perform is applied, and the rest stay one step away as
-other ways to get there. TONE_KNOWLEDGE.md gives the reasoning and the sources.
+other ways to get there. docs/TONE_KNOWLEDGE.md gives the reasoning and the sources.
 """
 
 from dataclasses import dataclass

@@ -1,6 +1,6 @@
 """What must hold when the player, the unit or the app does something at an awkward moment.
 
-Each test here answers a finding of the review of 2026-11-19 (CLAUDE_WORK_REVIEW.md).
+Each test here answers a finding of the review of 2026-11-19 (docs/archive/CLAUDE_WORK_REVIEW.md).
 """
 
 from contextlib import contextmanager

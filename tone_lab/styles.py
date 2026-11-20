@@ -9,7 +9,7 @@ AMP, PEDAL, CAPTURE = "Guitar Amplifier", "Guitar Overdrive", "Neural Capture"
 # What a control does, by its name, on any model that has it. A negative sign marks a control
 # that works the other way round: a Vox Tone Cut, a Matchless Cut and a RAT Filter all darken
 # as they rise, and a Tight control removes lows. Depth, Resonance and Deep are the power amp's
-# low-end resonance. TONE_KNOWLEDGE.md records how each name was checked.
+# low-end resonance. docs/TONE_KNOWLEDGE.md records how each name was checked.
 ROLES = {
     (AMP, "treble"): {"TREBLE": 1, "BRILLIANCE": 1, "TONE": 1, "HIGHS": 1},
     (AMP, "presence"): {"PRESENCE": 1, "TONE CUT": -1, "CUT": -1},

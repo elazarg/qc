@@ -142,7 +142,7 @@ class RoundTest(unittest.TestCase):
         self.assertIn("Aiming for: saturated, bright, ambient. A singing fuzz lead.", lines[1])
 
 
-    # ---- The findings of the review of 2026-11-19 (SUGGESTIONS_BRANCH_REVIEW.md) ----
+    # ---- The findings of the review of 2026-11-19 (docs/archive/SUGGESTIONS_BRANCH_REVIEW.md) ----
 
     def test_three_names_over_one_chain_are_one_design(self):
         same = reply()

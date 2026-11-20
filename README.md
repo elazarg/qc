@@ -55,7 +55,7 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m unittest discover -s tests
 ```
 
-Close Cortex Control and any audio program holding the driver before starting. The earlier app (`tone_lab/`, `python -m tone_lab`) is still here, reachable with `--old`; see [what Tone Lab knows about tone](TONE_KNOWLEDGE.md) and [what tone research says](TONE_RESEARCH.md).
+Close Cortex Control and any audio program holding the driver before starting. The earlier app (`tone_lab/`, `python -m tone_lab`) is still here, reachable with `--old`; see [what Tone Lab knows about tone](docs/TONE_KNOWLEDGE.md) and [what tone research says](docs/TONE_RESEARCH.md).
 
 ## Personal data
 

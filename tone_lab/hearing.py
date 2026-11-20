@@ -31,7 +31,7 @@ TAIL = 1.5
 EARLY = (.04, .40)   # Seconds after the phrase stops: a short echo or a small room sounds here.
 LATE = (.40, 1.5)    # A long delay or reverb still sounds here.
 # Where the words change, in the share of the 12 dB step that the chain swallowed. Set from chains measured on
-# the unit: see TONE_KNOWLEDGE.md, "Listening to a draft".
+# the unit: see docs/TONE_KNOWLEDGE.md, "Listening to a draft".
 DRIVE = ((.82, "saturated"), (.62, "overdriven"), (.40, "crunch"), (.18, "edge of breakup"), (0., "clean"))
 PEAKS_INTACT = 15.   # dB of peak over average. Above this the chain is squeezing level, not clipping.
 BRIGHTNESS = ((.45, "bright"), (-.25, "balanced"), (-9., "dark"))  # Octaves against the dry guitar.

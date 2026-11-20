@@ -278,7 +278,7 @@ class SuggestionsTest(unittest.TestCase):
         self.assertIn("could not be listened to",
                       RoundStrip.about(self.found, {**candidate, "served": None, "failed": "silence"}))
 
-    # ---- The findings of the review of 2026-11-19 (SUGGESTIONS_BRANCH_REVIEW.md) ----
+    # ---- The findings of the review of 2026-11-19 (docs/archive/SUGGESTIONS_BRANCH_REVIEW.md) ----
 
     def test_stop_drops_whatever_was_waiting_for_the_unit(self):
         self.arrive()

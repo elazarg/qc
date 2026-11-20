@@ -42,7 +42,7 @@ taken off each harmonic above the first:
 - low_order_db: the 2nd and 3rd together against the tone; high_order_db: the
   5th to 10th together against the tone. The ear hears energy in the high
   orders far more than the same energy in the 2nd and 3rd, which the tone
-  masks (Moore and Tan, JAES 2003/04; Geddes and Lee, AES 2003; TONE_RESEARCH.md
+  masks (Moore and Tan, JAES 2003/04; Geddes and Lee, AES 2003; docs/TONE_RESEARCH.md
   finding 7).
 - weighted_distortion_db: the harmonics weighted by order before they are
   added, sum of P_n * n^2 / 4 over n = 2..10, against the tone. The weighting
@@ -60,7 +60,7 @@ taken off each harmonic above the first:
 
 The centroid and tristimulus 3 follow how harsh a sound is heard, separately
 from how bright it is (Zacharakis, Pastiadis and Reiss, Music Perception 2014
-and 2015; TONE_RESEARCH.md finding 2).
+and 2015; docs/TONE_RESEARCH.md finding 2).
 """
 
 from dataclasses import asdict, dataclass, field

@@ -13,18 +13,18 @@ Brightness and Texture work, its low cut one of the ways Tightness and Body
 work; none of them is a knob of its own.
 
 Brightness (dark to bright) and Texture (round to rough) are the two axes tone
-words collapse onto (TONE_RESEARCH.md, findings 1 and 2); the desk shows them
+words collapse onto (docs/TONE_RESEARCH.md, findings 1 and 2); the desk shows them
 together as one pad. "Warm" sits on the texture axis, not opposite "bright".
 
 A knob's effect cannot be assumed from the table (amp controls interact:
-TONE_RESEARCH.md, finding 8), so `EXPECTED` says what each knob should do to
+docs/TONE_RESEARCH.md, finding 8), so `EXPECTED` says what each knob should do to
 what listening measures, and `check` compares a sound heard with its knobs
 against the same sound heard without them.
 
 A knob's rules name a control by the kind of block and the control's name,
 so one rule reaches every model that has such a control. `ROLES` gathers the
 names that do one job, with a sign for the ones that work the other way
-round (a Vox Tone Cut, a RAT Filter). TONE_KNOWLEDGE.md, "What each control
+round (a Vox Tone Cut, a RAT Filter). docs/TONE_KNOWLEDGE.md, "What each control
 does", records how each was checked.
 
 Beyond the rule table:
@@ -93,7 +93,7 @@ BRIGHTER = [*role(PEDAL, "treble", 2), *role(AMP, "treble", 2), *role(AMP, "pres
 # A cab microphone toward the speaker's edge (POSITION up, measured on the unit) is darker and fuller; nearer the
 # speaker (DISTANCE down) has more low end. Those are means to Brightness, Texture and Body, not knobs.
 MIC_TO_EDGE = [(category, "POSITION", 1.0) for category in CABS]
-# Rough is more energy in the high harmonic orders (TONE_RESEARCH.md, findings 2 and 7): more gain and a more open
+# Rough is more energy in the high harmonic orders (docs/TONE_RESEARCH.md, findings 2 and 7): more gain and a more open
 # top in the drive pedal, more presence, the cab's low-pass opened and the microphones toward the centre. Round is
 # the opposite, the microphones off centre.
 ROUGHER = [*role(PEDAL, "gain", 2.5), *role(PEDAL, "treble", 1.5), *role(AMP, "presence", 1.5)]
@@ -612,7 +612,7 @@ AMOUNTS = {"a touch": .5, "a tad": .5, "a bit": .5, "a little bit": .5, "a littl
            "very": 1.5, "so much": 1.7}
 COMPARATIVES = {
     "brighter": ("brightness", .3), "darker": ("brightness", -.35), "duller": ("brightness", -.3),
-    # Warm is round against rough, not dark against bright (TONE_RESEARCH.md, finding 1).
+    # Warm is round against rough, not dark against bright (docs/TONE_RESEARCH.md, finding 1).
     "warmer": ("texture", -.3), "rounder": ("texture", -.3), "smoother": ("texture", -.3),
     "rougher": ("texture", .3), "harsher": ("texture", .3),
     "tighter": ("tightness", .3), "looser": ("tightness", -.3),

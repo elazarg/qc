@@ -2,7 +2,7 @@
 
 Each word carries its remedies in the order the community tries them. The first
 one the loaded chain can perform is applied, and the rest stay one step away as
-other ways to get there. TONE_KNOWLEDGE.md gives the reasoning and the sources.
+other ways to get there. docs/TONE_KNOWLEDGE.md gives the reasoning and the sources.
 
 A remedy is a set of Shape knob moves (`lab.knobs.KNOBS`). `read` takes a short
 remark such as "the low end gets muddy when I palm mute" or "no fizz";
@@ -116,7 +116,7 @@ LEXICON = {
         away=(r("a brighter tone across the amp, drive and cab microphones", brightness=.3),
               r("more presence", presence=.3)),
         tips={"": "Check the listening level first: quiet monitoring makes any tone sound dull."}),
-    # Warm is round against rough, not dark against bright (TONE_RESEARCH.md, finding 1).
+    # Warm is round against rough, not dark against bright (docs/TONE_RESEARCH.md, finding 1).
     "warm": Word(toward=(
         r("a rounder top: fewer high harmonics, less presence, the cab's low-pass lower", texture=-.3),
         r("a darker top across the amp and drive", brightness=-.2),
