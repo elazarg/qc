@@ -66,6 +66,8 @@ class Rig:
         self.unit.recall(BUILD)
         self.unit.slot = BUILD
         held = self.unit.apply(held_silent(chain), stop=stop, fresh=True)
+        # The directory read at the start may be old: the player may have saved something into the cache's slots.
+        self.slots.refresh()
         target = self.slots.place_for(digest)
         self.slots.claim(target, cache_name(digest))
         held = self.unit.store(target, cache_name(digest))

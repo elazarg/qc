@@ -976,7 +976,13 @@ class Recorder:
                             desk.input_channel, self.guitar, self.stop, self.ready, done=self.recorded)
         elif self.ready.is_set() and not self.stop.is_set():
             self.status.set("Recording · dry + wet")
-        self.bench.window.after(100, self.poll)
+        window = self.bench.window
+        if not getattr(self, "poll_bound", False):
+            # The polling stops with the window, so nothing is called on a window that is gone.
+            self.poll_bound = True
+            window.bind("<Destroy>", lambda event: event.widget is window and getattr(self, "poll_id", None)
+                        and window.after_cancel(self.poll_id), add="+")
+        self.poll_id = window.after(100, self.poll)
 
     @staticmethod
     def capture(channel, guitar, stop, ready):

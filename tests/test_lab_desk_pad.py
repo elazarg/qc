@@ -149,3 +149,37 @@ class QuietDeskTest(unittest.TestCase):
 
     def test_saving_asks_for_the_name_in_place(self):
         self.assertFalse(hasattr(__import__("lab.desk.window", fromlist=["x"]), "simpledialog"))
+
+    def two_sounds(self):
+        from lab.sound.chain import Block, Chain, Row
+        from lab.sound.sounds import Sound
+
+        for side, name, model in (("a", "Plexi", 1081), ("b", "Hiwatt", 1063)):
+            sound = self.studio.store.save(Sound(name, Chain((Row((Block(model),), inlet=1, outlet=19),)),
+                                                 {"kind": "designed"}))
+            self.studio.set(**{side: sound.id})
+
+    def test_the_save_name_stays_hidden_while_comparing_blind(self):
+        self.two_sounds()
+        self.studio.set(blind=True)
+        self.desk.save()
+        self.assertEqual(self.desk.save_name.get(), "")
+        self.studio.set(blind=False)
+        self.desk.save()
+        self.assertEqual(self.desk.save_name.get(), "Hiwatt")
+
+    def test_a_new_take_shows_on_the_phrase_link(self):
+        import json
+
+        import numpy as np
+
+        from lab.hearing.audio import write_wave
+
+        take = self.studio.folder / "phrases" / "new"
+        take.mkdir(parents=True)
+        write_wave(take / "dry.wav", (np.sin(np.arange(48000) / 30) * .2)[:, None])
+        (take / "phrase.json").write_text(json.dumps({"id": "new", "instrument": "Les Paul", "setting": "Bridge",
+                                                      "recorded": "2026-11-20T12:00:00+00:00"}), encoding="utf-8")
+        self.studio.phrase = ("new", np.zeros((48000, 1)))
+        self.studio.set(status="Recorded.")
+        self.assertIn("Bridge", self.desk.phrase_link["text"])

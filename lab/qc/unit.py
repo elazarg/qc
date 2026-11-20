@@ -200,7 +200,10 @@ class Unit:
         for position, op in enumerate(ops):
             if stop is not None and stop.is_set():
                 raise Stopped("Stopped.")
-            if position == 0 or op.kind in ("add", "delete", "scene", "split") or ops[position - 1].kind == "scene":
+            # Checked before every route (a route write on the wrong preset would connect the guitar to it), at
+            # every change of kind, and around scenes and structure.
+            if (position == 0 or op.kind in ("add", "delete", "scene", "split", "route")
+                    or ops[position - 1].kind != op.kind):
                 self.guard()
             self.execute(op)
 

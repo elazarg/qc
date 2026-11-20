@@ -70,6 +70,7 @@ class Studio:
         self.preparing = None             # the round whose next three are being designed
         self.remark = None                # (text, sound id, remedies, the one applied) of the last remark
         self.requests = set()             # the player's requests in flight, each its own cancel signal
+        self.latest = None                # the newest of them
         self.progress = []                # (handler, value) reported by the unit's worker, handled by `poll`
         self.retry_open_at = None         # when to try opening the unit again after it refused
         self.watched_at = 0.              # when the unit was last asked whether the player moved it
@@ -160,7 +161,14 @@ class Studio:
                 sound.knobs = dict(values)
                 self.store.save(sound)
         same_pair = (before.a, before.b) == (self.state.a, self.state.b)
-        self.set(a=before.a, b=before.b, side=before.side, round=before.round, scene=before.scene,
+        # What is heard stays as it is: the same side, playing or not. Only when that side would be left empty does
+        # the selection move; with nothing left on either side, nothing plays.
+        side = self.state.side
+        if getattr(before, side) is None:
+            side = "a" if side == "b" else "b"
+        if before.a is None and before.b is None:
+            self.stop()
+        self.set(a=before.a, b=before.b, side=side, round=before.round, scene=before.scene,
                  blind=False, revision=self.state.revision + (0 if same_pair else 1), status="Undone.")
         if same_pair and self.state.shown:
             for side in ("a", "b"):
@@ -349,6 +357,10 @@ class Studio:
         heard = sound.heard
         if not heard or heard.get("phrase") != self.phrase_key() or heard.get("digest") != sound.chain.digest():
             return None
+        # Listening recalls the sound, which starts at its first scene: what was measured holds for that scene, or
+        # for any when the scenes do not differ.
+        if sound.chain.scenes_in_use() > 1 and self.state.scene != heard.get("scene", 0):
+            return None
         if not sound.knobs:
             return heard
         shaped = heard.get("shaped") or {}
@@ -389,6 +401,7 @@ class Studio:
 
         signal = Event()
         self.requests.add(signal)
+        self.latest = signal            # the player's newest request: only its answer goes on show
         return signal
 
     def select(self, side):
@@ -453,36 +466,50 @@ class Studio:
             return
         if not sound.knobs:
             return
-        phrase_id = self.phrase_key()
+        # The take, the part of it, the scene and the chain are fixed for the whole check: both measurements are
+        # made on them, and a correction is made only while they are still what is on show.
+        inputs = (self.phrase_key(), self.phrase[1], self.state.scene, sound.chain.digest())
+        phrase_id = inputs[0]
         if sound.heard and "probe" in sound.heard and sound.heard.get("phrase") == phrase_id \
                 and sound.heard.get("digest") == sound.chain.digest():
-            self._hear_shaped(sound, turned)
+            self._hear_shaped(sound, turned, inputs)
             return
         # The sound without its knobs has not been heard on this phrase: that first.
         self.set(working=f"Listening to {sound.name} without its Shape knobs, silently…")
 
         def heard(result):
             fresh = self.store.sound(sound_id)
-            fresh.heard = {"phrase": phrase_id, "digest": fresh.chain.digest(), **result.to_record()}
+            fresh.heard = {"phrase": phrase_id, "digest": inputs[3], "scene": 0, **result.to_record()}
             self.store.save(fresh)
             self.set(working="")
-            self._hear_shaped(fresh, turned)
+            if self._current(inputs):
+                self._hear_shaped(fresh, turned, inputs)
+            elif not self.state.mode:
+                self._show()
 
-        self.later(self.host.call("hear", sound.chain, self.phrase[1]), heard, self._shaping_failed)
+        self.later(self.host.call("hear", sound.chain, inputs[1]), heard, self._shaping_failed)
+
+    def _current(self, inputs):
+        """Whether the take, part, scene and chain a check was started on are still what is on show."""
+        key, _, scene, digest = inputs
+        return (self.phrase_key() == key and self.state.scene == scene
+                and any(sound is not None and sound.chain.digest() == digest
+                        for sound in (self.sound("a"), self.sound("b"))))
 
     def _shaping_failed(self, error):
         self.set(working="", status=f"Could not listen to the shaped sound: {error}")
         if not self.state.mode:
             self._show()
 
-    def _hear_shaped(self, sound, turned):
-        sound_id, values, phrase_id = sound.id, dict(sound.knobs), self.phrase_key()
+    def _hear_shaped(self, sound, turned, inputs):
+        sound_id, values, phrase_id = sound.id, dict(sound.knobs), inputs[0]
         self.set(working=f"Listening to {sound.name} as shaped, silently…")
 
         def heard(result):
             fresh = self.store.sound(sound_id)
             self.set(working="")
-            if fresh.knobs != values or not fresh.heard:
+            if fresh.knobs != values or not fresh.heard or fresh.heard.get("phrase") != phrase_id \
+                    or not self._current(inputs):
                 # Turned again meanwhile: that turn is checked in its turn.
                 if not self.state.mode:
                     self._show()
@@ -505,7 +532,7 @@ class Studio:
                         self.later(self.host.call("turn", side, fresh.knobs), lambda moves: None)
             self.say(_checked_words(found, turned, correction))
 
-        self.later(self.host.call("hear_shaped", sound.chain, values, self.phrase[1]), heard, self._shaping_failed)
+        self.later(self.host.call("hear_shaped", sound.chain, values, inputs[1]), heard, self._shaping_failed)
 
     def base(self):
         """Hear the sound on show without its Shape knobs, or with them again (the 0 key)."""
@@ -718,10 +745,10 @@ class Studio:
         """Three designs for `text`. `after` is the round these follow, whose designs and what was heard of them
         (`earlier`) inform these."""
         quietly = by == "app"
+        stop = self._request() if not quietly else None
         if not quietly:
             self.set(working="Designing three ways to get there. About a minute…")
         instrument = self._instrument()
-        stop = self._request() if not quietly else None
         future = self.thinking.submit(design.round_of_three, self.assistant, text, instrument, earlier=earlier, by=by,
                                       cancel=stop, assets_known=self._assets(), guitar=self._guitar(),
                                       setting=self._setting(), listening=None if quietly else self._listening())
@@ -755,6 +782,11 @@ class Studio:
                     self._save_round(earlier_round)
             if quietly:
                 self.say("Three more designs are ready, informed by what was heard: press N.")
+                return
+            if stop is not self.latest:
+                # A newer request is on its way or already answered: this one is kept, not put on show.
+                self.say(f"The designs for an earlier request ({text[:40]}) are in History; the latest request's "
+                         "are the ones shown.")
                 return
             self.set(working="", round=record["id"])
             if self.state.revision == revision:
@@ -840,11 +872,13 @@ class Studio:
         word = word.strip()[:24]
         if not word:
             return
-        if word in sound.marks:
+        blind_choice = self.state.blind and word in ("keeper", "not this")
+        if word in sound.marks and not blind_choice:
             sound.marks.remove(word)
         else:
+            # A choice made blind is a choice even when that sound already had the mark: it is kept, and counted.
             opposite = {"keeper": "not this", "not this": "keeper"}.get(word)
-            sound.marks = [item for item in sound.marks if item != opposite] + [word]
+            sound.marks = [item for item in sound.marks if item not in (opposite, word)] + [word]
             self._choice(sound, word)
         self.store.save(sound)
         if self.state.blind and word in ("keeper", "not this"):
@@ -947,8 +981,8 @@ class Studio:
         self.set(blind=True, status="Names hidden. Play A and B, then press X to see which was which.")
 
     def revise(self, sound, text):
-        self.set(working=f"Revising {sound.name}…")
         stop = self._request()
+        self.set(working=f"Revising {sound.name}…")
         future = self.thinking.submit(design.revise, self.assistant, sound, text, self._instrument(), cancel=stop,
                                       assets_known=self._assets(), guitar=self._guitar(), setting=self._setting())
         revision = self.state.revision
@@ -960,7 +994,10 @@ class Studio:
             self.set(working="")
             result.notes.append({"at": _now(), "text": text})
             self.store.save(result)
-            if self.state.revision == revision:
+            if stop is not self.latest:
+                self.say(f"The revision for an earlier request ({text[:40]}) is in History; the latest request's "
+                         "answer is the one shown.")
+            elif self.state.revision == revision:
                 self.put("b", result)
                 self.say(f"{result.name}, revised: {text}")
             else:
@@ -1004,7 +1041,7 @@ class Studio:
 
                 def heard(result, sound_id=sound.id, key=key, digest=sound.chain.digest()):
                     fresh = self.store.sound(sound_id)        # knobs or marks may have changed meanwhile
-                    fresh.heard = {"phrase": key, "digest": digest, **result.to_record()}
+                    fresh.heard = {"phrase": key, "digest": digest, "scene": 0, **result.to_record()}
                     if result.level_db is not None and result.level_db > -90:
                         fresh.tags = [tag for tag in fresh.tags if not tag.startswith("heard:")] + [
                             f"heard: {result.said()}"]
@@ -1112,7 +1149,7 @@ class Studio:
         def failed(error):
             self.set(working="", status=f"Recording: {error}")
 
-        self.later(self.host.call("record", seconds, side,
+        self.later(self.host.call("record", seconds, side, dict(heard_through.knobs) if heard_through else None,
                                   progress=lambda value: self.progress.append((opened, value))), recorded, failed)
 
     def recorded_phrases(self):

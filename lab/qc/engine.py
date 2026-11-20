@@ -64,10 +64,13 @@ class Engine:
         self.sides = {"a": None, "b": None}     # the chains being compared, without knob moves
         self.knobs = {"a": {}, "b": {}}         # stored values each side's knobs have changed: {(row, col, index): value}
         self.bases = {"a": None, "b": None}     # each side as the unit holds it, every value stated, from row 0
+        # What each side is played at, in dB against the sound's own output gain (a preset's authored levels
+        # are kept; matching and listening move them together).
         self.levels = {"a": PREVIEW_DB, "b": PREVIEW_DB}
         self.shown = None                       # what is on the unit now: ("pair", chain) or ("single", side, chain)
         self.active, self.mode, self.loop = "a", None, None
         self.loop_phrase = None                 # the audio the loop is playing
+        self.connected = False                  # an input was connected by something other than play
         self.borrowed = None
         self.offset = None
         self.asked, self.listening = {}, None      # see `level`
@@ -111,6 +114,19 @@ class Engine:
         self.shown = ("recall", None, None)
         return "recall"
 
+    def _own_db(self, side, row):
+        """A row's own output gain in the sound as the unit holds it, in dB (0 when the sound leaves it unset)."""
+        base = self.bases.get(side)
+        if base is None or row >= len(base.rows):
+            return 0.
+        value = dict(base.rows[row].output).get(VOLUME)
+        return leveling.db_of(value) if isinstance(value, (int, float)) else 0.
+
+    def _on_shown(self):
+        """Whether the unit is on the slot A and B were made ready on."""
+        return (self.shown is not None and self.shown[1] is not None
+                and same_slot(self.unit.position(), self.shown[1]))
+
     def _first_row(self, side):
         return 0 if side == "a" or self.shown[0] != "pair" else 2
 
@@ -122,6 +138,8 @@ class Engine:
 
     def play(self, side, mode, phrase=None):
         """Hear one side: from the guitar (`mode` "guitar") or from the recorded phrase ("phrase")."""
+        if self.shown is not None and self.shown[0] == "pair" and not self._on_shown():
+            self.shown = None           # the unit is elsewhere: the prepared A/B rows are not there to route
         if self.shown is None:
             if not any(self.sides.values()):
                 raise RuntimeError("Nothing is ready to play.")
@@ -133,9 +151,9 @@ class Engine:
         if self.shown[0] == "recall":
             # One sound on its own preset, played with its own routing: a preset spread over several rows whole.
             wanted = held.with_routes(routed(self.sides[side], port, MULTI_OUT).routes)
-            level = leveling.norm_of(self.levels[side])
             for r, row in enumerate(wanted.rows):
                 if row.outlet not in (0, 16, 17, 18):
+                    level = leveling.norm_of(self._own_db(side, r) + self.levels[side])
                     wanted = wanted.with_row(r, replace(row, output=tuple({**dict(row.output), VOLUME: level,
                                                                            MUTE: 0.}.items())))
             self.unit.apply(wanted)
@@ -151,7 +169,6 @@ class Engine:
             # not heard has no input and its outputs muted.
             first = self._first_row(name)
             on = name == side
-            level = leveling.norm_of(self.levels[name])
             routes = routed(self.sides[name], port if on else 0, MULTI_OUT).routes
             for offset in (0, 1):
                 inlet, outlet = routes[offset] if offset < len(routes) else (0, 0)
@@ -160,6 +177,7 @@ class Engine:
                 row = wanted.rows[first + offset]
                 output = dict(row.output)
                 if outlet not in INTERNAL:
+                    level = leveling.norm_of(self._own_db(name, offset) + self.levels[name])
                     output.update({VOLUME: level, MUTE: 0. if on else 1.})
                 wanted = wanted.with_row(first + offset, replace(row, inlet=inlet, outlet=outlet,
                                                                  output=tuple(output.items())))
@@ -181,6 +199,7 @@ class Engine:
 
                 if self.loop is not None:
                     self.loop.stop()
+                self.loop = self.loop_phrase = None       # nothing cached if the new one fails to start
                 self.loop = Loop(self.audio, phrase).start()
                 self.loop_phrase = phrase
         if mode != "phrase" and self.loop is not None:
@@ -227,10 +246,12 @@ class Engine:
         if self.loop is not None:
             self.loop.stop()
             self.loop = self.loop_phrase = None
-        if self.shown is not None and self.mode is not None and self.slots.ours(self.unit.position()):
+        if (self.mode is not None or self.connected) and self.slots.ours(self.unit.position()):
             held = self.unit.read()
-            self.unit.apply(held.with_routes([(0, row.outlet) for row in held.rows]))
-        self.mode = None
+            if any(row.inlet not in INTERNAL for row in held.rows):
+                self.unit.apply(held.with_routes([(0 if row.inlet not in INTERNAL else row.inlet, row.outlet)
+                                                  for row in held.rows]))
+        self.mode, self.connected = None, False
 
     # ---- shaping ----
 
@@ -289,18 +310,17 @@ class Engine:
 
     def measure_round_trip(self):
         self.quiet()
-        self.offset = calibrate(self.rig, self.audio, self.slots.folder)
         self.shown = None
+        self.offset = calibrate(self.rig, self.audio, self.slots.folder)
         return self.offset
 
     def hear(self, chain, dry, *, stop=None):
         """What `chain` does to the phrase, measured silently. Whatever was playing stops."""
         self.quiet()
+        self.shown = None               # the unit is borrowed: A and B must be made ready again, also after a failure
         if self.offset is None:
             self.measure_round_trip()
-        found = listen(self.rig, self.audio, chain, dry, self.offset, stop=stop)
-        self.shown = None
-        return found
+        return listen(self.rig, self.audio, chain, dry, self.offset, stop=stop)
 
     def hear_shaped(self, chain, knobs, dry, *, stop=None):
         """What `chain` with its Shape knobs at `knobs` does to the phrase, measured silently, as `hear` does.
@@ -310,22 +330,21 @@ class Engine:
         from lab.sound.knobs import apply as with_knobs
 
         self.quiet()
+        self.shown = None
         if self.offset is None:
             self.measure_round_trip()
         slot, held = self.rig.ready(chain, stop=stop)
         shaped = with_knobs(held, knobs) if knobs else held
-        found = listen(self.rig, self.audio, shaped, dry, self.offset, stop=stop)
-        self.shown = None
-        return found
+        return listen(self.rig, self.audio, shaped, dry, self.offset, stop=stop)
 
     def read(self, slot):
         """The chain and name of a preset saved on the unit."""
         self.quiet()
         self.slots.may_leave()
+        self.shown = None
         self.unit.slot = None
         held = self.unit.recall(slot)
         name = self.unit.name()
-        self.shown = None
         self.visited = slot                 # the app moved the unit here, so it may move it back on close
         return held, name
 
@@ -336,6 +355,7 @@ class Engine:
         built, where every value is stated: a design leaves most values to the unit, and a knob can only move
         a value that is there."""
         self.quiet()
+        self.shown = None
         target = self.slots.free_for_saving()
         # Its own routing, from the guitar input to the unit's outputs: a preset spread over several rows whole.
         playable = chain.with_routes(routed(chain, self.physical_input, MULTI_OUT).routes)
@@ -352,26 +372,36 @@ class Engine:
             playable = replace(playable, rows=(replace(playable.rows[0], output=tuple(
                 {**dict(playable.rows[0].output), VOLUME: leveling.norm_of(0.), MUTE: 0.}.items())),)
                                + playable.rows[1:])
-        self.unit.apply(playable)          # then connected as it will be played
-        # Building took a while: the slot must still be empty (or the app's own) just before writing it.
+        # Building took a while: the slot must still be empty (or the app's own) before anything is connected.
         self.slots.refresh()
         self.slots.claim(target, name)
-        stored = self.unit.store(target, name)
-        self.shown = None
+        self.connected = True
+        try:
+            self.unit.apply(playable)          # connected as it will be played, and stored so
+            stored = self.unit.store(target, name)
+        except Exception:
+            self.quiet()
+            raise
+        # Saved as it will be played, from the guitar input. Left as saved: disconnecting it now would be an edit to
+        # the preset just written. The desk makes A and B ready again at once.
+        self.connected = False
         return target, stored
 
-    def record(self, seconds, side=None, *, stop=None, progress=None):
+    def record(self, seconds, side=None, knobs=None, *, stop=None, progress=None):
         """Record the guitar: its dry input, as it reaches the unit before any processing, and the processed stereo
         return. With `side`, the player hears (and the wet take holds) that side's sound while playing. Returns
         the audio as (dry, wet left, wet right) columns. `progress("open")` says when the input is open."""
-        self.quiet()
-        if side is not None and self.sides.get(side) is not None:
-            self.play(side, "guitar")
         from lab.qc.device import recording_channels
 
-        # Which USB channels carry the dry input depends on the unit's USB Dry/Wet setting.
+        self.quiet()
+        # Which USB channels carry the dry input depends on the unit's USB Dry/Wet setting: read before anything
+        # is connected.
         channels = list(recording_channels(self.unit.device, self.physical_input))
         try:
+            if side is not None and self.sides.get(side) is not None:
+                self.play(side, "guitar")
+                if knobs:
+                    self.turn(side, knobs)       # the wet take is the sound as shaped, as it is named
             return self.audio.record(seconds, channels, cancel=stop,
                                      started=(lambda: progress("open")) if progress else None)
         finally:

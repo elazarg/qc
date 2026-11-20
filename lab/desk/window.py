@@ -103,6 +103,9 @@ class Desk:
         self.build()
         studio.listeners.append(lambda state: self.draw())
         root.protocol("WM_DELETE_WINDOW", self.close)
+        # The clock stops with the window, so nothing is called on a window that is gone.
+        root.bind("<Destroy>", lambda event: event.widget is root and getattr(self, "clock", None)
+                  and root.after_cancel(self.clock), add="+")
         session = studio.restore() or {}
         recorded = studio.recorded_phrases()
         kept = session.get("phrase") or {}
@@ -257,6 +260,12 @@ class Desk:
         self.guitar.configure(bg=mix(LIVE, TILE, .4) if state.mode == "guitar" else TILE)
         self.loop.configure(bg=mix(LIVE, TILE, .4) if state.mode == "phrase" else TILE)
         self.blind_link.configure(text="Show which was which" if state.blind else "Compare blind")
+        phrase_id = self.studio.phrase[0] if self.studio.phrase else None
+        if phrase_id != getattr(self, "phrase_shown", None):
+            self.phrase_shown = phrase_id
+            item = next((item for item in self.studio.recorded_phrases() if item["id"] == phrase_id), None)
+            self.phrase_link.configure(text=f"Phrase · {item.get('instrument', '')} · {item['setting']}" if item
+                                       else ("Phrase" if phrase_id else "No phrase"))
         self.draw_strip()
         self.draw_scenes()
         if self.panel and self.drawn_from() != self.panel_key:
@@ -271,7 +280,7 @@ class Desk:
             sides.append(None if sound is None else (sound.id, json.dumps(sound.heard, sort_keys=True, default=str),
                                                      json.dumps(sound.knobs, sort_keys=True), tuple(sound.marks)))
         return (self.panel, state.side, state.round, state.blind, state.scene, state.song, state.instrument,
-                tuple(sides), self.show_nano, tuple(sorted(self.expanded)))
+                tuple(sides), self.show_nano, tuple(sorted(self.expanded)), self.studio.phrase_key())
 
     def caption(self, sound):
         if sound is None:
@@ -745,7 +754,8 @@ class Desk:
         # The name is for this sound with these knobs, whatever is selected by the time it is confirmed.
         self.save_target = (sound.id, dict(sound.knobs))
         self.save_name.delete(0, "end")
-        self.save_name.insert(0, sound.name[:24])
+        if not self.studio.state.blind:     # filled in with the name only when it is not hidden
+            self.save_name.insert(0, sound.name[:24])
         self.save_row.pack(fill="x", pady=(8, 0), after=self.save_row_after)
         self.save_name.focus_set()
 
@@ -873,7 +883,7 @@ class Desk:
             self.seat_tick()
             self.come_forward()
         finally:
-            self.root.after(80, self.tick)
+            self.clock = self.root.after(80, self.tick)
 
     def answer_second_launch(self):
         import socket

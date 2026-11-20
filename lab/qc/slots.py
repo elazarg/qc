@@ -181,12 +181,19 @@ class Slots:
             return True
         return bool(self.tone_lab and slot and slot.get("folder_key") == self.tone_lab)
 
+    def scratch(self, slot):
+        """The build slot or a cache slot: the app's working slots, never a preset anybody saved."""
+        return same_slot(slot, BUILD) or bool(self.tone_lab and slot and slot.get("folder_key") == self.tone_lab
+                                              and slot.get("position") in CACHE_SLOTS)
+
     def give_back(self, record, also=None):
-        """Select the player's preset and scene again, if the unit is still on one of the app's slots, or on
-        `also`, a preset of the player's the app itself moved to (to read it). A preset the player chose on the
-        unit meanwhile is left alone."""
+        """Select the player's preset and scene again, if the unit is still where the app left it: a working
+        slot, the exact slot the app last put up (unless the player has edited it since), or `also`, a preset of
+        the player's the app itself moved to (to read it). A preset the player chose on the unit meanwhile is left
+        alone, saved Tone Lab presets included."""
         position = self.unit.position()
-        if self.ours(position) or (also is not None and same_slot(position, also)):
+        left_here = same_slot(position, self.unit.slot) and self.unit.dirty() is False
+        if self.scratch(position) or left_here or (also is not None and same_slot(position, also)):
             self.unit.slot = None
             self.unit.recall(record["position"])
             if self.unit.scene() != record["scene"]:

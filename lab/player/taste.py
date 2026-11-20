@@ -190,15 +190,16 @@ def comparisons(folder, sounds=None):
     by_id = {sound.id: sound for sound in sounds}
     pairs = {}
 
-    def add(kept, over, how, weight, decision):
+    def add(kept, over, how, weight, decision, context=None):
         if kept == over:
             return
         key = (kept, over)
         if key not in pairs or pairs[key]["weight"] < weight:
-            pairs[key] = {"kept": kept, "over": over, "how": how, "weight": weight, "decision": decision}
+            pairs[key] = {"kept": kept, "over": over, "how": how, "weight": weight, "decision": decision,
+                          **({"context": context} if context else {})}
 
     for number, entry in enumerate(choices(folder)):
-        add(entry["kept"], entry["over"], entry.get("how", "a/b"), 1., f"choice {number}")
+        add(entry["kept"], entry["over"], entry.get("how", "a/b"), 1., f"choice {number}", entry.get("context"))
 
     requests, in_rounds = {}, set()
     for record in _rounds(folder):
@@ -238,8 +239,34 @@ def evidence(folder, sounds=None):
         from lab.sound.sounds import Store
 
         sounds = Store(folder).sounds()
+    by_id = {sound.id: sound for sound in sounds}
     rows = {sound.id: features(sound.heard) for sound in sounds}
-    return comparisons(folder, sounds), {key: value for key, value in rows.items() if value}
+    pairs = []
+    for pair in comparisons(folder, sounds):
+        context = pair.get("context")
+        if context:
+            # An audition with its own context: each sound as it was heard then, or the pair is left out.
+            pair = dict(pair)
+            for side in ("kept", "over"):
+                pair[side] = _as_auditioned(by_id.get(pair[side]), pair[side], context, rows)
+        pairs.append(pair)
+    return pairs, {key: value for key, value in rows.items() if value}
+
+
+def _as_auditioned(sound, sound_id, context, rows):
+    """The feature row of a sound as it was auditioned: with the knobs it had, on the take it was played on.
+    Returns the key of that row (added to `rows`), or a key with no row when it was not measured so."""
+    missing = f"{sound_id}|unmeasured"
+    if sound is None or not sound.heard:
+        return missing
+    knobs = (context.get("knobs") or {}).get(sound_id) or {}
+    phrase = context.get("phrase")
+    record = sound.heard if not knobs else sound.heard.get("shaped")
+    if not record or (knobs and record.get("knobs") != knobs) or (phrase and record.get("phrase") != phrase):
+        return missing
+    key = f"{sound_id}|{json.dumps(knobs, sort_keys=True)}|{phrase}"
+    rows[key] = features(record if not knobs else {**record, "probe": record.get("probe")})
+    return key
 
 
 # ---- The model ----
