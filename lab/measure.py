@@ -28,10 +28,12 @@ Also from the phrase:
   "6-12 kHz". Brightness is measured from band energy, never from the spectral
   centre alone, which mis-ranks distorted guitar (TONE_RESEARCH.md finding 3).
 
-Texture (round, even, edged, rough) is an inference, a word from two of the
-probe's measurements: tristimulus 3 and the order-weighted distortion
-(`lab.probe` defines both). Its thresholds are provisional until a ladder of
-chains is measured on the unit.
+Texture (round, warm, even, edged, rough) is an inference, a word from the
+probe's harmonics: how much there is (order-weighted distortion), and the
+balance between high orders (5th-10th) and low orders (2nd-3rd), with
+tristimulus 3 for hard clipping. Its thresholds were set from a ladder of
+sixteen chains measured on the unit (research/measurements/distortion-ladder.md);
+more chains and other phrases would make them firmer.
 
 `match` plans one common loudness for several sounds, only ever cutting
 unless a lift was asked for, and never past a peak ceiling.
@@ -75,19 +77,39 @@ def distortion_word(distortion_db, soft_db):
 # order-weighted distortion (Shorter's n^2/4). PROVISIONAL: set from synthetic chains only (tanh and hard clipping
 # of a pure tone; a square wave reads tristimulus 3 = 0.06 and weighted 0 dB), not yet calibrated on the unit.
 # Calibrate with a ladder of chains measured there, as research/measurements/distortion-ladder.md did for distortion.
-ROUND_WEIGHTED_BELOW = -30.                       # PROVISIONAL: weighted distortion below this is round
-EDGED_TRISTIMULUS3, EDGED_WEIGHTED = .005, -12.   # PROVISIONAL: either at or above this is edged
-ROUGH_TRISTIMULUS3, ROUGH_WEIGHTED = .03, -4.     # PROVISIONAL: either at or above this is rough
-TEXTURE = ("round", "even", "edged", "rough")
+# Texture, from the harmonic spread of the test tone. Set from the ladder measured on the unit on 2026-11-20
+# (research/measurements/distortion-ladder.md): driven amps through a cab put 0.3 to 0.7 % of the power in the 5th
+# to 10th harmonics, far from hard clipping, so the share alone does not tell them apart; the balance between high
+# orders (5th-10th) and low orders (2nd-3rd) does, from -6 dB (a Plexi at gain 2 or 5) to +4 dB (a Soldano lead).
+ROUND_WEIGHTED_BELOW = -30.     # so few harmonics, weighted by order, that the tone stays round
+WARM_BALANCE_BELOW = -3.        # low orders clearly stronger than high ones
+EVEN_BALANCE_BELOW = 1.5        # about level
+EDGED_BALANCE_BELOW = 4.        # high orders somewhat stronger; above this, rough
+ROUGH_TRISTIMULUS3 = .03        # a share of high orders only hard clipping reaches: rough whatever the balance
+TEXTURE = ("round", "warm", "even", "edged", "rough")
 
 
-def texture_word(tristimulus3, weighted_distortion_db):
-    """An inference from two measurements: how rough the harmonics make the sound, round to rough."""
-    if tristimulus3 >= ROUGH_TRISTIMULUS3 or weighted_distortion_db >= ROUGH_WEIGHTED:
+def texture_word(tristimulus3, weighted_distortion_db, low_order_db=None, high_order_db=None):
+    """An inference from measurements of the harmonics: round (few), warm (low orders lead), even, edged, rough
+    (high orders lead). Without the order levels (records from before they were measured), only round and rough
+    can be told."""
+    if tristimulus3 >= ROUGH_TRISTIMULUS3:
         return "rough"
-    if tristimulus3 >= EDGED_TRISTIMULUS3 or weighted_distortion_db >= EDGED_WEIGHTED:
-        return "edged"
-    return "round" if weighted_distortion_db < ROUND_WEIGHTED_BELOW else "even"
+    if weighted_distortion_db < ROUND_WEIGHTED_BELOW:
+        return "round"
+    if low_order_db is None or high_order_db is None:
+        return "even"
+    balance = high_order_db - low_order_db
+    if balance < WARM_BALANCE_BELOW:
+        return "warm"
+    if balance < EVEN_BALANCE_BELOW:
+        return "even"
+    return "edged" if balance < EDGED_BALANCE_BELOW else "rough"
+
+
+def texture_of(probe):
+    return texture_word(probe["tristimulus3"], probe["weighted_distortion_db"], probe.get("low_order_db"),
+                        probe.get("high_order_db"))
 
 
 # Attack: from the running peak of the waveform (PEAK_WINDOW_S covers a period of the lowest guitar note, so a held
@@ -212,7 +234,7 @@ class Heard:
         the spread was measured."""
         if not self.probe or "tristimulus3" not in self.probe:
             return None
-        return texture_word(self.probe["tristimulus3"], self.probe["weighted_distortion_db"])
+        return texture_of(self.probe)
 
     @property
     def compressed(self):
@@ -261,10 +283,10 @@ def measured_lines(record):
         if "low_order_db" in probe:
             lines.append(f"Harmonic orders: low 2nd-3rd {probe['low_order_db']:.0f} dB, high 5th-10th "
                          f"{probe['high_order_db']:.0f} dB against the tone.")
-            word = record.get("texture") or texture_word(probe["tristimulus3"], probe["weighted_distortion_db"])
+            word = record.get("texture") or texture_of(probe)
             lines.append(f"Harmonic spread: weighted by order (n²/4) {probe['weighted_distortion_db']:.0f} dB "
                          f"against the tone, {100 * probe['tristimulus3']:.1f}% of the power in the 5th-10th, "
-                         f"centre at harmonic {probe['harmonic_centroid']:.2f}: texture {word} (a provisional word).")
+                         f"centre at harmonic {probe['harmonic_centroid']:.2f}: texture {word}.")
             lines.append(f"Harmonics against noise: {probe['hnr_db']:.0f} dB.")
         lines.append(f"Intermodulation (two notes together): {-probe['intermod_db']:.0f} dB below the notes.")
     lines.append(f"Compression: of a 12 dB drop in your playing, {12 * (1 - record['compression']):.0f} dB comes back: "

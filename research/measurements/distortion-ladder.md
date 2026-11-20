@@ -55,3 +55,38 @@ What each column measures:
 
 The rule is an interpretation of measured values, fitted to sixteen chains and one player's level. More chains,
 and the same ladder at each pickup setting, would make it firmer.
+
+## Texture, measured on the same ladder
+
+Measured again on 2026-11-20 with the harmonic orders (`lab/probe.py`): low orders are the 2nd and 3rd harmonics
+against the tone, high orders the 5th to 10th, weighted is Shorter's n²/4 weighting, T3 the share of the power
+in the 5th to 10th.
+
+| Chain | low | high | high − low | weighted | T3 | texture |
+|---|---|---|---|---|---|---|
+| US TWN Vibrato | −45.4 | −70.0 | | −42.5 | 0.0000 | round |
+| US DLX Vibrato | −42.8 | −48.9 | −6.1 | −37.6 | 0.0000 | round |
+| Brit Plexi 50, GAIN 2 | −30.6 | −36.9 | −6.3 | −23.9 | 0.0002 | warm |
+| Brit Plexi 50, GAIN 5 | −20.4 | −25.2 | −4.8 | −11.8 | 0.0030 | warm |
+| Brit Plexi 50, GAIN 8 | −21.2 | −22.1 | −0.9 | −9.2 | 0.0061 | even |
+| Brit Plexi 50, GAIN 10 | −21.8 | −21.4 | +0.4 | −8.8 | 0.0071 | even |
+| CA Duo Ch3 Modern | −25.4 | −22.5 | +2.9 | −9.6 | 0.0056 | edged |
+| Solo 100 Lead | −25.6 | −21.4 | +4.2 | −9.6 | 0.0072 | rough |
+| Green 808 into US TWN | −33.0 | −32.9 | +0.1 | −21.4 | 0.0005 | even |
+| Facial Fuzz into Plexi | −22.9 | −22.9 | 0.0 | −10.9 | 0.0050 | even |
+| Compressors, reverb, delay, chorus, tremolo alone | ≤ −54 | ≤ −64 | | ≤ −49 | 0 | round |
+
+Real amps through a cab never approach hard clipping's share of high orders (0.06): the share alone cannot tell
+them apart. The balance between high and low orders does, from −6 dB (a Plexi at low gain) to +4 dB (a Soldano
+lead), which is the research's texture axis (TONE_RESEARCH.md, findings 2 and 7). The words:
+
+| Word | Rule |
+|---|---|
+| round | order-weighted distortion below −30 dB |
+| warm | high − low below −3 dB |
+| even | −3 to +1.5 dB |
+| edged | +1.5 to +4 dB |
+| rough | +4 dB or more, or T3 at least 0.03 (hard clipping) |
+
+Attack times on the same ladder were unreliable on driven sounds (a sustaining amp reaches its peak late, so the
+10-90 % rise reads long: 168 ms on the Duo); they are shown but not yet used for words.

@@ -159,14 +159,20 @@ class AttackAndBandsTest(unittest.TestCase):
 
 
 class TextureTest(unittest.TestCase):
-    """Round to rough from the probe's harmonic spread: an inference, with provisional thresholds."""
+    """Round to rough from the probe's harmonic spread: an inference, calibrated on the unit's ladder."""
 
     def test_texture_follows_how_far_the_harmonics_spread(self):
         tones = probe.test_signal(.25)[:, 0].astype(np.float64)
-        chains = (lambda s: s, lambda s: np.tanh(4 * s), lambda s: np.tanh(10 * s), lambda s: np.clip(30 * s, -.5, .5))
+        # Synthetic: a pure tone, soft clipping (mostly the 3rd harmonic) and hard clipping.
+        chains = (lambda s: s, lambda s: np.tanh(4 * s), lambda s: np.clip(30 * s, -.5, .5))
         words = [measure.heard(*through(lambda sound: sound, note()),
                                probe=probe.analyse(chain(tones)[:, None]).to_record()).texture for chain in chains]
-        self.assertEqual(words, list(measure.TEXTURE))
+        self.assertEqual(words, ["round", "warm", "rough"])
+        # Measured on the unit (tristimulus 3, order-weighted, low orders, high orders): Twin, Plexi at gain 5,
+        # Plexi at gain 10, CA Duo Ch3 Modern, Solo 100 Lead.
+        ladder = [(0, -42.5, -45.4, -70.), (.003, -11.8, -20.4, -25.2), (.0071, -8.8, -21.8, -21.4),
+                  (.0056, -9.6, -25.4, -22.5), (.0072, -9.6, -25.6, -21.4)]
+        self.assertEqual([measure.texture_word(*values) for values in ladder], list(measure.TEXTURE))
         self.assertEqual(measure.WORDS["texture"], measure.TEXTURE)
 
     def test_no_probe_or_an_old_probe_gives_no_texture(self):
@@ -196,7 +202,7 @@ class TextureTest(unittest.TestCase):
         orders = next(line for line in lines if line.startswith("Harmonic orders:"))
         self.assertIn("low 2nd-3rd", orders)
         self.assertIn("high 5th-10th", orders)
-        self.assertTrue(any("texture edged" in line for line in lines))
+        self.assertTrue(any("texture warm" in line for line in lines))
 
 
 class MatchTest(unittest.TestCase):
