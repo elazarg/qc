@@ -63,6 +63,8 @@ class Engine:
         self.physical_input = physical_input
         self.sides = {"a": None, "b": None}     # the chains being compared, without knob moves
         self.knobs = {"a": {}, "b": {}}         # stored values each side's knobs have changed: {(row, col, index): value}
+        self.wanted = {"a": None, "b": None}    # each side's knob positions as last asked: (values, scene)
+        self.on_unit = None                     # comparing by recall: the side whose preset the unit holds
         self.bases = {"a": None, "b": None}     # each side as the unit holds it, every value stated, from row 0
         # What each side is played at, in dB against the sound's own output gain (a preset's authored levels
         # are kept; matching and listening move them together).
@@ -97,8 +99,12 @@ class Engine:
     def show(self, a, b, *, stop=None):
         """Make A and B ready to play. Returns how they are compared: "pair" or "recall"."""
         self.quiet()
+        for side, chain in (("a", a), ("b", b)):
+            if chain != self.sides[side]:
+                self.wanted[side] = None        # another sound: its knobs are asked for again
         self.sides = {"a": a, "b": b}
         self.knobs = {"a": {}, "b": {}}
+        self.on_unit = None
         both = [chain for chain in (a, b) if chain is not None]
         if all(fits_two_rows(chain) for chain in both):
             combined = pair(a or Chain(), b or Chain())
@@ -111,6 +117,7 @@ class Engine:
             if self.sides[side] is not None:
                 slot, held = self.rig.ready(self.sides[side], stop=stop)
                 self.bases[side] = held
+                self.on_unit = side
         self.shown = ("recall", None, None)
         return "recall"
 
@@ -121,6 +128,14 @@ class Engine:
             return 0.
         value = dict(base.rows[row].output).get(VOLUME)
         return leveling.db_of(value) if isinstance(value, (int, float)) else 0.
+
+    def _own_mute(self, side, row):
+        """A row's own mute in the sound as the unit holds it: a lane its author muted stays muted when heard."""
+        base = self.bases.get(side)
+        if base is None or row >= len(base.rows):
+            return 0.
+        value = dict(base.rows[row].output).get(MUTE)
+        return 1. if isinstance(value, (int, float)) and value >= .5 else 0.
 
     def _on_shown(self):
         """Whether the unit is on the slot A and B were made ready on."""
@@ -144,8 +159,15 @@ class Engine:
             if not any(self.sides.values()):
                 raise RuntimeError("Nothing is ready to play.")
             self.show(self.sides["a"], self.sides["b"])   # Listening or saving used the unit meanwhile.
-        if self.shown[0] == "recall" and side != self.active or self.shown[0] == "recall" and self.mode is None:
+        if self.shown[0] == "recall" and (side != self.on_unit or self.mode is None):
             self._recall_side(side)
+        try:
+            return self._play(side, mode, phrase)
+        except Exception:
+            self.quiet()          # a scene or audio that would not start: nothing stays connected
+            raise
+
+    def _play(self, side, mode, phrase):
         port = USB_IN if mode == "phrase" else self.physical_input
         held = self.unit.read()
         if self.shown[0] == "recall":
@@ -155,7 +177,8 @@ class Engine:
                 if row.outlet not in (0, 16, 17, 18):
                     level = leveling.norm_of(self._own_db(side, r) + self.levels[side])
                     wanted = wanted.with_row(r, replace(row, output=tuple({**dict(row.output), VOLUME: level,
-                                                                           MUTE: 0.}.items())))
+                                                                           MUTE: self._own_mute(side, r)}.items())))
+            self.connected = True             # from the first route set, until `quiet`
             self.unit.apply(wanted)
             self._keep_scene()
             self._loop(mode, phrase)
@@ -178,9 +201,10 @@ class Engine:
                 output = dict(row.output)
                 if outlet not in INTERNAL:
                     level = leveling.norm_of(self._own_db(name, offset) + self.levels[name])
-                    output.update({VOLUME: level, MUTE: 0. if on else 1.})
+                    output.update({VOLUME: level, MUTE: self._own_mute(name, offset) if on else 1.})
                 wanted = wanted.with_row(first + offset, replace(row, inlet=inlet, outlet=outlet,
                                                                  output=tuple(output.items())))
+        self.connected = True
         self.unit.apply(wanted)
         self._keep_scene()
         self._loop(mode, phrase)
@@ -225,9 +249,13 @@ class Engine:
 
     def _recall_side(self, side):
         chain = self.sides[side]
+        self.on_unit = None
         slot, held = self.rig.ready(chain)
         self.knobs[side] = {}
         self.shown = ("recall", slot, held)
+        self.on_unit = side
+        if self.wanted[side] is not None and self.wanted[side][0]:
+            self.turn(side, *self.wanted[side])   # turned while the other side was on the unit
 
     def scene(self, scene):
         """Choose the scene heard (0 to 7). It is kept when A and B are made ready again or recalled."""
@@ -263,6 +291,10 @@ class Engine:
         chain = self.bases[side]
         if chain is None:
             return []
+        self.wanted[side] = (dict(values), scene)
+        if self.shown is None or (self.shown[0] == "recall" and (self.on_unit != side or not self._on_ours())):
+            # That side's preset is not the one on the unit: the knobs go on when it is recalled.
+            return knobs.moves(chain, values)
         targets = knobs.targets(chain, values, scene=scene)
         first = self._first_row(side) if self.shown and self.shown[0] == "pair" else 0
         wanted = {}
@@ -314,15 +346,15 @@ class Engine:
         self.offset = calibrate(self.rig, self.audio, self.slots.folder)
         return self.offset
 
-    def hear(self, chain, dry, *, stop=None):
-        """What `chain` does to the phrase, measured silently. Whatever was playing stops."""
+    def hear(self, chain, dry, scene=0, *, stop=None):
+        """What `chain` does to the phrase in `scene`, measured silently. Whatever was playing stops."""
         self.quiet()
         self.shown = None               # the unit is borrowed: A and B must be made ready again, also after a failure
         if self.offset is None:
             self.measure_round_trip()
-        return listen(self.rig, self.audio, chain, dry, self.offset, stop=stop)
+        return listen(self.rig, self.audio, chain, dry, self.offset, stop=stop, scene=scene)
 
-    def hear_shaped(self, chain, knobs, dry, *, stop=None):
+    def hear_shaped(self, chain, knobs, dry, scene=0, *, stop=None):
         """What `chain` with its Shape knobs at `knobs` does to the phrase, measured silently, as `hear` does.
 
         As `save` does, the knobs are applied to the chain as the unit holds it once built, where every value is
@@ -334,8 +366,8 @@ class Engine:
         if self.offset is None:
             self.measure_round_trip()
         slot, held = self.rig.ready(chain, stop=stop)
-        shaped = with_knobs(held, knobs) if knobs else held
-        return listen(self.rig, self.audio, shaped, dry, self.offset, stop=stop)
+        shaped = with_knobs(held, knobs) if knobs else held      # as the desk turns them: every scene moved
+        return listen(self.rig, self.audio, shaped, dry, self.offset, stop=stop, scene=scene)
 
     def read(self, slot):
         """The chain and name of a preset saved on the unit."""
@@ -358,9 +390,8 @@ class Engine:
         self.shown = None
         target = self.slots.free_for_saving()
         # Its own routing, from the guitar input to the unit's outputs: a preset spread over several rows whole.
+        # Every row's own level and mute are kept as the sound has them.
         playable = chain.with_routes(routed(chain, self.physical_input, MULTI_OUT).routes)
-        playable = replace(playable, rows=(replace(playable.rows[0], output=tuple(
-            {**dict(playable.rows[0].output), VOLUME: leveling.norm_of(0.), MUTE: 0.}.items())),) + playable.rows[1:])
         self.slots.claim(target, name)
         self.unit.slot = None
         self.rig.build(playable)            # assembled and cached silent
@@ -369,9 +400,6 @@ class Engine:
 
             held = self.unit.read()
             playable = with_knobs(held.with_routes(playable.routes), knobs)
-            playable = replace(playable, rows=(replace(playable.rows[0], output=tuple(
-                {**dict(playable.rows[0].output), VOLUME: leveling.norm_of(0.), MUTE: 0.}.items())),)
-                               + playable.rows[1:])
         # Building took a while: the slot must still be empty (or the app's own) before anything is connected.
         self.slots.refresh()
         self.slots.claim(target, name)
@@ -379,8 +407,20 @@ class Engine:
         try:
             self.unit.apply(playable)          # connected as it will be played, and stored so
             stored = self.unit.store(target, name)
-        except Exception:
+        except Exception as error:
+            # The write may have gone through even if reading it back failed: the input is taken off wherever the
+            # unit really is, the new slot included, and the player told what may be there.
+            written = False
+            try:
+                written = same_slot(self.unit.position(), target)
+                if written:
+                    self.unit.slot = target
+            except Exception:  # noqa: BLE001
+                pass
             self.quiet()
+            if written:
+                raise RuntimeError(f"Tone Lab {target['position'] + 1} may hold {name!r} now, but saving it could "
+                                   f"not be confirmed: {error}") from error
             raise
         # Saved as it will be played, from the guitar input. Left as saved: disconnecting it now would be an edit to
         # the preset just written. The desk makes A and B ready again at once.

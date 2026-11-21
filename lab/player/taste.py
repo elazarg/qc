@@ -181,7 +181,8 @@ def comparisons(folder, sounds=None):
     - Outside rounds: a keeper over a not-this when one was revised from the other or both from the same sound.
     Keepers and not-thises of different requests are never compared: what was asked for would decide the pair,
     not the player's taste. A pair given more than once counts once, at its largest weight; a pair given both
-    ways (the player changed their mind) keeps both, and they cancel.
+    ways (the player changed their mind) keeps both, and they cancel. Recorded choices are told apart by their
+    audition (take, scene, knob positions) as well: the same two sounds heard otherwise are another comparison.
     """
     if sounds is None:
         from lab.sound.sounds import Store
@@ -193,7 +194,7 @@ def comparisons(folder, sounds=None):
     def add(kept, over, how, weight, decision, context=None):
         if kept == over:
             return
-        key = (kept, over)
+        key = (kept, over, json.dumps(context, sort_keys=True) if context else None)
         if key not in pairs or pairs[key]["weight"] < weight:
             pairs[key] = {"kept": kept, "over": over, "how": how, "weight": weight, "decision": decision,
                           **({"context": context} if context else {})}
@@ -264,7 +265,14 @@ def _as_auditioned(sound, sound_id, context, rows):
     record = sound.heard if not knobs else sound.heard.get("shaped")
     if not record or (knobs and record.get("knobs") != knobs) or (phrase and record.get("phrase") != phrase):
         return missing
-    key = f"{sound_id}|{json.dumps(knobs, sort_keys=True)}|{phrase}"
+    # The scene heard, when the sound's scenes differ: a measurement of another scene is not that audition.
+    scene = int(context.get("scene") or 0)
+    if sound.chain.scenes_in_use() > 1:
+        if int(record.get("scene", sound.heard.get("scene", 0)) or 0) != scene:
+            return missing
+    else:
+        scene = 0
+    key = f"{sound_id}|{json.dumps(knobs, sort_keys=True)}|{phrase}|{scene}"
     rows[key] = features(record if not knobs else {**record, "probe": record.get("probe")})
     return key
 

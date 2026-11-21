@@ -168,7 +168,8 @@ class Studio:
             side = "a" if side == "b" else "b"
         if before.a is None and before.b is None:
             self.stop()
-        self.set(a=before.a, b=before.b, side=side, round=before.round, scene=before.scene,
+        # The scene stays as the unit has it: the knob positions put back are sent for the scene heard now.
+        self.set(a=before.a, b=before.b, side=side, round=before.round,
                  blind=False, revision=self.state.revision + (0 if same_pair else 1), status="Undone.")
         if same_pair and self.state.shown:
             for side in ("a", "b"):
@@ -364,6 +365,8 @@ class Studio:
         if not sound.knobs:
             return heard
         shaped = heard.get("shaped") or {}
+        if sound.chain.scenes_in_use() > 1 and shaped.get("scene", heard.get("scene", 0)) != self.state.scene:
+            return None
         return shaped if shaped.get("knobs") == sound.knobs and shaped.get("phrase") == self.phrase_key() else None
 
     def scene(self, scene):
@@ -468,10 +471,11 @@ class Studio:
             return
         # The take, the part of it, the scene and the chain are fixed for the whole check: both measurements are
         # made on them, and a correction is made only while they are still what is on show.
-        inputs = (self.phrase_key(), self.phrase[1], self.state.scene, sound.chain.digest())
+        inputs = (self.phrase_key(), self.phrase[1], self.state.scene, sound.chain.digest(), sound.id)
         phrase_id = inputs[0]
+        scene = inputs[2] if sound.chain.scenes_in_use() > 1 else 0
         if sound.heard and "probe" in sound.heard and sound.heard.get("phrase") == phrase_id \
-                and sound.heard.get("digest") == sound.chain.digest():
+                and sound.heard.get("digest") == sound.chain.digest() and sound.heard.get("scene", 0) == scene:
             self._hear_shaped(sound, turned, inputs)
             return
         # The sound without its knobs has not been heard on this phrase: that first.
@@ -479,7 +483,7 @@ class Studio:
 
         def heard(result):
             fresh = self.store.sound(sound_id)
-            fresh.heard = {"phrase": phrase_id, "digest": inputs[3], "scene": 0, **result.to_record()}
+            fresh.heard = {"phrase": phrase_id, "digest": inputs[3], "scene": scene, **result.to_record()}
             self.store.save(fresh)
             self.set(working="")
             if self._current(inputs):
@@ -487,14 +491,18 @@ class Studio:
             elif not self.state.mode:
                 self._show()
 
-        self.later(self.host.call("hear", sound.chain, inputs[1]), heard, self._shaping_failed)
+        self.later(self.host.call("hear", sound.chain, inputs[1], scene), heard, self._shaping_failed)
 
     def _current(self, inputs):
-        """Whether the take, part, scene and chain a check was started on are still what is on show."""
-        key, _, scene, digest = inputs
-        return (self.phrase_key() == key and self.state.scene == scene
-                and any(sound is not None and sound.chain.digest() == digest
-                        for sound in (self.sound("a"), self.sound("b"))))
+        """Whether the take, part, scene and sound (its chain unchanged) a check was started on are still what is
+        on show."""
+        key, _, scene, digest, sound_id = inputs
+        if self.phrase_key() != key or self.state.scene != scene or sound_id not in (self.state.a, self.state.b):
+            return False
+        try:
+            return self.store.sound(sound_id).chain.digest() == digest
+        except (OSError, ValueError):
+            return False
 
     def _shaping_failed(self, error):
         self.set(working="", status=f"Could not listen to the shaped sound: {error}")
@@ -517,7 +525,8 @@ class Studio:
             after = result.to_record()
             found = knobs.check(fresh.heard, after, values)
             correction = _correction(found, turned, values)
-            fresh.heard = {**fresh.heard, "shaped": {"phrase": phrase_id, "knobs": values, **after, "check": found,
+            fresh.heard = {**fresh.heard, "shaped": {"phrase": phrase_id, "knobs": values,
+                                                     "scene": fresh.heard.get("scene", 0), **after, "check": found,
                                                      "corrected": correction}}
             if correction:
                 key, old, new = correction
@@ -532,7 +541,8 @@ class Studio:
                         self.later(self.host.call("turn", side, fresh.knobs), lambda moves: None)
             self.say(_checked_words(found, turned, correction))
 
-        self.later(self.host.call("hear_shaped", sound.chain, values, inputs[1]), heard, self._shaping_failed)
+        scene = inputs[2] if sound.chain.scenes_in_use() > 1 else 0
+        self.later(self.host.call("hear_shaped", sound.chain, values, inputs[1], scene), heard, self._shaping_failed)
 
     def base(self):
         """Hear the sound on show without its Shape knobs, or with them again (the 0 key)."""
@@ -575,30 +585,32 @@ class Studio:
     def difference(self):
         """What listening heard differ between A and B, in plain words, when both were heard on the same phrase."""
         a, b = self.sound("a"), self.sound("b")
-        if not (a and b and a.heard and b.heard and "probe" in a.heard and "probe" in b.heard):
-            return ["Both sounds need to have been listened to with the current tests. That happens by itself "
-                    "while the unit is free."]
-        if a.heard.get("phrase") != b.heard.get("phrase"):
-            return ["A and B were listened to on different phrases, so they cannot be compared fairly yet."]
+        if not (a and b):
+            return ["Put a sound on both A and B to compare them."]
+        # What was measured of each as it plays now: this take, this scene, these knob positions.
+        ha, hb = self.evidence(a), self.evidence(b)
+        if not (ha and hb and "probe" in ha and "probe" in hb):
+            return ["Both sounds need to have been listened to as they are set now (this take, scene and knob "
+                    "positions). That happens by itself while the unit is free."]
         lines = []
-        level = b.heard["level_db"] - a.heard["level_db"]
+        level = hb["level_db"] - ha["level_db"]
         if abs(level) >= 1:
             lines.append(f"B is {abs(level):.0f} dB {'louder' if level > 0 else 'quieter'}.")
-        pa, pb = a.heard.get("probe") or {}, b.heard.get("probe") or {}
+        pa, pb = ha.get("probe") or {}, hb.get("probe") or {}
         if pa and pb and abs(pb["distortion_db"] - pa["distortion_db"]) >= 3:
-            lines.append(f"Distortion: A {a.heard['distortion']} ({pa['distortion_db']:.0f} dB of harmonics), "
-                         f"B {b.heard['distortion']} ({pb['distortion_db']:.0f} dB).")
-        ca, cb = a.heard["compression"], b.heard["compression"]
+            lines.append(f"Distortion: A {ha['distortion']} ({pa['distortion_db']:.0f} dB of harmonics), "
+                         f"B {hb['distortion']} ({pb['distortion_db']:.0f} dB).")
+        ca, cb = ha["compression"], hb["compression"]
         if abs(cb - ca) > .1:
             lines.append(f"B is {'more' if cb > ca else 'less'} compressed: of a 12 dB drop in your playing, "
                          f"A gives back {12 * (1 - ca):.0f} dB and B {12 * (1 - cb):.0f} dB.")
-        bright = b.heard["brightness_oct"] - a.heard["brightness_oct"]
+        bright = hb["brightness_oct"] - ha["brightness_oct"]
         if abs(bright) >= .1:
             lines.append(f"B is {abs(bright):.1f} octave {'brighter' if bright > 0 else 'darker'}.")
-        low = b.heard["low_end_db"] - a.heard["low_end_db"]
+        low = hb["low_end_db"] - ha["low_end_db"]
         if abs(low) >= 1.5:
             lines.append(f"B has {abs(low):.0f} dB {'more' if low > 0 else 'less'} low end.")
-        space = b.heard["tail_db"] - a.heard["tail_db"]
+        space = hb["tail_db"] - ha["tail_db"]
         if abs(space) >= 3:
             lines.append(f"B rings on {abs(space):.0f} dB {'more' if space > 0 else 'less'} after you stop.")
         return lines or ["Listening heard no clear difference between A and B."]
@@ -763,15 +775,17 @@ class Studio:
             aim, designs = result
             record = {"id": knowledge_id(), "request": text, "aim": aim, "created": _now(),
                       "previous": after, "by": by, "candidates": []}
+            newest = quietly or stop is self.latest
             song = aim.get("song") or (self.round(after) or {}).get("aim", {}).get("song")
             if song:
                 record["aim"]["song"] = song
-                if not quietly:
+                if newest and not quietly:
                     self.set(song=song_name(song))
             for sound, differs in designs:
                 sound.tags = [f"aim: {summary(aim)}"]
-                if self.state.song:
-                    sound.origin = {**sound.origin, "song": self.state.song}
+                tag = song_name(song) if song else (self.state.song if newest else None)
+                if tag:
+                    sound.origin = {**sound.origin, "song": tag}
                 self.store.save(sound)
                 record["candidates"].append({"sound": sound.id, "differs": differs})
             self._save_round(record)
@@ -783,7 +797,7 @@ class Studio:
             if quietly:
                 self.say("Three more designs are ready, informed by what was heard: press N.")
                 return
-            if stop is not self.latest:
+            if not newest:
                 # A newer request is on its way or already answered: this one is kept, not put on show.
                 self.say(f"The designs for an earlier request ({text[:40]}) are in History; the latest request's "
                          "are the ones shown.")
@@ -802,7 +816,7 @@ class Studio:
             if stop is not None and stop.is_set():
                 return
             if not quietly:
-                self.set(working="", status=str(error))
+                self._request_failed(stop, error)
 
         self.later(future, arrived, failed)
 
@@ -991,7 +1005,8 @@ class Studio:
             self.requests.discard(stop)
             if stop.is_set():
                 return
-            self.set(working="")
+            if stop is self.latest:
+                self.set(working="")
             result.notes.append({"at": _now(), "text": text})
             self.store.save(result)
             if stop is not self.latest:
@@ -1003,7 +1018,19 @@ class Studio:
             else:
                 self.say(f"The revision of {sound.name} is ready in History. B changed meanwhile.")
 
-        self.later(future, revised, lambda error: None if stop.is_set() else self.set(working="", status=str(error)))
+        def failed(error):
+            self.requests.discard(stop)
+            if not stop.is_set():
+                self._request_failed(stop, error)
+
+        self.later(future, revised, failed)
+
+    def _request_failed(self, stop, error):
+        """A request that failed: the working line and Cancel stay while a newer one is still on its way."""
+        if stop is self.latest:
+            self.set(working="", status=str(error))
+        else:
+            self.say(f"An earlier request failed ({error}); the latest is still on its way.")
 
     # ---- rounds ----
 

@@ -3,9 +3,9 @@
 Every rule about writing to the unit lives here, once:
 
 - Nothing is written unless the selected preset is the one being worked on.
-  It is checked before each block, before each scene, and before each group
-  of values. Asking the unit costs about 0.1 s, so it is not checked before
-  every single value.
+  It is checked before every write: a player who selects another preset on
+  the unit between two writes must not have the next one land on theirs.
+  Asking the unit costs about 0.1 s a write; that is the price.
 - A chain is put on the unit by `apply`, which plans the writes (see
   `chain.py`), carries them out in order, then reads back until the unit
   holds what was asked for. Where the old code paused for a fixed time after
@@ -196,15 +196,11 @@ class Unit:
             self.sleep(self.pace)
 
     def run(self, ops, stop=None):
-        """Carry out writes, checking the selected preset before each block and each scene."""
-        for position, op in enumerate(ops):
+        """Carry out writes, checking the selected preset before each one."""
+        for op in ops:
             if stop is not None and stop.is_set():
                 raise Stopped("Stopped.")
-            # Checked before every route (a route write on the wrong preset would connect the guitar to it), at
-            # every change of kind, and around scenes and structure.
-            if (position == 0 or op.kind in ("add", "delete", "scene", "split", "route")
-                    or ops[position - 1].kind != op.kind):
-                self.guard()
+            self.guard()
             self.execute(op)
 
     def apply(self, wanted, *, stop=None, sounding=(), fresh=False):

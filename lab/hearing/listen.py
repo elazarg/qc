@@ -59,9 +59,11 @@ def calibrate(rig, audio, folder):
     return offset
 
 
-def listen(rig, audio, chain, dry, offset, *, stop=None):
-    """What `chain` does to the mono phrase `dry`, and what test signals show of it (`measure.Heard`)."""
+def listen(rig, audio, chain, dry, offset, *, stop=None, scene=0):
+    """What `chain` does to the mono phrase `dry` in `scene`, and what test signals show of it (`measure.Heard`)."""
     slot, held = rig.ready(chain, stop=stop)
+    if scene and chain.scenes_in_use() > 1:
+        rig.unit.select_scene(scene)        # recalling starts at the first scene
     # The chain's own routing, fed from the computer and returned to it: a preset spread over several rows is
     # heard whole.
     held = rig.connect(held, routed(chain, *USB).routes)

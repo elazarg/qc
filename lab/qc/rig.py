@@ -61,6 +61,7 @@ class Rig:
     def build(self, chain, *, stop=None):
         self.slots.may_leave()
         digest = chain.digest()
+        self.slots.refresh()                # the player may have saved a preset into the build slot since
         self.slots.claim(BUILD, BUILD_NAME)
         self.unit.slot = None
         self.unit.recall(BUILD)

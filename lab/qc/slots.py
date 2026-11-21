@@ -167,9 +167,10 @@ class Slots:
         return record
 
     def may_leave(self):
-        """Refuse to move away from a preset of the player's that has unsaved edits, or whose state the unit did
-        not tell: recalling another preset would discard them."""
-        if self.ours(self.unit.position()):
+        """Refuse to move away from a preset with unsaved edits, or whose state the unit did not tell: recalling
+        another preset would discard them. Only the app's working slots are left whatever their state (their
+        edits are the app's own); a saved preset, the player's or one in the Tone Lab setlist, is checked."""
+        if self.scratch(self.unit.position(), fresh=True):
             return
         if self.unit.dirty() is not False:
             raise RuntimeError(UNSAVED)
@@ -181,10 +182,19 @@ class Slots:
             return True
         return bool(self.tone_lab and slot and slot.get("folder_key") == self.tone_lab)
 
-    def scratch(self, slot):
-        """The build slot or a cache slot: the app's working slots, never a preset anybody saved."""
-        return same_slot(slot, BUILD) or bool(self.tone_lab and slot and slot.get("folder_key") == self.tone_lab
-                                              and slot.get("position") in CACHE_SLOTS)
+    def scratch(self, slot, fresh=False):
+        """The build slot or a cache slot: the app's working slots, never a preset anybody saved. The build slot
+        counts only while the directory shows it empty or the app's (with `fresh`, read again first): the player
+        may have saved a preset of their own there."""
+        if same_slot(slot, BUILD):
+            try:
+                if fresh:
+                    self.refresh()
+                return self.held(BUILD) in ("", BUILD_NAME)
+            except RuntimeError:
+                return False
+        return bool(self.tone_lab and slot and slot.get("folder_key") == self.tone_lab
+                    and slot.get("position") in CACHE_SLOTS)
 
     def give_back(self, record, also=None):
         """Select the player's preset and scene again, if the unit is still where the app left it: a working
@@ -192,8 +202,9 @@ class Slots:
         the player's the app itself moved to (to read it). A preset the player chose on the unit meanwhile is left
         alone, saved Tone Lab presets included."""
         position = self.unit.position()
-        left_here = same_slot(position, self.unit.slot) and self.unit.dirty() is False
-        if self.scratch(position) or left_here or (also is not None and same_slot(position, also)):
+        placed = same_slot(position, self.unit.slot) or (also is not None and same_slot(position, also))
+        # A preset the app put up or read is left only when it has no edits: the player may have edited it.
+        if self.scratch(position, fresh=True) or (placed and self.unit.dirty() is False):
             self.unit.slot = None
             self.unit.recall(record["position"])
             if self.unit.scene() != record["scene"]:
