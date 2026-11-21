@@ -2,7 +2,7 @@
 tell them from the sound alone.
 
     from lab.learner import GuitarLearner
-    learner = GuitarLearner(seat)     # seat: see lab.desk.window.LearnerSeat
+    learner = GuitarLearner(seat)     # seat: see lab.learner.seat.LearnerSeat
     learner.show()
 
     calibration    guitar input calibration, one control at a time: calibration.open(seat)

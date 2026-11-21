@@ -40,6 +40,10 @@ UNSAVED = ("The preset on the Quad Cortex has unsaved changes (or the unit did n
            "the unit; Tone Lab leaves it alone until then.")
 
 
+class Unsaved(RuntimeError):
+    """The preset on the unit has unsaved edits, or the unit did not say. Nothing was recalled over it."""
+
+
 class NotOurs(RuntimeError):
     """The slot holds something the app did not put there. It was left untouched."""
 
@@ -173,7 +177,7 @@ class Slots:
         if self.scratch(self.unit.position(), fresh=True):
             return
         if self.unit.dirty() is not False:
-            raise RuntimeError(UNSAVED)
+            raise Unsaved(UNSAVED)
 
     def ours(self, slot):
         """Whether a slot is one the app works in: the build slot, or any slot of the Tone Lab setlist,

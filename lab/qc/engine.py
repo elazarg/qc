@@ -23,10 +23,10 @@ from dataclasses import replace
 from qc_mcp import leveling
 
 from lab.sound import catalog
-from lab.sound.chain import COLUMNS, INTERNAL, Chain, Row, routed
+from lab.sound.chain import INTERNAL, Chain, Row, routed
 from lab.hearing.listen import calibrate, calibration, listen
 from lab.qc.rig import Rig
-from lab.qc.unit import same_slot
+from lab.qc.unit import CEILING_DB, same_slot
 
 MULTI_OUT, USB_IN, USB_OUT = 19, 12, 14
 PREVIEW_DB = -12.     # the level of a sound nobody has measured yet
@@ -73,6 +73,8 @@ class Engine:
         self.active, self.mode, self.loop = "a", None, None
         self.loop_phrase = None                 # the audio the loop is playing
         self.connected = False                  # an input was connected by something other than play
+        self.visited = None                     # a preset of the player's the app itself moved the unit to
+        self.chosen_scene = None                # the scene heard, kept across making ready and recalling
         self.borrowed = None
         self.offset = None
         self.asked, self.listening = {}, None      # see `level`
@@ -91,7 +93,7 @@ class Engine:
     def close(self):
         self.quiet()
         if self.borrowed is not None:
-            self.slots.give_back(self.borrowed, also=getattr(self, "visited", None))
+            self.slots.give_back(self.borrowed, also=self.visited)
             self.borrowed = None
 
     # ---- what is shown ----
@@ -179,7 +181,7 @@ class Engine:
                     wanted = wanted.with_row(r, replace(row, output=tuple({**dict(row.output), VOLUME: level,
                                                                            MUTE: self._own_mute(side, r)}.items())))
             self.connected = True             # from the first route set, until `quiet`
-            self.unit.apply(wanted)
+            self.unit.apply(wanted, current=held)
             self._keep_scene()
             self._loop(mode, phrase)
             self.active, self.mode = side, mode
@@ -205,7 +207,7 @@ class Engine:
                 wanted = wanted.with_row(first + offset, replace(row, inlet=inlet, outlet=outlet,
                                                                  output=tuple(output.items())))
         self.connected = True
-        self.unit.apply(wanted)
+        self.unit.apply(wanted, current=held)
         self._keep_scene()
         self._loop(mode, phrase)
         self.active, self.mode = side, mode
@@ -265,7 +267,7 @@ class Engine:
         return scene
 
     def _keep_scene(self):
-        chosen = getattr(self, "chosen_scene", None)
+        chosen = self.chosen_scene
         if chosen is not None and self.unit.scene() != chosen:
             self.unit.select_scene(chosen)
 
@@ -327,8 +329,9 @@ class Engine:
         Levels window's listening level); the result stays within the floor and the ceiling."""
         self.asked[side] = db
         played = self.listening(db) if self.listening else db
-        self.levels[side] = max(-40., min(6., played))
-        if self.mode is not None and side == self.active:
+        before, self.levels[side] = self.levels[side], max(-40., min(CEILING_DB, played))
+        # A level that is already the one played is not written again: the desk matches levels at every play.
+        if self.mode is not None and side == self.active and abs(self.levels[side] - before) > .05:
             self.play(side, self.mode)
 
     def listen_at(self, listening):
@@ -426,6 +429,16 @@ class Engine:
         # the preset just written. The desk makes A and B ready again at once.
         self.connected = False
         return target, stored
+
+    def inputs(self, physical_input=None):
+        """Which USB channels carry the dry guitar and the processed sound now, and what the unit is on: for the
+        Guitar Learner, which records the inputs itself and cannot open the unit while the engine holds it.
+        Returns {"channels": (dry, wet left, wet right), "preset", "scene", "position", "firmware"}."""
+        from lab.qc.device import recording_channels
+
+        channels = recording_channels(self.unit.device, physical_input or self.physical_input)
+        return {"channels": tuple(channels), "preset": self.unit.name(), "scene": self.unit.scene(),
+                "position": self.unit.position(), "firmware": self.unit.firmware}
 
     def record(self, seconds, side=None, knobs=None, *, stop=None, progress=None):
         """Record the guitar: its dry input, as it reaches the unit before any processing, and the processed stereo

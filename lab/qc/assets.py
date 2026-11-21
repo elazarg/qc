@@ -38,6 +38,7 @@ import re
 from lab.sound import catalog
 from lab import knowledge
 from lab.sound.chain import Block
+from lab.qc.unit import Stopped
 
 FILE = "assets.json"
 IR_KEY = re.compile(r"CIR_[0-9a-f]+", re.IGNORECASE)
@@ -117,7 +118,7 @@ def listing(engine, *, stop=None, folder=None):
     failed: it raises and what was read before is kept.
     """
     if stop is not None and stop.is_set():
-        raise RuntimeError("Stopped.")
+        raise Stopped("Stopped.")
     device = engine.unit.device
     found = device.list_directory()
     roots = {folder_.get("key") for part in ("irs", "captures") for folder_ in (found or {}).get(part, [])}

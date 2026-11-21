@@ -50,7 +50,10 @@ class BudgetTest(unittest.TestCase):
         self.assertEqual(record["core"]["cpu"], 92.)
 
     def test_written_where_knowledge_looks_and_read_back_at_once(self):
-        shared = self.folder / "knowledge"
+        shared = self.folder / "tables"
+        shared.mkdir()
+        for table in knowledge.SHARED.glob("*.json"):       # the tables that ship: all of them must be there
+            (shared / table.name).write_bytes(table.read_bytes())
         with mock.patch.object(knowledge, "SHARED", shared):
             knowledge.table.cache_clear()
             try:

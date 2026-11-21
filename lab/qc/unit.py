@@ -16,8 +16,8 @@ Every rule about writing to the unit lives here, once:
 - `stop` is honoured between any two writes.
 
 The device library re-queues retained packets each time a reply matches, so a
-polled request grows its queue without bound. `position` clears it under the
-library's lock, as the old app learned to.
+polled request grows its queue without bound. `device.Device` clears it under
+the library's lock around every read, `position` included.
 """
 
 from dataclasses import replace
@@ -26,8 +26,7 @@ import time
 from qc_mcp import leveling
 
 from lab.sound import catalog
-from lab.sound.chain import (Chain, Op, differences, from_preset, plan_levels, plan_routes, plan_structure, plan_values,
-                             same)
+from lab.sound.chain import differences, from_preset, plan_levels, plan_routes, plan_structure, plan_values, same
 
 CEILING_DB = 6.        # a row's output volume, in dB, never goes above this
 SETTLE = 3.            # seconds to wait for the unit to show a change before giving up
@@ -79,16 +78,7 @@ class Unit:
     # ---- reading ----
 
     def position(self):
-        lock = getattr(self.device, "_io_lock", None)
-        pending = getattr(self.device, "_pending", None)
-        if lock is None or pending is None:
-            return self.device.get_setlist_position()
-        with lock:
-            pending.clear()
-            try:
-                return self.device.get_setlist_position()
-            finally:
-                pending.clear()
+        return self.device.get_setlist_position()
 
     def read(self):
         preset = self.device.get_current_preset()
@@ -203,15 +193,16 @@ class Unit:
             self.guard()
             self.execute(op)
 
-    def apply(self, wanted, *, stop=None, sounding=(), fresh=False):
+    def apply(self, wanted, *, stop=None, sounding=(), fresh=False, current=None):
         """Make the unit hold `wanted`, and return what it holds afterwards.
 
         `sounding` are rows that may stay connected while their blocks change.
         `fresh` adds every block anew, so that values the chain leaves unset are
-        the unit's own and not what the slot held before.
+        the unit's own and not what the slot held before. `current` is what the
+        unit holds when the caller has just read it, to save reading it again.
         """
         wanted = bounded(wanted)
-        current = self.read()
+        current = self.read() if current is None else current
         structure = plan_structure(current, wanted, sounding=sounding, fresh=fresh)
         self.run(structure, stop)
         if fresh:
@@ -232,18 +223,19 @@ class Unit:
                     raise Refused(f"The Quad Cortex has no processing left for {missing[0]}. "
                                   "Remove a block or choose a lighter one.") from None
                 raise
-        self.guard()
         for attempt in range(2):
             ops = plan_values(current, wanted)
             if not ops:
                 break
             self.run(ops, stop)
             current = self.read()
-        self.run(plan_levels(current, wanted), stop)
+        levels = plan_levels(current, wanted)
+        self.run(levels, stop)
         routes = plan_routes(current, wanted)
-        if routes:
-            # Every row's level and mute must be on the unit before any input is connected: a level the unit
-            # did not take would play the sound at whatever the preset holds.
+        # Every row's level must be on the unit before any input is connected: a level the unit did not take
+        # would play the sound at whatever the preset holds. A mute needs no such check: one the unit did not
+        # take leaves a row silent, or its input is taken off by the routes that follow and checked below.
+        if routes and any(op.args[2] == catalog.LANE_VOLUME for op in levels):
             held = self.read()
             for r, want in enumerate(wanted.rows):
                 have = dict(held.rows[r].output)

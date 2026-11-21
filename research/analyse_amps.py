@@ -3,7 +3,7 @@
 Run from the repository root: python research/analyse_amps.py
 It reads whatever research/measurements/amps/*.json exist, so it can be run
 while the sweep (measure_amps.py) is still going and again when it is done. It
-writes tone_lab/knowledge/controls.json, which the app loads through
+writes lab/tables/controls.json, which the app loads through
 tone_lab/measured.py, and research/amp-controls-report.md.
 
 A knob's effect is given per tenth of its travel, as the knob rises, so the

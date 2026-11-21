@@ -14,7 +14,7 @@ on show with `studio.turn`, provided that knob is available on its chain.
 `stop()` ends it.
 
     from lab.learner import gestures
-    gestures.start(seat)        # the seat of lab.desk.window.LearnerSeat, or the desk
+    gestures.start(seat)        # the seat of lab.learner.seat.LearnerSeat, or the desk
     gestures.stop()
 """
 

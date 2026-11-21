@@ -15,7 +15,7 @@ from functools import lru_cache
 import json
 from pathlib import Path
 
-PATH = Path(__file__).with_name("knowledge") / "controls.json"
+PATH = Path(__file__).resolve().parents[1] / "lab" / "tables" / "controls.json"
 POLARITY = PATH.with_name("polarity.json")
 BANDS = ("below 200 Hz", "200–800 Hz", "800 Hz–3 kHz", "3–6 kHz", "above 6 kHz")
 # The bands in which each role of styles.ROLES is judged.

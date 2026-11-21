@@ -16,7 +16,7 @@ compensation has aligned them. The reference channel then lines up every pass
 with every other, which gives the correlation between any two models.
 
 Raw results go to research/measurements/polarity.json and the table the app
-uses to tone_lab/knowledge/polarity.json. Silent in the room; selecting another
+uses to lab/tables/polarity.json. Silent in the room; selecting another
 preset on the unit stops the run.
 """
 import json
@@ -35,7 +35,7 @@ from measure_controls import phrase  # noqa: E402
 from tone_lab import audio, device, device_presets, draft_render, iterate, models  # noqa: E402
 
 OUT = ROOT / "research" / "measurements" / "polarity.json"
-TABLE = ROOT / "tone_lab" / "knowledge" / "polarity.json"
+TABLE = ROOT / "lab" / "tables" / "polarity.json"
 REFERENCE_AMP, REFERENCE_CAB, GAIN_BLOCK = 1008, 12001, 16005  # Rols Jazz CH120: light and clean
 SECONDS, SLACK = 1.5, 2400
 WEAK = .1  # below this the two barely interact, whichever way the switch is set

@@ -16,6 +16,12 @@ left on disk.
 
 `Host(local=...)` runs the same engine on a thread instead, for tests and
 for the simulated unit.
+
+A command that fails raises `Fault` from its future: the message, the kind of
+failure (the name of what was raised where the unit is held, such as
+"Stopped", "Moved" or "Refused") and the trace from there. The trace is kept
+because the worker has nowhere of its own to write it: started without a
+console, what it prints is lost.
 """
 
 from concurrent.futures import Future
@@ -23,6 +29,23 @@ import multiprocessing
 from queue import Empty
 import threading
 import traceback
+
+
+# Outcomes that are part of ordinary use, not faults: said on the line, never logged with a trace.
+EXPECTED = frozenset({"Stopped", "Moved", "Unsaved", "Refused", "NotOurs", "EditorActive"})
+
+
+class Fault(RuntimeError):
+    """A command failed where the unit is held. `kind` names what was raised there and `trace` is its trace
+    there ("" when there is none, as for a command dropped before it began)."""
+
+    def __init__(self, message, kind="RuntimeError", trace=""):
+        super().__init__(message)
+        self.kind, self.trace = kind, trace
+
+    @property
+    def expected(self):
+        return self.kind in EXPECTED
 
 
 def _engine(simulated, folder, physical_input):
@@ -51,7 +74,8 @@ def _serve(commands, replies, stop, stopped_before, simulated, folder, physical_
     try:
         engine, context = _engine(simulated, folder, physical_input)
     except Exception as error:  # noqa: BLE001
-        replies.put((None, False, f"{type(error).__name__}: {error}"))
+        replies.put((None, False, (type(error).__name__, f"{type(error).__name__}: {error}",
+                                   traceback.format_exc())))
         return
     replies.put((None, True, "ready"))
     try:
@@ -63,7 +87,7 @@ def _serve(commands, replies, stop, stopped_before, simulated, folder, physical_
             # between is then either seen here or leaves the flag set for this command.
             stop.clear()
             if ticket <= stopped_before.value:
-                replies.put((ticket, False, "Stopped before it began."))
+                replies.put((ticket, False, ("Stopped", "Stopped before it began.", "")))
                 continue
             if options.pop("_progress", False):
                 options = {**options, "progress": lambda value, ticket=ticket: replies.put((ticket, "progress", value))}
@@ -82,8 +106,8 @@ def _serve(commands, replies, stop, stopped_before, simulated, folder, physical_
                     result = getattr(engine, name)(*args, **options)
                 replies.put((ticket, True, result))
             except Exception as error:  # noqa: BLE001
-                replies.put((ticket, False, f"{error}" if str(error) else type(error).__name__,))
-                traceback.print_exc()
+                replies.put((ticket, False, (type(error).__name__, str(error) or type(error).__name__,
+                                             traceback.format_exc())))
     finally:
         try:
             engine.close()
@@ -141,7 +165,8 @@ class Host:
                     self.ready.set_result(value)
                     continue
                 # The worker could not start: every command waiting, and every one sent from now on, fails.
-                self._fail_all(f"The Quad Cortex could not be opened: {value}")
+                kind, message, trace = value
+                self._fail_all(f"The Quad Cortex could not be opened: {message}", kind, trace)
                 return
             if ok == "progress":
                 listener = self.progress.get(ticket)
@@ -152,16 +177,20 @@ class Host:
                 future = self.futures.pop(ticket, None)
                 self.progress.pop(ticket, None)
             if future is not None:
-                future.set_result(value) if ok else future.set_exception(RuntimeError(value))
+                if ok:
+                    future.set_result(value)
+                else:
+                    kind, message, trace = value
+                    future.set_exception(Fault(message, kind, trace))
 
-    def _fail_all(self, message):
+    def _fail_all(self, message, kind="WorkerGone", trace=""):
         with self.lock:
-            self.failed = message
+            self.failed = (message, kind, trace)
             pending, self.futures = list(self.futures.values()), {}
         for future in pending:
-            future.set_exception(RuntimeError(message))
+            future.set_exception(Fault(message, kind, trace))
         if not self.ready.done():
-            self.ready.set_exception(RuntimeError(message))
+            self.ready.set_exception(Fault(message, kind, trace))
 
     def call(self, name, *args, progress=None, **options):
         """Send a command; its `Future` holds the result. `progress`, if given, is called (on another thread) with
@@ -169,7 +198,7 @@ class Host:
         future = Future()
         with self.lock:
             if self.failed is not None:
-                future.set_exception(RuntimeError(self.failed))
+                future.set_exception(Fault(*self.failed))
                 return future
             self.ticket += 1
             self.futures[self.ticket] = future

@@ -376,7 +376,7 @@ def usable(reading, available):
 
 # ---- What is known about each model -------------------------------------------------------------
 
-KNOWLEDGE = Path(__file__).with_name("knowledge") / "gear.json"
+KNOWLEDGE = Path(__file__).resolve().parents[1] / "lab" / "tables" / "gear.json"
 SECTIONS = {"amps": "amp", "drives": "drive", "cabs": "cab", "effects": "effect"}
 # Words in a maker's or model's name that are too common to tie a request to it.
 COMMON = frozenset("""the and for with from that this tone sound like amp amps guitar pedal style type based clean lead

@@ -8,7 +8,7 @@ input disconnected, so nothing is heard, each named setting is loaded and the
 block read back, and the block is removed again.
 
 What it writes is the table `knowledge.table("device")` reads
-(`tone_sessions/device-presets.json`): for each model its name, category,
+(`device-presets.json` in the data folder): for each model its name, category,
 whether this unit would load it at all, and each named setting's values in
 display units, plus the plugins the unit says it is licensed for. A partial
 file is resumed: models already read on the same firmware are skipped, so a
@@ -49,7 +49,7 @@ LOADED_WITHIN = 2.5      # seconds for the unit to say a named setting is on the
 
 def default_path():
     """Where `knowledge` reads the named settings from, decided when asked (tests move it)."""
-    return knowledge.REPO / "tone_sessions" / "device-presets.json"
+    return knowledge.device_path()
 
 
 def stored_as_listed(cell, info):

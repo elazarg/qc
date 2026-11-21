@@ -3,7 +3,7 @@
 `GuitarLearner(desk)` opens on whatever desk seats it. The desk provides:
 root, read_state(path), set_status(text), submit(task, message, work, *args,
 done), job, task_if_active(name), stop(), stop_signal, ready, live_is_ready,
-leaving, takes and input_channel (see `lab.desk.window.LearnerSeat`).
+leaving, takes and input_channel (see `lab.learner.seat.LearnerSeat`).
 """
 
 from concurrent.futures import ThreadPoolExecutor

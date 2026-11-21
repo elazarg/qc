@@ -26,6 +26,7 @@ from pathlib import Path
 import re
 
 from lab import knowledge
+from lab.qc.unit import Stopped
 from lab.qc.slots import BUILD, BUILD_NAME, CACHE_PREFIX, CACHE_SLOTS, MY_PRESETS, OLD_APP, TONE_LAB_NAME
 
 FILE = "directory.json"
@@ -102,7 +103,7 @@ def directory(engine, *, stop=None, factory=False, folder=None):
     remembered directory is kept.
     """
     if stop is not None and stop.is_set():
-        raise RuntimeError("Stopped.")
+        raise Stopped("Stopped.")
     device = engine.unit.device
     listing = device.list_directory()
     if not listing or not any(row.get("key") == MY_PRESETS for row in listing.get("presets", [])

@@ -141,18 +141,29 @@ class NamedTest(unittest.TestCase):
 
     def test_written_where_knowledge_looks_and_read_back_at_once(self):
         self.engine.open()
-        with mock.patch.object(knowledge, "REPO", self.folder):
+        home = self.folder / "home"
+        with mock.patch.dict("os.environ", {"TONE_LAB_HOME": str(home)}),                 mock.patch.object(knowledge, "REPO", self.folder):
             knowledge.table.cache_clear()
             knowledge.locked.cache_clear()
             try:
                 found = named.harvest(self.engine)
-                self.assertEqual(Path(found["path"]), self.folder / "tone_sessions" / "device-presets.json")
+                self.assertEqual(Path(found["path"]), home / "device-presets.json")
                 self.assertEqual(knowledge.named_settings(AMP)["Tight Modern"]["GAIN"], 3.)
                 self.assertNotIn("Default", knowledge.named_settings(AMP))
                 self.assertIn(DELAY, knowledge.locked())
             finally:
                 knowledge.table.cache_clear()
                 knowledge.locked.cache_clear()
+
+    def test_what_the_earlier_app_read_is_copied_to_the_data_folder_once(self):
+        home, old = self.folder / "home", self.folder / "tone_sessions" / "device-presets.json"
+        old.parent.mkdir(parents=True)
+        old.write_text(json.dumps({"firmware": "4.1.1", "models": {}}), encoding="utf-8")
+        with mock.patch.dict("os.environ", {"TONE_LAB_HOME": str(home)}),                 mock.patch.object(knowledge, "REPO", self.folder):
+            self.assertEqual(knowledge.device_path(), home / "device-presets.json")
+            self.assertEqual(json.loads((home / "device-presets.json").read_text(encoding="utf-8"))["firmware"],
+                             "4.1.1")
+            self.assertTrue(old.is_file())                    # the earlier app still reads its own
 
     def test_runs_where_the_unit_is_held(self):
         host = Host(self.folder / "host", simulated=True, local=True)

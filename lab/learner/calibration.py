@@ -1,7 +1,7 @@
 """Guitar input calibration: teach one control's settings from dry takes, check what is heard, map a gesture.
 
     from lab.learner import calibration
-    calibration.open(seat)      # the seat of lab.desk.window.LearnerSeat: the same protocol as the Guitar Learner
+    calibration.open(seat)      # the seat of lab.learner.seat.LearnerSeat: the same protocol as the Guitar Learner
 
 One control at a time (pickup selector, volume or tone) is taught from takes
 recorded at two or more of its settings, with the others held fixed

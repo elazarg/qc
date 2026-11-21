@@ -23,7 +23,8 @@ from pathlib import Path
 from lab.sound import catalog
 
 REPO = Path(__file__).resolve().parents[1]
-SHARED = REPO / "tone_lab" / "knowledge"
+SHARED = REPO / "lab" / "tables"       # the tables that ship with the app
+DEVICE = "device-presets.json"         # the unit's named settings, read from the player's unit: in the data folder
 
 
 def home():
@@ -47,35 +48,69 @@ def home():
     return folder
 
 
-def _load(path):
+def device_path():
+    """Where the unit's named settings are kept: the data folder. What the earlier app read into the program
+    folder is copied there once, so the half hour it took is not spent again."""
+    path = home() / DEVICE
+    old = REPO / "tone_sessions" / DEVICE
+    if not path.exists() and old.is_file():
+        try:
+            spare = path.with_suffix(".copying")
+            spare.write_bytes(old.read_bytes())
+            os.replace(spare, path)
+        except OSError:
+            return old
+    return path
+
+
+class MissingTable(RuntimeError):
+    """A table that ships with the app is not there or cannot be read. Nothing is designed on a guess."""
+
+
+def _load(path, shipped=False):
     try:
         return json.loads(Path(path).read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+    except (OSError, ValueError) as error:
+        if shipped:
+            raise MissingTable(f"{Path(path).name} is missing from {Path(path).parent} or cannot be read. "
+                               "Restore it from the repository (git checkout -- lab/tables).") from error
         return {}
 
 
 @dataclass(frozen=True)
 class Source:
     name: str
-    path: Path
+    file: str
     made_by: str
     firmware: str | None
 
 
 @lru_cache(maxsize=None)
 def table(name):
-    paths = {"gear": SHARED / "gear.json", "costs": SHARED / "costs.json", "controls": SHARED / "controls.json",
-             "polarity": SHARED / "polarity.json", "device": REPO / "tone_sessions" / "device-presets.json"}
-    return _load(paths[name])
+    if name == "device":
+        return _load(device_path())      # not there until the unit's named settings have been read
+    return _load(SHARED / f"{name}.json", shipped=True)
 
 
+SHIPPED = ("gear", "costs", "controls", "polarity")
 SOURCES = (
-    Source("gear", SHARED / "gear.json", "research/build_knowledge.py", None),
-    Source("costs", SHARED / "costs.json", "python -m tone_lab.budget", "firmware"),
-    Source("controls", SHARED / "controls.json", "research/measure_amps.py, research/analyse_amps.py", "firmware"),
-    Source("polarity", SHARED / "polarity.json", "research/measure_polarity.py", "firmware"),
-    Source("device", REPO / "tone_sessions" / "device-presets.json", "python -m tone_lab.device_presets", "firmware"),
+    Source("gear", "gear.json", "research/build_knowledge.py", None),
+    Source("costs", "costs.json", "python -m lab budget", "firmware"),
+    Source("controls", "controls.json", "research/measure_amps.py, research/analyse_amps.py", "firmware"),
+    Source("polarity", "polarity.json", "research/measure_polarity.py", "firmware"),
+    Source("device", DEVICE, "python -m lab named-settings", "firmware"),
 )
+
+
+def missing():
+    """The shipped tables that are not there or cannot be read, by file name. `doctor` reports them."""
+    found = []
+    for name in SHIPPED:
+        try:
+            _load(SHARED / f"{name}.json", shipped=True)
+        except MissingTable:
+            found.append(f"{name}.json")
+    return found
 
 
 def stale(firmware):

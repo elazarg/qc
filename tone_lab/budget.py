@@ -16,7 +16,7 @@ from pathlib import Path
 
 from . import models
 
-PATH = Path(__file__).with_name("knowledge") / "costs.json"
+PATH = Path(__file__).resolve().parents[1] / "lab" / "tables" / "costs.json"
 # The unit states about 92 per processor. Filling rows 1 and 2 with graded blocks showed one processor
 # taking 90.7 and refusing 91.5, and the other taking 87.96 and refusing 87.97.
 CPU = (91., 87.96)
