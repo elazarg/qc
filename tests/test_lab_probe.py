@@ -1,5 +1,7 @@
 """Test signals: what a chain is, measured directly, on chains whose answer is known."""
 
+import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
+import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
 import unittest
 
 import numpy as np
@@ -346,6 +348,16 @@ class LevelTest(unittest.TestCase):
         phrase = (.3 * np.sin(2 * np.pi * 196 * t) * np.exp(-2 * (t % .5)))[:, None]
         self.assertAlmostEqual(held_note_peak(phrase), .3, delta=.06)
         self.assertAlmostEqual(float(np.abs(test_signal(.3)).max()), .3, delta=.01)
+
+
+class StereoTest(unittest.TestCase):
+    def test_opposite_phase_sides_measure_as_the_same_distortion_as_in_phase(self):
+        """(review 2026-11-20)"""
+        tones = test_signal(.3)
+        driven = np.tanh(tones[:, 0] * 8) * .3
+        in_phase = analyse(np.stack([driven, driven], axis=1))
+        opposite = analyse(np.stack([driven, -driven], axis=1))
+        self.assertAlmostEqual(opposite.distortion_db, in_phase.distortion_db, places=3)
 
 
 if __name__ == "__main__":

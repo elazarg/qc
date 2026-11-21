@@ -1,6 +1,9 @@
 """What the player's guitar puts out, told to the designer: synthetic profiles only."""
 
+import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
+import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
 import json
+from functools import lru_cache
 import unittest
 
 import numpy as np
@@ -83,6 +86,16 @@ LOW_RIFF = (82.4, 110., 146.8, 196., 146.8, 110.)
 STRUM = "open strings strummed once"
 
 
+@lru_cache(maxsize=None)
+def partials(pitch, samples):
+    """A note's partials at 1/k up to 5 kHz, `samples` long. Worked out once for each pitch and length: summing
+    them is what these tests spent their time on."""
+    time = np.arange(samples) / RATE
+    tone = sum(np.sin(2 * np.pi * pitch * k * time + k) / k for k in range(1, 60) if pitch * k < 5000)
+    tone.setflags(write=False)
+    return tone
+
+
 def take(pitches=LOW_RIFF, level=.12, accent=1., hiss_db=None, tilt=None):
     """One made-up pickup playing `pitches`, half a second apart, then a second of silence: every note has the
     same spectral envelope (partials at 1/k up to 5 kHz). `accent` picks the fourth note that much harder;
@@ -92,7 +105,7 @@ def take(pitches=LOW_RIFF, level=.12, accent=1., hiss_db=None, tilt=None):
     for index, pitch in enumerate(pitches):
         begin = round((.25 + .5 * index) * RATE)
         time = np.arange(total - begin) / RATE
-        tone = sum(np.sin(2 * np.pi * pitch * k * time + k) / k for k in range(1, 60) if pitch * k < 5000)
+        tone = partials(pitch, total)[:total - begin]          # a later note is the same tone, cut shorter
         out[begin:] += level * (accent if index == 3 else 1.) * tone * np.exp(-6 * time)
     if tilt is not None:
         out = tilt(out)

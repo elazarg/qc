@@ -2,6 +2,10 @@
 
 Ported from test_tone_space."""
 
+import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
+import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
+import hidden_tk  # noqa: E402,F401  (keeps every window off the screen)
+
 from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
@@ -64,6 +68,10 @@ class FieldTest(unittest.TestCase):
 
 
 class OnTheUnitTest(unittest.TestCase):
+    def test_what_the_contrast_found_is_said_in_two_lines_for_the_difference_panel(self):
+        lines = field.contrast_lines({"perceptual_delta": [("Brightness", 1.25, "ERB"), ("Tail continuity", -3., "dB")]})
+        self.assertEqual(lines, ["B against A, level aside:", "Brightness +1.2 ERB  ·  Tail continuity -3.0 dB"])
+
     def test_the_contrast_of_a_and_b_is_measured_silently(self):
         with TemporaryDirectory() as folder:
             unit = host(folder)

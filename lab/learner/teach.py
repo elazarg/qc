@@ -1,7 +1,11 @@
-"""Teach a control: the window where the app is taught to tell one guitar control's settings apart by sound.
+"""Teach a control: where the app is taught to tell one guitar control's settings apart by sound.
 
     from lab.learner import teach
     teach.open(seat)        # the seat of lab.learner.seat.LearnerSeat
+
+It is shown in the desk's window, in the place of the side panel, and laid out for that width; the parts used
+less often are shown on request, in place. A choice among a few (the instrument, a setting, the knob a gesture
+turns) is a row of chips, a WAV is chosen from a list in place or by its path, and nothing is bound to a key.
 
 One control at a time (pickup selector, volume or tone) is taught from takes
 recorded at two or more of its settings, with the others held fixed. A fresh
@@ -18,7 +22,6 @@ from datetime import datetime
 from pathlib import Path
 from threading import Event
 import tkinter as tk
-from tkinter import filedialog, ttk
 
 from scipy.io import wavfile
 
@@ -27,6 +30,7 @@ from lab.desk import theme as palette
 from lab.sound.knobs import KNOBS
 from lab.learner import folders, gestures as guitar_gestures, inputs, taught, takes
 from lab.learner.taught import CONTROLS, HINTS
+from lab.tools.common import WIDTH, Chips, FileChoice, disclosure, scrolled, usual_folders, wheel
 
 TITLE = "Teach a control"
 
@@ -45,24 +49,18 @@ FONT = palette.FONT
 def button(parent, label, command, *, accent=False, compact=False):
     return tk.Button(
         parent, text=label, command=command, font=(FONT, 10, "bold"), relief="flat",
-        borderwidth=0, padx=10 if compact else 14, pady=6 if compact else 9,
+        borderwidth=0, padx=8 if compact else 12, pady=4 if compact else 7,
         background=ACCENT if accent else palette.TILE, foreground=INK if accent else TEXT,
         activebackground="#ffd7b7" if accent else palette.RULE, activeforeground=INK if accent else TEXT,
-        disabledforeground="#8a8b9a" if not accent else "#7a5a43", takefocus=True,
-        highlightthickness=1, highlightcolor=ACCENT, highlightbackground=parent.cget("bg"),
+        disabledforeground="#8a8b9a" if not accent else "#7a5a43",
     )
 
 
 def label(parent, text=None, *, variable=None, size=10, strong=False, color=TEXT, wrap=0):
     options = {"textvariable": variable} if variable is not None else {"text": text}
-    return tk.Label(parent, **options, font=(FONT, size, "bold" if strong else "normal"),
+    return tk.Label(parent, **options, font=(FONT, 9 if size == 10 else size, "bold" if strong else "normal"),
                     background=parent.cget("bg"), foreground=color, wraplength=wrap,
                     justify="left", anchor="w")
-
-
-def card(parent, *, padding=16):
-    return tk.Frame(parent, background=PANEL, padx=padding, pady=padding,
-                    highlightbackground=LINE, highlightthickness=1)
 
 
 def entry(parent, variable, *, width=24):
@@ -70,22 +68,6 @@ def entry(parent, variable, *, width=24):
                     background=RECESS, foreground=TEXT, insertbackground=TEXT, relief="flat",
                     highlightthickness=1, highlightbackground=LINE, highlightcolor=ACCENT,
                     selectbackground="#3e4c68", selectforeground=TEXT)
-
-
-def add_scrollbar(parent, canvas):
-    style = ttk.Style(parent)
-    style.configure("ToneLab.Vertical.TScrollbar", background=LINE, troughcolor=BG, bordercolor=BG,
-                    darkcolor=LINE, lightcolor=LINE, arrowcolor=MUTED, arrowsize=11)
-    bar = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview, style="ToneLab.Vertical.TScrollbar")
-
-    def show(first, last):
-        bar.set(first, last)
-        if float(first) <= 0 and float(last) >= 1:
-            bar.pack_forget()
-        elif not bar.winfo_manager():
-            bar.pack(side="right", fill="y", before=canvas)
-
-    canvas.configure(yscrollcommand=show)
 
 
 class TeachPanel:
@@ -103,6 +85,7 @@ class TeachPanel:
         self.loaded_selection = None
         self.last_desk_guitar = seat.guitar if seat.guitar in taught.instruments() else taught.GUITARS[0]
         self.instrument = tk.StringVar(master=self.root, value=self.last_desk_guitar)
+        self.new_instrument = tk.StringVar(master=self.root)    # a guitar typed in, not one of the chips yet
         self.control = tk.StringVar(master=self.root, value=next(iter(CONTROLS)))
         self.example_label = tk.StringVar(master=self.root)
         self.start_seconds, self.end_seconds = tk.StringVar(master=self.root), tk.StringVar(master=self.root)
@@ -124,55 +107,57 @@ class TeachPanel:
         self.load_selection()
 
     def build(self, parent):
-        label(parent, variable=self.status, color=ACCENT, wrap=550).pack(side="bottom", fill="x", pady=(5, 0))
-        self.scroller = tk.Canvas(parent, background=BG, highlightthickness=0)
+        label(parent, variable=self.status, color=ACCENT, wrap=WIDTH).pack(side="bottom", fill="x", pady=(5, 0))
+        self.scroller, body = scrolled(parent)
         self.scroller.pack(side="left", fill="both", expand=True)
-        add_scrollbar(parent, self.scroller)
-        body = tk.Frame(self.scroller, background=BG)
-        frame = self.scroller.create_window((0, 0), anchor="nw", window=body)
-        body.bind("<Configure>", lambda _: self.scroller.configure(scrollregion=self.scroller.bbox("all")))
-        self.scroller.bind("<Configure>", lambda event: self.scroller.itemconfigure(frame, width=event.width))
 
-        header = card(body, padding=12)
+        header = tk.Frame(body, background=PANEL)
         header.pack(fill="x", pady=(0, 8))
-        choice = self.row(header)
-        self.instrument_box = self.combo(choice, "Instrument", self.instrument, taught.instruments(), width=18, editable=True)
-        controls = self.field_cell(choice, "Control to learn")
+        label(header, "Instrument", color=MUTED, size=9).pack(anchor="w")
+        self.instrument_chips = Chips(header, self.instrument, taught.instruments(), command=self.load_selection)
+        self.instrument_chips.pack(fill="x")
+        other = self.row(header, 2)
+        label(other, "Another guitar:", color=MUTED, size=9).pack(side="left")
+        self.instrument_entry = entry(other, self.new_instrument, width=18)
+        self.instrument_entry.pack(side="left", padx=6, ipady=2)
+        self.instrument_entry.bind("<Return>", lambda _: self.name_instrument())
+        label(header, "Control to learn", color=MUTED, size=9).pack(anchor="w", pady=(6, 2))
+        controls = self.row(header)
         self.control_buttons = {}
         for title, key in CONTROLS.items():
             self.control_buttons[title] = button(controls, title, lambda value=key: self.choose_control(value), compact=True)
             self.control_buttons[title].pack(side="left", padx=(0, 4))
-        self.instrument_box.bind("<<ComboboxSelected>>", lambda _: self.load_selection())
-        self.instrument_box.bind("<Return>", lambda _: self.load_selection())
-        self.instrument_box.bind("<FocusOut>", lambda _: self.load_selection())
 
-        workspace = tk.Frame(body, background=BG)
-        workspace.pack(fill="x")
-        workspace.columnconfigure((0, 1), weight=1, uniform="teach-a-control")
-        training = self.section(workspace, "Teach two settings")
-        training.grid(row=0, column=0, sticky="nsew", padx=(0, 4), pady=(0, 8))
-        label(training, variable=self.control_hint, color=MUTED, wrap=375).pack(anchor="w", pady=(4, 0))
-        label(training, "Repeat the same three sustained single notes at each setting.", color=MUTED,
-              wrap=375).pack(anchor="w", pady=(2, 0))
-        actions = self.row(training, 8)
-        self.label_box = self.combo(actions, "Setting on guitar", self.example_label, (), width=18, editable=True)
+        training = self.section(body, "Teach two settings")
+        label(training, variable=self.control_hint, color=MUTED, size=9, wrap=WIDTH).pack(anchor="w", pady=(4, 0))
+        label(training, "Repeat the same three sustained single notes at each setting.", color=MUTED, size=9,
+              wrap=WIDTH).pack(anchor="w", pady=(2, 0))
+        label(training, "Setting on guitar", color=MUTED, size=9).pack(anchor="w", pady=(6, 0))
+        self.setting_chips = Chips(training, self.example_label, ())
+        self.setting_chips.pack(fill="x")
+        self.setting_entry = entry(training, self.example_label, width=22)
+        self.setting_entry.pack(anchor="w", ipady=2, pady=(2, 0))
+        actions = self.row(training, 6)
         self.record = button(actions, "Record example", lambda: self.record_dry("example"), accent=True, compact=True)
-        self.record.pack(side="left", anchor="s", padx=(0, 6))
+        self.record.pack(side="left", padx=(0, 6))
         self.train = button(actions, "Learn settings", self.fit_profile, compact=True)
-        self.train.pack(side="left", anchor="s")
-        label(training, variable=self.progress_text, strong=True, wrap=375).pack(anchor="w", pady=(9, 0))
-        label(training, variable=self.next_step, color=MUTED, wrap=375).pack(anchor="w", pady=(3, 0))
-        label(training, variable=self.source_text, color=ACCENT, wrap=375).pack(anchor="w", pady=(3, 0))
-        label(training, variable=self.profile_text, color=ACCENT, wrap=375).pack(anchor="w", pady=(5, 0))
+        self.train.pack(side="left")
+        label(training, variable=self.progress_text, strong=True, size=9, wrap=WIDTH).pack(anchor="w", pady=(8, 0))
+        label(training, variable=self.next_step, color=MUTED, size=9, wrap=WIDTH).pack(anchor="w", pady=(3, 0))
+        label(training, variable=self.source_text, color=ACCENT, size=9, wrap=WIDTH).pack(anchor="w", pady=(3, 0))
+        label(training, variable=self.profile_text, color=ACCENT, size=9, wrap=WIDTH).pack(anchor="w", pady=(4, 0))
 
         example_tools = self.disclosure(training, "Example library and clip ranges")
         actions = self.row(example_tools, 4)
         self.use_latest = button(actions, "Use latest take", self.select_latest, compact=True)
-        self.add_wav = button(actions, "Choose a dry WAV…", self.select_wav, compact=True)
         self.add_take = button(actions, "Save labeled example", self.add_example, compact=True)
-        for widget in (self.use_latest, self.add_wav, self.add_take):
+        for widget in (self.use_latest, self.add_take):
             widget.pack(side="left", padx=(0, 6))
-        label(example_tools, variable=self.latest_text, color=MUTED, size=9, wrap=375).pack(anchor="w", pady=(4, 0))
+        label(example_tools, variable=self.latest_text, color=MUTED, size=9, wrap=WIDTH).pack(anchor="w", pady=(4, 0))
+        label(example_tools, "Or a dry WAV to label:", color=MUTED, size=9).pack(anchor="w", pady=(4, 0))
+        self.example_files = FileChoice(example_tools, folders=self.wav_folders, patterns=("*.wav",),
+                                        choose=self.select_wav, action="Label this WAV", height=3)
+        self.example_files.pack(fill="x")
         fields = self.row(example_tools, 4)
         self.field(fields, "Start (s, optional)", self.start_seconds, width=10)
         self.field(fields, "End (s, optional)", self.end_seconds, width=10)
@@ -181,78 +166,79 @@ class TeachPanel:
         self.example_list.pack(fill="x", pady=(8, 4))
         self.example_list.bind("<<ListboxSelect>>", lambda _: self.set_buttons())
         self.remove = button(example_tools, "Remove selected example", self.remove_example, compact=True)
-        self.remove.pack(anchor="e")
+        self.remove.pack(anchor="w")
 
-        analysis = self.section(workspace, "Check what Tone Lab hears")
-        analysis.grid(row=0, column=1, sticky="nsew", padx=(4, 0), pady=(0, 8))
-        actions = self.row(analysis, 8)
+        analysis = self.section(body, "Check what Tone Lab hears")
+        actions = self.row(analysis, 6)
         self.record_test = button(actions, "Record a fresh check", lambda: self.record_dry("check"), accent=True, compact=True)
         self.inspect_take = button(actions, "Check latest dry take", lambda: self.inspect(current=True), compact=True)
         for widget in (self.record_test, self.inspect_take):
             widget.pack(side="left", padx=(0, 5))
-        label(analysis, variable=self.estimate_text, color=MUTED, wrap=375).pack(anchor="w", pady=(8, 4))
+        label(analysis, variable=self.estimate_text, color=MUTED, size=9, wrap=WIDTH).pack(anchor="w", pady=(8, 4))
         label(analysis, "An estimate says which taught setting the notes are closest to, and how close: it applies "
                         "to the settings and notes you taught.", color=MUTED, size=9,
-              wrap=375).pack(anchor="w", pady=(0, 4))
+              wrap=WIDTH).pack(anchor="w", pady=(0, 4))
         self.observe_box = self.check(analysis, "Show estimate while playing guitar", self.observe, self.change_observe)
-        label(analysis, variable=self.live_text, color=MUTED, wrap=375).pack(anchor="w", pady=(4, 0))
-        label(analysis, variable=self.live_action, color=ACCENT, wrap=375).pack(anchor="w")
+        label(analysis, variable=self.live_text, color=MUTED, size=9, wrap=WIDTH).pack(anchor="w", pady=(4, 0))
+        label(analysis, variable=self.live_action, color=ACCENT, size=9, wrap=WIDTH).pack(anchor="w")
         details = self.disclosure(analysis, "Dry audio and estimate timeline")
-        actions = self.row(details, 5)
-        self.inspect_wav = button(actions, "Check a dry WAV…", self.inspect, compact=True)
-        self.audition = button(actions, "Hear selection", self.listen, compact=True)
-        for widget in (self.inspect_wav, self.audition):
-            widget.pack(side="left", padx=(0, 5))
+        label(details, "Check a dry WAV:", color=MUTED, size=9).pack(anchor="w")
+        self.check_files = FileChoice(details, folders=self.wav_folders, patterns=("*.wav",),
+                                      choose=self.inspect_file, action="Check this WAV", height=3)
+        self.check_files.pack(fill="x")
         self.timeline = self.listbox(details, height=5)
-        self.timeline.pack(fill="x")
+        self.timeline.pack(fill="x", pady=(6, 4))
+        self.audition = button(details, "Hear selection", self.listen, compact=True)
+        self.audition.pack(anchor="w")
 
-        live = card(body)
-        live.pack(fill="x", pady=(0, 10))
+        live = self.section(body, "Gestures")
         mapped = self.disclosure(live, "Gesture mapping")
-        label(mapped, "Map a return gesture", strong=True).pack(anchor="w", pady=(8, 0))
+        label(mapped, "Map a return gesture", strong=True, size=9).pack(anchor="w", pady=(6, 0))
         label(mapped, "Pick a starting setting and an excursion. A deliberate move away and back, about a second at "
                       "the excursion, can nudge one tone control.",
-              color=MUTED, wrap=550).pack(anchor="w", pady=(4, 8))
-        mapping = self.row(mapped)
-        self.home_box = self.combo(mapping, "Start and return", self.home, (), width=13)
-        self.excursion_box = self.combo(mapping, "Move to", self.excursion, (), width=13)
-        self.combo(mapping, "Tone control", self.knob, tuple(self.knob_keys), width=13)
-        self.field(mapping, "Step (%)", self.step, width=7)
+              color=MUTED, size=9, wrap=WIDTH).pack(anchor="w", pady=(4, 6))
+        label(mapped, "Start and return", color=MUTED, size=9).pack(anchor="w")
+        self.home_chips = Chips(mapped, self.home, ())
+        self.home_chips.pack(fill="x")
+        label(mapped, "Move to", color=MUTED, size=9).pack(anchor="w", pady=(4, 0))
+        self.excursion_chips = Chips(mapped, self.excursion, ())
+        self.excursion_chips.pack(fill="x")
+        label(mapped, "Tone control", color=MUTED, size=9).pack(anchor="w", pady=(4, 0))
+        Chips(mapped, self.knob, tuple(self.knob_keys)).pack(fill="x")
+        step = self.row(mapped, 4)
+        self.field(step, "Step (%)", self.step, width=7)
         self.map_save = button(mapped, "Save mapping", self.save_mapping, compact=True)
         self.map_save.pack(anchor="w", pady=(8, 4))
         self.arm_box = self.check(mapped, "Arm the mapped control when listening starts", self.arm)
         label(mapped, f"Tick this before Show estimate. The control is armed for {guitar_gestures.ARM_SECONDS:.0f} "
                       "seconds, and for as long again after each gesture; it turns the knob on the sound on show.",
-              color=MUTED, size=9, wrap=520).pack(anchor="w", pady=(1, 5))
-        self.scroller.bind("<MouseWheel>", self.scroll)
-        for panel in (header, training, example_tools, live, mapped, analysis, details):
-            for item in panel.winfo_children():
-                if isinstance(item, (tk.Frame, tk.Label)):
-                    item.bind("<MouseWheel>", self.scroll)
+              color=MUTED, size=9, wrap=WIDTH).pack(anchor="w", pady=(1, 5))
+        wheel(self.scroller)
 
-    def scroll(self, event):
-        self.scroller.yview_scroll(-int(event.delta / 120), "units")
+    def wav_folders(self):
+        """Where a dry WAV may be: the takes recorded here, then where recordings are usually kept."""
+        return [folders.recordings(), *usual_folders("wav", self.seat.studio.folder)]
+
+    def name_instrument(self):
+        """Take the guitar typed in the line as the instrument, as one the chips do not hold yet."""
+        name = self.new_instrument.get().strip()
+        if not name or not self.idle():
+            return
+        self.new_instrument.set("")
+        if name not in self.instrument_chips.chips:
+            self.instrument_chips.offer((*self.instrument_chips.chips, name))
+        self.instrument.set(name)
+        self.load_selection()
 
     def section(self, body, title):
-        panel = card(body, padding=12)
-        label(panel, title, size=13, strong=True).pack(anchor="w")
+        panel = tk.Frame(body, background=PANEL)
+        panel.pack(fill="x", pady=(0, 10))
+        label(panel, title, size=10, strong=True).pack(anchor="w")
         return panel
 
     @staticmethod
     def disclosure(parent, title):
-        content = tk.Frame(parent, background=PANEL)
-
-        def toggle():
-            if content.winfo_manager():
-                content.pack_forget()
-                control.configure(text=f"▸  {title}")
-            else:
-                content.pack(fill="x", pady=(6, 0))
-                control.configure(text=f"▾  {title}")
-
-        control = button(parent, f"▸  {title}", toggle, compact=True)
-        control.pack(anchor="w", pady=(5, 0))
-        return content
+        return disclosure(parent, title)
 
     @staticmethod
     def row(parent, pady=0):
@@ -267,33 +253,21 @@ class TeachPanel:
         return cell
 
     def field(self, parent, title, variable, width):
-        entry(self.field_cell(parent, title), variable, width=width).pack(ipady=4)
-
-    def combo(self, parent, title, variable, values, *, width, editable=False):
-        control = ttk.Combobox(self.field_cell(parent, title), textvariable=variable, values=values, width=width,
-                               state="normal" if editable else "readonly", style="ToneLab.Guitar.TCombobox")
-        style = ttk.Style(parent)
-        style.configure("ToneLab.Guitar.TCombobox", fieldbackground=RECESS, foreground=TEXT, background=LINE,
-                        arrowcolor=TEXT, padding=4)
-        style.map("ToneLab.Guitar.TCombobox", fieldbackground=[("readonly", RECESS)],
-                  foreground=[("readonly", TEXT)], selectbackground=[("readonly", RECESS)],
-                  selectforeground=[("readonly", TEXT)])
-        control.pack()
-        return control
+        entry(self.field_cell(parent, title), variable, width=width).pack(ipady=3)
 
     @staticmethod
     def check(parent, text, variable, command=None):
-        widget = tk.Checkbutton(parent, text=text, variable=variable, command=command, font=(FONT, 10),
+        widget = tk.Checkbutton(parent, text=text, variable=variable, command=command, font=(FONT, 9),
                                 background=PANEL, foreground=TEXT, activebackground=PANEL, activeforeground=TEXT,
-                                selectcolor=RECESS, relief="flat", highlightthickness=0, takefocus=True)
+                                selectcolor=RECESS, relief="flat", highlightthickness=0)
         widget.pack(anchor="w")
         return widget
 
     @staticmethod
     def listbox(parent, *, height):
         return tk.Listbox(parent, height=height, background=RECESS, foreground=TEXT, highlightthickness=1,
-                          highlightbackground=LINE, highlightcolor=ACCENT, selectbackground="#3e4c68",
-                          selectforeground=TEXT, exportselection=False, font=(FONT, 10), relief="flat")
+                          highlightbackground=LINE, highlightcolor=LINE, selectbackground=palette.TILE,
+                          selectforeground=TEXT, exportselection=False, font=(FONT, 9), relief="flat")
 
     # ---- what is chosen ----
 
@@ -363,8 +337,8 @@ class TeachPanel:
         if self.mapping and (self.mapping.home not in settings or self.mapping.excursion not in settings):
             self.mapping = None
         self.profile_text.set("Learned  ·  " + " / ".join(settings) if settings else "")
-        self.home_box.configure(values=settings)
-        self.excursion_box.configure(values=settings)
+        self.home_chips.offer(settings)
+        self.excursion_chips.offer(settings)
         self.home.set(self.mapping.home if self.mapping else settings[0] if settings else "")
         self.excursion.set(self.mapping.excursion if self.mapping else settings[1] if len(settings) > 1 else "")
         self.knob.set(KNOBS[self.mapping.control][0] if self.mapping else KNOBS["space"][0])
@@ -377,7 +351,7 @@ class TeachPanel:
         self.counts = taught.example_counts(self.examples)
         known = [name for name, _ in self.counts.values()]
         suggestions = [name for name in offered if name.casefold() not in self.counts]
-        self.label_box.configure(values=(*suggestions, *known))
+        self.setting_chips.offer((*suggestions, *known))
         self.control_hint.set(HINTS[control])
         self.example_list.delete(0, "end")
         for example in self.examples:
@@ -419,18 +393,18 @@ class TeachPanel:
                               state="normal" if (recording_example and stop_allowed or start_allowed and setting) else "disabled")
         self.record_test.configure(text="Stop and check" if recording_check else "Record a fresh check",
                                    state="normal" if (recording_check and stop_allowed or start_allowed and valid_profile) else "disabled")
-        self.instrument_box.configure(state="normal" if editable else "disabled")
+        self.instrument_chips.enable(editable)
+        self.instrument_entry.configure(state="normal" if editable else "disabled")
         for title, choice in self.control_buttons.items():
             selected = title == self.control.get()
             choice.configure(state="normal" if editable else "disabled", bg=ACCENT if selected else "#2c303c",
                              fg=INK if selected else TEXT)
-        self.label_box.configure(state="normal" if editable else "disabled")
+        self.setting_chips.enable(editable)
+        self.setting_entry.configure(state="normal" if editable else "disabled")
         for widget, ready in ((self.use_latest, editable and self.latest_dry is not None),
                               (self.add_take, editable and self.example_source is not None and setting),
-                              (self.add_wav, editable),
                               (self.train, editable and len(self.counts) >= 2),
                               (self.map_save, editable and valid_profile),
-                              (self.inspect_wav, editable and valid_profile),
                               (self.inspect_take, editable and valid_profile and self.latest_dry is not None),
                               (self.audition, editable and self.result_audio is not None),
                               (self.remove, editable and bool(self.example_list.curselection()))):
@@ -582,24 +556,20 @@ class TeachPanel:
         self.update_latest()
         if self.latest_dry:
             self.set_source(*self.latest_dry)
-            self.label_box.focus_set()
             self.status.set("")
         else:
             self.status.set(self.latest_text.get())
             self.set_buttons()
 
-    def select_wav(self):
+    def select_wav(self, path):
+        """Take a dry WAV chosen in the list, or by its path, as the take to label."""
+        if not self.idle():
+            self.status.set("Finish what is running first.")
+            return
         self.load_selection()
-        path = self.choose_file()
-        if path is not None:
-            self.set_source(path, path.name)
-            self.label_box.focus_set()
-            self.status.set("")
-
-    def choose_file(self):
-        filename = filedialog.askopenfilename(parent=self.root, title="Choose a dry mono WAV",
-                                              filetypes=(("WAV audio", "*.wav"),))
-        return Path(filename).resolve() if filename else None
+        path = Path(path).resolve()
+        self.set_source(path, path.name)
+        self.status.set("")
 
     def add_example(self):
         if not self.idle():
@@ -622,7 +592,7 @@ class TeachPanel:
             return
         self.examples = taught.examples(instrument, control)
         self.examples_changed = True
-        self.instrument_box.configure(values=taught.instruments())
+        self.instrument_chips.offer(taught.instruments())
         self.refresh_examples()
         self.example_label.set(self.suggested_setting())
         self.set_source(None)
@@ -743,14 +713,21 @@ class TeachPanel:
             self.estimate_text.set("Play the same notes at a setting you taught for a fresh check.")
         self.timeline.delete(0, "end")
 
-    def inspect(self, *, current=False):
+    def inspect(self, *, current=True):
+        """Check the latest dry take against what was taught."""
         try:
-            source = self.current_take()[0] if current else self.choose_file()
+            source = self.current_take()[0]
         except (OSError, RuntimeError, ValueError) as error:
             self.status.set(str(error))
             return
-        if source is not None:
-            self.inspect_path(source)
+        self.inspect_path(source)
+
+    def inspect_file(self, path):
+        """Check a dry WAV chosen in the list, or by its path."""
+        if not self.idle() or self.profile is None:
+            self.status.set("Learn two settings first." if self.profile is None else "Finish what is running first.")
+            return
+        self.inspect_path(Path(path).resolve())
 
     def inspect_path(self, source):
         if self.profile is None or self.working:
@@ -822,52 +799,49 @@ class TeachPanel:
         self.seat.later(self.worker.submit(work), done, failed)
 
 
-class TeachWindow:
+class Teaching:
+    """The teaching of a control, shown in the desk's window in the place of the side panel (`Desk.show`). It is
+    made once for a seat and kept, so it comes back as it was left."""
+
+    TITLE = TITLE
+
     def __init__(self, seat):
         self.seat = seat
-        self.window = tk.Toplevel(seat.root, background=BG)
-        self.window.withdraw()
-        self.window.title(f"{TITLE} · Tone Lab")
-        self.window.minsize(900, 620)
-        self.window.geometry("1000x760")
-        self.window.protocol("WM_DELETE_WINDOW", self.hide)
-        self.window.bind("<Escape>", lambda _: self.hide())
+        self.frame = seat.desk.host_frame()
         self.worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix="teach-a-control")
-        page = tk.Frame(self.window, background=BG, padx=20, pady=16)
-        page.pack(fill="both", expand=True)
-        header = tk.Frame(page, background=BG)
-        header.pack(fill="x", pady=(0, 10))
-        tk.Label(header, text="Teach a control's settings", font=("Georgia", 22), background=BG,
-                 foreground=TEXT).pack(side="left")
-        button(header, "Back to Tone Lab", self.hide, compact=True).pack(side="right")
-        body = tk.Frame(page, background=BG)
-        body.pack(fill="both", expand=True)
-        self.panel = TeachPanel(seat, body, self.worker)
+        self.panel = TeachPanel(seat, self.frame, self.worker)
+        self.scroller = self.panel.scroller
 
     def show(self):
-        from lab.learner.window import dark_title
+        self.seat.desk.show(self)
 
-        self.window.deiconify()
-        dark_title(self.window)
-        self.window.lift()
-        self.window.focus_set()
+    def showing(self):
+        return self.seat.desk.hosted is self
+
+    def shown(self):
+        """The desk has put the teaching on show: it takes the instrument chosen there."""
         self.panel.follow_desk_guitar()
 
-    def hide(self):
-        """Hide the window. A recording stops; gesture listening goes on, so the guitar can be played on the desk."""
+    def hidden(self):
+        """The desk has gone back from it. A recording stops; gesture listening goes on, so the guitar can be
+        played on the desk."""
         if self.panel.recording is not None:
             self.panel.recording["stop"].set()
-        self.window.withdraw()
-        self.seat.root.lift()
+
+    def hide(self):
+        if self.showing():
+            self.seat.desk.back()
+        else:
+            self.hidden()
 
 
-_windows = {}
+_shown = {}
 
 
 def open(seat):  # noqa: A001 - the name the desk calls
-    """Show the window for this seat, opening it the first time."""
-    found = _windows.get(id(seat))
-    if found is None or not found.window.winfo_exists():
-        found = _windows[id(seat)] = TeachWindow(seat)
+    """Show the teaching for this seat in the desk's window, making it the first time."""
+    found = _shown.get(id(seat))
+    if found is None or not found.frame.winfo_exists():
+        found = _shown[id(seat)] = Teaching(seat)
     found.show()
     return found

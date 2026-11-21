@@ -17,51 +17,56 @@ Where things are kept:
   (`Rounds`). A sound is read from its file whenever it is needed and written
   whole; its knob positions, marks and measurements live there.
 - Everything else the studio keeps track of is an attribute set up in
-  `__init__`: the phrase in use, the requests with the assistant, the last
-  remark, the knobs waiting to be checked, what is going on (`doing`, shown
-  as the working line) and who holds the audio input.
+  `__init__`: the phrase in use, the last remark, what is going on (`doing`,
+  shown as the working line) and who holds the audio input.
+
+Four parts do work of their own and keep their own state; the studio makes
+them, and each reaches the rest through it:
+
+- `ear` (`listening.Listening`): listening, silently, while the unit is free,
+  to what is on show and has not been heard as it plays now, and checking
+  knobs that were turned; and whether a measurement holds for what plays now.
+- `asking` (`requests.Requests`): the requests with the assistant, rounds and
+  revisions, of which only the newest answer goes on show.
+- `guitar` (`guitar.Guitar`): the takes recorded, and what the instrument
+  puts out, worked out from them away from the window's thread.
+- `marks` (`marks.Marks`): the player's marks, the choices they amount to,
+  and the songs a kept sound becomes a part of.
+
+What the window, the side tools and the Guitar Learner's seat call is here,
+on `Studio`, under one name each, whichever part does it.
 
 Work that takes time (anything on the unit, any call to the assistant) runs
 elsewhere and its result is handled here, on the window's thread, by `poll`.
 A result is applied only if what it was for is still what is shown: an answer
 for a sound that has since left B is offered, not applied.
-
-While the unit is free (`_use_free_unit`), the studio listens, silently, to
-what is on show and has not been heard as it plays now.
 """
 
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
-from datetime import datetime, timezone
 import json
 from pathlib import Path
-import re
-import threading
 import time
 import traceback
 
-from lab.sound import design, knobs, words
+from lab.sound import knobs, words
 from lab import knowledge
 from lab.sound.assistant import Assistant, Cancelled, Refused
 from lab.hearing.measure import summary
-from lab.sound.sounds import Sound, Store, describe, new_id, write_whole
+from lab.sound.sounds import Sound, Store, now, write_whole
+from lab.desk.difference import difference
+from lab.desk.guitar import Guitar
+from lab.desk.listening import Listening
+from lab.desk.marks import Marks
+from lab.desk.requests import Requests, Rounds, reads_as_change, song_name
 
-SETTLE_SECONDS = 4.     # a turn is checked by listening once no knob has moved for this long
-IDLE_SECONDS = 2.       # silent listening starts once the unit has been left alone for this long
 PHRASE_SECONDS = 3.5    # the part of a take that loops, until its edges are dragged
 RATE = 48000
-# The one correction a check may make to a knob, as a factor on its position: further when it did too little,
-# back when it did the opposite of what it is for.
-CORRECTION = {"too small": 1.6, "opposite": .5}
-CORRECTION_LIMIT = .4   # never more than this much of a knob's travel
 # Who may hold the audio input outside the engine, as the desk names them.
 HOLDERS = {"learner": "The Guitar Learner", "gestures": "Gesture listening"}
 # Holders beside whom the guitar may still be heard through the unit: that route is made on the unit and opens no
 # audio driver, and gestures are for playing the sound on show. (The Guitar Learner records the dry guitar alone.)
 GUITAR_GOES_ON = frozenset({"gestures"})
-# Why a silent listen can end without saying anything about the sound it was listening to: it was stopped, or the
-# unit was not the app's to use just then.
-NOT_THE_SOUND = frozenset({"Stopped", "Moved", "Unsaved", "NotOurs", "EditorActive", "WorkerGone"})
 
 
 @dataclass(frozen=True)
@@ -87,45 +92,6 @@ SET_ASIDE = "session.set-aside.json"
 KEPT = ("a", "b", "side", "round", "scene", "song", "instrument")
 
 
-class Rounds:
-    """The rounds on disk, one small JSON file each, written whole or not at all.
-
-    A round is {"id", "request", "aim", "created", "previous", "next", "by", "candidates": [{"sound", "differs"}]}.
-    """
-
-    def __init__(self, folder):
-        self.folder = Path(folder) / "rounds"
-
-    def save(self, record):
-        self.folder.mkdir(parents=True, exist_ok=True)
-        write_whole(self.folder / f"{record['id']}.json", json.dumps(record, indent=1))
-        return record
-
-    def get(self, round_id):
-        if not round_id:
-            return None
-        try:
-            found = json.loads((self.folder / f"{round_id}.json").read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return None
-        return found if isinstance(found, dict) else None
-
-    def of(self, sound_id):
-        """The round a sound was designed in, if any."""
-        for path in self.folder.glob("*.json"):
-            found = self.get(path.stem)
-            if found and any(candidate.get("sound") == sound_id for candidate in found.get("candidates", [])):
-                return found
-        return None
-
-    def follow(self, earlier_id, next_id):
-        """Note on a round which one was designed to follow it."""
-        earlier = self.get(earlier_id)
-        if earlier is not None:
-            earlier["next"] = next_id
-            self.save(earlier)
-
-
 class Studio:
     def __init__(self, host, folder=None, *, assistant=None, phrase=None):
         self.folder = Path(folder or knowledge.home())
@@ -141,14 +107,14 @@ class Studio:
         self.jobs = []                    # (future, done, failed, the activity it ends)
         self.progress = []                # (handler, value) reported by the unit's worker, handled by `poll`
         self.doing = {}                   # what is going on, by key, oldest first: the working line shows the newest
-        # The assistant.
-        self.requests = set()             # the player's requests in flight, each its own cancel signal
-        self.background = set()           # the app's own requests in flight, cancelled only when the app closes
-        self.latest = None                # the newest of the player's
-        self.preparing = None             # the round whose next three are being designed
+        self.ear = Listening(self)        # listening while the unit is free, and whether a measurement holds
+        self.asking = Requests(self)      # the requests with the assistant
+        self.guitar = Guitar(self)        # the takes, and what the instrument puts out
+        self.marks = Marks(self)          # the player's marks, choices and songs
         self.remark = None                # the last remark that moved knobs: {"text", "sound", "turn", "before", "after"}
         # The unit.
         self.opened = False               # the engine has noted the player's preset: the unit may be borrowed
+        self.firmware = None              # the unit's firmware, as it said when it opened
         self.retry_open_at = None         # when to try opening the unit again after it refused
         self.watched_at = 0.              # when the unit was last asked whether the player moved it
         self.said_stale = False           # the remark about tables from another firmware was made
@@ -159,30 +125,13 @@ class Studio:
         self.hearing_base = set()         # sides heard without their Shape knobs for now
         self.audio_held_by = None         # who holds the audio input outside the engine: a key of HOLDERS
         self.audio_quiet = None           # the future of the `quiet` sent for them
-        # Listening while the unit is free.
+        # The phrase.
         self.phrase = phrase              # (id, mono dry audio: the part of the take that loops) or None
         self.phrase_whole = None          # (the whole take, where the loop starts, where it ends) or None
-        self.shaping = None               # (sound id, knobs turned, when) waiting to be checked by listening
-        self.settle_seconds = SETTLE_SECONDS
-        self.idle_seconds = IDLE_SECONDS
-        self.free_since = None            # since when the unit has been left alone
-        self.hearing = None               # the sound a silent listen in flight is for
-        self.listen_after = 0.            # no silent listen before this (after one the unit turned away)
-        self.looking = False              # asking the unit what it is on, before borrowing it
-        self.looked = False               # ... and it was on one of the app's own slots, in this quiet stretch
-        self.away = False                 # the player chose a preset of their own on the unit: it is left alone
-        self.unit_borrowed = False        # a listen used the unit: A and B are made ready again afterwards
-        self.settled = None               # what was on show when nothing was left to hear or prepare
-        # The session, the guitar, the player.
+        # The session.
         self.desk_session = {}            # the window's part of session.json (the open panel)
         self.restored = False             # the last session was put back and waits for the unit
         self.notice = ""                  # said once, when the unit opens
-        self.profiles = {}                # instrument -> (the takes it was made from, (profile, lines))
-        self.profile_lock = threading.Lock()
-        self.profiling = None             # the takes a profile is being worked out from
-        self.profile_failed = None        # (those takes, why)
-        self.profile_version = 0          # bumped when a profile arrives, for the window
-        self.taste = None                 # the taste model, once fitted
         self.listening = None             # the Levels tool's listening level, kept here by it
         self.drawing_fault = None         # the last fault of a listener, so that it is logged once
         self.aside_said = 0               # how many of the files the store set aside have been said
@@ -232,6 +181,72 @@ class Studio:
     def sound(self, side):
         sound_id = getattr(self.state, side)
         return self.store.sound(sound_id) if sound_id else None
+
+    # ---- what the parts do, under the names the window, the tools, the seat and the tests call ----
+
+    def evidence(self, sound):
+        """What was measured of `sound` as it plays now, or None (`Listening.evidence`)."""
+        return self.ear.evidence(sound)
+
+    def unheard(self, sound):
+        """Why `sound` could not be listened to as it plays now, or None."""
+        return self.ear.unheard(sound)
+
+    def _current(self, inputs):
+        return self.ear.current(inputs)
+
+    hearing = property(lambda self: self.ear.hearing)
+    shaping = property(lambda self: self.ear.shaping)
+    settle_seconds = property(lambda self: self.ear.settle_seconds,
+                              lambda self, seconds: setattr(self.ear, "settle_seconds", seconds))
+    idle_seconds = property(lambda self: self.ear.idle_seconds,
+                            lambda self, seconds: setattr(self.ear, "idle_seconds", seconds))
+
+    def new_round(self, text, **options):
+        """Three designs for `text`, the first of which goes on B (`Requests.new_round`)."""
+        self.asking.new_round(text, **options)
+
+    def more(self, **options):
+        self.asking.more(**options)
+
+    def revise(self, sound, text):
+        self.asking.revise(sound, text)
+
+    def cancel(self):
+        """Drop every request the assistant is working on for the player. True when there was one."""
+        return self.asking.cancel()
+
+    def cancellable(self):
+        return self.asking.cancellable()
+
+    def _request(self, quietly=False):
+        return self.asking.signal(quietly)
+
+    preparing = property(lambda self: self.asking.preparing)
+
+    def recorded_phrases(self):
+        """The takes recorded, newest first, as their records."""
+        return self.guitar.recorded()
+
+    def guitar_profile(self):
+        """What the current instrument puts out, as (profile, lines), worked out here and now."""
+        return self.guitar.now()
+
+    def guitar_lines(self):
+        """The same as lines for the Guitar panel, without waiting (`Guitar.lines`)."""
+        return self.guitar.lines()
+
+    profile_version = property(lambda self: self.guitar.version)
+
+    def mark(self, word, side=None):
+        """Put a mark on the sound on a side, or take it off (`Marks.mark`)."""
+        self.marks.mark(word, side)
+
+    def taste_lines(self):
+        return self.marks.taste_lines()
+
+    def add_part(self, part, scene=None):
+        self.marks.add_part(part, scene)
 
     # ---- the session, kept between starts ----
 
@@ -392,7 +407,7 @@ class Studio:
         if self.state.working != self._working():
             self._set()
         now = time.monotonic()
-        self._use_free_unit(now)
+        self.ear.use_free_unit(now)
         if self.retry_open_at is not None and now >= self.retry_open_at:
             self.retry_open_at = None
             self.open()
@@ -415,7 +430,7 @@ class Studio:
 
     def _watched(self, result):
         if result.get("moved") and self.state.mode:
-            self.away = True
+            self.ear.left_alone()
             self._set(mode=None, shown=None, status="Another preset was chosen on the Quad Cortex, so Tone Lab "
                                                     "stopped sending sound and leaves it alone. Press Guitar or "
                                                     "Phrase to come back.")
@@ -423,7 +438,7 @@ class Studio:
     def log_error(self, error, trace):
         try:
             with open(self.folder / "errors.log", "a", encoding="utf-8") as log:
-                log.write(f"\n--- {_now()} {type(error).__name__}: {error}\n{trace}")
+                log.write(f"\n--- {now()} {type(error).__name__}: {error}\n{trace}")
         except OSError:
             pass
 
@@ -433,7 +448,7 @@ class Studio:
         self.begin("open", "Connecting to the Quad Cortex…")
 
         def opened(result):
-            self.opened = True
+            self.opened, self.firmware = True, result.get("firmware")
             note = " Gave back the preset a crash had left borrowed." if result.get("recovered") else ""
             if self.notice:
                 note += " " + self.notice
@@ -459,24 +474,15 @@ class Studio:
         listing = self.folder / "directory.json"
         if not listing.exists() or time.time() - listing.stat().st_mtime > 12 * 3600:
             self.later(self.host.call("lab.qc.library.directory", folder=str(self.folder)),
-                       lambda entries: self._say_stale(), lambda error: None)
+                       lambda entries: None, lambda error: None)
 
     def _stale_words(self):
-        """A remark, made once, when the unit's firmware (as the last directory read found it) is not the one some
-        measured tables were made on. Nothing when the firmware is not known."""
-        try:
-            firmware = json.loads((self.folder / "directory.json").read_text(encoding="utf-8")).get("firmware")
-        except (OSError, ValueError, AttributeError):
-            firmware = None
-        if self.said_stale or not firmware or not knowledge.stale(firmware):
+        """A remark, made once, when the unit's firmware (as it said when it opened) is not the one some measured
+        tables were made on. Nothing when the unit did not say."""
+        if self.said_stale or not self.firmware or not knowledge.stale(self.firmware):
             return ""
         self.said_stale = True
-        return f" Some measured tables were made on another firmware than the unit's {firmware}."
-
-    def _say_stale(self):
-        said = self._stale_words()
-        if said:
-            self.say((self.state.status + said).strip())
+        return f" Some measured tables were made on another firmware than the unit's {self.firmware}."
 
     def put(self, side, sound, **changes):
         """Put a sound on A or B, and get both ready on the unit. `changes` are other things on show that change
@@ -494,8 +500,7 @@ class Studio:
         self.shows += 1
         key = self.showing = ("show", self.shows)
         self.hearing_base.clear()
-        self.unit_borrowed = self.away = False
-        self.listen_after = 0.
+        self.ear.made_ready()
         # A scene the sounds now on show do not have is not kept.
         scene = self.state.scene
         if scene and not any(sound.chain.scenes_in_use() > scene for sound in (a, b) if sound):
@@ -531,9 +536,9 @@ class Studio:
         if self.sound("a") is None and self.sound("b") is None:
             self.say("Nothing is on A or B yet.")
             return
-        self.away, self.listen_after = False, 0.    # the player is back at the desk's sounds
+        self.ear.came_back()
         # A silent listen has the unit: the player comes first, and it is listened to again later.
-        interrupted = self.hearing is not None
+        interrupted = self.ear.hearing is not None
         if interrupted:
             self.host.stop()                # which also drops whatever waited behind the listen
             self.level_sent, self.showing = {}, None
@@ -588,7 +593,7 @@ class Studio:
         from lab.qc.engine import PREVIEW_DB
 
         sounds = {side: self.sound(side) for side in ("a", "b")}
-        heard = {side: self.evidence(sound) for side, sound in sounds.items() if sound}
+        heard = {side: self.ear.evidence(sound) for side, sound in sounds.items() if sound}
         heard = {side: record for side, record in heard.items()
                  if record and record.get("level_db") is not None and record["level_db"] > -90}
         key = "loudness_lufs" if all(record.get("loudness_lufs") is not None for record in heard.values()) \
@@ -636,7 +641,7 @@ class Studio:
 
     def close(self):
         self.remember()
-        for signal in (*self.requests, *self.background):
+        for signal in (*self.asking.requests, *self.asking.background):
             signal.set()
         self.host.close()
         self.thinking.shutdown(wait=False, cancel_futures=True)
@@ -701,202 +706,7 @@ class Studio:
         whole = self.phrase_whole
         return f"{self.phrase[0]}@{whole[1]}-{whole[2]}" if whole else self.phrase[0]
 
-    def _playing_as(self, sound):
-        """What a measurement of `sound` must have been made on to hold for what plays now: this take and this
-        part of it, this chain, and the scene heard (any scene, when the sound's scenes do not differ). Every
-        question of whether a measurement holds is answered by comparing with this."""
-        return (self.phrase_key(), sound.chain.digest(),
-                self.state.scene if sound.chain.scenes_in_use() > 1 else 0)
-
-    @staticmethod
-    def _made_on(record):
-        return record.get("phrase"), record.get("digest"), record.get("scene", 0)
-
-    def _heard(self, sound):
-        """The record of listening to `sound` without its knobs, when it holds for what plays now, or None. It is
-        the record of a listen that failed when it has "failed"."""
-        heard = sound.heard
-        return heard if heard and self._made_on(heard) == self._playing_as(sound) else None
-
-    def evidence(self, sound):
-        """What was measured of `sound` as it plays now (this phrase, this chain, this scene, these knobs), or
-        None."""
-        heard = self._heard(sound)
-        if heard is None or "failed" in heard:
-            return None
-        if not sound.knobs:
-            return heard
-        shaped = heard.get("shaped") or {}
-        # The shaped measurement is kept inside the one it was compared with; one written before that was so says
-        # itself what it was made on.
-        made_on = self._made_on({**heard, **{key: shaped[key] for key in ("phrase", "scene") if key in shaped}})
-        return shaped if shaped.get("knobs") == sound.knobs and made_on == self._playing_as(sound) else None
-
-    def unheard(self, sound):
-        """Why `sound` could not be listened to as it plays now, or None when it could or has not been tried."""
-        heard = self._heard(sound) if sound is not None else None
-        return heard.get("failed") if heard else None
-
-    def _current(self, inputs):
-        """Whether the take, part, scene and sound (its chain unchanged) a check was started on are still what is
-        on show. `inputs` is (phrase key, the audio, scene, chain digest, sound id)."""
-        key, _, scene, digest, sound_id = inputs
-        if sound_id not in (self.state.a, self.state.b):
-            return False
-        try:
-            sound = self.store.sound(sound_id)
-        except (OSError, ValueError):
-            return False
-        return self._playing_as(sound) == (key, digest, scene if sound.chain.scenes_in_use() > 1 else 0)
-
     # ---- listening while the unit is free ----
-
-    def _use_free_unit(self, now):
-        """While nothing plays, nobody else has the input and the unit has nothing to do: check knobs that were
-        turned, then listen to what is on show and has not been heard as it plays now, then make A and B ready
-        again, then prepare three more. Listening starts only once the unit has been left alone for a moment."""
-        if self.hearing is not None or self.looking:
-            return                                  # the studio's own listening: the quiet stretch goes on
-        if not (self.opened and not self.state.mode and self.audio_held_by is None and self.phrase is not None
-                and not self.host.busy and self.host.failed is None):
-            self.free_since, self.looked = None, False
-            return
-        if self.free_since is None:
-            self.free_since = now
-        if self.away or now < self.listen_after:
-            return
-        if self.shaping is not None and now - self.shaping[2] >= self.settle_seconds:
-            if not self.looked:
-                self._look_first()
-                return
-            if self._check_shaping(now):
-                return
-        on_show = (self.state.a, self.state.b, self.state.round, self.phrase_key(), self.state.scene)
-        if now - self.free_since < self.idle_seconds or self.settled == on_show:
-            return
-        sound = self._next_to_hear()
-        if sound is not None and not self.looked:
-            self._look_first()
-        elif sound is not None:
-            self._listen(sound)
-        elif self.unit_borrowed:
-            self.unit_borrowed = False
-            self._show()                            # listening used the unit: A and B go back, knobs as they stand
-        else:
-            self.settled = on_show
-            self._prepare_next()
-
-    def _look_first(self):
-        """Before the unit is borrowed to listen: ask what it is on. When the player has chosen a preset of their
-        own there, by hand, it is left alone until they come back to the desk's sounds."""
-        from lab.qc.slots import BUILD_NAME, CACHE_PREFIX
-
-        self.looking = True
-
-        def found(result):
-            self.looking = False
-            name = str(result.get("preset") or "")
-            if name == BUILD_NAME or name.startswith(CACHE_PREFIX):
-                self.looked = True
-            else:
-                self._turned_away("Moved", "Another preset is selected on the Quad Cortex, so Tone Lab leaves it "
-                                           "alone and listens to nothing. Press Guitar or Phrase to come back.")
-
-        def failed(error):
-            self.looking = False
-            self._turned_away(getattr(error, "kind", ""), error, wait=60)
-
-        self.later(self.host.call("inputs"), found, failed)
-
-    def _turned_away(self, kind, error, wait=15):
-        """The unit was not the app's to listen with. After the player chose another preset there, nothing is
-        listened to until they come back; otherwise it is tried again after `wait` seconds."""
-        if kind == "Moved":
-            self.away = True
-        self.listen_after = time.monotonic() + wait
-        self._set(status=str(error))
-
-    def _next_to_hear(self):
-        """The next sound to listen to: the sounds on A and B first, then the designs of the round on show. One
-        that could not be heard is not tried again until its chain, the phrase or the scene changes. A sound whose
-        chain was already listened to on another sound takes what came of it."""
-        ids = [sound_id for sound_id in (self.state.a, self.state.b) if sound_id]
-        ids += [item["sound"] for item in (self.round() or {}).get("candidates", [])]
-        sounds, known = [], {}
-        for sound_id in dict.fromkeys(ids):
-            try:
-                sound = self.store.sound(sound_id)
-            except Exception:  # noqa: BLE001  a file that is gone or unreadable is not listened to
-                continue
-            sounds.append(sound)
-            heard = self._heard(sound)
-            if heard is not None and ("probe" in heard or "failed" in heard):
-                known.setdefault(self._playing_as(sound), heard)
-        for sound in sounds:
-            heard = self._heard(sound)
-            if heard is not None and ("probe" in heard or "failed" in heard):
-                continue
-            twin = known.get(self._playing_as(sound))
-            if twin is None:
-                return sound
-            sound.heard = {key: value for key, value in twin.items() if key != "shaped"}
-            self.store.save(sound)
-        return None
-
-    def _listen(self, sound, then=None, dropped=None):
-        """Listen to `sound` without its knobs, silently, as it plays now, and keep what was measured with what it
-        was measured on. `then(sound)` follows a measurement; `dropped()` a listen that was stopped."""
-        phrase_key, digest, scene = self._playing_as(sound)
-        sound_id, name = sound.id, "a sound" if self.state.blind else sound.name
-        self.hearing, self.unit_borrowed = sound_id, True
-        self.begin("listen", f"Listening to {name}, silently…")
-
-        def heard(result):
-            self.hearing = None
-            fresh = self.store.sound(sound_id)        # knobs or marks may have changed meanwhile
-            # "probe" marks a record as made with the current tests: without it the sound would be listened to again.
-            fresh.heard = {"probe": None, "phrase": phrase_key, "digest": digest, "scene": scene, **result.to_record()}
-            if result.level_db is not None and result.level_db > -90:
-                fresh.tags = [tag for tag in fresh.tags if not tag.startswith("heard:")] + [
-                    f"heard: {result.said()}"]
-            self.store.save(fresh)
-            self._set()
-            if then is not None:
-                then(fresh)
-
-        def failed(error):
-            self.hearing = None
-            kind = getattr(error, "kind", "")
-            if kind in NOT_THE_SOUND:
-                # Nothing was learned about the sound: it is listened to again later.
-                if kind != "Stopped":
-                    self._turned_away(kind, error)
-                if dropped is not None:
-                    dropped()
-                return
-            fresh = self.store.sound(sound_id)
-            fresh.heard = {"failed": str(error), "phrase": phrase_key, "digest": digest, "scene": scene}
-            fresh.tags = [tag for tag in fresh.tags if not tag.startswith("heard:")]
-            self.store.save(fresh)
-            self._set(status=f"Could not listen to {name}: {error}")
-
-        self.later(self.host.call("hear", sound.chain, self.phrase[1], scene), heard, failed, doing="listen")
-
-    def _prepare_next(self):
-        """When every design of the round on show has been listened to, prepare three more in the background, if
-        the assistant may be called without asking. Only for a round the player asked for: the app's own rounds
-        lead to no further call."""
-        found = self.round()
-        if found is None or found.get("next") or self.preparing or not self.assistant.automatic:
-            return
-        if found.get("by") == "app":
-            return
-        try:
-            heard = [self.store.sound(candidate["sound"]).heard for candidate in found["candidates"]]
-        except Exception:  # noqa: BLE001
-            return
-        if all(heard):
-            self.more(by="app")
 
     # ---- shaping ----
 
@@ -914,14 +724,8 @@ class Studio:
             self.later(self.host.call("turn", side, sound.knobs), lambda moves: None)
         turned = {key for key in set(before) | set(sound.knobs) if before.get(key, 0) != sound.knobs.get(key, 0)}
         if turned:
-            self._check_later(sound.id, turned)
+            self.ear.check_later(sound.id, turned)
         self._set()
-
-    def _check_later(self, sound_id, turned):
-        """Have knobs that were turned on a sound checked by listening, once the turning has stopped and the unit
-        is free (`_check_shaping`)."""
-        earlier = self.shaping[1] if self.shaping and self.shaping[0] == sound_id else set()
-        self.shaping = (sound_id, set(turned) | earlier, time.monotonic())
 
     def base(self):
         """Hear the sound on show without its Shape knobs, or with them again."""
@@ -939,89 +743,6 @@ class Studio:
         self._set(status=f"{sound.name}: " + ("the base, without the Shape knobs" if without else "shaped"))
 
     # ---- knobs that check themselves ----
-
-    def _check_shaping(self, now):
-        """Once the knobs of a sound have not been turned for a few seconds (and the unit is free), listen to the
-        sound as shaped, silently, and compare it with the sound heard without its knobs. True when a listen was
-        started.
-
-        A knob can do something else on this amp than the table says (amp controls interact: docs/TONE_RESEARCH.md,
-        finding 8). One knob that measured the wrong way, or too little, is corrected once; nothing is measured
-        again for that correction, so this never loops."""
-        if self.shaping is None:
-            return False
-        sound_id, turned, at = self.shaping
-        if now - at < self.settle_seconds:
-            return False
-        self.shaping = None
-        if sound_id not in (self.state.a, self.state.b):
-            return False                            # no longer on show
-        try:
-            sound = self.store.sound(sound_id)
-        except (OSError, ValueError):
-            return False
-        if not sound.knobs:
-            return False
-        # The take, the part of it, the scene and the chain are fixed for the whole check: both measurements are
-        # made on them, and a correction is made only while they are still what is on show.
-        inputs = (self.phrase_key(), self.phrase[1], self.state.scene, sound.chain.digest(), sound.id)
-        heard = self._heard(sound)
-        if heard is not None and "failed" in heard:
-            return False                            # it cannot be listened to: nothing to compare with
-        if heard is not None and "probe" in heard:
-            self._hear_shaped(sound, turned, inputs)
-            return True
-
-        # The sound without its knobs has not been heard as it plays now: that first. A listen the player's own
-        # playing stopped is made again later.
-        self._listen(sound, then=lambda fresh: self._current(inputs) and self._hear_shaped(fresh, turned, inputs),
-                     dropped=lambda: self._check_later(sound_id, turned))
-        return True
-
-    def _hear_shaped(self, sound, turned, inputs):
-        sound_id, values = sound.id, dict(sound.knobs)
-        phrase_key, _, scene = self._playing_as(sound)
-        name = "a sound" if self.state.blind else sound.name
-        self.hearing, self.unit_borrowed = sound_id, True
-        self.begin("listen", f"Listening to {name} as shaped, silently…")
-
-        def heard(result):
-            self.hearing = None
-            fresh = self.store.sound(sound_id)
-            if fresh.knobs != values or self._heard(fresh) is None or not self._current(inputs):
-                return                              # turned again meanwhile: that turn is checked in its turn
-            after = result.to_record()
-            found = knobs.check(fresh.heard, after, values)
-            correction = _correction(found, turned, values)
-            fresh.heard = {**fresh.heard, "shaped": {"phrase": phrase_key, "knobs": values,
-                                                     "scene": fresh.heard.get("scene", 0), **after, "check": found,
-                                                     "corrected": correction}}
-            if correction:
-                key, old, new = correction
-                fresh.knobs = {name: value for name, value in {**values, key: new}.items() if value}
-                if self.remark and self.remark["sound"] == sound_id and self.remark["after"] == values:
-                    self.remark["after"] = dict(fresh.knobs)     # the remedy as corrected is still the remedy
-            self.store.save(fresh)
-            if correction and self.state.mode and self.state.shown:
-                # Playing began meanwhile, which made A and B ready again: the corrected knobs go on as it plays.
-                for side in ("a", "b"):
-                    if getattr(self.state, side) == sound_id:
-                        self.later(self.host.call("turn", side, fresh.knobs), lambda moves: None)
-            self.say(_checked_words(found, turned, correction))
-
-        def failed(error):
-            self.hearing = None
-            kind = getattr(error, "kind", "")
-            if kind == "Stopped":
-                self._check_later(sound_id, turned)     # the player's own playing stopped it: checked afterwards
-                return
-            if kind in NOT_THE_SOUND:
-                self._turned_away(kind, error)
-            else:
-                self._set(status=f"Could not listen to the shaped sound: {error}")
-
-        self.later(self.host.call("hear_shaped", sound.chain, values, inputs[1], scene), heard, failed,
-                   doing="listen")
 
     def named(self, row, column, setting, side=None):
         """A copy of the sound with one block set to one of its model's named settings, put on the same side."""
@@ -1055,29 +776,10 @@ class Studio:
         if not (a and b):
             return ["Put a sound on both A and B to compare them."]
         # What was measured of each as it plays now: this take, this scene, these knob positions.
-        ha, hb = self.evidence(a), self.evidence(b)
+        ha, hb = self.ear.evidence(a), self.ear.evidence(b)
         if ha and hb and "probe" in ha and "probe" in hb:
-            return _difference(ha, hb)
-        return [line for side, sound in (("A", a), ("B", b)) for line in [self._not_measured(side, sound)] if line]
-
-    def _not_measured(self, side, sound):
-        """Why there is no measurement of the sound on a side as it plays now, and what will bring one; None when
-        there is one."""
-        why = self.unheard(sound)
-        if why:
-            return f"{side} could not be listened to: {why}"
-        heard = self._heard(sound)
-        if heard is None or "probe" not in heard:
-            return (f"{side} has not been listened to as it is set now (this take and scene). That happens by itself "
-                    "while nothing plays.")
-        if self.evidence(sound) is not None:
-            return None
-        shaped = heard.get("shaped") or {}
-        if shaped.get("corrected") and self.shaping is None:
-            return (f"{side}'s Shape knobs were corrected after they were measured, and are not measured again by "
-                    "themselves: turn one to have them measured where they stand.")
-        return (f"{side}'s Shape knobs have not been measured where they stand. That happens by itself a few seconds "
-                "after they were last turned, while nothing plays.")
+            return difference(ha, hb)
+        return [line for line in (self.ear.not_measured("A", a), self.ear.not_measured("B", b)) if line]
 
     def available(self, side=None):
         sound = self.sound(side or self.state.side)
@@ -1109,6 +811,13 @@ class Studio:
                 remark = {"text": text.casefold(), "sound": sound.id, "turn": turn, "before": dict(base)}
                 following = f" Say it again for: {ways[turn + 1].say}." if turn + 1 < len(ways) else ""
                 said = f"{reading.said}: {ways[turn].say}.{following}"
+            elif ways and again:
+                # Every remedy this chain can perform was tried, and the last one is still on. Nothing is sent
+                # to the assistant for a word said once more: that is asked for on purpose.
+                self.say(f"That was the last thing players try for “{reading.said.lower()}” that this chain can do; "
+                         "it is still on. To have the assistant rework the sound instead, ask in more words: what "
+                         "to change and what to keep (for example “less mud in the palm mutes, same gain”).")
+                return
         if moves is None and sound:
             moves = knobs.direction(text)
             said = text
@@ -1119,7 +828,7 @@ class Studio:
                 values[key] = round(max(low, min(1., values.get(key, 0.) + step)), 2)
             self.turn(values, side)
             sound = self.sound(side)          # as turn left it
-            sound.notes.append({"at": _now(), "text": text})
+            sound.notes.append({"at": now(), "text": text})
             self.store.save(sound)
             self.remark = {**remark, "after": dict(sound.knobs)} if remark else None
             self.say(said)
@@ -1132,9 +841,9 @@ class Studio:
             return
         b = self.sound("b")
         if b is not None and reads_as_change(text):
-            self.revise(b, text)
+            self.asking.revise(b, text)
         else:
-            self.new_round(text)
+            self.asking.new_round(text)
 
     def _preset_named(self, text):
         """A request that is exactly the name of one of the player's presets on the unit means that preset."""
@@ -1167,7 +876,6 @@ class Studio:
 
         def read(entries):
             self._set(status=f"{len(entries)} presets on the unit.")
-            self._say_stale()
             if done:
                 done(entries)
 
@@ -1199,14 +907,6 @@ class Studio:
     def _instrument(self):
         return self.store.instrument(self.state.instrument)
 
-    def _setting(self):
-        """The pickup setting the phrase in use was recorded on, if it was noted."""
-        if not self.phrase:
-            return None
-        found = next((item for item in self.recorded_phrases() if item["id"] == self.phrase[0]), None)
-        setting = (found or {}).get("setting")
-        return None if not setting or setting == "unknown" else setting
-
     def _listening(self):
         """What guitar music the player listens to most, if the listening history was analysed (personal; kept in
         the data folder)."""
@@ -1217,169 +917,6 @@ class Studio:
         except (OSError, ValueError):
             return None
         return prior(record)
-
-    def _design(self, function, *args, **options):
-        """Run a call to the designer on the assistant's thread. What the instrument puts out (`profile.facts`) is
-        worked out there first, from the takes as they are now: reading them takes a second or more."""
-        from lab.hearing.profile import facts
-
-        instrument, setting = self.state.instrument, self._setting()
-        takes = self._takes(instrument)
-
-        def work():
-            found = self._profile(instrument, takes)[0] if takes else None
-            return function(*args, guitar=facts(found, setting) if found else None, setting=setting, **options)
-
-        return self.thinking.submit(work)
-
-    def _request(self, quietly=False):
-        """A cancel signal for a request to the assistant: the player's (cancelled by Cancel) or, `quietly`, the
-        app's own (cancelled only when the app closes)."""
-        signal = threading.Event()
-        (self.background if quietly else self.requests).add(signal)
-        if not quietly:
-            self.latest = signal            # the player's newest request: only its answer goes on show
-        return signal
-
-    def cancellable(self):
-        return any(not signal.is_set() for signal in self.requests)
-
-    def cancel(self):
-        """Drop every request the assistant is working on for the player; answers that still come are ignored."""
-        active = [signal for signal in self.requests if not signal.is_set()]
-        if not active:
-            return False
-        for signal in active:
-            signal.set()
-            self.doing.pop(signal, None)
-        self.requests.clear()
-        self._set(status="Request cancelled.")
-        return True
-
-    def new_round(self, text, *, earlier=None, by="player", after=None, saying=None):
-        """Three designs for `text`. `after` is the round these follow, whose designs and what was heard of them
-        (`earlier`) inform these. `saying` is the working line, when it is not the usual one."""
-        quietly = by == "app"
-        stop = self._request(quietly)
-        if not quietly:
-            self.begin(stop, saying or "Designing three ways to get there. About a minute…")
-        future = self._design(design.round_of_three, self.assistant, text, self._instrument(), earlier=earlier,
-                              by=by, cancel=stop, assets_known=self._assets(),
-                              listening=None if quietly else self._listening())
-        revision = self.state.revision
-        if after:
-            self.preparing = after
-
-        def over():
-            (self.background if quietly else self.requests).discard(stop)
-            if after and self.preparing == after:
-                self.preparing = None
-
-        def arrived(result):
-            over()
-            if stop.is_set():
-                return
-            aim, designs = result
-            record = {"id": new_id(), "request": text, "aim": aim, "created": _now(),
-                      "previous": after, "by": by, "candidates": []}
-            # The song is the one this request is for, or the one the round it follows was for: never one left
-            # over from an earlier, unrelated request.
-            song = aim.get("song") or (self.rounds.get(after) or {}).get("aim", {}).get("song")
-            if song:
-                record["aim"]["song"] = song
-            for sound, differs in designs:
-                sound.tags = [f"aim: {summary(aim)}"]
-                if song:
-                    sound.origin = {**sound.origin, "song": song_name(song)}
-                self.store.save(sound)
-                record["candidates"].append({"sound": sound.id, "differs": differs})
-            self.rounds.save(record)
-            if after:
-                self.rounds.follow(after, record["id"])
-            if quietly:
-                self.say("Three more designs are ready, informed by what was heard: click › next three.")
-                return
-            if stop is not self.latest:
-                # A newer request is on its way or already answered: this one is kept, not put on show.
-                self.say(f"The designs for an earlier request ({text[:40]}) are in History; the latest request's "
-                         "are the ones shown.")
-                return
-            on_show = {"round": record["id"], "song": song_name(song) if song else None}
-            if self.state.revision == revision:
-                self.put("b", self.store.sound(record["candidates"][0]["sound"]), **on_show)
-                self.say(f"Aiming for {summary(aim)}. "
-                         f"1 of {len(designs)} is on B · {designs[0][0].name}")
-            else:
-                self._set(**on_show)
-                self.say(f"{len(designs)} designs are ready. B changed meanwhile, so it was left alone.")
-
-        def failed(error):
-            over()
-            if not stop.is_set() and not quietly:
-                self._request_failed(stop, error)
-
-        self.later(future, arrived, failed, doing=stop)
-
-    def more(self, *, by="player"):
-        """Three more for the round on show, informed by its designs, what listening heard and the player's marks."""
-        found = self.round()
-        if found is None:
-            self.say("Ask for a sound first.")
-            return
-        if found.get("next"):
-            self.go_round(found["next"])
-            return
-        if self.preparing == found["id"]:
-            self.say("Three more are on their way.")
-            return
-        earlier = []
-        for candidate in found["candidates"]:
-            sound = self.store.sound(candidate["sound"])
-            earlier.append({"name": sound.name, "differs": candidate["differs"], "chain": describe(sound.chain),
-                            "heard": {key: sound.heard.get(key) for key in ("distortion", "compressed",
-                                                                               "brightness", "tail")}
-                            if sound.heard and "failed" not in sound.heard else None,
-                            "player_marks": sound.marks, "player_said": [note["text"] for note in sound.notes],
-                            "played": sound.played})
-        self.new_round(found["request"], earlier=earlier, by=by, after=found["id"],
-                       saying="Designing three more, from what was heard and what you marked…")
-
-    def revise(self, sound, text):
-        stop = self._request()
-        self.begin(stop, f"Revising {sound.name}…")
-        future = self._design(design.revise, self.assistant, sound, text, self._instrument(), cancel=stop,
-                              assets_known=self._assets())
-        revision = self.state.revision
-
-        def revised(result):
-            self.requests.discard(stop)
-            if stop.is_set():
-                return
-            result.notes.append({"at": _now(), "text": text})
-            self.store.save(result)
-            if stop is not self.latest:
-                self.say(f"The revision for an earlier request ({text[:40]}) is in History; the latest request's "
-                         "answer is the one shown.")
-            elif self.state.revision == revision:
-                self.put("b", result)
-                self.say(f"{result.name}, revised: {text}")
-            else:
-                self.say(f"The revision of {sound.name} is ready in History. B changed meanwhile.")
-
-        def failed(error):
-            self.requests.discard(stop)
-            if not stop.is_set():
-                self._request_failed(stop, error)
-
-        self.later(future, revised, failed, doing=stop)
-
-    def _request_failed(self, stop, error):
-        """A request that failed. The working line and Cancel stay while a newer one is still on its way: each
-        request is an activity of its own."""
-        if stop is self.latest:
-            self._set(status=str(error))
-        else:
-            self.say(f"An earlier request failed ({error}); the latest is still on its way.")
 
     # ---- rounds ----
 
@@ -1406,7 +943,7 @@ class Studio:
         if found and found.get("next"):
             self.go_round(found["next"])
         elif found:
-            self.more()
+            self.asking.more()
 
     def step(self, place):
         found = self.round()
@@ -1414,83 +951,6 @@ class Studio:
             self.put("b", self.store.sound(found["candidates"][place]["sound"]))
 
     # ---- the player's marks, copying, blind comparison ----
-
-    def mark(self, word, side=None):
-        """Put a mark on the sound on a side, or take it off. "keeper" and "not this" exclude each other."""
-        sound = self.sound(side or self.state.side)
-        if sound is None:
-            return
-        word = word.strip()[:24]
-        if not word:
-            return
-        blind_choice = self.state.blind and word in ("keeper", "not this")
-        if word in sound.marks and not blind_choice:
-            sound.marks.remove(word)
-        else:
-            # A choice made blind is a choice even when that sound already had the mark: it is kept, and counted.
-            opposite = {"keeper": "not this", "not this": "keeper"}.get(word)
-            sound.marks = [item for item in sound.marks if item not in (opposite, word)] + [word]
-            self._choice(sound, word)
-        self.store.save(sound)
-        if blind_choice:
-            # The choice is made: now say which was which.
-            side = (side or self.state.side).upper()
-            self._set(blind=False,
-                      status=f"{side}: {word}. A was {self.sound('a').name}, B was {self.sound('b').name}.")
-        else:
-            self.say(f"{sound.name}: " + (", ".join(sound.marks) if sound.marks else "no marks"))
-        if word == "keeper" and word in sound.marks:
-            self._into_song(sound)
-        self._learn()
-
-    def _into_song(self, sound):
-        """A sound kept or saved from a round that was for a song becomes that song's part: the request said
-        which song and part, so nothing has to be named by hand."""
-        song = (self.rounds.of(sound.id) or {}).get("aim", {}).get("song")
-        if not song and sound.parent:
-            song = (self.rounds.of(sound.parent) or {}).get("aim", {}).get("song")
-        if not song:
-            return
-        name = song_name(song)
-        record = self.store.song(name)
-        record.update(artist=song.get("artist"), instrument=self.state.instrument)
-        part = (song.get("part") or "main").capitalize()
-        record["parts"] = [item for item in record["parts"] if item["name"] != part] + [{"name": part, "sound": sound.id}]
-        if self.phrase and not record.get("phrase"):
-            record["phrase"] = self.phrase[0]
-        self.store.save_song(record)
-        self._set(song=name)
-
-    def _choice(self, sound, word):
-        """A keeper or a not-this given while A and B are both on show is a choice between them (blind when names
-        are hidden), recorded for the taste model."""
-        from lab.player import taste
-
-        side = "a" if self.state.a == sound.id else "b" if self.state.b == sound.id else None
-        other = self.sound("b" if side == "a" else "a") if side else None
-        if other is None or other.id == sound.id or word not in ("keeper", "not this"):
-            return
-        kept, over = (sound, other) if word == "keeper" else (other, sound)
-        context = {"phrase": self.phrase_key(), "scene": self.state.scene,
-                   "knobs": {kept.id: dict(kept.knobs), over.id: dict(over.knobs)}}
-        taste.record_choice(self.folder, kept.id, over.id, "blind" if self.state.blind else "a/b",
-                            round_id=self.state.round, context=context)
-
-    def _learn(self):
-        """Fit the taste model again from everything chosen so far; cheap, and quiet if it fails."""
-        from lab.player import taste
-
-        try:
-            self.taste = taste.learn(self.folder)
-        except Exception:  # noqa: BLE001
-            self.taste = None
-
-    def taste_lines(self):
-        """What the player's choices so far say, in measured quantities, or that there is not enough yet."""
-        from lab.player import taste
-
-        model = self.taste or taste.load(self.folder)
-        return taste.describe(model) if model else ["No choices yet: marks and A/B choices teach it."]
 
     def copy_to_a(self):
         """A copy of B, as it is now, on A: a sound of its own, so turning B's knobs leaves it as it is."""
@@ -1558,8 +1018,8 @@ class Studio:
             fresh = self.store.sound(sound.id)
             fresh.saved = {"slot": slot, "name": name, "knobs": knob_values}
             self.store.save(fresh)
-            self._into_song(fresh)
-            self._learn()
+            self.marks.into_song(fresh)
+            self.marks.learn()
             self._set(shown=None, status=f"Saved · Tone Lab {slot['position'] + 1} · {name}")
             self._show()
 
@@ -1570,9 +1030,15 @@ class Studio:
         if self._input_held():
             return
         self.begin("round trip", "Measuring the USB round trip…")
-        self.unit_borrowed = True
+        self.ear.lent()
         self.later(self.host.call("measure_round_trip"),
                    lambda offset: self._set(status=f"Round trip: {offset} samples."), doing="round trip")
+
+    def clear_listening(self):
+        """Play at the desk's own levels again: no offset and no mute from the Levels tool (`self.listening`)."""
+        self.listening = None
+        self.later(self.host.call("lab.tools.levels.clear"), lambda levels: None)
+        self._set(status="Back at the desk's own level.")
 
     # ---- phrases and the guitar ----
 
@@ -1590,17 +1056,18 @@ class Studio:
             self.play("phrase")          # the new take, or the new part of it, replaces the one looping
         self._set()
 
-    def record(self, setting, seconds=8.):
+    def record(self, setting, seconds=8., gesture=None):
         """Record a phrase on the current instrument, noting the pickup setting it was played on: the dry input and,
-        when a sound is on show, the selected sound's stereo return as it was heard while playing."""
-        import math
-
+        when a sound is on show, the selected sound's stereo return as it was heard while playing. `gesture` says
+        what was played ("open strings strummed once…": `lab.hearing.profile.GESTURES`, or the player's own words):
+        two pickup settings are compared only on takes of the same gesture. The take is kept by
+        `lab.tools.phrases.keep`, which refuses one in which nothing came in or which clipped."""
         if self._input_held():
             return
         self.stop()
         side = self.state.side if self.sound(self.state.side) is not None and self.state.shown else None
         heard_through = self.sound(side) if side else None
-        self.unit_borrowed = True
+        self.ear.lent()
         self.begin("record", "Opening the input… wait for “play now”.")
 
         def opened(_):
@@ -1609,34 +1076,18 @@ class Studio:
                            + (f" (you hear {side.upper()})" if side else "") + "…")
 
         def recorded(audio):
-            from lab.hearing.audio import write_wave
+            from lab.tools import phrases
 
-            dry = audio[:, :1]
-            peak = float(abs(dry).max()) if len(dry) else 0.
-            level = 20 * math.log10(max(peak, 1e-9))
-            if peak < .003:
-                self._set(status=f"Nothing came in on the guitar input (peak {level:.0f} dBFS). The take was not "
-                                 "kept.")
+            try:
+                info, dry, level = phrases.keep(self.folder, audio, instrument=self.state.instrument,
+                                                setting=setting, heard_through=heard_through, gesture=gesture)
+            except phrases.NotKept as error:
+                self._set(status=str(error))
                 return
-            if peak >= .999:
-                self._set(status="The take clipped at the input. Turn the input gain down and record again; it "
-                                 "was not kept.")
-                return
-            phrase_id = new_id()
-            folder = self.folder / "phrases" / phrase_id
-            folder.mkdir(parents=True)
-            write_wave(folder / "dry.wav", dry)
-            info = {"id": phrase_id, "instrument": self.state.instrument, "setting": setting, "recorded": _now(),
-                    "seconds": round(len(dry) / RATE, 2)}
-            wet = audio[:, 1:3]
-            if wet.shape[1] == 2 and float(abs(wet).max()) > 1e-4:
-                write_wave(folder / "wet.wav", wet)
-                info["wet"] = ({"sound": heard_through.id, "name": heard_through.name} if heard_through
-                               else {"sound": None, "name": "the preset on the unit"})
-            (folder / "phrase.json").write_text(json.dumps(info, indent=1), encoding="utf-8")
-            self.profile_version += 1            # the guitar's profile has a new take to take in
-            self.use_phrase(phrase_id, dry.copy(), 0, len(dry))
-            self._set(status=f"Recorded {info['seconds']:g} s on {setting}, peaking at {level:.0f} dBFS. "
+            self.guitar.version += 1            # the guitar's profile has a new take to take in
+            self.use_phrase(info["id"], dry.copy(), 0, len(dry))
+            self._set(status=f"Recorded {info['seconds']:g} s on {setting}"
+                             + (f" ({gesture})" if gesture else "") + f", peaking at {level:.0f} dBFS. "
                              "It is now the phrase.")
 
         def failed(error):
@@ -1647,95 +1098,7 @@ class Studio:
                                   progress=lambda value: self.progress.append((opened, value))), recorded, failed,
                    doing="record")
 
-    def recorded_phrases(self):
-        found = []
-        for folder in (self.folder / "phrases").glob("*"):
-            try:
-                found.append((folder.stat().st_mtime_ns, json.loads((folder / "phrase.json").read_text(encoding="utf-8"))))
-            except (OSError, ValueError):
-                continue
-        # Newest first, by when it was played; the file time only breaks ties.
-        found.sort(key=lambda pair: (pair[1].get("recorded", ""), pair[0]), reverse=True)
-        return [item for _, item in found]
-
-    def _takes(self, instrument=None):
-        """The takes recorded on an instrument with their pickup setting noted, as (phrase id, setting, the dry
-        take's file)."""
-        instrument = instrument or self.state.instrument
-        return tuple((item["id"], item["setting"], self.folder / "phrases" / item["id"] / "dry.wav")
-                     for item in self.recorded_phrases()
-                     if item.get("instrument") == instrument and item.get("setting", "unknown") != "unknown")
-
-    def _profile(self, instrument, takes):
-        """What an instrument puts out at each pickup setting, from these takes, as (profile, lines). Reading the
-        takes takes a second or more, so this runs on a worker; what it finds is kept until the takes change."""
-        from lab.hearing.audio import read_wave
-        from lab.hearing.profile import profile
-
-        made_from = tuple((phrase_id, setting) for phrase_id, setting, _ in takes)
-        with self.profile_lock:
-            held = self.profiles.get(instrument)
-        if held is not None and held[0] == made_from:
-            return held[1]
-        found = profile([(setting, read_wave(path)[:, :1]) for _, setting, path in takes])
-        with self.profile_lock:
-            self.profiles[instrument] = (made_from, found)
-        return found
-
-    def guitar_profile(self):
-        """What the current instrument puts out at each pickup setting, from the phrases recorded on it, as
-        (profile, lines). Worked out here and now: the desk uses `guitar_lines`, which does not wait."""
-        takes = self._takes()
-        if not takes:
-            return {}, [f"No phrase has been recorded on the {self.state.instrument} with its pickup setting noted. "
-                        "Record the same short phrase on each setting."]
-        return self._profile(self.state.instrument, takes)
-
-    def guitar_lines(self):
-        """What the current instrument puts out, as lines for the Guitar panel. When it has not been worked out
-        from the takes as they are now, that is started on a worker and the lines say so; `profile_version`
-        changes when it arrives."""
-        instrument, takes = self.state.instrument, self._takes()
-        if not takes:
-            return self.guitar_profile()[1]
-        made_from = tuple((phrase_id, setting) for phrase_id, setting, _ in takes)
-        held = self.profiles.get(instrument)
-        if held is not None and held[0] == made_from:
-            return held[1][1]
-        if self.profile_failed is not None and self.profile_failed[0] == made_from:
-            return [f"The takes could not be read: {self.profile_failed[1]}"]
-        if self.profiling != made_from:
-            self.profiling = made_from
-
-            def arrived(found=None, error=None):
-                self.profiling = None
-                self.profile_failed = (made_from, str(error)) if error is not None else None
-                self.profile_version += 1
-                self._set()
-
-            self.later(self.reading.submit(self._profile, instrument, takes), arrived,
-                       lambda error: arrived(error=error))
-        return [f"Working out what the {instrument} puts out from {len(takes)} takes…"]
-
     # ---- songs ----
-
-    def add_part(self, part, scene=None):
-        """Make the sound on show (or one scene of it, 0 to 7) a part of the song being worked on."""
-        if not self.state.song:
-            self.say("Name the song first.")
-            return
-        sound = self.sound(self.state.side)
-        if sound is None:
-            return
-        song = self.store.song(self.state.song)
-        song["instrument"] = self.state.instrument
-        entry = {"name": part, "sound": sound.id, **({"scene": scene} if scene is not None else {})}
-        song["parts"] = [item for item in song["parts"] if item["name"] != part] + [entry]
-        if self.phrase and not song.get("phrase"):
-            song["phrase"] = self.phrase[0]
-        self.store.save_song(song)
-        where = f", scene {'ABCDEFGH'[scene]}" if scene is not None else ""
-        self.say(f"{sound.name}{where} is the {part} of {song['name']}.")
 
 
 def _expected(error):
@@ -1753,142 +1116,3 @@ def loudest_at(dry, seconds=PHRASE_SECONDS):
         return 0, len(dry)
     energy = np.concatenate(([0.], np.cumsum(np.square(dry[:, 0], dtype=np.float64))))
     return int(np.argmax(energy[length:] - energy[:-length])), length
-
-
-def _difference(ha, hb):
-    """What two measurements differ by, A's and B's, in plain words."""
-    lines = []
-    level = hb["level_db"] - ha["level_db"]
-    if abs(level) >= 1:
-        lines.append(f"B is {abs(level):.0f} dB {'louder' if level > 0 else 'quieter'}.")
-    pa, pb = ha.get("probe") or {}, hb.get("probe") or {}
-    if pa and pb and abs(pb["distortion_db"] - pa["distortion_db"]) >= 3:
-        lines.append(f"Distortion: A {ha['distortion']} ({pa['distortion_db']:.0f} dB of harmonics), "
-                     f"B {hb['distortion']} ({pb['distortion_db']:.0f} dB).")
-    ca, cb = ha["compression"], hb["compression"]
-    if abs(cb - ca) > .1:
-        lines.append(f"B is {'more' if cb > ca else 'less'} compressed: of a 12 dB drop in your playing, "
-                     f"A gives back {12 * (1 - ca):.0f} dB and B {12 * (1 - cb):.0f} dB.")
-    bright = hb["brightness_oct"] - ha["brightness_oct"]
-    if abs(bright) >= .1:
-        lines.append(f"B is {abs(bright):.1f} octave {'brighter' if bright > 0 else 'darker'}.")
-    low = hb["low_end_db"] - ha["low_end_db"]
-    if abs(low) >= 1.5:
-        lines.append(f"B has {abs(low):.0f} dB {'more' if low > 0 else 'less'} low end.")
-    space = hb["tail_db"] - ha["tail_db"]
-    if abs(space) >= 3:
-        lines.append(f"B rings on {abs(space):.0f} dB {'more' if space > 0 else 'less'} after you stop.")
-    return lines or ["Listening heard no clear difference between A and B."]
-
-
-def _correction(found, turned, values):
-    """The one correction a check allows: the knob turned that measured the wrong way or too little and is turned
-    furthest, its position scaled (further for too little, back for the wrong way), never past its limits or by
-    more than `CORRECTION_LIMIT`. Returns (knob, old position, new position) or None."""
-    wrong = [key for key in turned if key in found and found[key]["verdict"] in CORRECTION and values.get(key)]
-    for key in sorted(wrong, key=lambda key: -abs(values[key])):
-        old = values[key]
-        wanted = old * CORRECTION[found[key]["verdict"]]
-        wanted = old + max(-CORRECTION_LIMIT, min(CORRECTION_LIMIT, wanted - old))
-        new = round(max(knobs.KNOBS[key][1], min(1., wanted)), 2)
-        if new != old:
-            return key, old, new
-    return None
-
-
-def _measured(entry):
-    change, units = entry["change"], entry["units"]
-    digits = 2 if units == "octave" else 0 if units == "ms" else 1 if units == "dB" else 3
-    return f"{knobs.MEASURES.get(entry['measure'], entry['measure'])} {change:+.{digits}f}{' ' + units if units else ''}"
-
-
-def _checked_words(found, turned, correction):
-    """What listening measured of the knobs just turned, in one line for the status."""
-    parts, unmeasured = [], []
-    for key in sorted(turned, key=lambda key: list(knobs.KNOBS).index(key) if key in knobs.KNOBS else 99):
-        entry = found.get(key)
-        if entry is None:
-            continue
-        title = knobs.KNOBS[key][0]
-        if entry["verdict"] == "not measurable":
-            unmeasured.append(title)
-            continue
-        parts.append(f"{title}: {_measured(entry)}, {entry['verdict']}")
-    line = "Measured with the knobs, against without: " + ("; ".join(parts) if parts else "nothing that listening "
-                                                                                           "measures") + "."
-    if unmeasured:
-        line += f" Not measured: {', '.join(unmeasured)}."
-    if correction:
-        key, old, new = correction
-        how = "further" if abs(new) > abs(old) else "back"
-        line += (f" {knobs.KNOBS[key][0]} turned {how}, from {old:+.2f} to {new:+.2f}, once; "
-                 "not measured again.")
-    return line
-
-
-def song_name(song):
-    """"Artist - Title" for a song the assistant named."""
-    return " - ".join(part for part in (song.get("artist"), song.get("title")) if part)
-
-
-def _now():
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
-
-
-# ---- a new sound, or a change to the one on B ----
-
-NEW = ("make", "new sound", "build", "design", "give me", "something like", "i want a", "preset for", "tone for")
-# Words that ask for a change. One of them alone does not make a request a change ("More Than a Feeling" and
-# "Turn the Page" are songs): it must be about something of a sound.
-_CHANGE = frozenset("""more less add adding remove without turn switch swap replace change raise lower boost cut
-    reduce increase decrease tame drop lose keep too bit little touch tad slightly much enough instead no not try use
-    put move set shorten lengthen tighten brighten darken soften""".split())
-# The blocks of a chain. Named with "the" ("the delay in dotted eighths"), one of them makes a request a change.
-_BLOCKS = frozenset("""amp amps cab cabs cabinet speaker mic microphone ir capture pedal pedals overdrive drive fuzz
-    boost compressor gate eq delay delays reverb reverbs chorus flanger phaser tremolo vibrato wah octaver""".split())
-# What else a change can be about: what is heard of a sound, and the sound itself.
-_ABOUT = _BLOCKS | frozenset("""effect effects block blocks scene scenes level volume output input tone sound knob
-    knobs gain distortion dirt saturation crunch sustain compression mids mid midrange middle bass treble highs lows
-    presence bite punch attack body warmth brightness noise hum hiss feedback mud fizz tail tails repeats echo
-    echoes mix decay ambience width modulation it its it's this that b""".split())
-# Qualities of a sound. In the comparative, one of them makes a request a change ("tighter", "crunchier, like
-# AC/DC"); plain, it does so with a change word ("too bright in the neck position", "not clean enough").
-_PLAIN = frozenset("""bright dark dull warm round smooth rough harsh tight loose dirty heavy crunchy clean dry wet
-    roomy full thick fat thin punchy wide narrow shrill fizzy muddy boomy washy noisy compressed distorted""".split())
-_COMPARED = frozenset("""brighter darker duller warmer rounder smoother rougher harsher tighter looser dirtier heavier
-    crunchier cleaner drier dryer wetter roomier fuller thicker fatter thinner punchier wider narrower louder quieter
-    softer harder longer shorter bigger smaller higher lower faster slower fizzier muddier boomier""".split())
-# "make it heavier", "make the delay shorter": a change, although it begins like a request for a new sound.
-_MAKE_IT = re.compile(r"(?:can you |could you |please )?make (?:it|this|that|them|b|the (?:tone|sound|"
-                      + "|".join(sorted(_BLOCKS)) + r"))\b")
-_THE_BLOCK = re.compile(r"\bthe (?:" + "|".join(sorted(_BLOCKS)) + r")\b")
-_A_SOUND = re.compile(r"(?:a|an|some) (?!bit\b|little\b|touch\b|tad\b|lot\b).*\b(?:tone|sound|preset|patch)\b")
-
-
-def _wants_new(text):
-    """Whether a request says outright that it is for a new sound."""
-    lowered = text.casefold()
-    return any(lowered.startswith(word) or f" {word} " in f" {lowered} " for word in NEW) or " - " in text
-
-
-def reads_as_change(text):
-    """Whether a request reads as a change to the sound on B rather than as a request for a new one.
-
-    A request starts a round unless it reads as a change: "make it …", a remark the app understands, a quality
-    in the comparative ("tighter", "a bit cleaner"), a change word together with something of a sound ("more
-    sustain from the fuzz", "swap the amp", "less of it"), or a block of the chain named with "the" ("the delay in
-    dotted eighths"). An artist, a song or a description ("Comfortably Numb, the second solo", "More Than a
-    Feeling", "jazzy clean") is a request for a new sound, and so is anything that says so ("make …")."""
-    lowered = " ".join(re.findall(r"[a-z0-9'/&-]+", text.casefold().replace("’", "'")))
-    if _MAKE_IT.match(lowered):
-        return True
-    if _wants_new(text) or _A_SOUND.match(lowered):
-        return False
-    if words.read(text) or knobs.direction(text):
-        return True
-    tokens = set(re.findall(r"[a-z']+", lowered))
-    if tokens & _COMPARED:
-        return True
-    if tokens & _CHANGE and tokens & (_ABOUT | _PLAIN):
-        return True
-    return bool(_THE_BLOCK.search(lowered))

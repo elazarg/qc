@@ -187,6 +187,9 @@ class Assistant:
 
     @staticmethod
     def _codex(prompt, schema, *, web, seconds, cancel):
+        # Set by tests/isolated.py: no test runs the real Codex. A stand-in named by TONE_LAB_CODEX may run.
+        if os.environ.get("TONE_LAB_TESTING") and not os.environ.get("TONE_LAB_CODEX"):
+            raise RuntimeError("A test tried to run the real Codex. Give the Assistant a `run`, or a stand-in.")
         executable = codex()
         with TemporaryDirectory(prefix="tone-assistant-", ignore_cleanup_errors=True) as directory:
             root = Path(directory)

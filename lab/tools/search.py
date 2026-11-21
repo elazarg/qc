@@ -6,8 +6,8 @@ Carried over from the old search and match (`tone_search`, the search side of `l
   by its name, request, explanation, notes, blocks and tags, and by measured qualities: "bright", "dark",
   "punchy", "even", "ambient", "dry"… rank sounds against each other by what was measured of them. "No
   delay" and "less reverb" turn a quality round.
-- **Match a reference.** A reference recording (a WAV, a preset captured from the unit in the library, or
-  the sound on A) is described without regard to its level: spectral balance in octave bands, brightness,
+- **Match a reference.** A reference recording (a WAV chosen in place from where recordings are kept, or by
+  its path; a preset captured from the unit in the Sounds panel; or the sound on A) is described without regard to its level: spectral balance in octave bands, brightness,
   top-end fizz, how much the level moves, crest, stereo width and what rings on after notes. Each candidate
   sound is played silently through the unit with the desk's phrase and described the same way; the
   closest come first, by the weighting chosen (Balanced, Tone, Dynamics, Space). When the reference was
@@ -17,7 +17,7 @@ On the old desk results were recordings in session folders. On the new core they
 goes on A or B to be heard through the unit, and the descriptions of rendered sounds are kept in
 `search-cache.json` by the digest of the chain as heard (its Shape knobs applied) and the phrase, so a sound
 is rendered for matching once per phrase and again when its knobs move. Each description is written as soon
-as its sound is rendered, where the unit is held: stopping, closing the window or one sound that cannot be
+as its sound is rendered, where the unit is held: stopping, leaving the tool or one sound that cannot be
 built costs nothing already rendered. A sound the unit will not build is noted and left out of the ranking.
 
 The reference is played on the computer at the level of the app's other previews, never louder.
@@ -38,9 +38,9 @@ from lab.hearing.audio import RATE, read_wave
 from lab.hearing.measure import match as match_levels, measure
 from lab.qc.unit import Mismatch, Refused, Stopped
 from lab.sound.sounds import describe as describe_chain
-from lab.desk.theme import FONT, INK, SOFT, SUBTLE, TILE, WHITE
-from lab.tools.common import (Window, button, gained, heard_chain, label, listbox, menu_choice, phrase, play, render,
-                              section)
+from lab.desk.theme import FONT, INK, SOFT, SUBTLE, TILE
+from lab.tools.common import (WIDTH, Chips, FileChoice, Tool, button, disclosure, gained, heard_chain, label, listbox,
+                              phrase, play, render, section, usual_folders)
 
 BANDS = (65, 125, 250, 500, 1_000, 2_000, 4_000, 8_000, 12_000)
 MATCH_PRIORITIES = {
@@ -352,57 +352,69 @@ def describe_sounds(engine, chains, dry, *, stop=None):
     return {"described": described, "issues": issues}
 
 
-# ---- the window ----
+# ---- the tool ----
 
 # The narrowest first: matching renders every sound in the scope that has not been rendered with this phrase,
 # and a sound not yet in the cache takes the unit a quarter of a minute to build.
 SCOPES = ("The last 20", "This round", "Saved on the unit", "Every sound")
 
 
-class SearchWindow(Window):
+class SearchTool(Tool):
     TITLE = "Tone search"
-    SIZE = "640x660"
 
     def build(self):
         self.results, self.reference = [], None
         find = section(self.body, "Find a sound", "Words such as: bright clean, punchy lead no delay, "
                                                   "something from Rhythm.")
-        self.query = tk.Entry(find, font=(FONT, 11), bg=TILE, fg=INK, relief="flat",
-                              insertbackground=INK)
-        self.query.pack(fill="x", ipady=5)
+        row = tk.Frame(find, bg=find["bg"])
+        row.pack(fill="x")
+        self.query = tk.Entry(row, font=(FONT, 10), bg=TILE, fg=INK, relief="flat", insertbackground=INK)
+        self.query.pack(side="left", fill="x", expand=True, ipady=4)
         self.query.bind("<Return>", lambda _: self.find())
+        button(row, "Find", self.find).pack(side="left", padx=(6, 0))
 
-        match = section(self.body, "Match a reference", "Your sounds are played silently through the unit with "
-                                                        "the desk's phrase and compared with the reference.")
+        # Matching against a reference is the rarer use: shown on request.
+        match = disclosure(self.body, "Match a reference")
+        label(match, "Your sounds are played silently through the unit with the desk's phrase and compared with "
+                     "the reference.", size=9, color=SUBTLE, wrap=WIDTH).pack(fill="x", pady=(0, 4))
         row = tk.Frame(match, bg=match["bg"])
         row.pack(fill="x")
-        button(row, "A WAV…", self.choose_wave, quiet=True).pack(side="left")
-        self.captured = tk.Menubutton(row, text="A captured preset", bg=WHITE, fg=INK, relief="flat",
-                                      font=(FONT, 9, "bold"), padx=10, pady=5, cursor="hand2")
-        options = tk.Menu(self.captured, tearoff=False, postcommand=lambda: self.list_references(options))
-        self.captured.configure(menu=options)
-        self.captured.pack(side="left", padx=4)
+        button(row, "A WAV", lambda: self.offer("wav"), quiet=True).pack(side="left")
+        button(row, "A captured preset", lambda: self.offer("captured"), quiet=True).pack(side="left", padx=4)
         button(row, "The sound on A", self.reference_from_a, quiet=True).pack(side="left")
-        self.reference_text = label(match, size=9, color=SOFT, wrap=560)
+        # Choosing the WAV or the captured preset, in place: one of the two at a time, under the buttons.
+        self.choice = tk.Frame(match, bg=match["bg"])
+        self.choice.pack(fill="x")
+        self.offered = None
+        self.wave_choice = FileChoice(self.choice, folders=lambda: usual_folders("wav", self.folder),
+                                      patterns=("*.wav",), choose=self.use_wave, action="Use as the reference")
+        self.captured = tk.Frame(self.choice, bg=match["bg"])
+        self.captured_list = listbox(self.captured, height=4)
+        self.captured_list.pack(fill="x")
+        button(self.captured, "Use as the reference", self.use_captured).pack(anchor="w", pady=(4, 0))
+        self.captured_found = []
+        self.reference_text = label(match, size=9, color=SOFT, wrap=WIDTH)
         self.reference_text.pack(fill="x", pady=(6, 0))
+        label(match, "Among", size=9, color=SUBTLE).pack(fill="x", pady=(6, 0))
+        self.scope = tk.StringVar(master=self.frame, value=SCOPES[0])
+        Chips(match, self.scope, SCOPES).pack(fill="x")
+        label(match, "Weighing", size=9, color=SUBTLE).pack(fill="x", pady=(4, 0))
+        self.priority = tk.StringVar(master=self.frame, value="Balanced")
+        Chips(match, self.priority, tuple(MATCH_PRIORITIES)).pack(fill="x")
         row = tk.Frame(match, bg=match["bg"])
         row.pack(fill="x", pady=(6, 0))
-        self.scope = tk.StringVar(master=self.top, value=SCOPES[0])
-        menu_choice(row, self.scope, SCOPES).pack(side="left")
-        self.priority = tk.StringVar(master=self.top, value="Balanced")
-        menu_choice(row, self.priority, tuple(MATCH_PRIORITIES)).pack(side="left", padx=4)
         button(row, "Find the closest", self.match).pack(side="left")
         button(row, "Stop", self.stop, quiet=True).pack(side="left", padx=4)
-        button(row, "Hear the reference", self.hear_reference, quiet=True).pack(side="right")
+        button(row, "Hear the reference", self.hear_reference, quiet=True).pack(side="left")
 
         found = section(self.body, "Results")
-        self.box = listbox(found, height=9)
+        self.box = listbox(found, height=8)
         self.box.pack(fill="x")
         row = tk.Frame(found, bg=found["bg"])
         row.pack(fill="x", pady=(6, 0))
         for side in ("a", "b"):
             button(row, f"Put on {side.upper()}", lambda side=side: self.put(side)).pack(side="left", padx=(0, 6))
-        self.detail = label(found, size=9, color=SUBTLE, wrap=560)
+        self.detail = label(found, size=9, color=SUBTLE, wrap=WIDTH)
         self.detail.pack(fill="x", pady=(6, 0))
         self.box.bind("<<ListboxSelect>>", lambda _: self.describe_selected())
 
@@ -474,25 +486,43 @@ class SearchWindow(Window):
         self.reference_text.configure(text=f"Reference: {name}" + (" · recorded with the desk's phrase"
                                                                    if phrase_name else ""))
 
-    def choose_wave(self):
-        from tkinter import filedialog
+    def offer(self, kind):
+        """Show the choice of a WAV or of a captured preset under the buttons; pressed again, put it away."""
+        for part in (self.wave_choice, self.captured):
+            part.pack_forget()
+        self.offered = None if kind == self.offered else kind
+        if self.offered == "wav":
+            self.wave_choice.look()
+            self.wave_choice.pack(fill="x", pady=(4, 0))
+        elif self.offered == "captured":
+            self.captured_found = references(self.folder)[:15]
+            self.captured_list.delete(0, "end")
+            for item in self.captured_found:
+                self.captured_list.insert("end", f"{item['name']} · {item.get('setlist', '')}"[:60])
+            self.captured.pack(fill="x", pady=(4, 0))
+            if not self.captured_found:
+                self.say("No preset has been captured yet: Sounds, More with this preset, Use as reference.")
 
-        path = filedialog.askopenfilename(filetypes=[("WAV audio", "*.wav")], parent=self.top)
-        if path:
-            try:
-                self.set_reference(read_wave(path), Path(path).name)
-            except (OSError, ValueError) as error:
-                self.say(str(error))
+    def use_wave(self, path):
+        try:
+            self.set_reference(read_wave(path), Path(path).name)
+        except (OSError, ValueError) as error:
+            self.say(str(error))
+            return
+        self.offer(None)
 
-    def list_references(self, menu):
-        menu.delete(0, "end")
-        found = references(self.folder)
-        if not found:
-            menu.add_command(label="Capture one from Library first", state="disabled")
-        for item in found[:15]:
-            menu.add_command(label=f"{item['name']} · {item.get('setlist', '')}"[:60],
-                             command=lambda item=item: self.set_reference(read_wave(item["file"]), item["name"],
-                                                                          item.get("phrase")))
+    def use_captured(self):
+        picked = self.captured_list.curselection()
+        if not picked:
+            self.say("Choose a captured preset in the list first.")
+            return
+        item = self.captured_found[picked[0]]
+        try:
+            self.set_reference(read_wave(item["file"]), item["name"], item.get("phrase"))
+        except (OSError, ValueError) as error:
+            self.say(str(error))
+            return
+        self.offer(None)
 
     def reference_from_a(self):
         sound, taken = self.studio.sound("a"), phrase(self.studio)
@@ -548,4 +578,4 @@ class SearchWindow(Window):
 
 
 def open(desk):  # noqa: A001
-    return SearchWindow.open(desk)
+    return SearchTool.open(desk)

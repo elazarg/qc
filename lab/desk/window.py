@@ -5,10 +5,12 @@ Run it with `python -m lab` (the Quad Cortex) or `python -m lab --simulated`
 and panels that open when called. Nothing here decides anything; `studio.py`
 does.
 
-Everything in this window happens in it: no dialogs, no pop-up menus, no
-keyboard shortcuts. Choices are buttons, names are typed in place, and the
-panels say what they hold. (The Guitar Learner and the side tools, opened
-from the Guitar and More panels, still have windows of their own.)
+Everything happens in this one window: no dialogs, no pop-up windows or
+menus, no keyboard shortcuts. Choices are buttons, names are typed in place,
+and the panels say what they hold. The side tools, the Guitar Learner and the
+teaching of a control are shown in the place of the side panel, one at a time
+(`Desk.show`), with "‹ Back" to return to the panel they were opened from.
+Each is made once and kept, so it comes back as it was left.
 
 What is drawn again, and when: the tiles and the lines on every change of
 state; the round's chips, the scene chips and the open panel only when what
@@ -93,7 +95,9 @@ def loop_edges(edges, at, shortest=SHORTEST_LOOP):
 
 
 class Desk:
-    def __init__(self, root, studio):
+    def __init__(self, root, studio, door=None):
+        """`door` is the socket `claim_door` bound, on which a second launch knocks; None for a desk without one
+        (a simulated unit, a test)."""
         self.root, self.studio = root, studio
         self.panel = self.learner = None
         self.panel_key = None           # what the open panel was drawn from; it is redrawn only when that changes
@@ -103,11 +107,20 @@ class Desk:
         self.show_nano = False
         self.sounds_kind = "Presets"    # which list the Sounds panel shows
         self.capture_version = 2        # what an unlabelled capture is taken to be
-        self.record_setting = None
+        self.record_setting = None      # the pickup setting the next take is played on
+        self.record_gesture = None      # what is played in it, when it is one of the gestures settings are compared on
+        self.gestures_shown = None      # what the Guitar panel last showed of gesture listening
+        self.tools = {}                 # the side tools made so far, by title (`lab.tools.common.Tool.open`)
+        self.hosted = None              # the tool, the learner or the teaching on show in the side panel's place
+        self.teaching = None            # the teaching of a control, once it was opened
+        self.sounds_query = ""          # what the Sounds panel's presets are filtered by
+        self.preset_more = False        # whether the Sounds panel shows what else can be done with a preset
+        self.reference_scene = "Default scene"      # the scene a preset is captured in as a reference
+        self.contrast = None            # what "Measure A and B now" found, and for which sounds and phrase
         self.save_target = None         # (sound id, knob positions) the name being typed is for
         self.phrase_shown = None        # the phrase the link at the right names
         self.seat = None                # the Guitar Learner's seat, once something of the learner was opened
-        self.clock = self.door = None   # the `after` of `tick`; the socket a second launch knocks on
+        self.clock, self.door = None, door      # the `after` of `tick`; the socket a second launch knocks on
         self.drawing_fault = None       # the last fault while drawing, so that it is logged once
         self.play_when_free = None      # what to play once gesture listening has let go of the audio input
         self.closing = False
@@ -178,6 +191,16 @@ class Desk:
         self.tray = tk.Frame(body, bg=DARK, width=430, padx=12, pady=10)
         self.tray.grid_propagate(False)
         self.tray.pack_propagate(False)        # one width for every panel
+        # Where a tool, the Guitar Learner or the teaching of a control is shown: the tray's place and size. Its
+        # frames are not the tray's children, which are destroyed whenever a panel is drawn again.
+        self.side = tk.Frame(body, bg=DARK, width=430, padx=12, pady=10)
+        self.side.grid_propagate(False)
+        self.side.pack_propagate(False)
+        head = tk.Frame(self.side, bg=DARK)
+        head.pack(fill="x", pady=(0, 6))
+        self.side_title = label(head, size=11, bold=True)
+        self.side_title.pack(side="left")
+        link(head, "‹ Back", self.back, color=ACCENT).pack(side="right")
 
         pair = tk.Frame(main, bg=PAPER)
         pair.pack(fill="both", expand=True)
@@ -207,6 +230,11 @@ class Desk:
                 widget.bind("<ButtonRelease-1>", lambda _, side=side: self.studio.select(side))
             self.tiles[side] = (tile, name, caption, air, marks)
 
+        # Shown while the Levels tool's offset or mute is on: nothing else on the desk would say so.
+        self.level_row = tk.Frame(main, bg=PAPER)
+        self.level_note = label(self.level_row, size=9, color=SUBTLE)
+        self.level_note.pack(side="left")
+        link(self.level_row, "Back to the desk's own level", self.clear_listening).pack(side="left")
         self.scene_row = tk.Frame(main, bg=PAPER)
         self.scene_row.pack(fill="x", pady=(8, 0))
         self.strip = tk.Frame(main, bg=PAPER)
@@ -304,6 +332,14 @@ class Desk:
         for widget, mode in ((self.guitar, "guitar"), (self.loop, "phrase")):
             widget.configure(bg=mix(LIVE, TILE, .4) if state.mode == mode else TILE, fg=DIM if held else INK)
         self.blind_link.configure(text="Show which was which" if state.blind else "Compare blind")
+        if studio.listening is not None:
+            from lab.tools.levels import reading
+
+            self.level_note.configure(text=f"Listening level: {reading(studio.listening)}")
+            if not self.level_row.winfo_manager():
+                self.level_row.pack(fill="x", pady=(6, 0), before=self.scene_row)
+        elif self.level_row.winfo_manager():
+            self.level_row.pack_forget()
         if studio.history and not self.undo_link.winfo_manager():
             self.undo_link.pack(side="left")
         elif not studio.history and self.undo_link.winfo_manager():
@@ -316,7 +352,7 @@ class Desk:
                                        if item else ("Phrase" if phrase_id else "No phrase"))
         self.draw_strip(sounds["b"])
         self.draw_scenes()
-        if self.panel and not self.dragging and self.drawn_from(sounds) != self.panel_key:
+        if self.panel and self.hosted is None and not self.dragging and self.drawn_from(sounds) != self.panel_key:
             self.fill_panel()
 
     def drawn_from(self, sounds=None):
@@ -417,7 +453,46 @@ class Desk:
 
     # ---- panels ----
 
+    def host_frame(self):
+        """A frame for something to be shown in the side panel's place (`show`). It is kept until the desk closes."""
+        return tk.Frame(self.side, bg=DARK)
+
+    def show(self, thing):
+        """Show a tool, the Guitar Learner or the teaching of a control in the place of the side panel.
+
+        `thing` has a `frame` (from `host_frame`), a `TITLE`, and `shown()` and `hidden()`, called as it comes
+        and goes. One at a time: what was there is hidden and kept as it was."""
+        if self.hosted is thing:
+            return
+        if self.hosted is not None:
+            self._hide_hosted()
+        self.tray.grid_remove()
+        self.hosted = thing
+        self.side_title.configure(text=thing.TITLE)
+        thing.frame.pack(fill="both", expand=True)
+        self.side.grid(row=0, column=1, sticky="ns", padx=(14, 0))
+        thing.shown()
+
+    def back(self):
+        """Back from what is on show in the side panel's place to the panel it was opened from."""
+        if self.hosted is None:
+            return
+        self._hide_hosted()
+        self.side.grid_remove()
+        if self.panel:
+            self.tray.grid(row=0, column=1, sticky="ns", padx=(14, 0))
+            self.fill_panel()
+
+    def _hide_hosted(self):
+        thing, self.hosted = self.hosted, None
+        thing.frame.pack_forget()
+        thing.hidden()
+
     def toggle(self, name):
+        if self.hosted is not None:
+            self.back()
+            if self.panel == name:      # the panel the hosted thing was opened from: it is on show again
+                return
         if self.panel == name:
             self.panel = None
             self.studio.remember(panel=None)
@@ -448,15 +523,27 @@ class Desk:
         if sound is None:
             label(self.tray, "Nothing to shape yet.", color=SUBTLE).pack(fill="x")
             return
+        from lab.tools.common import scrolled, wheel
+
         values = dict(sound.knobs)
         available = studio.available()
+        # Undo and hearing it without the knobs stay on show under the knobs, however many the sound has: they
+        # are placed first, from the bottom, and the knobs scroll in the room that is left.
+        actions = tk.Frame(self.tray, bg=DARK)
+        actions.pack(side="bottom", fill="x", pady=(10, 0))
+        button(actions, "Undo", studio.undo).pack(side="left")
+        without = studio.state.side in studio.hearing_base
+        button(actions, "Hear it with the knobs again" if without else "Hear it without the knobs",
+               studio.base).pack(side="left", padx=6)
         if set(knob_table.PAD) & set(available):
             self.shape_pad(values, [key for key in knob_table.PAD if key in available])
+        knobs_view, knob_rows = scrolled(self.tray)
+        knobs_view.pack(fill="both", expand=True)
         for key in available:
             if key in knob_table.PAD:
                 continue
             title, low, _ = knob_table.KNOBS[key]
-            row = tk.Frame(self.tray, bg=DARK)
+            row = tk.Frame(knob_rows, bg=DARK)
             row.pack(fill="x")
             label(row, title, size=9, color=SOFT).pack(side="left")
             scale = tk.Scale(row, from_=low, to=1, resolution=.05, orient="horizontal", length=230, showvalue=False,
@@ -465,12 +552,7 @@ class Desk:
             scale.pack(side="right")
             scale.bind("<Button-1>", lambda _: setattr(self, "dragging", True), add="+")
             scale.bind("<ButtonRelease-1>", lambda _, key=key, scale=scale: self.turned(key, scale.get()))
-        actions = tk.Frame(self.tray, bg=DARK)
-        actions.pack(fill="x", pady=(10, 0))
-        button(actions, "Undo", studio.undo).pack(side="left")
-        without = studio.state.side in studio.hearing_base
-        button(actions, "Hear it with the knobs again" if without else "Hear it without the knobs",
-               studio.base).pack(side="left", padx=6)
+        wheel(knobs_view)
 
     def shape_pad(self, values, usable):
         """Brightness and Texture as one point on a square: dark to bright across, round to rough up. Drag the
@@ -595,8 +677,47 @@ class Desk:
         self.fill_panel()
 
     def panel_difference(self):
+        """What listening heard differ between A and B; and, asked for, both played silently now with the phrase
+        and compared, level aside (`lab.tools.field.contrast`)."""
+        from lab.tools import field
+
         for line in self.studio.difference():
             label(self.tray, line, size=10, wrap=400).pack(fill="x", pady=2)
+        button(self.tray, "Measure A and B now", self.measure_difference).pack(anchor="w", pady=(10, 4))
+        label(self.tray, "Plays the phrase silently through both, as they are set now, and says how B differs from "
+                         "A whatever their levels.", size=9, color=SUBTLE, wrap=400).pack(fill="x")
+        found = self.contrast
+        if found and found["key"] == self.contrast_key():
+            for line in field.contrast_lines(found):
+                label(self.tray, line, size=9, wrap=400).pack(fill="x", pady=(4, 0))
+            chart = tk.Canvas(self.tray, bg=PAPER, width=400, height=100, highlightthickness=0)
+            chart.pack(fill="x", pady=(6, 0))
+            field.draw_bands(chart, found["spectrum_db"], width=400, height=100)
+
+    def contrast_key(self):
+        """What a measured contrast holds for: the two sounds as they are set, and the phrase."""
+        sounds = [self.studio.sound(side) for side in ("a", "b")]
+        return tuple((sound.id, json.dumps(sound.knobs, sort_keys=True)) if sound else None
+                     for sound in sounds) + (self.studio.phrase_key(),)
+
+    def measure_difference(self):
+        from lab.tools.common import heard_chain, send
+
+        studio = self.studio
+        a, b = studio.sound("a"), studio.sound("b")
+        if a is None or b is None or studio.phrase is None:
+            studio.say("Put sounds on A and B and choose a phrase first.")
+            return
+        key = self.contrast_key()
+
+        def measured(found):
+            self.contrast = {**found, "key": key}
+            self.refill("Difference")
+
+        if not send(studio, "lab.tools.field.contrast", heard_chain(a), heard_chain(b), studio.phrase[1],
+                    done=measured, failed=lambda error: studio.say(str(error)), renders=True,
+                    working="Playing the phrase silently through A and B…"):
+            studio.say(studio.held_words())
 
     def panel_phrase(self):
         """The phrases recorded, recording a new one with its pickup setting, and the loop: drag its edges."""
@@ -668,6 +789,8 @@ class Desk:
             self.panel_assets("ir" if self.sounds_kind == "IRs" else "capture")
             return
         from lab.qc.library import cached, place
+        from lab.tools import library
+        from lab.tools.common import SCENE_LETTERS
 
         entries = cached(self.studio.folder)
         top = tk.Frame(self.tray, bg=DARK)
@@ -678,24 +801,100 @@ class Desk:
                   color=SUBTLE).pack(side="left")
             return
         search = tk.Entry(top, font=(FONT, 10), bg=TILE, fg=INK, relief="flat", insertbackground=INK)
+        search.insert(0, self.sounds_query)
         search.pack(side="left", fill="x", expand=True, ipady=4, padx=(0, 8))
+        # What is under the list is placed first, from the bottom, so that the list takes the room that is left
+        # and nothing under it is pushed out of the panel.
+        foot = tk.Frame(self.tray, bg=DARK)
+        foot.pack(side="bottom", fill="x")
         box = tk.Listbox(self.tray, bg=DARK, fg=INK, selectbackground=TILE, relief="flat", highlightthickness=0,
-                         font=(FONT, 9), height=24)
+                         font=(FONT, 9), height=6, exportselection=False)
         box.pack(fill="both", expand=True)
         rows = []
 
         def fill(*_):
-            wanted = search.get().strip().casefold()
-            rows[:] = [(item["slot"], item["name"], item["setlist"]) for item in entries
-                       if wanted in f"{item['name']} {item['setlist']}".casefold()]
+            # Every word typed must be in the name, the setlist or the slot as the unit shows it ("12B").
+            self.sounds_query = search.get()
+            rows[:] = [(item["slot"], item["name"], item["setlist"])
+                       for item in library.filtered(entries, self.sounds_query)]
             box.delete(0, "end")
             for slot, name, setlist in rows:
                 box.insert("end", f"{name}  ·  {setlist} {place(slot['position'])}")
 
+        def chosen():
+            picked = box.curselection()
+            if not picked:
+                self.studio.say("Choose a preset in the list first.")
+            return rows[picked[0]] if picked else None
+
         fill()
-        search.bind("<KeyRelease>", fill)
-        box.bind("<Double-Button-1>", lambda _: self.work_on(box, rows))
-        button(self.tray, "Work on this", lambda: self.work_on(box, rows)).pack(fill="x", pady=(6, 0))
+        search.bind("<KeyRelease>", fill)       # the list follows what is typed
+        box.bind("<Double-Button-1>", lambda _: self.work_on(box, rows))      # the same as the button below
+        button(foot, "Work on this", lambda: self.work_on(box, rows)).pack(fill="x", pady=(6, 0))
+        more = tk.Label(foot, text="More with this preset " + ("▴" if self.preset_more else "▾"), bg=DARK,
+                        fg=ACCENT, font=(FONT, 9), cursor="hand2", anchor="w")
+        more.pack(fill="x", pady=(6, 0))
+        more.bind("<ButtonRelease-1>", lambda _: (setattr(self, "preset_more", not self.preset_more),
+                                                   self.fill_panel()))
+        if not self.preset_more:
+            return
+        label(foot, "Use as reference plays the phrase silently through it, in the scene chosen, and keeps what "
+                    "came back for Tone search to match against.", size=9, color=SUBTLE, wrap=400).pack(fill="x")
+        scenes = tk.Frame(foot, bg=DARK)
+        scenes.pack(fill="x", pady=(2, 2))
+        for index, scene in enumerate(("Default scene", *SCENE_LETTERS)):
+            lit = scene == self.reference_scene
+            chip = tk.Label(scenes, text=scene, bg=TILE if lit else DARK, fg=INK if lit else SOFT, font=(FONT, 8),
+                            padx=6, pady=2, cursor="hand2")
+            chip.grid(row=0, column=index, padx=(0, 2))
+            chip.bind("<ButtonRelease-1>", lambda _, scene=scene: (setattr(self, "reference_scene", scene),
+                                                                   self.fill_panel()))
+        actions = tk.Frame(foot, bg=DARK)
+        actions.pack(fill="x", pady=(2, 0))
+        button(actions, "Use as reference", lambda: self.reference_preset(chosen())).pack(side="left")
+        button(actions, "Leave it on the unit", lambda: self.leave_preset(chosen())).pack(side="left", padx=6)
+        label(foot, "Leave it on the unit selects it, and it stays selected when the app closes.", size=9,
+              color=SUBTLE, wrap=400).pack(fill="x", pady=(2, 0))
+
+    def reference_preset(self, row):
+        """Play the phrase silently through a saved preset and keep the return as a reference for Tone search."""
+        from lab.tools import library
+        from lab.tools.common import SCENE_LETTERS, send
+
+        studio = self.studio
+        if row is None:
+            return
+        if studio.phrase is None:
+            studio.say("Record or choose a phrase first.")
+            return
+        slot, name, setlist = row
+        scene = None if self.reference_scene == "Default scene" else SCENE_LETTERS.index(self.reference_scene)
+        phrase_name = studio.phrase[0]
+
+        def captured(found):
+            library.keep_reference(Path(studio.folder), {"slot": slot, "setlist": setlist}, scene, found, phrase_name)
+            studio.say(f"Reference ready · {found['name']}" + (f" · scene {self.reference_scene}" if scene is not None
+                                                               else "") + ". Tone search can match against it.")
+
+        if not send(studio, "lab.tools.library.capture", slot, studio.phrase[1], scene, done=captured,
+                    failed=lambda error: studio.say(str(error)), renders=True,
+                    working=f"Playing the phrase silently through {name}…"):
+            studio.say(studio.held_words())
+
+    def leave_preset(self, row):
+        """Select a saved preset on the unit and make it the one given back when the app closes. A preset being
+        edited on the unit is not recalled over (`library.leave`)."""
+        from lab.tools.common import send
+
+        studio = self.studio
+        if row is None:
+            return
+        slot, name, _ = row
+        if not send(studio, "lab.tools.library.leave", slot, renders=True, working=f"Selecting {name}…",
+                    done=lambda record: studio.say(f"{record['name']} is selected and stays selected when the app "
+                                                   "closes."),
+                    failed=lambda error: studio.say(str(error))):
+            studio.say(studio.held_words())
 
     def panel_assets(self, kind):
         from lab.qc.assets import cached
@@ -874,18 +1073,40 @@ class Desk:
                     for wiring in (instrument.get("wiring") or [""])]
         label(self.tray, f"Record a phrase on the {self.studio.state.instrument}, played on:", size=9,
               color=SUBTLE).pack(fill="x", pady=(10, 2))
+        from lab.tools.common import flow
+
         grid = tk.Frame(self.tray, bg=DARK)
         grid.pack(fill="x")
-        for index, setting in enumerate(settings):
+        chips = []
+        for setting in settings:
             chosen = setting == self.record_setting
             chip = tk.Label(grid, text=setting, bg=TILE if chosen else DARK, fg=INK if chosen else SOFT, font=(FONT, 8),
                             padx=6, pady=2, cursor="hand2")
-            chip.grid(row=index // 3, column=index % 3, sticky="w", padx=(0, 4), pady=1)
             chip.bind("<ButtonRelease-1>", lambda _, setting=setting: (setattr(self, "record_setting", setting),
                                                                        self.fill_panel()))
+            chips.append(chip)
+        flow(grid, chips, width=400)        # as many to a row as fit the panel, however long the names
+        # What is played decides what a take measures as much as the pickup does, so pickup settings are compared
+        # only on takes marked as the same gesture (`lab.hearing.profile`). Choosing one is optional.
+        from lab.hearing.profile import GESTURES
+
+        label(self.tray, "To compare pickup settings, play the same thing on each and say which:", size=9,
+              color=SUBTLE, wrap=400).pack(fill="x", pady=(6, 2))
+        for gesture in GESTURES:
+            chosen = gesture == self.record_gesture
+            chip = tk.Label(self.tray, text=gesture, bg=TILE if chosen else DARK, fg=INK if chosen else SOFT,
+                            font=(FONT, 8), padx=6, pady=2, cursor="hand2", anchor="w")
+            chip.pack(fill="x", pady=1)
+            chip.bind("<ButtonRelease-1>", lambda _, gesture=gesture: self.choose_gesture(gesture))
         go = button(self.tray, f"Record {RECORD_SECONDS:g} s" if self.record_setting else "Choose the setting first",
-                    lambda: self.record_setting and self.studio.record(self.record_setting, RECORD_SECONDS))
+                    lambda: self.record_setting and self.studio.record(self.record_setting, RECORD_SECONDS,
+                                                                       gesture=self.record_gesture))
         go.pack(anchor="w", pady=(4, 0))
+
+    def choose_gesture(self, gesture):
+        """Mark the next take as this gesture, or, pressed again, as none."""
+        self.record_gesture = None if gesture == self.record_gesture else gesture
+        self.fill_panel()
 
     def choose_recorded(self, item, start=None, end=None):
         """Make a recorded take the phrase: the part of it kept from before, or its loudest few seconds."""
@@ -893,15 +1114,28 @@ class Desk:
         self.studio.use_phrase(item["id"], whole, start, end)
 
     def panel_guitar(self):
-        row = tk.Frame(self.tray, bg=DARK)
-        row.pack(fill="x", pady=(0, 8))
-        button(row, "Guitar Learner", self.open_learner).pack(side="left")
-        button(row, "Input calibration", self.open_calibration).pack(side="left", padx=6)
-        from lab.learner import gestures
+        """The Guitar Learner and teaching a control (each shown in this panel's place), gesture listening, what
+        the instrument puts out, and recording a take."""
+        from lab.learner import gestures, offered_for
 
-        button(row, "Gestures off" if gestures.running() else "Gestures on",
-               lambda: (self.toggle_gestures(), self.refill("Guitar"))).pack(side="left")
-        label(self.tray, f"What the {self.studio.state.instrument} puts out", size=10, bold=True).pack(fill="x")
+        instrument = self.studio.state.instrument
+        offered = bool(offered_for(instrument))
+        row = tk.Frame(self.tray, bg=DARK)
+        row.pack(fill="x", pady=(0, 4))
+        if offered:
+            button(row, "Guitar Learner", self.open_learner).pack(side="left", padx=(0, 6))
+        button(row, "Teach a control", self.open_teach).pack(side="left", padx=(0, 6))
+        state = gestures.state()
+        self.gestures_shown = _gestures_shown(state)
+        button(row, f"Gestures off · armed {state['seconds_left']:.0f} s" if state["armed"]
+               else "Gestures off" if state["running"] else "Gestures on", self.toggle_gestures).pack(side="left")
+        if not offered:
+            label(self.tray, f"The Guitar Learner has no layout of the {instrument}'s controls, so it is not "
+                             "offered for it.", size=9, color=SUBTLE, wrap=400).pack(fill="x")
+        label(self.tray, f"Gestures on for {gestures.ARM_SECONDS:.0f} s, and {gestures.ARM_SECONDS:.0f} s more "
+                         "after each gesture: a return gesture taught on a guitar control turns its Shape knob on "
+                         "the sound on show.", size=9, color=SUBTLE, wrap=400).pack(fill="x", pady=(0, 8))
+        label(self.tray, f"What the {instrument} puts out", size=10, bold=True).pack(fill="x")
         # Worked out away from the window (reading the takes takes a second or more); the panel is drawn again
         # when it arrives.
         for line in self.studio.guitar_lines():
@@ -931,12 +1165,15 @@ class Desk:
         button(self.tray, "Measure the USB round trip", self.studio.measure_round_trip).pack(anchor="w")
 
     def learner_seat(self):
-        return self.seat or LearnerSeat(self)
+        """The Guitar Learner's seat at this desk, made when something of the learner is first opened. With a
+        simulated unit it opens no audio driver: there is no unit behind the real one."""
+        return self.seat or LearnerSeat(self, real_audio=not self.studio.host.simulated)
 
-    def open_calibration(self):
-        from lab.learner import calibration
+    def open_teach(self):
+        """Teaching one control's settings, in the side panel's place."""
+        from lab.learner import teach
 
-        calibration.open(self.learner_seat())
+        self.teaching = teach.open(self.learner_seat())
 
     def toggle_gestures(self):
         from lab.learner import gestures
@@ -944,16 +1181,37 @@ class Desk:
         if gestures.running():
             gestures.stop()
             self.studio.say("Gestures off.")
+        else:
+            try:                                        # refused, with the reason, on a simulated unit
+                gestures.start(self.learner_seat())
+                self.studio.say(f"Gestures on for {gestures.ARM_SECONDS:.0f} s: play, and the taught control turns "
+                                "its knob on the sound on show.")
+            except ValueError as error:
+                self.studio.say(f"Gestures: {error}")
+        self.refill("Guitar")
+
+    def follow_gestures(self):
+        """While the Guitar panel is open, draw it again when what it shows of gesture listening has changed:
+        about once a second while it is armed, since it shows the seconds left."""
+        if self.panel != "Guitar" or self.dragging or self.hosted is not None:
             return
-        try:
-            gestures.start(self.learner_seat())
-        except ValueError as error:
-            self.studio.say(f"Gestures: {error}")
-            return
-        self.studio.say("Gestures on: play, and the mapped control turns the knob on the sound on show.")
+        from lab.learner import gestures
+
+        if _gestures_shown(gestures.state()) != self.gestures_shown:
+            self.fill_panel()
+
+    def clear_listening(self):
+        """Take the Levels tool's offset or mute off. Through the tool when it is open, so that it shows the
+        same."""
+        levels = self.tools.get("Levels")
+        if levels is not None and levels.alive():
+            levels.change(None)
+            self.studio.say("Back at the desk's own level.")
+        else:
+            self.studio.clear_listening()
 
     def open_learner(self):
-        """The Guitar Learner, in a window of its own, seated on this desk."""
+        """The Guitar Learner, in the side panel's place, seated on this desk."""
         from lab.learner import GuitarLearner
 
         if self.learner is None:
@@ -973,20 +1231,10 @@ class Desk:
             if self.play_when_free and not self.studio.audio_held_by:
                 mode, self.play_when_free = self.play_when_free, None
                 self.studio.play(mode)
+            self.follow_gestures()
             self.come_forward()
         finally:
             self.clock = self.root.after(80, self.tick)
-
-    def answer_second_launch(self):
-        import socket
-
-        try:
-            self.door = socket.socket()
-            self.door.bind(("127.0.0.1", PORT))
-            self.door.listen(2)
-            self.door.setblocking(False)
-        except OSError:
-            self.door = None
 
     def come_forward(self):
         """A second launch knocked: say that a desk is here (so that it leaves), and come forward."""
@@ -1016,9 +1264,7 @@ class Desk:
             return
         self.closing = True
         if self.seat is not None:
-            self.seat.leaving = True
-            if self.seat.stop_signal is not None:
-                self.seat.stop_signal.set()
+            self.seat.leaving = True        # which ends its recording or listening and gives the input back
         self.studio.begin("close", "Giving the Quad Cortex back…")
         self.root.update()
         try:
@@ -1032,21 +1278,26 @@ class Desk:
 
 
 def main(arguments):
+    """Open the desk. The first thing done is the single-instance check: the desk's port is bound before anything
+    else is started (the first run's checks, the engine, the window). When another desk has it, that desk is
+    asked to come forward and this launch leaves."""
+    from lab import setup
     from lab.qc.host import Host
 
     simulated = "--simulated" in arguments
-    if not simulated and not only_desk():
-        return
+    door = None
+    if not simulated:
+        door, another = claim_door()
+        if another:
+            return
     folder = home() / ("simulated" if simulated else "")
     folder.mkdir(parents=True, exist_ok=True)
     root = tk.Tk()
-    notice = first_run(folder) if not simulated else ""
+    notice = setup.first_run(folder) if not simulated else ""
     host = Host(folder, simulated=simulated)
     studio = Studio(host, folder)
     studio.notice = notice
-    desk = Desk(root, studio)
-    if not simulated:
-        desk.answer_second_launch()
+    Desk(root, studio, door=door)
     root.mainloop()
 
 
@@ -1055,47 +1306,60 @@ HERE = b"Tone Lab desk"  # what a desk answers a knock with: anything else on th
 WAIT_FOR_CLOSING = 20.  # seconds a new launch waits for a desk that holds the door without answering
 
 
-def only_desk():
-    """True when no other desk is open. Otherwise ask that one to come forward and say no: two desks would fight
-    over the unit. Only a desk's own answer counts: another program on that port, or a desk that is on its way
-    out and no longer answers, does not keep this one from opening."""
+def bind_door():
+    """The desk's port, bound and listening, or None when something has it already."""
     import socket
+
+    door = socket.socket()
+    try:
+        if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+            door.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)     # nobody binds beside it
+        door.bind(("127.0.0.1", PORT))
+        door.listen(2)
+        door.setblocking(False)
+    except OSError:
+        door.close()
+        return None
+    return door
+
+
+def knock():
+    """Ask whoever has the desk's port to come forward. True when a desk answered: only a desk's own answer
+    (`HERE`) counts, so another program on that port, or a desk that no longer answers, is not taken for one."""
+    import socket
+
+    try:
+        with socket.create_connection(("127.0.0.1", PORT), timeout=.5) as other:
+            other.settimeout(2.)            # the knock is the connection itself: a desk answers it and comes forward
+            return other.recv(len(HERE)) == HERE
+    except OSError:
+        return False
+
+
+def claim_door():
+    """The single-instance check. Returns (door, another): the port bound for this desk, or None; and whether
+    another desk is open (it was asked to come forward: two desks would fight over the unit).
+
+    A desk that is closing still holds the port for a while without answering (it is giving the unit back): it
+    is waited for rather than opened beside. Something else that keeps the port does not keep the desk from
+    opening: after the wait it opens without a door."""
     import time
 
-    # A desk answers within a tick. One that is closing (it is giving the unit back, which can take a while) still
-    # holds the door without answering: wait for it to go rather than open beside it.
     deadline = time.monotonic() + WAIT_FOR_CLOSING
     while True:
-        try:
-            other = socket.create_connection(("127.0.0.1", PORT), timeout=.5)
-        except OSError:
-            return True                     # nobody there
-        try:
-            with other:
-                other.settimeout(2.)          # the knock is the connection itself: a desk answers it and comes forward
-                if other.recv(len(HERE)) == HERE:
-                    return False
-        except OSError:
-            pass
+        door = bind_door()
+        if door is not None:
+            return door, False
+        if knock():
+            return None, True
         if time.monotonic() > deadline:
-            return True                     # something else has that port
+            return None, False
         time.sleep(.5)
 
 
-def first_run(folder):
-    """Once: check what the app needs, bring the earlier app's history in, and return what to say about it."""
-    from lab import migrate, setup
-
-    if not setup.first_run_needed(folder):
-        return ""
-    findings = setup.checks(folder)
-    try:
-        moved = migrate.summary(migrate.migrate(folder))[0]
-    except Exception as error:  # noqa: BLE001
-        moved = f"The earlier app's history could not be brought in: {error}"
-    setup.record(folder, findings)
-    missing = [item["say"] for item in findings if not item["ok"]]
-    return " ".join(missing) + " " + moved if missing else moved
+def _gestures_shown(state):
+    """What the Guitar panel shows of gesture listening (`gestures.state()`): it is drawn again when this changes."""
+    return state["running"], state["armed"], round(state["seconds_left"])
 
 
 if __name__ == "__main__":

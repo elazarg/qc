@@ -1,3 +1,5 @@
+import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
+import hidden_tk  # noqa: E402,F401  (keeps every window off the screen)
 import unittest
 
 from tone_lab.guitar_learner_ui import report_score, training_coverage

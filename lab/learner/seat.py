@@ -44,8 +44,12 @@ def is_the_players_home(folder):
 class LearnerSeat:
     HOLD = "learner"
 
-    def __init__(self, desk):
+    def __init__(self, desk, *, real_audio=True):
+        """`real_audio` is False for a desk whose unit is simulated (`host.simulated`): the learner's recordings
+        and listening open the Quad Cortex's real audio driver, which has nothing to do with a simulated unit, so
+        `submit` refuses them."""
         self.desk, self.root, self.studio = desk, desk.root, desk.studio
+        self.real_audio = real_audio
         self.worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix="learner")
         self.job = self.done = None         # the recording or listening under way; the desk reads `job`
         self.stop_signal = None             # ends it; the desk sets it when closing
@@ -104,6 +108,9 @@ class LearnerSeat:
         """Run `work(*args)` on the seat's thread with the audio driver held for the learner, then call
         `done((result, None))` or `done((None, why it failed))` on the desk's clock. False when it cannot start."""
         if self.job is not None or self._leaving:
+            return False
+        if not self.real_audio:
+            self.set_status("Not with a simulated unit.")
             return False
         holder = self.studio.audio_held_by
         if holder not in (None, self.HOLD):

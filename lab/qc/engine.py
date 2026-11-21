@@ -23,12 +23,12 @@ from dataclasses import replace
 from qc_mcp import leveling
 
 from lab.sound import catalog
-from lab.sound.chain import INTERNAL, Chain, Row, routed
+from lab.sound.chain import INTERNAL, MULTI_OUT, Chain, Row, routed
 from lab.hearing.listen import RoundTripChanged, calibrate, calibration, listen
 from lab.qc.rig import Rig
 from lab.qc.unit import CEILING_DB, same_slot
 
-MULTI_OUT, USB_IN, USB_OUT = 19, 12, 14
+USB_IN = 12
 PREVIEW_DB = -12.     # the level of a sound nobody has measured yet
 MUTE, VOLUME = catalog.LANE_MUTE, catalog.LANE_VOLUME
 
@@ -88,7 +88,8 @@ class Engine:
         self.slots.may_leave()                  # unsaved edits on the player's preset: wait, touch nothing
         self.borrowed = self.slots.note_borrowed()
         self.offset = calibration(self.slots.folder, self.unit.firmware)
-        return {"recovered": recovered, "borrowed": self.borrowed, "calibrated": self.offset is not None}
+        return {"recovered": recovered, "borrowed": self.borrowed, "calibrated": self.offset is not None,
+                "firmware": self.unit.firmware}
 
     def close(self):
         self.quiet()
@@ -442,12 +443,16 @@ class Engine:
     def inputs(self, physical_input=None):
         """Which USB channels carry the dry guitar and the processed sound now, and what the unit is on: for the
         Guitar Learner, which records the inputs itself and cannot open the unit while the engine holds it.
-        Returns {"channels": (dry, wet left, wet right), "preset", "scene", "position", "firmware"}."""
+        Returns {"channels": (dry, wet left, wet right), "preset", "scene", "position", "firmware", "ours"};
+        "ours" says whether the unit is on a slot the app works in or put up itself, and not on a preset the
+        player chose by hand."""
         from lab.qc.device import recording_channels
 
         channels = recording_channels(self.unit.device, physical_input or self.physical_input)
+        position = self.unit.position()
+        ours = self.slots.scratch(position) or same_slot(position, self.unit.slot)
         return {"channels": tuple(channels), "preset": self.unit.name(), "scene": self.unit.scene(),
-                "position": self.unit.position(), "firmware": self.unit.firmware}
+                "position": position, "firmware": self.unit.firmware, "ours": bool(ours)}
 
     def record(self, seconds, side=None, knobs=None, *, stop=None, progress=None):
         """Record the guitar: its dry input, as it reaches the unit before any processing, and the processed stereo

@@ -11,7 +11,8 @@ the Shape panel always agree. A gesture (a drag from press to release, a sweep f
 unit while it lasts and becomes the sound's knob positions once, at its end: one step for the desk's Undo,
 one write of the sound, one check by listening. "Measure A and B" plays the phrase silently through both
 sounds on the unit and says how B differs from A, level aside: octave-band balance, brightness, how much the
-level moves, stereo sides and what rings on.
+level moves, stereo sides and what rings on. It is asked for in the desk's Difference panel, which shows
+what `contrast` found with `contrast_lines` and `draw_bands`; the field itself is the plane.
 """
 
 from dataclasses import dataclass
@@ -20,7 +21,7 @@ import tkinter as tk
 
 from lab.sound.knobs import KNOBS
 from lab.desk.theme import ACCENT, DARK, DIM, FONT, PAPER, RULE, SUBTLE, TONE_A
-from lab.tools.common import Window, button, heard_chain, label, menu_choice, phrase, render_many, section
+from lab.tools.common import WIDTH, Chips, Tool, button, disclosure, label, render_many
 from lab.tools.search import BANDS, describe
 
 
@@ -137,7 +138,29 @@ def contrast(engine, a, b, dry, *, stop=None):
     return {"spectrum_db": list(found.spectrum_db), "perceptual_delta": [list(item) for item in found.perceptual_delta]}
 
 
-# ---- the window ----
+def contrast_lines(found):
+    """What `contrast` found, in two lines of words."""
+    return ["B against A, level aside:",
+            "  ·  ".join(f"{name} {value:+.1f} {unit}" for name, value, unit in found["perceptual_delta"])]
+
+
+def draw_bands(chart, values, *, width, height):
+    """Draw the difference in each octave band (`contrast`'s "spectrum_db") as bars up and down from a line."""
+    chart.delete("all")
+    centre = (height - 18) / 2
+    chart.create_line(4, centre, width - 4, centre, fill=RULE)
+    scale = max(6., max(abs(value) for value in values))
+    step = (width - 10) / len(values)
+    for index, (value, name) in enumerate(zip(values, BAND_NAMES)):
+        x = 5 + step * (index + .5)
+        y = centre - value / scale * (centre - 5)
+        chart.create_rectangle(x - step * .28, centre, x + step * .28, y, fill=ACCENT if value > 0 else TONE_A,
+                               outline="")
+        chart.create_text(x, height - 8, text=name, font=(FONT, 8), fill=SUBTLE)
+    chart.create_text(width - 4, 3, anchor="ne", text=f"±{scale:.0f} dB", font=(FONT, 8), fill=SUBTLE)
+
+
+# ---- the tool ----
 
 @dataclass(frozen=True)
 class Mark:
@@ -147,9 +170,8 @@ class Mark:
     values: dict
 
 
-class FieldWindow(Window):
+class FieldTool(Tool):
     TITLE = "Tone field"
-    SIZE = "640x640"
 
     def build(self):
         self.side = self.studio.state.side
@@ -158,45 +180,49 @@ class FieldWindow(Window):
         self.point = (0., 0.)
         self.marks = {}
         self.drag_job = self.sweep_job = None
-        self.result = None
-        top = tk.Frame(self.body, bg=PAPER)
-        top.pack(fill="x", pady=(0, 6))
-        self.plane = tk.StringVar(master=self.top, value=next(iter(PLANES)))
-        menu_choice(top, self.plane, tuple(PLANES), command=self.recenter).pack(side="right")
-        self.description = label(top, size=9, color=SUBTLE, wrap=420)
-        self.description.pack(side="left", fill="x")
-        self.canvas = tk.Canvas(self.body, bg=DARK, height=260, highlightthickness=1, highlightbackground=RULE,
-                                highlightcolor=RULE, cursor="crosshair")
-        self.canvas.pack(fill="both", expand=True)
+        self.plane = tk.StringVar(master=self.frame, value=next(iter(PLANES)))
+        Chips(self.body, self.plane, tuple(PLANES), command=self.recenter).pack(fill="x")
+        self.description = label(self.body, size=9, color=SUBTLE, wrap=WIDTH)
+        self.description.pack(fill="x", pady=(2, 4))
+        self.canvas = tk.Canvas(self.body, bg=PAPER, width=WIDTH, height=220, highlightthickness=1,
+                                highlightbackground=RULE, highlightcolor=RULE, cursor="crosshair")
+        self.canvas.pack(fill="x")
         self.canvas.bind("<Configure>", lambda _: self.paint())
         self.canvas.bind("<Button-1>", self.push)
         self.canvas.bind("<B1-Motion>", self.drag)
         self.canvas.bind("<ButtonRelease-1>", lambda _: self.apply_point())
-        self.controls = label(self.body, size=9, color=SUBTLE, wrap=600)
-        self.controls.pack(fill="x", pady=(4, 0))
+        self.controls = label(self.body, size=9, color=SUBTLE, wrap=WIDTH)
+        self.controls.pack(fill="x", pady=(4, 6))
+        row = tk.Frame(self.body, bg=self.body["bg"])
+        row.pack(fill="x")
+        button(row, "Back to the centre", lambda: self.set_point(0., 0.), quiet=True).pack(side="left")
+        button(row, "Use current as centre", self.recenter, quiet=True).pack(side="left", padx=4)
 
-        marks = section(self.body, "Remember a contrast")
+        # Marking two points and going between them is the rarer use: shown on request.
+        marks = disclosure(self.body, "Remember a contrast")
         row = tk.Frame(marks, bg=marks["bg"])
         row.pack(fill="x")
         self.jump = {}
         for slot in ("A", "B"):
             button(row, f"Mark {slot}", lambda slot=slot: self.mark(slot)).pack(side="left", padx=(0, 4))
             self.jump[slot] = button(row, f"Jump to {slot}", lambda slot=slot: self.recall(slot), quiet=True)
-            self.jump[slot].pack(side="left", padx=(0, 8))
-        self.sweep_button = button(row, "Sweep A → B", self.toggle_sweep, quiet=True)
-        self.sweep_button.pack(side="left")
-        button(row, "Use current as centre", self.recenter, quiet=True).pack(side="right")
-        button(row, "Back to the centre", lambda: self.set_point(0., 0.), quiet=True).pack(side="right", padx=4)
-
-        measure = section(self.body, "The sounds on A and B", "Played silently through the unit with the phrase.")
-        row = tk.Frame(measure, bg=measure["bg"])
-        row.pack(fill="x")
-        button(row, "Measure A and B", self.measure).pack(side="left")
-        self.measured = label(measure, size=9, wrap=560)
-        self.measured.pack(fill="x", pady=(4, 0))
-        self.chart = tk.Canvas(measure, bg=PAPER, height=100, highlightthickness=0)
-        self.chart.pack(fill="x", pady=(4, 0))
+            self.jump[slot].pack(side="left", padx=(0, 6))
+        self.sweep_button = button(marks, "Sweep A → B", self.toggle_sweep, quiet=True)
+        self.sweep_button.pack(anchor="w", pady=(4, 0))
+        label(self.body, "How B differs from A as they are set now: Difference, Measure A and B now.", size=9,
+              color=SUBTLE, wrap=WIDTH).pack(fill="x", pady=(8, 0))
         self.sync()
+
+    def shown(self):
+        """On show again: on the side selected now, from where its knobs stand."""
+        super().shown()
+        if self.side != self.studio.state.side or self.read_values() != self.values:
+            self.recenter()
+
+    def hidden(self):
+        """Left: a sweep ends where it is, and is kept there."""
+        self.stop_sweep()
+        super().hidden()
 
     # what the desk holds
 
@@ -371,46 +397,5 @@ class FieldWindow(Window):
         self.paint()
         self.sweep_job = self.after(400, lambda: self.sweep_step(index + 1, steps))
 
-    # measuring A and B
-
-    def measure(self):
-        a, b, taken = self.studio.sound("a"), self.studio.sound("b"), phrase(self.studio)
-        if a is None or b is None or taken is None:
-            self.say("Put sounds on A and B and choose a phrase first.")
-            return
-
-        def measured(found):
-            self.result = found
-            self.measured.configure(text=f"{a.name} → {b.name}, B against A, level aside\n" + "  ·  ".join(
-                f"{name} {value:+.1f} {unit}" for name, value, unit in found["perceptual_delta"]))
-            self.paint_chart()
-
-        self.call("lab.tools.field.contrast", heard_chain(a), heard_chain(b), taken[1], done=measured,
-                  working="Playing the phrase silently through A and B…", renders=True)
-
-    def paint_chart(self):
-        chart = self.chart
-        chart.delete("all")
-        if not self.result:
-            return
-        width, height = max(180, chart.winfo_width()), max(80, chart.winfo_height())
-        centre = (height - 18) / 2
-        chart.create_line(4, centre, width - 4, centre, fill=RULE)
-        values = self.result["spectrum_db"]
-        scale = max(6., max(abs(value) for value in values))
-        step = (width - 10) / len(values)
-        for index, (value, name) in enumerate(zip(values, BAND_NAMES)):
-            x = 5 + step * (index + .5)
-            y = centre - value / scale * (centre - 5)
-            chart.create_rectangle(x - step * .28, centre, x + step * .28, y, fill=ACCENT if value > 0 else TONE_A,
-                                   outline="")
-            chart.create_text(x, height - 8, text=name, font=(FONT, 8), fill=SUBTLE)
-        chart.create_text(width - 4, 3, anchor="ne", text=f"±{scale:.0f} dB", font=(FONT, 8), fill=SUBTLE)
-
-    def close(self):
-        self.stop_sweep()
-        super().close()
-
-
 def open(desk):  # noqa: A001
-    return FieldWindow.open(desk)
+    return FieldTool.open(desk)

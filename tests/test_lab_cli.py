@@ -112,6 +112,13 @@ class DispatchTest(Home):
                 except OSError:
                     continue
                 with knock:
+                    # What the caller sent is read before answering and hanging up, as a desk does: closing with
+                    # it unread resets the connection on Windows, and the answer may never arrive.
+                    knock.settimeout(1.)
+                    try:
+                        knock.recv(16)
+                    except OSError:
+                        pass
                     if answer is not None:
                         knock.sendall(answer)
 

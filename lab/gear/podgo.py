@@ -54,11 +54,11 @@ import zlib
 
 from lab.sound import catalog
 from lab import knowledge
-from lab.sound.chain import Block, Chain, Row, SCENES
+from lab.sound.chain import MULTI_OUT, Block, Chain, Row, SCENES
 from lab.sound.sounds import Sound, settings
 
 RESEARCH = Path(__file__).resolve().parents[2] / "research" / "podgo-models.json"
-INPUT, MULTI_OUT, SCENE_NAME = 1, 19, 12
+INPUT, SCENE_NAME = 1, 12
 SNAPSHOT_CONTROLLER = 11          # the controller number that assigns a value to snapshots
 SNAPSHOTS = 4
 

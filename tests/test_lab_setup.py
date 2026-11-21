@@ -1,5 +1,7 @@
 """First run on a new computer: plain findings for each check, and the data moved out of the program folder."""
 
+import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
+import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
 import json
 import os
 from pathlib import Path

@@ -1,5 +1,10 @@
 """Usage and feedback: the ledger day by day, tool opens, notes kept with the desk, and the unit's share."""
 
+import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
+import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
+import hidden_tk  # noqa: E402,F401  (keeps every window off the screen)
+
+from collections import Counter
 import json
 from pathlib import Path
 import sys
@@ -47,6 +52,22 @@ class LedgerTest(unittest.TestCase):
             self.assertEqual(today["seconds"], 44.)
             self.assertEqual(today["characters"], 3700)
             self.assertIn(f"3 of {DAILY}", usage.today_line(folder, today="2026-11-19"))
+
+    def test_a_call_is_counted_on_the_player_s_own_day_as_the_daily_allowance_counts_it(self):
+        # Before: the day was the first ten characters of the time, so a call late in the evening, written in
+        # another offset, was counted on a different day here than by the allowance.
+        from lab.sound.assistant import local_day
+
+        late, early = "2026-11-18T23:30:00-12:00", "2026-11-19T00:30:00+14:00"     # 11:30 and 10:30 UTC, a day apart
+        with TemporaryDirectory() as folder:
+            times = (late, late, early)
+            ledger(folder, [{"at": at, "kind": "round", "by": "player", "outcome": "ok"} for at in times]
+                   + [{"at": "sometime", "kind": "round", "by": "player", "outcome": "ok"}])
+            days = usage.daily(folder)
+            counted = {day["day"]: day["calls"] for day in days}
+            self.assertEqual(counted, dict(Counter(local_day(at) for at in times)))
+            self.assertNotEqual(counted, dict(Counter(at[:10] for at in times)))        # wherever this is run
+            self.assertEqual(usage.day_line(days[0]).split("  ·  ")[0], days[0]["day"])
 
     def test_the_ledger_the_assistant_writes_is_the_one_read(self):
         with TemporaryDirectory() as folder:

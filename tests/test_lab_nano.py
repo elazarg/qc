@@ -1,5 +1,7 @@
 """The Nano Cortex sheet: what to capture, which cab, and what goes in the fixed slots."""
 
+import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
+import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
 import unittest
 
 from lab.gear import nano

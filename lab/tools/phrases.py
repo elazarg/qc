@@ -5,8 +5,8 @@ processed stereo return in the next two. A phrase is its dry column, kept under 
 folder with what was played (`phrase.json`), and beside it the processed return when there was one. A take in
 which nothing came in, or which clipped at the input, is not a phrase: it is refused with the reason.
 
-`python -m lab record` keeps its takes through `keep`. The desk's `Studio.record` should too (it still has
-its own copy of these lines).
+The desk (`Studio.record`) and `python -m lab record` both keep their takes through `keep`. The desk says
+what was played in the take (`gesture`), so that pickup settings are compared on takes of the same thing.
 """
 
 from datetime import datetime, timezone
@@ -36,11 +36,13 @@ def dry_of(take):
     return dry, level
 
 
-def keep(folder, take, *, instrument, setting, heard_through=None):
+def keep(folder, take, *, instrument, setting, heard_through=None, gesture=None):
     """Keep a take as a phrase in the data folder `folder`. Returns (its record, the dry audio, its peak in dBFS).
 
     `heard_through` is the sound the player heard while playing, if the take's processed return is that sound's
     (an object with `id` and `name`); without it a return that is not silent is the preset on the unit's.
+    `gesture` says what was played ("open strings strummed once…": `lab.hearing.profile.GESTURES`, or the
+    player's own words) and is kept in the record when given.
     """
     from lab.hearing.audio import RATE, write_wave
     from lab.sound.sounds import new_id
@@ -53,7 +55,7 @@ def keep(folder, take, *, instrument, setting, heard_through=None):
     write_wave(target / "dry.wav", dry)
     info = {"id": phrase_id, "instrument": instrument, "setting": setting,
             "recorded": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-            "seconds": round(len(dry) / RATE, 2)}
+            "seconds": round(len(dry) / RATE, 2), **({"gesture": gesture} if gesture else {})}
     wet = take[:, 1:3] if take.ndim == 2 else take[:, :0]
     if wet.shape[1] == 2 and float(np.abs(wet).max()) > 1e-4:
         write_wave(target / "wet.wav", wet)

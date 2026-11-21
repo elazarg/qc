@@ -2,6 +2,8 @@
 holds the audio input (`Studio.hold_audio`), runs on the seat's worker, reports back on the desk's clock, and
 gives the input back however it ends."""
 
+import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
+import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
@@ -9,6 +11,7 @@ import unittest
 
 from lab.desk.studio import Studio
 from lab.desk.window import LearnerSeat
+from lab.learner import folders
 from lab.qc.host import Host
 from lab.sound.assistant import Assistant
 
@@ -22,7 +25,10 @@ class SeatTest(unittest.TestCase):
         host.ready.result(10)
         self.studio = Studio(host, home, assistant=Assistant(home, automatic=False, run=lambda *a, **k: {}))
         self.addCleanup(self.studio.close)
+        self.addCleanup(folders.log_to, None)             # the seat points the learner's folders and log at this desk
+        self.addCleanup(folders.use, None)
         self.seat = LearnerSeat(SimpleNamespace(root=None, studio=self.studio))
+        self.addCleanup(self.seat.worker.shutdown, wait=True)
 
     def finish(self):
         self.seat.job.result(30)
@@ -57,6 +63,14 @@ class SeatTest(unittest.TestCase):
         self.assertFalse(self.seat.submit("…", lambda: 0, done=lambda result: None))
         self.assertIsNone(self.seat.job)
         self.assertEqual(self.studio.audio_held_by, "gestures")
+
+    def test_a_seat_at_a_desk_whose_unit_is_simulated_opens_no_audio_driver(self):
+        seat = LearnerSeat(SimpleNamespace(root=None, studio=self.studio), real_audio=False)
+        self.addCleanup(seat.worker.shutdown, wait=True)
+        ran = []
+        self.assertFalse(seat.submit("Opening the dry input…", lambda: ran.append("opened"), done=ran.append))
+        self.assertEqual((self.studio.state.status, ran, seat.job, self.studio.audio_held_by),
+                         ("Not with a simulated unit.", [], None, None))
 
 
 if __name__ == "__main__":

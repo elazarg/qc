@@ -1,6 +1,7 @@
 """Gestures: the detector, the one cadence from audio to a gesture, the arm, and the session on the desk's side."""
 
 import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
+import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
 from contextlib import contextmanager
 from concurrent.futures import Future
 from queue import Queue
@@ -467,13 +468,22 @@ class DeskSideTest(unittest.TestCase):
         self.seat.tick()
         self.assertEqual(heard[-1]["label"], "Tone 10")
 
-    def test_the_phrase_loop_ends_listening(self):
+    def test_listening_does_not_watch_what_the_desk_plays(self):
+        # The desk ends gesture listening itself before it starts the phrase (`Desk.toggle_play`), and holds the
+        # phrase back until the input is free. The session's own check for a playing phrase could never be true.
         session = self.started(control="pickup")
         self.studio.state.mode = "phrase"
         self.seat.tick()
-        self.assertTrue(session.signal.is_set())
-        self.assertTrue(settle(self.seat, lambda: session.finished))
-        self.assertIn("Gesture listening stopped while the phrase plays.", self.studio.statuses)
+        self.assertFalse(session.signal.is_set())
+        self.assertFalse(session.finished)
+
+    def test_it_is_refused_on_a_desk_whose_unit_is_simulated(self):
+        # Listening opens the Quad Cortex's real audio driver, which a simulated unit has nothing to do with.
+        self.seat.real_audio = False
+        with self.assertRaisesRegex(ValueError, "Not with a simulated unit"):
+            gestures.start(self.seat, control="pickup")
+        self.assertFalse(gestures.running())
+        self.assertIsNone(self.studio.audio_held_by)
 
     def test_a_failure_to_start_is_said_and_written_down(self):
         self.studio.host.error = RuntimeError("the engine stopped")

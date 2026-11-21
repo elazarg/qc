@@ -50,6 +50,8 @@ def editor_running():
 
 
 def _library(share):
+    if os.environ.get("TONE_LAB_TESTING"):    # set by tests/isolated.py: no test opens the real unit
+        raise RuntimeError("A test tried to open the real Quad Cortex. Use lab.qc.sim.SimUnit.")
     from qc_mcp.transport import QuadCortex
 
     return QuadCortex(share=share)

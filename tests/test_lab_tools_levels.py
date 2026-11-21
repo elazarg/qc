@@ -3,6 +3,10 @@
 Ported from test_level_plan (the planning). A and B are matched by the desk itself; the tool measures with
 `hearing.measure`, the one measurement."""
 
+import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
+import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
+import hidden_tk  # noqa: E402,F401  (keeps every window off the screen)
+
 from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory

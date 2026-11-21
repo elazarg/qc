@@ -71,6 +71,8 @@ class Audio:
     """The Quad Cortex's ASIO driver."""
 
     def __init__(self):
+        if os.environ.get("TONE_LAB_TESTING"):    # set by tests/isolated.py: no test opens the real driver
+            raise RuntimeError("A test tried to open the Quad Cortex's audio driver. Use lab.qc.sim.SimAudio.")
         os.environ["SD_ENABLE_ASIO"] = "1"
         import sounddevice
 

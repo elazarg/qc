@@ -9,7 +9,11 @@ what kind of guitar music the most listened artists make; its answer is kept
 and shown, and the designer uses it as a background for open requests.
 **Start this song** names the song on the desk; **Make it** asks for a round.
 
-Everything this window works out is personal: it is kept in the data
+The export is chosen in place: the zips and history files found in Downloads
+and in the data folder's `imports`, or a path typed in. It is read away from
+the window, since a long history takes seconds.
+
+Everything this tool works out is personal: it is kept in the data
 folder's `personal` folder, never in the project. The export's path is
 remembered there too.
 
@@ -20,11 +24,12 @@ prints it.
 import json
 from pathlib import Path
 import tkinter as tk
-from tkinter import filedialog
 
-from lab.tools.common import Window, button, label, listbox
+from lab.desk.theme import SUBTLE
+from lab.tools.common import WIDTH, FileChoice, Tool, button, disclosure, label, listbox, usual_folders
 
 REMEMBERED = "spotify.json"
+EXPORTS = ("my_spotify_data*.zip", "*spotify*.zip", "Streaming_History_Audio_*.json", "StreamingHistory_music_*.json")
 
 
 def personal(folder):
@@ -50,34 +55,43 @@ def preset_names(store, folder):
 
 def songs(paths, names=(), *, limit=40):
     """(summary, songs) of an export: the songs chosen and come back to most, each marked with the preset or
-    sound of the player's it already has (`names`), as the window lists them."""
+    sound of the player's it already has (`names`), as the tool lists them."""
     from lab.player import listening
 
     summary = listening.summarize(listening.plays(paths), limit=limit)
     return summary, listening.with_presets(summary["songs"], names)
 
 
-class ListeningWindow(Window):
+def chosen_words(song):
+    """How often a song was chosen, in words: an export that does not record how a play started says so."""
+    return "chosen: not recorded" if song.get("chosen") is None else f"chosen {song['chosen']}×"
+
+
+class ListeningTool(Tool):
     TITLE = "Songs you listen to"
-    SIZE = "600x640"
 
     def build(self):
-        row = tk.Frame(self.body, bg=self.body["bg"])
-        row.pack(fill="x")
-        button(row, "Choose the export…", self.choose).pack(side="left")
-        button(row, "Ask about the artists", self.ask_about_artists).pack(side="left", padx=6)
-        self.where = label(row, size=9, wrap=260)
-        self.where.pack(side="left", padx=10)
-        self.list = listbox(self.body, height=20)
-        self.list.pack(fill="both", expand=True, pady=(10, 6))
+        self.songs, self.context = [], {}
+        self.reading = None             # the export being read, away from the window
+        self.where = label(self.body, size=9, wrap=WIDTH)
+        self.where.pack(fill="x")
+        self.list = listbox(self.body, height=11)
+        self.list.pack(fill="x", pady=(4, 6))
         self.list.bind("<<ListboxSelect>>", lambda _: self.describe())
-        self.note = label(self.body, size=9, wrap=560)
+        self.note = label(self.body, size=9, wrap=WIDTH)
         self.note.pack(fill="x")
         actions = tk.Frame(self.body, bg=self.body["bg"])
         actions.pack(fill="x", pady=(6, 0))
         button(actions, "Start this song", self.start).pack(side="left")
         button(actions, "Make it", self.make).pack(side="left", padx=6)
-        self.songs, self.context = [], {}
+        button(self.body, "Ask about the artists", self.ask_about_artists, quiet=True).pack(anchor="w", pady=(6, 0))
+        # The export is chosen once; choosing another is shown on request.
+        self.export = disclosure(self.body, "The Spotify export")
+        label(self.export, "The zip Spotify sends, or its streaming-history files: click each in the list, or paste "
+                           "a path.", size=9, color=SUBTLE, wrap=WIDTH).pack(fill="x")
+        self.files = FileChoice(self.export, folders=lambda: usual_folders("spotify", self.folder),
+                                patterns=EXPORTS, choose=self.choose, several=True, action="Read this export")
+        self.files.pack(fill="x")
         saved = saved_analysis(self.folder)
         if saved:
             self.show(saved)
@@ -85,6 +99,7 @@ class ListeningWindow(Window):
         if not saved and paths and all(Path(path).exists() for path in paths):
             self.load(paths)
         elif not saved:
+            self.export.show(True)
             self.say("Choose your Spotify export: the zip, or its streaming-history files.")
 
     def remembered(self):
@@ -93,23 +108,35 @@ class ListeningWindow(Window):
         except (OSError, ValueError):
             return None
 
-    def choose(self):
-        paths = filedialog.askopenfilenames(parent=self.top, title="Spotify export",
-                                            filetypes=(("Spotify export", "*.zip *.json"),))
-        if paths:
-            (personal(self.folder) / REMEMBERED).write_text(json.dumps({"paths": list(paths)}), encoding="utf-8")
-            self.load(list(paths))
+    def choose(self, paths):
+        paths = [str(path) for path in paths]
+        (personal(self.folder) / REMEMBERED).write_text(json.dumps({"paths": paths}), encoding="utf-8")
+        self.load(paths)
 
     def load(self, paths):
-        try:
-            summary, ranked = songs(paths, preset_names(self.studio.store, self.folder))
-        except (OSError, ValueError) as error:
-            self.say(str(error))
+        """Read the export away from the window (a long history takes seconds), then list its songs."""
+        if self.reading is not None:
+            self.say("Still reading the export.")
             return
-        record = {"summary": {**summary, "songs": ranked},
-                  "guitar_context": (saved_analysis(self.folder) or {}).get("guitar_context")}
-        self.save(record)
-        self.show(record)
+        names = preset_names(self.studio.store, self.folder)
+        self.say("Reading the export…")
+        self.reading = self.studio.reading.submit(songs, paths, names)
+
+        def read(result):
+            self.reading = None
+            summary, ranked = result
+            record = {"summary": {**summary, "songs": ranked},
+                      "guitar_context": (saved_analysis(self.folder) or {}).get("guitar_context")}
+            self.save(record)
+            if self.alive():
+                self.export.show(False)
+                self.show(record)
+
+        def failed(error):
+            self.reading = None
+            self.say(f"The export could not be read: {error}")
+
+        self.studio.later(self.reading, read, failed)
 
     def save(self, record):
         from lab.player import listening
@@ -128,19 +155,25 @@ class ListeningWindow(Window):
         self.list.delete(0, "end")
         for song in self.songs:
             mark = "  · preset" if song.get("preset") else ""
-            self.list.insert("end", f"{song['artist']} – {song['title']}  ({song['chosen']}× on {song['days']} days){mark}")
+            self.list.insert("end", f"{song['artist']} – {song['title']}  ({chosen_words(song)}, {song['days']} days)"
+                                    f"{mark}")
         self.where.configure(text=f"{summary['hours']} hours over {len(summary['years'])} years")
         self.say("Most chosen and returned to first. Select one for what is known about it.")
 
     def chosen(self):
         picked = self.list.curselection()
+        if not picked:
+            self.say("Choose a song in the list first.")
         return self.songs[picked[0]] if picked else None
 
     def describe(self):
-        song = self.chosen()
-        if song is None:
+        picked = self.list.curselection()
+        if not picked:
             return
-        parts = [f"Chosen {song['chosen']} times on {song['days']} days, {song['hours']} hours."]
+        song = self.songs[picked[0]]
+        often = ("How often it was chosen is not recorded in this export" if song.get("chosen") is None
+                 else f"Chosen {song['chosen']} times")
+        parts = [f"{often}; played on {song['days']} days, {song['hours']} hours."]
         if song.get("both_versions"):
             parts.append("You listen to it live and in the studio: say which version when you ask.")
         if song.get("preset"):
@@ -186,4 +219,4 @@ class ListeningWindow(Window):
 
 
 def open(desk):  # noqa: A001 - every tool opens with `open(desk)`
-    return ListeningWindow.open(desk)
+    return ListeningTool.open(desk)

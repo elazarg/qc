@@ -6,10 +6,10 @@ tell them from the sound alone.
     learner.show()                    # stays closed, and says why, for a guitar it has no layout for
     offered_for("Charvel")            # the control layouts it has for an instrument; none: not offered
 
-    window         the Guitar Learner's window
-    report         what it says of its checks and of an estimate, without the window
-    teach          the window where one control's settings are taught: teach.open(seat)
-    taught         what was taught about one control, and checking a take against it, without the window
+    window         the Guitar Learner, shown in the desk's window in the place of the side panel
+    report         what it says of its checks and of an estimate, without anything on show
+    teach          teaching one control's settings, shown in the same place: teach.open(seat)
+    taught         what was taught about one control, and checking a take against it, without anything on show
     gestures       a return gesture on a guitar control turns a Shape knob: gestures.start(seat), .state(), .stop()
     compensation   whether a high shelf can make up for a rolled-back tone pot
     board          the guitar's controls, drawn on a photograph of it
@@ -31,7 +31,7 @@ __all__ = ["GuitarLearner", "offered_for"]
 
 
 def __getattr__(name):
-    # The window brings in Tk; the worker process and the analysis do not need it.
+    # What is shown brings in Tk; the worker process and the analysis do not need it.
     if name in __all__:
         from lab.learner import window
 

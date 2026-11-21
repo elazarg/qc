@@ -14,6 +14,13 @@ Every rule about writing to the unit lives here, once:
 - A block the unit leaves out was refused for want of processing, and
   `Refused` names it.
 - `stop` is honoured between any two writes.
+- The unit may show a change a moment after it was written, and may leave a
+  read unanswered. Every check after a write reads until the change shows,
+  within `SETTLE` seconds; a read that goes unanswered inside such a wait is
+  "not shown yet", and outside one it is asked once more.
+- When a change fails after an input was being connected, the input is taken
+  off by writing so, without first asking the unit what it holds: what it
+  shows may be older than what it does.
 
 The device library re-queues retained packets each time a reply matches, so a
 polled request grows its queue without bound. `device.Device` clears it under
@@ -24,6 +31,7 @@ from dataclasses import replace
 import time
 
 from qc_mcp import leveling
+from qc_mcp.transport import QCError
 
 from lab.sound import catalog
 from lab.sound.chain import differences, from_preset, plan_levels, plan_routes, plan_structure, plan_values, same
@@ -80,11 +88,28 @@ class Unit:
     def position(self):
         return self.device.get_setlist_position()
 
+    def _held(self):
+        """What the unit holds now, or None when it left this read unanswered."""
+        try:
+            preset = self.device.get_current_preset()
+        except QCError:
+            return None
+        return None if preset is None else from_preset(preset)
+
     def read(self):
-        preset = self.device.get_current_preset()
-        if preset is None:
-            raise RuntimeError("The Quad Cortex did not return its preset.")
-        return from_preset(preset)
+        """What the unit holds. A read it leaves unanswered is asked once more."""
+        for _ in range(2):
+            held = self._held()
+            if held is not None:
+                return held
+        raise RuntimeError("The Quad Cortex did not return its preset.")
+
+    def shows(self, test, what):
+        """Read the preset until `test(held)` is true and return it. A read left unanswered is not shown yet."""
+        def shown():
+            held = self._held()
+            return held if held is not None and test(held) else None
+        return self.until(shown, what)
 
     def name(self):
         return self.device.get_current_preset().name
@@ -99,7 +124,10 @@ class Unit:
         """Whether the selected preset has unsaved edits: True, False, or None when the unit did not say (asked
         twice). Callers treat None as edits that must not be lost."""
         for _ in range(2):
-            state = self.device.read_state("PresetDirty")
+            try:
+                state = self.device.read_state("PresetDirty")
+            except QCError:
+                state = None
             if state is not None:
                 return bool(getattr(state, "is_dirty", getattr(state, "dirty", False)))
         return None
@@ -208,12 +236,11 @@ class Unit:
         if fresh:
             current = self.read()
         if structure:
-            def placed():
-                held = self.read()
-                return held if all((held.block(r, c).model if held.block(r, c) else 0) == (b.model if b else 0)
-                                   for r, row in enumerate(wanted.rows) for c, b in enumerate(row.cells)) else None
+            def placed(held):
+                return all((held.block(r, c).model if held.block(r, c) else 0) == (b.model if b else 0)
+                           for r, row in enumerate(wanted.rows) for c, b in enumerate(row.cells))
             try:
-                current = self.until(placed, "every block in place")
+                current = self.shows(placed, "every block in place")
             except Mismatch:
                 self.guard()  # A block missing from another preset was not refused: the player moved.
                 held = self.read()
@@ -228,7 +255,12 @@ class Unit:
             if not ops:
                 break
             self.run(ops, stop)
-            current = self.read()
+            try:
+                # The values are waited for as the blocks are. One the unit has not shown by then is written
+                # once more, and the check at the end decides.
+                current = self.shows(lambda held: not plan_values(held, wanted), "the values")
+            except Mismatch:
+                current = self.read()
         levels = plan_levels(current, wanted)
         self.run(levels, stop)
         routes = plan_routes(current, wanted)
@@ -236,34 +268,36 @@ class Unit:
         # would play the sound at whatever the preset holds. A mute needs no such check: one the unit did not
         # take leaves a row silent, or its input is taken off by the routes that follow and checked below.
         if routes and any(op.args[2] == catalog.LANE_VOLUME for op in levels):
-            held = self.read()
-            for r, want in enumerate(wanted.rows):
-                have = dict(held.rows[r].output)
-                for index, value in want.output:
-                    if index not in have or not same(have[index], value):
-                        raise Mismatch(f"The Quad Cortex did not take the level of row {r + 1}, so nothing was "
-                                       "connected.")
+            def unlevelled(held):
+                return [r for r, want in enumerate(wanted.rows) for index, value in want.output
+                        if index not in dict(held.rows[r].output) or not same(dict(held.rows[r].output)[index], value)]
+            try:
+                self.shows(lambda held: not unlevelled(held), "the levels")
+            except Mismatch:
+                row = (unlevelled(self.read()) or [0])[0]
+                raise Mismatch(f"The Quad Cortex did not take the level of row {row + 1}, so nothing was "
+                               "connected.") from None
         try:
             self.run(routes, stop)
             self.guard()
-            held = self.read()
-            wrong = differences(held, wanted)
-            if wrong:
-                raise Mismatch("The Quad Cortex did not confirm the chain: " + "; ".join(wrong[:3]))
+            try:
+                held = self.shows(lambda held: not differences(held, wanted), "the chain")
+            except Mismatch:
+                wrong = differences(self.read(), wanted)
+                raise Mismatch("The Quad Cortex did not confirm the chain: " + "; ".join(wrong[:3])) from None
         except Exception:
-            self._disconnect([op.args[0] for op in routes])
+            self._disconnect(routes)
             raise
         return held
 
-    def _disconnect(self, rows):
-        """After a failure: take the input off every row this change was connecting, as far as the unit lets."""
-        if not rows:
-            return
+    def _disconnect(self, routes):
+        """After a failure: take the input off every row this change was connecting, as far as the unit lets.
+        Written without asking what the unit holds first: a unit that has not yet shown the connection would
+        be taken to have none, and left sounding."""
         try:
-            self.guard()
-            held = self.read()
-            for r in rows:
-                if held.rows[r].inlet not in (0, 16, 17, 18):
-                    self.device.set_routing(r, in_portid=0, out_portid=held.rows[r].outlet)
+            for op in routes:
+                row, inlet, outlet = op.args
+                self.guard()
+                self.device.set_routing(row, in_portid=inlet if inlet in (16, 17, 18) else 0, out_portid=outlet)
         except Exception:  # noqa: BLE001
             pass

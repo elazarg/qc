@@ -1,4 +1,9 @@
-"""The library: filtering the unit's presets, reading them, capturing a reference and leaving one selected."""
+"""What the Sounds panel does with a saved preset beside working on it: filtering the unit's presets, capturing
+one as a reference and leaving one selected. (The panel itself is in test_lab_one_window.py.)"""
+
+import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
+import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
+import hidden_tk  # noqa: E402,F401  (keeps every window off the screen)
 
 import json
 from pathlib import Path
@@ -26,12 +31,14 @@ class FilterTest(unittest.TestCase):
         self.assertEqual([found["name"] for found in library.filtered(rows, "vai")], ["Vai for The Love God", "Lead Vai"])
         self.assertEqual([found["name"] for found in library.filtered(rows, "vai gigs")], ["Lead Vai"])
         self.assertEqual([found["name"] for found in library.filtered(rows, "32g")], ["Clean Strat"])
-        self.assertEqual([found["name"] for found in library.ordered(rows)],
-                         ["Vai for The Love God", "Lead Vai", "Clean Strat"])
+        self.assertEqual(library.filtered(rows, ""), rows)
 
-    def test_nothing_read_yet_is_an_empty_list(self):
-        with TemporaryDirectory() as folder:
-            self.assertEqual(library.cached(folder), [])
+    def test_the_tool_that_listed_the_presets_is_gone_and_its_operations_are_kept(self):
+        # The list, its filter and Work on this are the Sounds panel's; a second window did the same.
+        for name in ("LibraryWindow", "open", "ordered", "cached", "directory"):
+            self.assertFalse(hasattr(library, name), name)
+        for name in ("filtered", "capture", "leave", "keep_reference"):
+            self.assertTrue(callable(getattr(library, name)), name)
 
 
 class OnTheUnitTest(unittest.TestCase):
@@ -40,9 +47,6 @@ class OnTheUnitTest(unittest.TestCase):
             unit = host(folder)
             try:
                 unit.call("open").result(10)
-                rows = unit.call("lab.tools.library.directory").result(30)
-                self.assertIsInstance(rows, list)
-                self.assertEqual(library.cached(folder), rows)      # kept in the desk's data folder
                 factory = {"folder_key": FACTORY, "position": 0, "is_factory": True}
                 captured = unit.call("lab.tools.library.capture", factory, phrase(), 1).result(60)
                 self.assertEqual(captured["name"], "Brit 2203")

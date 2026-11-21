@@ -3,6 +3,8 @@ when the app listens by itself, what a failure leaves behind, and who has the au
 
 Each test here failed on the desk as the whole-codebase review found it (docs/WHOLE_CODEBASE_REVIEW.md)."""
 
+import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
+import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
 from concurrent.futures import Future
 import json
 from pathlib import Path
@@ -618,11 +620,17 @@ class FaultLogTest(FlowCase):
         self.assertEqual(self.studio.state.status, "It broke.")
         self.assertIn("File engine.py, in show", self.log())
 
-    def test_the_firmware_remark_is_made_for_the_units_firmware_as_last_read(self):
+    def test_the_firmware_remark_is_made_for_the_firmware_the_unit_says_when_it_opens(self):
+        from lab.qc import sim
+
+        self.assertEqual(self.studio.firmware, sim.SimUnit.firmware)
         self.assertNotIn("another firmware", self.studio.state.status)       # the simulated unit's is the tables'
-        (self.folder / "directory.json").write_text(json.dumps({"firmware": "9.9.9", "presets": []}),
-                                                    encoding="utf-8")
-        again = Studio(self.host, self.folder, assistant=self.studio.assistant)
+        self.addCleanup(setattr, sim.SimUnit, "firmware", sim.SimUnit.firmware)
+        sim.SimUnit.firmware = "9.9.9"                    # as after a firmware update
+        host = Host(self.folder / "updated", simulated=True, local=True)
+        host.ready.result(10)
+        again = Studio(host, self.folder, assistant=self.studio.assistant)
+        self.addCleanup(again.close)
         again.open()
         deadline = time.monotonic() + 10
         while time.monotonic() < deadline and not again.opened:
@@ -689,13 +697,13 @@ class GuitarProfileTest(FlowCase):
             "seconds": 1}), encoding="utf-8")
 
     def watched(self):
-        threads, original = [], self.studio._profile
+        threads, original = [], self.studio.guitar.profile
 
         def profile(instrument, takes):
             threads.append(threading.current_thread().name)
             return original(instrument, takes)
 
-        self.studio._profile = profile
+        self.studio.guitar.profile = profile
         return threads
 
     def test_the_designer_gets_the_takes_recorded_this_session_worked_out_off_the_windows_thread(self):
@@ -724,7 +732,7 @@ class GuitarProfileTest(FlowCase):
         self.assertNotIn(threading.current_thread().name, threads)
         lines = self.studio.guitar_lines()
         self.assertNotIn("Working out", lines[0])
-        self.assertEqual(lines, self.studio.guitar_profile()[1])
+        self.assertEqual(lines[:len(self.studio.guitar_profile()[1])], self.studio.guitar_profile()[1])
 
 
 class AudioHoldTest(FlowCase):

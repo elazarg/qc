@@ -12,15 +12,17 @@ model that stands in, how close a match that is (same gear, same family, same
 kind) and why, which settings were set from the POD Go's values, and what was
 left out. A chain made this way is a starting point, not a copy.
 
-The backup's path is remembered in the data folder.
+The backup is chosen in place: the `.pgb` files found where POD Go Edit writes
+them (Documents, Line 6, POD Go, Backups), or a path typed in. Its path is
+remembered in the data folder.
 """
 
 import json
 from pathlib import Path
 import tkinter as tk
-from tkinter import filedialog
 
-from lab.tools.common import Window, button, label, listbox
+from lab.desk.theme import SUBTLE
+from lab.tools.common import WIDTH, FileChoice, Tool, button, disclosure, label, listbox, usual_folders
 
 REMEMBERED = "podgo.json"
 
@@ -34,31 +36,35 @@ def account(item):
     return text + ("\n\n" + "\n".join(f"· {line}" for line in lines) if lines else "")
 
 
-class PodWindow(Window):
+class PodTool(Tool):
     TITLE = "POD Go presets"
-    SIZE = "640x680"
 
     def build(self):
-        row = tk.Frame(self.body, bg=self.body["bg"])
-        row.pack(fill="x")
-        button(row, "Choose a backup…", self.choose).pack(side="left")
-        self.where = label(row, size=9, wrap=420)
-        self.where.pack(side="left", padx=10)
-        self.list = listbox(self.body, height=12)
-        self.list.pack(fill="x", pady=(10, 6))
+        self.items = []
+        self.where = label(self.body, size=9, wrap=WIDTH)
+        self.where.pack(fill="x")
+        self.list = listbox(self.body, height=9)
+        self.list.pack(fill="x", pady=(4, 6))
         self.list.bind("<<ListboxSelect>>", lambda _: self.describe())
         actions = tk.Frame(self.body, bg=self.body["bg"])
         actions.pack(fill="x", pady=(0, 6))
         button(actions, "Put on B", self.put).pack(side="left")
         button(actions, "Ask for this", self.ask).pack(side="left", padx=6)
-        self.note = label(self.body, size=9, wrap=600)
-        self.note.pack(fill="x")
-        self.items = []
+        # The backup is chosen once; choosing another is shown on request.
+        self.backup = disclosure(self.body, "The POD Go backup")
+        label(self.backup, "A .pgb backup: POD Go Edit, Backup. Usually under Documents, Line 6, POD Go, Backups.",
+              size=9, color=SUBTLE, wrap=WIDTH).pack(fill="x")
+        self.files = FileChoice(self.backup, folders=lambda: usual_folders("pod", self.folder), patterns=("*.pgb",),
+                                choose=self.choose, action="Read this backup")
+        self.files.pack(fill="x")
+        self.note = label(self.body, size=9, wrap=WIDTH)
+        self.note.pack(fill="x", pady=(6, 0))
         path = self.remembered()
         if path and Path(path).is_file():
             self.load(path)
         else:
-            self.say("Choose your POD Go backup (.pgb): POD Go Edit → Backup, usually under Documents\\Line 6.")
+            self.backup.show(True)
+            self.say("Choose your POD Go backup.")
 
     def remembered(self):
         try:
@@ -66,15 +72,13 @@ class PodWindow(Window):
         except (OSError, ValueError):
             return None
 
-    def choose(self):
-        start = Path.home() / "Documents" / "Line 6" / "POD Go" / "Backups"
-        path = filedialog.askopenfilename(parent=self.top, title="POD Go backup", initialdir=str(start),
-                                          filetypes=(("POD Go backup", "*.pgb"),))
-        if path:
-            (self.folder / REMEMBERED).write_text(json.dumps({"backup": path}), encoding="utf-8")
-            self.load(path)
+    def choose(self, path):
+        (self.folder / REMEMBERED).write_text(json.dumps({"backup": str(path)}), encoding="utf-8")
+        if self.load(path):
+            self.backup.show(False)
 
     def load(self, path):
+        """Read a backup and list its presets. False, with the reason said, when it cannot be read."""
         from lab.gear import podgo
 
         try:
@@ -82,8 +86,9 @@ class PodWindow(Window):
         except (OSError, ValueError) as error:
             self.items = []
             self.list.delete(0, "end")
+            self.backup.show(True)
             self.say(f"{Path(path).name}: {error}")
-            return
+            return False
         self.where.configure(text=Path(path).name)
         self.list.delete(0, "end")
         for item in self.items:
@@ -93,15 +98,18 @@ class PodWindow(Window):
         unread = sum(not item.pieces for item in self.items)
         self.say(f"{len(self.items)} presets: {chains} came across as chains, {len(self.items) - chains - unread} "
                  "as descriptions to design from" + (f", {unread} could not be read." if unread else "."))
+        return True
 
     def chosen(self):
         picked = self.list.curselection()
+        if not picked:
+            self.say("Choose a preset in the list first.")
         return self.items[picked[0]] if picked else None
 
     def describe(self):
-        item = self.chosen()
-        if item is not None:
-            self.note.configure(text=account(item)[:2400])
+        picked = self.list.curselection()
+        if picked:
+            self.note.configure(text=account(self.items[picked[0]])[:2400])
 
     def put(self):
         item = self.chosen()
@@ -131,4 +139,4 @@ class PodWindow(Window):
 
 
 def open(desk):  # noqa: A001 - every tool opens with `open(desk)`
-    return PodWindow.open(desk)
+    return PodTool.open(desk)

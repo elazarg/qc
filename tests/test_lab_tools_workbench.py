@@ -5,6 +5,10 @@ into working slots and built drafts on them. On the new core that is `lab.qc.rig
 `lab.qc.unit`, tested in test_lab_*; what is ported here is what the workbenches did with it: a request at two
 strengths next to the original, scenes, a sweep, a level-matched blind comparison, a kept preference."""
 
+import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
+import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
+import hidden_tk  # noqa: E402,F401  (keeps every window off the screen)
+
 import json
 from pathlib import Path
 import sys

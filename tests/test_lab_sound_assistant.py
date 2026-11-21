@@ -1,5 +1,7 @@
 """The assistant's own program handling and ledger, against a stand-in for Codex. The real Codex is never run."""
 
+import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
+import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
 from datetime import datetime, timedelta, timezone
 import json
 import os
@@ -110,7 +112,7 @@ class ProgramTest(StandIn):
 
     def test_cancel_ends_the_program_and_what_it_started(self):
         cancel = threading.Event()
-        threading.Timer(1., cancel.set).start()
+        threading.Thread(target=lambda: self.started() and cancel.set(), daemon=True).start()   # once it runs
         started = time.monotonic()
         with self.assertRaises(Cancelled):
             self.ask("hang", seconds=60, cancel=cancel)
@@ -183,6 +185,41 @@ class LedgerTest(unittest.TestCase):
         self.assertEqual(helper.ask("round", "p", {}, by="player"), {"ok": True})
         self.assertEqual(len(self.ledger.read_text(encoding="utf-8").splitlines()), 2)   # the one that waited too
         self.assertEqual(helper.spent_today(), 2)
+
+
+class QuotaTest(unittest.TestCase):
+    def test_two_calls_started_together_cannot_both_take_the_last_place(self):
+        """(review 2026-11-20)"""
+        folder = TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        ledger = Path(folder.name) / "ledger.jsonl"
+        today = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        ledger.write_text("".join(json.dumps({"at": today, "kind": "x"}) + "\n" for _ in range(assistant.DAILY - 1)),
+                          encoding="utf-8")
+        answering, gate = threading.Event(), threading.Event()
+
+        def slow(prompt, schema, **options):
+            answering.set()
+            gate.wait(5)
+            return {}
+
+        asked = Assistant(folder.name, run=slow)
+        results = []
+
+        def call():
+            try:
+                results.append(asked.ask("round", "p", {}, by="player"))
+            except assistant.Refused as error:
+                results.append(error)
+
+        first = threading.Thread(target=call)
+        first.start()
+        self.assertTrue(answering.wait(5))        # the first call holds the day's last place and is not back yet
+        call()
+        gate.set()
+        first.join(5)
+        self.assertEqual([type(item).__name__ for item in results], ["Refused", "dict"])
+        self.assertEqual(len(ledger.read_text(encoding="utf-8").splitlines()), assistant.DAILY)
 
 
 if __name__ == "__main__":

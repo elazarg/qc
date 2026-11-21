@@ -1,7 +1,9 @@
-"""The Guitar Learner's window on a seat: the guitar it works on, recording and listening through the seat, and
-work that waits its turn. Everything is inside a temporary folder; no window is seen, no driver opened."""
+"""The Guitar Learner on a seat: the guitar it works on, recording and listening through the seat, work that
+waits its turn, and choosing a take or a WAV in place. Everything is inside a temporary folder; no window is
+seen, no driver opened. That it is shown in the real desk's window and fits it is in test_lab_one_window.py."""
 
 import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
+import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
 import hidden_tk  # noqa: E402,F401  (keeps every window off the screen)
 import json
 from pathlib import Path
@@ -19,6 +21,7 @@ from lab.learner.window import GuitarLearner, offered_for
 from test_lab_learner_gestures import note
 from test_lab_learner_seat import seat_for, settle
 from test_lab_learner_takes import four_inputs
+from test_lab_tools_support import hosting
 
 PACKAGE = Path(__file__).resolve().parents[1] / "lab" / "learner"
 
@@ -55,6 +58,7 @@ class WindowTest(unittest.TestCase):
             self.skipTest(f"No display: {error}")
         self.root.withdraw()
         self.seat = seat_for(self, self.root)
+        hosting(self.seat.desk, self.root)
         self.learner = None
 
     def tearDown(self):
@@ -90,7 +94,8 @@ class WindowTest(unittest.TestCase):
     def test_opens_on_a_seat_reads_the_dataset_and_remembers_the_layout(self):
         data.add("Charvel", "dk24_blade", self.wave("original.wav"), {"pickup": 5, "volume": 10., "tone": 10.})
         learner = self.opened()
-        self.assertEqual(learner.window.title(), "Guitar Learner · Tone Lab")
+        self.assertEqual(learner.TITLE, "Guitar Learner")
+        self.assertEqual(learner.frame.winfo_toplevel(), self.root)        # in the desk's window, not one of its own
         self.assertEqual((learner.guitar, learner.layout), ("Charvel", "dk24_hh_toggle"))
         self.assertEqual(learner.count.get(), "0 examples  ·  0 setups")
         self.assertEqual(learner.title.get(), "Check a recording")
@@ -102,24 +107,82 @@ class WindowTest(unittest.TestCase):
         self.assertIn("Taught blade positions 5", learner.coverage.get())
 
         learner.toggle_dataset()
-        self.assertEqual(len(learner.table.get_children()), 1)
+        self.assertEqual(learner.table.size(), 1)
+        self.assertIn("original", learner.table.get(0))
         self.assertIn("1 examples", learner.dataset_summary.get())
-        learner.toggle_dataset()
-        self.assertFalse(learner.dataset_open)
+        learner.table.selection_set(0)
+        learner.open_dataset_row()                          # the button under the list, not a double click
+        self.settle(lambda: learner.source is not None)
+        self.assertEqual(learner.source.kind, "saved-excerpt")
+        self.assertFalse(learner.dataset_open)              # the recording is on show in its place
+
+    def test_a_take_or_a_wav_is_chosen_in_place(self):
+        # In place of the menu of takes and the file dialog: the takes listed, and the WAVs found or a path typed.
+        take = folders.recordings() / "clip-20261118-010000-abcdef"
+        take.mkdir(parents=True)
+        audio.write_wave(take / "dry.wav", (np.concatenate([note(110, "neck", seconds=1.)] * 3))[:, None])
+        folders.write_json(take / "clip.json", {"guitar": "Charvel", "duration_seconds": 3.})
+        (self.seat.studio.folder / "imports").mkdir(parents=True)      # where the app's own imports are kept
+        found = self.wave("found.wav").replace(self.seat.studio.folder / "imports" / "found.wav")
+        learner = self.opened()
+        self.assertEqual(learner.chooser.winfo_manager(), "")         # shown on request
+        learner.toggle_takes()
+        self.assertEqual(learner.chooser.winfo_manager(), "pack")
+        self.assertEqual(learner.takes.size(), 1)
+        learner.takes.selection_set(0)
+        learner.open_take()
+        self.settle(lambda: learner.source is not None)
+        self.assertEqual(learner.source.path, (take / "dry.wav").resolve())
+        self.assertEqual(learner.chooser.winfo_manager(), "")         # put away once one is chosen
+
+        learner.toggle_takes()
+        self.assertIn("found.wav", learner.wav_choice.list.get(0))
+        learner.wav_choice.path.insert(0, str(found.with_name("missing.wav")))
+        learner.wav_choice.typed()
+        self.assertIn("There is no file at", learner.wav_choice.said.cget("text"))
+        learner.wav_choice.list.selection_set(0)
+        learner.wav_choice.use()
+        self.settle(lambda: learner.source is not None and learner.source.path.name == "found.wav")
+        self.assertEqual(learner.source.path.name, "found.wav")
 
     def test_it_works_on_the_desks_guitar_and_stays_closed_for_one_it_has_no_layout_for(self):
         # Before: every take was stamped "Charvel" and taught into its dataset, whatever the desk had chosen.
         self.seat.studio.state.instrument = "Les Paul"
         learner = self.opened()
         learner.show()
-        self.assertEqual(learner.window.state(), "withdrawn")
+        self.assertFalse(learner.showing())
+        self.assertIsNone(self.seat.desk.hosted)
         self.assertIn("no control layout for the Les Paul", self.seat.studio.statuses[-1])
         self.assertIsNone(learner.guitar)
         self.seat.studio.state.instrument = "Charvel"
         learner.show()
         self.settle()
-        self.assertEqual(learner.window.state(), "normal")
+        self.assertTrue(learner.showing())
+        self.assertEqual(learner.frame.winfo_manager(), "pack")
         self.assertEqual((learner.guitar, learner.layout), ("Charvel", "dk24_hh_toggle"))
+
+    def test_going_back_to_the_desk_ends_a_recording_and_a_live_listening(self):
+        learner = self.opened()
+        learner.show()
+        learner.stop, learner.live_stop = Event(), Event()
+        stop, live = learner.stop, learner.live_stop
+        self.seat.desk.back()
+        self.assertTrue(stop.is_set() and live.is_set())
+        self.assertFalse(learner.showing())
+        learner.stop = learner.live_stop = None
+
+    def test_the_knobs_and_the_switches_are_set_with_the_mouse_alone(self):
+        # Before: a double click put a knob back, and the arrow keys turned it.
+        learner = self.opened()
+        for dial in learner.board.dials.values():
+            self.assertEqual([key for key in dial.bind() if "Key" in key or "Double" in key], [])
+        board = learner.board
+        board.set_knob("tone", 4.)
+        board.set_knob("volume", 7.5)
+        self.assertEqual((board.values["tone"], board.values["volume"]), (4., 7.5))
+        board.full_button.invoke()                      # what the double click did, as a button that says so
+        self.assertEqual((board.values["tone"], board.values["volume"]), (10., 10.))
+        self.assertEqual(board.full_button.cget("text"), "Knobs to 10")
 
     def test_a_take_is_recorded_through_the_seat_stamped_with_the_desks_guitar_and_opened(self):
         learner = self.opened()

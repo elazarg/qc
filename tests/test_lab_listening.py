@@ -1,5 +1,7 @@
 """The listening-history analysis, on a made-up export: what is kept of each play, and what it concludes."""
 
+import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
+import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -123,6 +125,16 @@ class ListeningTest(unittest.TestCase):
         self.assertEqual([item["artist"] for item in found["artists"]], ["Band A", "Band B"])
         self.assertEqual(found["tone_families"], {"crunch": 1, "fuzz": 1, "clean": 1})
         self.assertIsNone(listening.prior({"summary": summary}))
+
+
+class MixedHistoryTest(unittest.TestCase):
+    def test_standard_and_extended_dates_compare(self):
+        """(review 2026-11-20)"""
+        plays = [listening.Play(artist="A", title="x", album="", ms=200000, ts="2024-03-01 21:05", deliberate=True,
+                                complete=True, skipped=False),
+                 listening.Play(artist="B", title="y", album="", ms=200000, ts="2024-03-02T21:05:11Z",
+                                deliberate=True, complete=True, skipped=False)]
+        self.assertIn(2024, listening.summarize(plays)["years"])
 
 
 if __name__ == "__main__":

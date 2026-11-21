@@ -1,5 +1,7 @@
 """What the player's decisions say, from synthetic sounds and synthetic choices only."""
 
+import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
+import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
 import json
 from pathlib import Path
 import tempfile
@@ -8,10 +10,18 @@ import unittest
 import numpy as np
 
 from lab.player import taste
-from lab.sound.chain import Chain
+from lab.sound import catalog
+from lab.sound.chain import Block, Chain, Row
 from lab.sound.sounds import Sound, Store
 
 TOP = ("compression", "brightness_db", "brightness_oct")
+
+
+def folder_of(test):
+    """A folder of the test's own, removed when the test ends."""
+    made = tempfile.TemporaryDirectory()
+    test.addCleanup(made.cleanup)
+    return Path(made.name)
 
 
 def record(**values):
@@ -120,7 +130,7 @@ class FeaturesTest(unittest.TestCase):
 
 class EvidenceTest(unittest.TestCase):
     def setUp(self):
-        self.folder = Path(tempfile.mkdtemp())
+        self.folder = folder_of(self)
 
     def test_choices_are_appended_and_read_back(self):
         taste.record_choice(self.folder, "a", "b", "blind")
@@ -373,7 +383,7 @@ class FitTest(unittest.TestCase):
 
 class KeepingTest(unittest.TestCase):
     def test_learn_reads_the_data_folder_and_keeps_the_model_there(self):
-        folder = Path(tempfile.mkdtemp())
+        folder = folder_of(self)
         store = Store(folder)
         sounds = synthetic(20, seed=6)
         for item in sounds:
@@ -388,7 +398,7 @@ class KeepingTest(unittest.TestCase):
         self.assertEqual([path.name for path in folder.glob("taste*")], [taste.MODEL])
 
     def test_a_model_kept_by_the_earlier_method_is_fitted_again_not_shown(self):
-        folder = Path(tempfile.mkdtemp())
+        folder = folder_of(self)
         Store(folder)
         earlier = {"version": 1, "enough": True, "n": 8, "features": {"brightness_oct": {"strength": "strong",
                    "weight": -1.2, "kept_higher": 0, "kept_lower": 8}}, "samples": [], "sample_names": []}
@@ -399,10 +409,59 @@ class KeepingTest(unittest.TestCase):
         self.assertTrue(taste.describe(earlier)[0].startswith("Not enough evidence yet"))    # never read as it was
 
     def test_no_model_kept_reads_as_none(self):
-        folder = Path(tempfile.mkdtemp())
+        folder = folder_of(self)
         self.assertIsNone(taste.load(folder))
         (folder / taste.MODEL).write_text("{", encoding="utf-8")
         self.assertIsNone(taste.load(folder))
+
+
+class AuditionedTest(unittest.TestCase):
+    """A choice is judged on what was heard when it was made. (reviews of 2026-11-20)"""
+
+    def setUp(self):
+        self.folder = folder_of(self)
+        self.store = Store(self.folder)
+
+    def test_a_choice_between_shaped_sounds_is_judged_on_the_shaped_measurements(self):
+        def heard(brightness, shaped_brightness, knobs):
+            base = {"phrase": "p@0-1", "brightness_oct": brightness, "level_db": -20., "probe": {}}
+            return {**base, "shaped": {"phrase": "p@0-1", "knobs": knobs, "brightness_oct": shaped_brightness,
+                                       "level_db": -20., "probe": {}}}
+
+        self.store.save(Sound("K", Chain(), {"kind": "designed"}, id="k", knobs={"brightness": .5},
+                              heard=heard(-.5, .5, {"brightness": .5})))
+        self.store.save(Sound("O", Chain(), {"kind": "designed"}, id="o", heard=heard(.0, .0, {})))
+        taste.record_choice(self.folder, "k", "o", "a/b",
+                            context={"phrase": "p@0-1", "knobs": {"k": {"brightness": .5}, "o": {}}})
+        pairs, rows_ = taste.evidence(self.folder)
+        kept = rows_[pairs[0]["kept"]]
+        self.assertEqual(kept["brightness_oct"], .5)          # as heard, shaped; not the base -0.5
+
+    def switched(self):
+        gain = catalog.model(1081).index("GAIN")
+        return Chain((Row((Block(1081).set(gain, (.3, .9) + (.3,) * 6), Block(12001)), inlet=1, outlet=19),))
+
+    def test_a_measurement_of_scene_a_does_not_stand_for_a_choice_made_in_scene_b(self):
+        for name in ("k", "o"):
+            self.store.save(Sound(name, self.switched(), {"kind": "designed"}, id=name,
+                                  heard={"phrase": "p@0-1", "scene": 0, "brightness_oct": .1, "level_db": -20.,
+                                         "probe": {}}))
+        taste.record_choice(self.folder, "k", "o", "a/b", context={"phrase": "p@0-1", "scene": 1,
+                                                                    "knobs": {"k": {}, "o": {}}})
+        pairs, rows_ = taste.evidence(self.folder)
+        self.assertEqual([pair for pair in pairs if pair["kept"] in rows_], [])
+
+    def test_a_repeated_choice_in_another_audition_is_kept_too(self):
+        one_row = Chain((Row((Block(1081), Block(12001)), inlet=1, outlet=19),))
+        for name in ("k", "o"):
+            self.store.save(Sound(name, one_row, {"kind": "designed"}, id=name,
+                                  heard={"phrase": "p2@0-1", "scene": 0, "brightness_oct": .1, "level_db": -20.,
+                                         "probe": {}}))
+        for phrase in ("p1@0-1", "p2@0-1"):
+            taste.record_choice(self.folder, "k", "o", "a/b", context={"phrase": phrase, "scene": 0,
+                                                                        "knobs": {"k": {}, "o": {}}})
+        pairs, rows_ = taste.evidence(self.folder)
+        self.assertEqual(sum(pair["kept"] in rows_ for pair in pairs), 1)     # the one measured on p2
 
 
 if __name__ == "__main__":

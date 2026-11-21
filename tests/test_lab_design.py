@@ -1,9 +1,12 @@
 """Asking for sounds: the cards, the checks on an answer, rounds and revisions, and the ledger of calls."""
 
+import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
+import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import json
 import unittest
+from unittest import mock
 
 from lab.qc import assets
 from lab.sound import catalog, design
@@ -640,6 +643,79 @@ class AnswersTest(unittest.TestCase):
         script = Scripted(reply(broken), reply(broken))
         with self.assertRaisesRegex(ValueError, "could not be used"):
             design.round_of_three(Assistant(self.folder, run=script), "plexi crunch", CHARVEL)
+
+
+class PointedAtTest(unittest.TestCase):
+    """Which models a request points at, and what a model's card tells the designer. (The earlier app's tests
+    of this, carried over.)"""
+
+    def named(self, text):
+        return {catalog.model(model_id).name for model_id in design.named_in(text, "electric")}
+
+    def test_a_request_points_at_gear_by_maker_model_artist_or_genre(self):
+        self.assertLessEqual({"CA Duo Ch3 Modern", "Green 808", "412 CA Stand OS S V30 90s (M)"},
+                             self.named("rectifier wall of sound"))
+        self.assertLessEqual({"Plini Clean", "Plini Lead"}, self.named("plini"))
+        self.assertIn("US DLX Vibrato", self.named("blues with a deluxe reverb"))
+
+    def test_a_remark_about_the_sound_points_at_nothing(self):
+        for remark in ("a bit tighter", "too bright on the high strings", "make it sound like a clean guitar amp"):
+            self.assertEqual(design.named_in(remark, "electric"), [], remark)
+
+    def test_the_amps_come_first_and_bring_the_boosts_and_cabs_they_are_paired_with(self):
+        found = design.named_in("rectifier wall of sound", "electric")
+        kinds = [catalog.model(model_id).category for model_id in found]
+        self.assertEqual(kinds[0], "Guitar Amplifier")
+        self.assertLess(kinds.index("Guitar Amplifier"), kinds.index("Guitar Overdrive"))
+        self.assertIn("Cabsim Guitar (M)", kinds[kinds.index("Guitar Overdrive"):])
+        self.assertEqual(len(found), len(set(found)))
+
+    def test_a_model_the_unit_will_not_run_is_never_pointed_at(self):
+        usable = design.usable
+        with mock.patch.object(design, "usable", lambda model_id, kind: model_id != RECTIFIER and usable(model_id, kind)):
+            self.assertNotIn(RECTIFIER, design.named_in("rectifier wall of sound", "electric"))
+            self.assertNotIn(RECTIFIER, design.offered("rectifier wall of sound", "electric"))
+
+    def test_a_request_widens_the_models_offered_beyond_the_everyday_ones(self):
+        everyday = {model_id for model_id in design.EVERYDAY if design.usable(model_id, "electric")}
+        self.assertEqual(set(design.offered("a bit tighter", "electric")), everyday)
+        offered = set(design.offered("rectifier wall of sound", "electric"))
+        self.assertLess(everyday, offered)
+        self.assertLessEqual({1018, 1019, 1020}, offered)       # the three channel modes of the Dual Rectifier
+        held = Chain((Row((Block(1176),), inlet=1, outlet=19),))
+        self.assertNotIn(1176, everyday)
+        self.assertIn(1176, design.offered("warmer", "electric", held))     # what the sound holds stays offered
+
+    def test_a_card_says_what_the_model_is_what_to_watch_out_for_and_what_its_controls_do(self):
+        card = design.card(5)                                   # Green 808
+        self.assertIn("TS808", card["about"])
+        self.assertLessEqual(len(card["about"]), 300)
+        self.assertIn("honk", card["watch_out"])
+        self.assertEqual(set(card["controls"]), {"OVERDRIVE", "TONE", "LEVEL"})
+        self.assertLessEqual(set(card["control_notes"]), set(card["controls"]))
+        self.assertIn("gain", card["control_notes"]["OVERDRIVE"])
+        bare = design.card(16005)                               # a model the research says nothing about
+        self.assertFalse({"about", "watch_out", "control_notes"} & set(bare))
+
+    def test_a_switch_is_offered_apart_from_the_knobs_and_only_in_whole_positions(self):
+        card = design.card(1011)                                # UK C30 TopBoost
+        self.assertEqual(set(card["controls"]), {"VOLUME", "BASS", "TREBLE", "TONE CUT"})
+        self.assertEqual(card["switches"], {"BOOST": [0, 1]})
+        _, problems = design.to_chain(answer("Half", [block(1011, 0, boost=.5), block(V30, 1)]),
+                                      offered_ids={1011, V30})
+        self.assertEqual(len([problem for problem in problems if "BOOST" in problem]), 1, problems)
+        chain, problems = design.to_chain(answer("On", [block(1011, 0, boost=1), block(V30, 1)]),
+                                          offered_ids={1011, V30})
+        self.assertEqual(problems, [])
+
+    def test_a_card_carries_the_units_named_settings_for_the_models_own_controls_only(self):
+        from lab import knowledge
+
+        named = {"Tight boost": {"OVERDRIVE": 0, "TONE": 5.5, "LEVEL": 9, "NOT A CONTROL": 1}, "Nothing of its own": {"X": 1}}
+        with mock.patch.object(knowledge, "named_settings", return_value=named):
+            self.assertEqual(design.card(5)["named_settings"], {"Tight boost": {"OVERDRIVE": 0, "TONE": 5.5, "LEVEL": 9}})
+        with mock.patch.object(knowledge, "named_settings", return_value={}):
+            self.assertNotIn("named_settings", design.card(5))
 
 
 if __name__ == "__main__":

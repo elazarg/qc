@@ -1,9 +1,10 @@
 """One silent listening, pass by pass, against a made-up unit: nothing here opens an audio driver."""
 
+import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
+import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from types import SimpleNamespace
 import unittest
 
 import numpy as np
@@ -11,7 +12,13 @@ import numpy as np
 from lab.hearing import listen as listening
 from lab.hearing.audio import RATE
 from lab.hearing.measure import measured_lines
+from lab.qc.rig import Rig as RealRig
+from lab.qc.sim import MY_PRESETS, SimAudio, SimUnit
+from lab.qc.slots import Slots
+from lab.qc.unit import Moved
 from lab.sound.chain import Chain, Row
+
+from support import PLEXI, V30, fast, one_row
 
 LATENCY = 96
 
@@ -168,6 +175,44 @@ class CalibrationTest(unittest.TestCase):
                          {"firmware": "9.9.9", "offset": 7750})
         self.assertEqual(listening.calibration(self.folder, "9.9.9"), 7750)
         self.assertEqual([path.name for path in self.folder.iterdir()], ["calibration.json"])
+
+
+class UsableTest(unittest.TestCase):
+    def test_a_silent_return_is_not_measured(self):
+        """(review 2026-11-20)"""
+        with self.assertRaisesRegex(RuntimeError, "Nothing came back"):
+            listening.usable(np.zeros((4800, 2)), "the phrase")
+        with self.assertRaisesRegex(RuntimeError, "clipped"):
+            listening.usable(np.ones((4800, 2)), "the phrase")
+
+
+class MovedAwayTest(unittest.TestCase):
+    """Listening on the simulated unit, with the guarded unit, the slots and the rig as the app has them."""
+
+    def test_listening_ends_with_the_pass_during_which_the_player_chose_another_preset(self):
+        for during in (1, 2, 3):                 # the phrase, the softer phrase, the test signals
+            with self.subTest(during=during), TemporaryDirectory() as folder:
+                device = SimUnit()
+                device.save_slot(MY_PRESETS, 9, "Theirs", [(PLEXI, {})])
+                unit = fast(device)
+                rig = RealRig(unit, Slots(unit, Path(folder)))
+                audio, passes = SimAudio(device), []
+                reamp = audio.reamp
+
+                def reamp_while_the_player_switches(dry, **options):
+                    passes.append(len(dry))
+                    returned = reamp(dry, **options)
+                    if len(passes) == during:
+                        device.player_selects(MY_PRESETS, 9)
+                    return returned
+
+                audio.reamp = reamp_while_the_player_switches
+                with self.assertRaises(Moved):
+                    listening.listen(rig, audio, one_row(PLEXI, V30), phrase(1.), SimAudio.LATENCY)
+                self.assertEqual(len(passes), during)        # no pass was played into the preset they chose
+                self.assertEqual(device.position["position"], 9)
+                self.assertFalse(device.dirty)               # and nothing was written to it
+                self.assertEqual(device.working.name, "Theirs")
 
 
 if __name__ == "__main__":

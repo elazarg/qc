@@ -2,6 +2,7 @@
 
 
 import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
+import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
 import hidden_tk  # noqa: E402,F401  (keeps every window off the screen)
 from types import SimpleNamespace
 import tkinter as tk
@@ -50,22 +51,34 @@ class PadPanelTest(unittest.TestCase):
     def test_the_pad_comes_above_the_other_knobs_and_takes_the_place_of_their_sliders(self):
         tray = self.panel(["drive", "brightness", "texture", "body"], {"brightness": .5, "texture": -.25})
         children = tray.winfo_children()
-        self.assertIsInstance(children[0], tk.Canvas)
-        self.assertEqual(int(children[0]["width"]), desk_module.PAD_SIZE)
-        texts = [children[0].itemcget(item, "text") for item in children[0].find_all()
-                 if children[0].type(item) == "text"]
+        # Undo and hearing it without the knobs are placed first, at the bottom, so they stay on show; the pad is
+        # the first thing from the top, and the sliders scroll in the room between.
+        self.assertEqual([part["text"] for part in children[0].winfo_children()], ["Undo", "Hear it without the knobs"])
+        self.assertEqual(children[0].pack_info()["side"], "bottom")
+        pad = children[1]
+        self.assertIsInstance(pad, tk.Canvas)
+        self.assertEqual(int(pad["width"]), desk_module.PAD_SIZE)
+        texts = [pad.itemcget(item, "text") for item in pad.find_all() if pad.type(item) == "text"]
         self.assertEqual(set(texts), {"dark", "bright", "round", "rough"})
-        dot = [item for item in children[0].find_all() if children[0].type(item) == "oval"][0]
-        x0, y0, x1, y1 = children[0].coords(dot)
+        dot = [item for item in pad.find_all() if pad.type(item) == "oval"][0]
+        x0, y0, x1, y1 = pad.coords(dot)
         self.assertEqual(((x0 + x1) / 2, (y0 + y1) / 2), pad_point(.5, -.25))
-        self.assertEqual(children[1]["text"], "Brightness +0.50 · Texture -0.25")
-        rows = [child for child in children if isinstance(child, tk.Frame)
-                if any(isinstance(part, tk.Scale) for part in child.winfo_children())]
-        self.assertEqual([row.winfo_children()[0]["text"] for row in rows], ["Distortion", "Body"])
+        self.assertEqual(children[2]["text"], "Brightness +0.50 · Texture -0.25")
+        self.assertEqual([row.winfo_children()[0]["text"] for row in self.slider_rows(tray)], ["Distortion", "Body"])
+
+    def slider_rows(self, widget):
+        found = []
+        for child in widget.winfo_children():
+            if isinstance(child, tk.Frame) and any(isinstance(part, tk.Scale) for part in child.winfo_children()):
+                found.append(child)
+            found += self.slider_rows(child)
+        return found
 
     def test_no_pad_when_the_sound_has_nothing_for_either_axis(self):
         tray = self.panel(["drive"], {})
-        self.assertFalse(any(isinstance(child, tk.Canvas) for child in tray.winfo_children()))
+        self.assertFalse(any(isinstance(child, tk.Canvas) and child["cursor"] == "crosshair"
+                             for child in tray.winfo_children()))
+        self.assertEqual(len(self.slider_rows(tray)), 1)
 
 
 if __name__ == "__main__":

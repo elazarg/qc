@@ -4,6 +4,7 @@ with a fault while drawing or in a click, with a second launch, and what it draw
 Each test here failed on the desk as the whole-codebase review found it (docs/WHOLE_CODEBASE_REVIEW.md)."""
 
 import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
+import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
 import hidden_tk  # noqa: E402,F401  (keeps every window off the screen)
 import gc
 import json
@@ -193,6 +194,8 @@ class FaultsTest(DeskCase):
 
 
 class SecondLaunchTest(DeskCase):
+    """One desk at a time: the desk's port is bound before anything else is started, and a second launch knocks."""
+
     def setUp(self):
         super().setUp()
         port, wait = desk_module.PORT, desk_module.WAIT_FOR_CLOSING
@@ -200,10 +203,10 @@ class SecondLaunchTest(DeskCase):
         self.addCleanup(setattr, desk_module, "WAIT_FOR_CLOSING", wait)
         desk_module.PORT, desk_module.WAIT_FOR_CLOSING = free_port(), .6
 
-    def knock(self):
-        """What a second launch finds, while this desk's clock runs."""
+    def second_launch(self):
+        """What a second launch's claim finds, while this desk's clock runs."""
         found = []
-        knocking = threading.Thread(target=lambda: found.append(desk_module.only_desk()))
+        knocking = threading.Thread(target=lambda: found.append(desk_module.claim_door()))
         knocking.start()
         deadline = time.monotonic() + 10
         while knocking.is_alive() and time.monotonic() < deadline:
@@ -213,22 +216,57 @@ class SecondLaunchTest(DeskCase):
         knocking.join(5)
         return found[0]
 
-    def test_an_open_desk_answers_and_a_closed_one_leaves_the_door_free(self):
-        self.assertTrue(self.knock())                     # nobody there
-        self.open(keep_open=False)
-        self.desk.answer_second_launch()
-        self.assertFalse(self.knock())                    # a desk is open: the second launch leaves
+    def test_the_first_launch_has_the_door_a_second_leaves_and_a_closed_desk_frees_it(self):
+        door, another = desk_module.claim_door()
+        self.assertFalse(another)
+        self.assertIsNotNone(door)
+        host = Host(self.home / "unit", simulated=True, local=True)
+        host.ready.result(10)
+        self.studio = Studio(host, self.home, assistant=Assistant(self.home, automatic=False, run=self.script))
+        self.root = tk.Tk()
+        self.desk = Desk(self.root, self.studio, door=door)
+        self.assertEqual(self.second_launch(), (None, True))      # a desk is open: it answers, the launch leaves
         self.desk.close()
         self.assertIsNone(self.desk.door)
-        with self.assertRaises(OSError):
-            socket.create_connection(("127.0.0.1", desk_module.PORT), timeout=.5).close()
-        self.assertTrue(self.knock())
+        again, another = self.second_launch()
+        self.assertFalse(another)
+        self.assertIsNotNone(again)                                # the door is free again
+        again.close()
 
     def test_something_else_on_that_port_does_not_keep_the_desk_from_opening(self):
         with socket.socket() as other:
             other.bind(("127.0.0.1", desk_module.PORT))
             other.listen(2)                               # it takes the knock and never answers as a desk does
-            self.assertTrue(self.knock())
+            self.assertEqual(self.second_launch(), (None, False))
+
+    def test_the_door_is_claimed_before_anything_else_is_started(self):
+        from unittest import mock
+
+        from lab import setup
+        from lab.qc import host as host_module
+
+        order = []
+
+        def noting(name, result=None):
+            return lambda *args, **options: (order.append((name, args, options)), result)[1]
+
+        with (mock.patch.object(desk_module, "claim_door", noting("door", ("the door", False))),
+              mock.patch.object(desk_module, "home", lambda: self.home),
+              mock.patch.object(desk_module.tk, "Tk", noting("window", mock.Mock())),
+              mock.patch.object(setup, "first_run", noting("first run", "Brought the history in.")),
+              mock.patch.object(host_module, "Host", noting("engine", "the host")),
+              mock.patch.object(desk_module, "Studio", noting("studio", mock.Mock())),
+              mock.patch.object(desk_module, "Desk", noting("desk"))):
+            desk_module.main([])
+        self.assertEqual([name for name, _, _ in order], ["door", "window", "first run", "engine", "studio", "desk"])
+        self.assertEqual(order[2][1], (self.home,))               # the first run's work, by the setup module
+        self.assertEqual(order[-1][2], {"door": "the door"})      # and the door is handed to the desk
+        order.clear()
+        with (mock.patch.object(desk_module, "claim_door", noting("door", (None, True))),
+              mock.patch.object(desk_module.tk, "Tk", noting("window")),
+              mock.patch.object(setup, "first_run", noting("first run"))):
+            desk_module.main([])
+        self.assertEqual([name for name, _, _ in order], ["door"])        # another desk is open: nothing is started
 
 
 class PhrasePanelTest(DeskCase):
@@ -390,14 +428,135 @@ class DrawingTest(DeskCase):
             take(self.home, name, seconds=1, setting=setting)
         self.open()
         read_on = []
-        original = self.studio._profile
-        self.studio._profile = lambda *args: (read_on.append(threading.current_thread().name), original(*args))[1]
+        original = self.studio.guitar.profile
+        self.studio.guitar.profile = lambda *args: (read_on.append(threading.current_thread().name),
+                                                    original(*args))[1]
         self.desk.toggle("Guitar")
         self.assertTrue(any("Working out" in text for text in self.panel_text()))
         self.settle()
         self.assertFalse(any("Working out" in text for text in self.panel_text()))
         self.assertTrue(read_on)
         self.assertNotIn(threading.current_thread().name, read_on)
+
+
+class GuitarPanelTest(DeskCase):
+    def buttons(self):
+        found = []
+
+        def walk(widget):
+            for child in widget.winfo_children():
+                if isinstance(child, tk.Button):
+                    found.append(child)
+                walk(child)
+
+        walk(self.desk.tray)
+        return {button["text"]: button for button in found}
+
+    def test_the_learners_buttons_are_teach_a_control_gestures_and_the_learner_where_it_is_offered(self):
+        from lab.learner import gestures, offered_for
+
+        self.open()
+        self.assertTrue(offered_for(self.studio.state.instrument))
+        self.desk.toggle("Guitar")
+        buttons = self.buttons()
+        self.assertTrue({"Guitar Learner", "Teach a control", "Gestures on"} <= set(buttons))
+        self.assertNotIn("Input calibration", buttons)
+        seconds = f"{gestures.ARM_SECONDS:.0f} s"
+        self.assertTrue(any(f"Gestures on for {seconds}, and {seconds} more after each gesture" in text
+                            for text in self.panel_text()))
+        self.studio.set(instrument="Bass")                # no layout of its controls
+        self.assertFalse(offered_for("Bass"))
+        self.assertNotIn("Guitar Learner", self.buttons())
+        self.assertIn("Teach a control", self.buttons())
+        self.assertTrue(any("not offered for it" in text for text in self.panel_text()))
+
+    def test_the_gestures_button_says_how_long_it_is_armed_and_the_panel_follows_the_seconds(self):
+        from unittest import mock
+
+        from lab.learner import gestures
+
+        self.open()
+        state = {"running": True, "armed": True, "seconds_left": 12.4, "instrument": "Charvel", "control": "tone"}
+        with mock.patch.object(gestures, "state", lambda: dict(state)):
+            self.desk.toggle("Guitar")
+            self.assertIn("Gestures off · armed 12 s", self.buttons())
+            before = self.desk.tray.winfo_children()
+            self.desk.follow_gestures()
+            self.assertEqual(self.desk.tray.winfo_children(), before)       # nothing changed: nothing drawn again
+            state["seconds_left"] = 11.2
+            self.desk.follow_gestures()
+            self.assertIn("Gestures off · armed 11 s", self.buttons())
+            state.update(running=False, armed=False, seconds_left=0.)
+            self.desk.follow_gestures()
+            self.assertIn("Gestures on", self.buttons())
+
+    def test_with_a_simulated_unit_nothing_of_the_learner_opens_the_real_audio_driver(self):
+        from lab.learner import gestures
+
+        from lab.learner import folders
+
+        self.addCleanup(folders.log_to, None)             # the seat points the learner's folders and log at this desk
+        self.addCleanup(folders.use, None)
+        self.open()
+        self.assertTrue(self.studio.host.simulated)
+        self.desk.toggle("Guitar")
+        self.buttons()["Gestures on"].invoke()
+        self.assertEqual(self.studio.state.status, "Gestures: Not with a simulated unit.")
+        self.assertFalse(gestures.running())
+        seat = self.desk.learner_seat()
+        ran = []
+        self.assertFalse(seat.submit("Opening the dry input…", lambda: ran.append(1), done=ran.append))
+        self.assertEqual((self.studio.state.status, ran, self.studio.audio_held_by),
+                         ("Not with a simulated unit.", [], None))
+        seat.worker.shutdown(wait=True)
+
+    def test_a_take_is_recorded_with_the_gesture_chosen_for_it(self):
+        from unittest import mock
+
+        from lab.hearing.profile import GESTURES
+
+        self.open()
+        self.desk.toggle("Phrase")
+        self.assertTrue(set(GESTURES) <= set(self.panel_text()))           # offered as chips, in the panel
+        self.desk.record_setting = "Bridge · Series"
+        self.desk.choose_gesture(GESTURES[1])
+        with mock.patch.object(self.studio, "record") as record:
+            self.buttons()["Record 8 s"].invoke()
+        record.assert_called_once_with("Bridge · Series", 8., gesture=GESTURES[1])
+        self.desk.choose_gesture(GESTURES[1])             # pressed again: no gesture
+        self.assertIsNone(self.desk.record_gesture)
+
+
+class ListeningLevelTest(DeskCase):
+    SETTINGS = {"master_db": 0, "loudness_db": 3, "muted": False, "match": True}
+
+    def test_the_levels_tools_offset_is_said_near_a_and_b_and_cleared_in_place(self):
+        self.open()
+        self.settle()
+        self.assertEqual(self.desk.tools, {})
+        self.assertEqual(self.desk.level_row.winfo_manager(), "")
+        self.studio.listening = dict(self.SETTINGS)       # as the Levels tool leaves it while an offset is on
+        self.studio.say("Louder.")
+        self.assertEqual(self.desk.level_row.winfo_manager(), "pack")
+        self.assertEqual(self.desk.level_note["text"], "Listening level: +3 dB from matched")
+        self.studio.listening = {**self.SETTINGS, "muted": True}
+        self.studio.say("Muted.")
+        self.assertEqual(self.desk.level_note["text"], "Listening level: Muted")
+        self.desk.clear_listening()
+        self.assertIsNone(self.studio.listening)
+        self.assertEqual(self.desk.level_row.winfo_manager(), "")
+        self.settle()
+        self.assertEqual(self.studio.state.status, "Back at the desk's own level.")
+
+    def test_with_the_levels_tool_open_it_is_cleared_through_the_tool(self):
+        from types import SimpleNamespace
+
+        self.open()
+        changed = []
+        self.desk.tools["Levels"] = SimpleNamespace(alive=lambda: True, change=changed.append)
+        self.studio.listening = dict(self.SETTINGS)
+        self.desk.clear_listening()
+        self.assertEqual(changed, [None])                 # the tool puts its own controls back, and the level
 
 
 if __name__ == "__main__":

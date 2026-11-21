@@ -4,6 +4,8 @@ These tests are the earlier app's and go when it goes: without `tone_lab/` they 
 side, which does not need the earlier app, is tested in test_lab_launcher.py.
 """
 
+import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
+import hidden_tk  # noqa: E402,F401  (keeps every window off the screen)
 from pathlib import Path
 import runpy
 import sys

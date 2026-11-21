@@ -1,17 +1,21 @@
 """The rewrite's core: chains, the simulated unit, the guarded unit, slots and the cache."""
 
-from pathlib import Path
-from tempfile import TemporaryDirectory
-import unittest
+import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
+import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
+from pathlib import Path  # noqa: E402
+from tempfile import TemporaryDirectory  # noqa: E402
+import unittest  # noqa: E402
 
-from qc_mcp import leveling
+from qc_mcp import leveling  # noqa: E402
 
-from lab.sound import catalog
-from lab.sound.chain import Block, Chain, Row, differences, from_preset, plan_structure
-from lab.qc.rig import Rig
-from lab.qc.sim import FACTORY, MY_PRESETS, TONE_LAB, SimUnit
-from lab.qc.slots import BUILD, CACHE_SLOTS, NotOurs, Slots
-from lab.qc.unit import Moved, Refused, Unit
+from lab.sound import catalog  # noqa: E402
+from lab.sound.chain import Block, Chain, Row, differences, plan_structure  # noqa: E402
+from lab.qc.rig import Rig  # noqa: E402
+from lab.qc.sim import FACTORY, MY_PRESETS, TONE_LAB, SimUnit  # noqa: E402
+from lab.qc.slots import BUILD, CACHE_SLOTS, NotOurs, Slots  # noqa: E402
+from lab.qc.unit import Moved, Refused  # noqa: E402
+
+from support import engine_on, fast, one_row  # noqa: E402
 
 RECTIFIER, PLEXI, V30, GREENBACK, EQ, DELAY, GOVERNOR = 1018, 1081, 12001, 12006, 4005, 6011, 11
 
@@ -34,7 +38,8 @@ def lead_and_rhythm():
 
 
 class Player(SimUnit):
-    """A unit whose player selects another preset after a given number of writes."""
+    """A unit whose player selects another preset while write number `leave_after` is under way: that write
+    is already sent and lands on the preset they chose. `stray` are the writes that came after it."""
 
     def __init__(self, leave_after=None, **options):
         super().__init__(**options)
@@ -46,10 +51,6 @@ class Player(SimUnit):
         elif self.leave_after is not None and len(self.log) > self.leave_after and call not in ("recall",):
             self.stray.append(call)
         super()._write(call, *args)
-
-
-def fast(device):
-    return Unit(device, settle=.05, sleep=lambda seconds: None)
 
 
 class ChainTest(unittest.TestCase):
@@ -104,16 +105,17 @@ class UnitTest(unittest.TestCase):
         unit.slot = BUILD
         unit.apply(lead_and_rhythm())
         writes = len(whole.log) - count
-        for after in range(count + 1, count + writes, 3):
+        self.assertGreater(writes, 20)
+        for after in range(count + 1, count + writes):
             device = Player(leave_after=after)
             unit = fast(device)
             device.recall(**BUILD)
             unit.slot = BUILD
             with self.assertRaises(Moved):
                 unit.apply(lead_and_rhythm())
-            # A switch in the middle of a block can let the rest of that block's values land, and no more.
-            self.assertLessEqual(len(device.stray), 40, after)
-            self.assertNotIn("add", device.stray[1:], after)
+            # The unit is asked which preset is selected before every write, so the write under way when the
+            # player switched is the last one: wherever in the build they switch, nothing more is written.
+            self.assertEqual(device.stray, [], after)
 
     def test_a_row_is_never_turned_up_past_the_ceiling(self):
         unit = fast(SimUnit())
@@ -187,6 +189,31 @@ class SlotsTest(unittest.TestCase):
             with self.slots.borrowed():
                 pass
 
+
+
+class DirectoryTest(unittest.TestCase):
+    def test_a_slot_missing_from_the_listing_is_never_saved_over(self):
+        """(review 2026-11-20)"""
+        device = SimUnit()
+        device.save_slot(TONE_LAB, 0, "Already here", [(PLEXI, {})])
+        listing = device.list_directory
+
+        def incomplete(**options):
+            found = listing(**options)
+            for folder in found["presets"]:
+                if folder["key"] == TONE_LAB:
+                    folder["files"] = [row for row in folder["files"] if row["index"] != 0]
+            return found
+
+        device.list_directory = incomplete
+        folder = TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        engine = engine_on(device, folder.name)
+        engine.open()
+        with self.assertRaisesRegex(RuntimeError, "incompletely"):
+            engine.save(one_row(1063, V30), "Mine")
+        self.assertEqual(device.slots[(TONE_LAB, 0)].name, "Already here")
+        self.assertNotIn("Mine", [grid.name for grid in device.slots.values()])
 
 
 class RoutingTest(unittest.TestCase):

@@ -1,31 +1,23 @@
-"""The controls workbench: every Shape knob in its group, the versions of a sound, and what the unit holds.
+"""Versions and the unit: the line of revisions a sound belongs to, and what the Quad Cortex holds now.
 
-Carried over from the old second workbench (`clip --workbench`: the knob panel `knob_panel`, the draft card
-`draft_ui`, the live panel), onto the desk's studio:
+What is left of the old second workbench once the desk's Shape panel does the knobs (turning them, hearing
+the sound without them, Undo) and the desk saves and plays:
 
-- **Every knob.** The desk's Shape panel shows the knobs a sound can use; here they are all, by group
-  (Main, Response, EQ, Effects, Character), each saying which controls of which blocks it moves at its
-  present position. A knob the sound has no block for is shown and greyed. "Hear the base" plays the sound
-  with the knobs at rest, and again with them; Reset puts them all at rest.
 - **Versions.** A sound's line of revisions, oldest to newest, from the one it was first made as: step
-  between them (each goes on the selected side), read why it was made that way and the pages it drew on,
-  try it on the guitar, save it to the unit.
+  between them (each goes on the selected side), and read, in place, why it was made that way and the pages
+  it drew on (their addresses are shown as text; nothing is opened outside the window).
+- **What each knob moves here.** For the selected sound, which controls of which blocks each Shape knob
+  moves. The Shape panel turns the knobs; this says what turning one does to this chain.
 - **What the unit holds.** The chain on the Quad Cortex now, block by block, read back: what the knobs
   actually wrote, whatever the desk believes.
-
-The old knob was a drawn dial turned by dragging or the arrow keys; here it is the desk's slider, the
-same control the Shape panel uses.
 """
 
 import tkinter as tk
-import webbrowser
 
 from lab.sound import knobs
 from lab.sound.sounds import describe
-from lab.desk.theme import ACCENT, ACCENT_INK, DARK, DIM, FONT, INK, PAPER, SUBTLE, TILE
-from lab.tools.common import Window, button, label, section, stated
-
-GROUPS = {"Main": knobs.PRIMARY, **knobs.GROUPS}
+from lab.desk.theme import SUBTLE
+from lab.tools.common import WIDTH, Tool, button, disclosure, label, section, stated
 
 
 def lineage(store, sound):
@@ -62,6 +54,24 @@ def reach(chain, key, value):
     return names
 
 
+def reach_lines(sound):
+    """For each Shape knob this sound can use, the controls it moves: "Drive: Brit Plexi GAIN, …"."""
+    lines = []
+    for key in knobs.available(sound.chain):
+        names = reach(sound.chain, key, sound.knobs.get(key, 0.))
+        lines.append(f"{knobs.KNOBS[key][0]}: " + (", ".join(names[:6]) or "nothing here yet"))
+    return lines
+
+
+def why_lines(sound):
+    """Why a sound was made as it was, and the pages it drew on, as text: each page's title and its address."""
+    lines = [sound.explanation] if sound.explanation else []
+    for source in sound.sources or []:
+        title, url = (source.get("title", ""), source.get("url")) if isinstance(source, dict) else (str(source), None)
+        lines.append(" · ".join(part for part in (title[:90], url) if part))
+    return lines
+
+
 # ---- operations, run where the unit is held ----
 
 def held(engine, *, stop=None):
@@ -70,57 +80,42 @@ def held(engine, *, stop=None):
     return {"lines": describe(chain), "position": engine.unit.position(), "name": engine.unit.name()}
 
 
-# ---- the window ----
+# ---- the tool ----
 
-class ControlsWindow(Window):
-    TITLE = "Controls workbench"
-    SIZE = "640x720"
+class ControlsTool(Tool):
+    TITLE = "Versions and the unit"
 
     def build(self):
-        self.group, self.base = "Main", None
-        self.scales = {}
-        self.shown = None               # what the board was last drawn from
-        knobs_card = section(self.body, "Every knob")
-        self.name = label(knobs_card, size=10, bold=True)
-        self.name.pack(fill="x")
-        self.tabs = tk.Frame(knobs_card, bg=knobs_card["bg"])
-        self.tabs.pack(fill="x", pady=(6, 4))
-        self.board = tk.Frame(knobs_card, bg=knobs_card["bg"])
-        self.board.pack(fill="x")
-        self.hint = label(knobs_card, size=9, color=SUBTLE, wrap=560)
-        self.hint.pack(fill="x", pady=(4, 0))
-        row = tk.Frame(knobs_card, bg=knobs_card["bg"])
-        row.pack(fill="x", pady=(6, 0))
-        self.base_button = button(row, "Hear the base", self.toggle_base, quiet=True)
-        self.base_button.pack(side="left")
-        button(row, "Reset", self.reset, quiet=True).pack(side="left", padx=6)
-
+        self.drawn = None               # what the tool was last drawn from
         versions = section(self.body, "Versions")
+        self.name = label(versions, size=10, bold=True, wrap=WIDTH)
+        self.name.pack(fill="x")
         row = tk.Frame(versions, bg=versions["bg"])
-        row.pack(fill="x")
+        row.pack(fill="x", pady=(4, 0))
         self.older = button(row, "Older", lambda: self.step(-1), quiet=True)
         self.older.pack(side="left")
         self.newer = button(row, "Newer", lambda: self.step(1), quiet=True)
         self.newer.pack(side="left", padx=4)
-        button(row, "Try on the guitar", lambda: self.studio.play("guitar"), quiet=True).pack(side="left", padx=4)
-        button(row, "Save to QC", self.save).pack(side="right")
-        self.sources = tk.Menubutton(row, text="Why", bg=TILE, fg=INK, relief="flat", font=(FONT, 9), padx=8)
-        self.sources_menu = tk.Menu(self.sources, tearoff=False)
-        self.sources.configure(menu=self.sources_menu)
-        self.sources.pack(side="right", padx=4)
-        self.version = label(versions, size=9, wrap=560)
+        self.version = label(versions, size=9, wrap=WIDTH)
         self.version.pack(fill="x", pady=(6, 0))
-        self.explanation = label(versions, size=9, color=SUBTLE, wrap=560)
+        self.why = disclosure(versions, "Why it was made this way")
+        self.why_text = label(self.why, size=9, color=SUBTLE, wrap=WIDTH)
+        self.why_text.pack(fill="x")
+        self.moves = disclosure(self.body, "What each knob moves here")
+        self.moves_text = label(self.moves, size=9, color=SUBTLE, wrap=WIDTH)
+        self.moves_text.pack(fill="x")
 
         unit = section(self.body, "What the Quad Cortex holds")
-        button(unit, "Read it back", self.read_back, quiet=True).pack(anchor="w")
-        self.held = label(unit, size=9, wrap=560)
+        button(unit, "Read it back", self.read_back, quiet=True).pack(anchor="w", pady=(4, 0))
+        self.held = label(unit, size=9, wrap=WIDTH)
         self.held.pack(fill="x", pady=(4, 0))
-        self.listener = lambda state: self.after(0, self.refresh) if self.alive() else None
+        self.listener = lambda state: self.after(0, self.refresh) if self.showing() else None
         self.studio.listeners.append(self.listener)
         self.refresh()
 
-    # the knobs
+    def shown(self):
+        super().shown()
+        self.refresh()
 
     def sound(self):
         return self.studio.sound(self.studio.state.side)
@@ -129,96 +124,19 @@ class ControlsWindow(Window):
         if not self.alive():
             return
         sound = self.sound()
-        # The desk's state changes often (its working line); the board is rebuilt only when what it shows does.
-        shown = (self.studio.state.side, sound.id if sound else None, tuple(sorted((sound.knobs if sound else {})
-                                                                                   .items())), self.group, self.base)
-        if shown == self.shown and not force:
+        # The desk's state changes often (its working line); the tool is drawn again only when what it shows does.
+        drawn = (self.studio.state.side, sound.id if sound else None,
+                 tuple(sorted((sound.knobs if sound else {}).items())))
+        if drawn == self.drawn and not force:
             return
-        self.shown = shown
+        self.drawn = drawn
         self.name.configure(text=f"{self.studio.state.side.upper()} · {sound.name}" if sound else
                             "Nothing on the selected side.")
-        for child in self.tabs.winfo_children():
-            child.destroy()
-        for group in GROUPS:
-            active = group == self.group
-            tk.Button(self.tabs, text=group, command=lambda group=group: self.show(group), relief="flat",
-                      borderwidth=0, padx=8, pady=3, font=(FONT, 9), bg=ACCENT if active else TILE,
-                      fg=ACCENT_INK if active else INK).pack(side="left", padx=(0, 3))
-        self.fill_board(sound)
-        self.fill_versions(sound)
-
-    def show(self, group):
-        self.group = group
-        self.refresh()
-
-    def fill_board(self, sound):
-        for child in self.board.winfo_children():
-            child.destroy()
-        self.scales = {}
         if sound is None:
-            return
-        available = set(knobs.available(sound.chain))
-        values = sound.knobs if self.base is None else self.base
-        for index, key in enumerate(GROUPS[self.group]):
-            title, low, _ = knobs.KNOBS[key]
-            usable = key in available
-            cell = tk.Frame(self.board, bg=DARK)
-            cell.grid(row=index // 2, column=index % 2, sticky="ew", padx=(0, 10), pady=1)
-            label(cell, title, size=9, color=INK if usable else DIM).pack(side="left")
-            scale = tk.Scale(cell, from_=low, to=1, resolution=.05, orient="horizontal", length=170, showvalue=False,
-                             bg=DARK, fg=INK, troughcolor=TILE if usable else PAPER, highlightthickness=0,
-                             borderwidth=0, state="normal" if usable else "disabled")
-            scale.set(values.get(key, 0.))
-            scale.pack(side="right")
-            scale.bind("<ButtonRelease-1>", lambda _, key=key, scale=scale: self.turned(key, scale.get()))
-            for widget in (cell, scale):
-                widget.bind("<Enter>", lambda _, key=key, usable=usable: self.describe_knob(key, usable), add="+")
-            self.scales[key] = scale
-
-    def describe_knob(self, key, usable):
-        sound = self.sound()
-        if sound is None:
-            return
-        if not usable:
-            self.hint.configure(text=f"{knobs.KNOBS[key][0]} needs a block this sound does not have.")
-            return
-        names = reach(sound.chain, key, sound.knobs.get(key, 0.))
-        self.hint.configure(text=f"{knobs.KNOBS[key][0]} moves " + (", ".join(names[:6]) or "nothing here yet") + ".")
-
-    def turned(self, key, value):
-        sound = self.sound()
-        if sound is None:
-            return
-        self.base = None
-        self.base_button.configure(text="Hear the base")
-        self.studio.turn({**sound.knobs, key: value})
-
-    def toggle_base(self):
-        sound = self.sound()
-        if sound is None:
-            return
-        if self.base is None:
-            if not sound.knobs:
-                self.say("The knobs are already at rest.")
-                return
-            self.base = dict(sound.knobs)
-            self.studio.turn({})
-            self.base_button.configure(text="Hear the shape")
-        else:
-            values, self.base = self.base, None
-            self.studio.turn(values)
-            self.base_button.configure(text="Hear the base")
-
-    def reset(self):
-        self.base = None
-        self.studio.turn({})
-
-    # the versions
-
-    def fill_versions(self, sound):
-        self.sources_menu.delete(0, "end")
-        if sound is None:
-            self.version.configure(text="")
+            for control in (self.older, self.newer):
+                control.configure(state="disabled")
+            for text in (self.version, self.why_text, self.moves_text):
+                text.configure(text="")
             return
         line = lineage(self.studio.store, sound)
         place = next(index for index, item in enumerate(line) if item.id == sound.id)
@@ -230,18 +148,8 @@ class ControlsWindow(Window):
         request = origin.get("request")
         self.version.configure(text=f"Version {place + 1} of {len(line)} · {made}" + (f": {request}" if request else "")
                                + ("\n" + "\n".join(describe(sound.chain)) if sound.chain else ""))
-        self.explanation.configure(text=sound.explanation)
-        if sound.explanation:
-            self.sources_menu.add_command(label="Why this approach?", command=self.toggle_explanation)
-        for source in sound.sources or []:
-            title, url = (source.get("title", ""), source.get("url")) if isinstance(source, dict) else (str(source), None)
-            self.sources_menu.add_command(label=title[:90] or str(url), command=lambda url=url: url and webbrowser.open(url))
-
-    def toggle_explanation(self):
-        if self.explanation.winfo_manager():
-            self.explanation.pack_forget()
-        else:
-            self.explanation.pack(fill="x", pady=(4, 0))
+        self.why_text.configure(text="\n".join(why_lines(sound)) or "Nothing was noted for this one.")
+        self.moves_text.configure(text="\n".join(reach_lines(sound)) or "This sound has nothing the knobs move.")
 
     def step(self, direction):
         sound = self.sound()
@@ -251,9 +159,7 @@ class ControlsWindow(Window):
         place = next(index for index, item in enumerate(line) if item.id == sound.id) + direction
         if 0 <= place < len(line):
             self.studio.put(self.studio.state.side, line[place])
-
-    def save(self):
-        self.desk.save()                # the desk asks for the name in place, as its own Save to QC does
+            self.refresh()
 
     # the unit
 
@@ -263,11 +169,6 @@ class ControlsWindow(Window):
 
         self.call("lab.tools.controls.held", done=shown, working="Reading the Quad Cortex…")
 
-    def close(self):
-        if self.listener in self.studio.listeners:
-            self.studio.listeners.remove(self.listener)
-        super().close()
-
 
 def open(desk):  # noqa: A001
-    return ControlsWindow.open(desk)
+    return ControlsTool.open(desk)

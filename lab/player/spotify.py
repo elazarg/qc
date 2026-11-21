@@ -9,13 +9,13 @@ Spotify's "Download your data" gives listening history as JSON files
   ... with `master_metadata_album_artist_name`, `master_metadata_track_name`,
   `ms_played`, `ts`. Podcast episodes and audiobooks have no track name.
 
-Both come zipped. `history` reads files, folders or the zip itself. A play
-under 30 seconds is not counted (Spotify's own threshold for a stream).
-Versions of one song ("- Remastered 2011", "(Live)") are counted together.
+Both come zipped. `entries` reads files, folders or the zip itself, one file
+at a time, and `track_of` says what one entry is a play of. A play under 30
+seconds is not counted (`MINIMUM_MS`, Spotify's own threshold for a stream),
+and versions of one song ("- Remastered 2011", "(Live)") are counted together
+(`song_key`). The ranking of an export's songs is `lab.player.listening`.
 """
 
-from collections import defaultdict
-from dataclasses import dataclass
 import json
 from pathlib import Path
 import re
@@ -26,29 +26,6 @@ MINIMUM_MS = 30_000
 # "Deliver Me" or "(Olive Branch)" are not taken for "live"; a remix is another recording and is not folded in.
 _MARK = r"\b(remaster(ed)?|live|version|edit|mix|mono|stereo|demo|acoustic|deluxe)\b"
 VERSION = re.compile(r"\s*(\s-\s.*" + _MARK + r".*|[(\[][^)\]]*" + _MARK + r"[^)\]]*[)\]])\s*$", re.I)
-DASH = "–"
-
-
-@dataclass(frozen=True)
-class Track:
-    artist: str
-    title: str
-    ms: int
-    plays: int
-
-    @property
-    def minutes(self):
-        return round(self.ms / 60_000, 1)
-
-    @property
-    def text(self):
-        hours = self.ms / 3_600_000
-        spent = f"{hours:.1f} h" if hours >= 1 else f"{self.minutes:g} min"
-        return f"{self.artist} {DASH} {self.title} ({spent}, {self.plays} plays)"
-
-    def to_record(self):
-        return {"artist": self.artist, "title": self.title, "minutes": self.minutes, "plays": self.plays,
-                "text": self.text}
 
 
 def _entries(text, name):
@@ -107,59 +84,7 @@ def track_of(entry):
     return str(artist).strip(), str(title).strip(), int(ms)
 
 
-def history(paths):
-    """Every play in the given files, folders or zip archives, as (artist, title, ms) tuples."""
-    return [found for found in map(track_of, entries(paths)) if found]
-
-
 def song_key(title):
     """A title without its version marks, folded, for counting versions together and matching songs."""
     base = VERSION.sub("", title or "")
     return re.sub(r"[^\w]+", " ", base.casefold()).strip()
-
-
-def rank(plays, *, minimum_ms=MINIMUM_MS):
-    """Tracks by time listened, most first. Each is named by the version listened to most."""
-    totals, counts, names = defaultdict(int), defaultdict(int), defaultdict(lambda: defaultdict(int))
-    for artist, title, ms in plays:
-        if ms < minimum_ms:
-            continue
-        key = (artist.casefold(), song_key(title))
-        totals[key] += ms
-        counts[key] += 1
-        names[key][(artist, VERSION.sub("", title).strip() or title)] += ms
-    tracks = []
-    for key, ms in totals.items():
-        artist, title = max(names[key].items(), key=lambda item: item[1])[0]
-        tracks.append(Track(artist, title, ms, counts[key]))
-    return sorted(tracks, key=lambda track: (-track.ms, track.artist.casefold(), track.title.casefold()))
-
-
-def _known(store):
-    """Keys of the songs the store already has, by title and by "artist - title"."""
-    known = set()
-    for song in store.songs() if store is not None else ():
-        name = str(song.get("name") or "")
-        separator = next((s for s in (f" {DASH} ", " - ", " — ") if s in name), None)
-        if song.get("artist"):
-            known.add((str(song["artist"]).casefold(), song_key(name)))
-        elif separator:
-            artist, title = name.split(separator, 1)
-            known.add((artist.strip().casefold(), song_key(title)))
-            known.add(song_key(name))
-        else:
-            known.add(song_key(name))     # a song named by its title alone stands for any artist's
-    return known
-
-
-def proposals(paths, store=None, *, limit=20, minimum_ms=MINIMUM_MS):
-    """The songs listened to most that the store has no song for, as Tracks, most listened first."""
-    known = _known(store)
-    found = []
-    for track in rank(history(paths), minimum_ms=minimum_ms):
-        if song_key(track.title) in known or (track.artist.casefold(), song_key(track.title)) in known:
-            continue
-        found.append(track)
-        if len(found) >= limit:
-            break
-    return found

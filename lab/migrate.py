@@ -43,12 +43,11 @@ import shutil
 from lab.sound import catalog
 from lab import knowledge
 from lab.qc.library import SCENES as SCENE_LETTERS
-from lab.sound.chain import Block, Chain, Row, SCENES
+from lab.sound.chain import MULTI_OUT, Block, Chain, Row, SCENES
 from lab.sound.sounds import Sound, Store
 
 OLD = Path(__file__).resolve().parents[1] / "tone_sessions"
 DONE = "migrated.json"
-MULTI_OUT = 19
 ROLES = ("Gate", "Compressor", "Drive", "Amp", "Cab", "Equalizer", "Modulation", "Delay", "Reverb")
 SETLISTS = "/media/p4/Presets/"
 WORKING = {("/media/p4/Presets/My Presets", 254), ("/media/p4/Presets/My Presets", 255),

@@ -59,6 +59,21 @@ class LearnerFoldersTest(unittest.TestCase):
         self.assertFalse(folders.bring_old(old, new))             # never a second time
         self.assertFalse((new / "recordings" / "later.wav").exists())
 
+    def test_an_empty_folder_does_not_stop_the_copy_and_one_with_data_is_never_written_over(self):
+        old, new = self.old_data(), self.base / "data" / "learner"
+        new.mkdir(parents=True)
+        (new / "live-driver.log").write_text("something asked where the folder is", encoding="utf-8")
+        self.assertTrue(folders.bring_old(old, new))
+        self.assertEqual((new / "recordings" / "clip-20261118-120000-abcdef" / "dry.wav").read_text(encoding="utf-8"),
+                         "audio")
+        self.assertTrue((new / "live-driver.log").is_file())
+        self.assertFalse(new.with_name("learner.copying").exists())
+        # Recorded since: the earlier data is not copied over it, nor merged into it.
+        other = self.base / "data2" / "learner"
+        (other / "recordings" / "clip-new").mkdir(parents=True)
+        self.assertFalse(folders.bring_old(old, other))
+        self.assertFalse((other / "guitar_learner").exists())
+
     def test_nothing_is_made_when_there_was_no_earlier_data(self):
         (self.base / "program" / "tone_sessions" / "lab").mkdir(parents=True)
         new = self.base / "data" / "learner"

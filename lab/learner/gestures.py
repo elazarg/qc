@@ -462,10 +462,6 @@ class Session:
 
     def pump(self):
         """Handle what the worker has said so far."""
-        if getattr(self.studio.state, "mode", None) == "phrase" and not self.signal.is_set():
-            # The phrase loop needs the unit's audio driver; the dry input lets go of it.
-            self.stop()
-            self.say("Gesture listening stopped while the phrase plays.")
         while True:
             try:
                 event = self.events.get_nowait()
@@ -571,8 +567,13 @@ def start(seat, *, instrument=None, control=None, arm=True, listener=None, obser
 
     Asked again while a session runs: for the same instrument and control, the listener is added to it and, with
     `arm`, it is armed again; for another control, that session is ended and a new one starts once it has let go
-    of the input."""
+    of the input.
+
+    Refused (`ValueError`) on a desk whose unit is simulated: listening opens the Quad Cortex's real audio
+    driver, which has nothing to do with a simulated unit."""
     global _session
+    if not seat.real_audio:
+        raise ValueError("Not with a simulated unit.")
     instrument = instrument or seat.guitar
     settings = config(instrument, seat.input_channel, control=control, arm=arm, observe=observe)
     current = _session if running() else None

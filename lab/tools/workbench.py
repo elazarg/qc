@@ -9,7 +9,8 @@ sound, played silently through the unit with the desk's phrase:
 - **Strengths**: a request such as "darker" or "more jazz" as Shape knob moves, at 40 % and 85 %, next to the
   sound as it is.
 - **Sweep**: one control of one block at several values, in the units the unit shows.
-- **WAV files**: two or more recordings from elsewhere, no unit needed.
+- **WAV files**: two or more recordings from elsewhere, chosen in place from where recordings are kept or by
+  their paths; no unit needed.
 
 The versions are level-matched (one loudness, only cuts, peaks under −3 dBTP), shuffled under letters and
 played on the computer. "Keep" notes the last one played with a remark; "Which was which?" reveals the
@@ -33,9 +34,10 @@ from lab.sound import knobs, words
 from lab.hearing.audio import read_wave
 from lab.hearing.measure import match, measure
 from lab.sound.sounds import Sound
-from lab.desk.theme import FONT, INK, SUBTLE, TILE, WHITE
-from lab.tools.common import (SCENE_LETTERS, Window, button, gained, heard_chain, label, listbox, menu_choice, phrase,
-                              play, section, silence, with_knobs, write_pcm16)
+from lab.desk.theme import FONT, INK, SUBTLE, TILE
+from lab.tools.common import (SCENE_LETTERS, WIDTH, Chips, FileChoice, Tool, button, disclosure, flow, gained,
+                              heard_chain, label, listbox, phrase, play, section, silence, usual_folders,
+                              with_knobs, write_pcm16)
 
 STRENGTHS = (.4, .85)
 KINDS = ("Scenes", "Strengths", "Sweep", "WAV files")
@@ -234,78 +236,95 @@ def as_sound(record, letter, parent):
     return sound
 
 
-# ---- the window ----
+# ---- the tool ----
 
-class WorkbenchWindow(Window):
+class WorkbenchTool(Tool):
     TITLE = "Comparison workbench"
-    SIZE = "640x700"
 
     def build(self):
         self.target = self.record = self.last = None
         self.auditions = {}
+        self.control_rows = []          # the controls listed for a sweep: (label, row, column, index)
         make = section(self.body, "Versions of the selected sound",
                        "Rendered silently with the desk's phrase, then level-matched and shuffled.")
-        row = tk.Frame(make, bg=make["bg"])
-        row.pack(fill="x")
-        self.kind = tk.StringVar(master=self.top, value=KINDS[0])
-        menu_choice(row, self.kind, KINDS, command=self.kind_changed).pack(side="left")
-        self.argument = tk.Entry(row, font=(FONT, 10), relief="flat", bg=TILE, fg=INK,
-                                 insertbackground=INK, width=28)
-        self.argument.pack(side="left", padx=6, ipady=4)
-        button(row, "Render", self.render).pack(side="right")
-        self.control = tk.StringVar(master=self.top, value="")
-        self.control_menu = tk.Menubutton(make, textvariable=self.control, bg=WHITE, fg=INK, relief="flat",
-                                          font=(FONT, 9), padx=8, pady=4)
-        self.control_options = tk.Menu(self.control_menu, tearoff=False, postcommand=self.list_controls)
-        self.control_menu.configure(menu=self.control_options)
-        self.help = label(make, size=9, color=SUBTLE, wrap=560)
-        self.help.pack(fill="x", pady=(6, 0))
+        self.kind = tk.StringVar(master=self.frame, value=KINDS[0])
+        Chips(make, self.kind, KINDS, command=self.kind_changed).pack(fill="x")
+        self.help = label(make, size=9, color=SUBTLE, wrap=WIDTH)
+        self.help.pack(fill="x", pady=(4, 4))
+        # What a kind needs is shown for that kind alone: the words or values, the control, the recordings.
+        self.typed = tk.Frame(make, bg=make["bg"])
+        self.argument = tk.Entry(self.typed, font=(FONT, 10), relief="flat", bg=TILE, fg=INK, insertbackground=INK)
+        self.argument.pack(fill="x", ipady=4)
+        self.argument.bind("<Return>", lambda _: self.render())
+        self.control_list = listbox(make, height=5)
+        self.files = FileChoice(make, folders=lambda: usual_folders("wav", self.folder), patterns=("*.wav",),
+                                choose=self.imported, several=True, action="Compare these")
+        self.render_button = button(make, "Render", self.render)
 
-        hear = section(self.body, "Blind audition")
-        self.players = tk.Frame(hear, bg=hear["bg"])
+        # The audition is shown once there is a comparison to hear.
+        self.hear = section(self.body, "Blind audition")
+        self.players = tk.Frame(self.hear, bg=self.hear["bg"])
         self.players.pack(fill="x")
-        self.about = label(hear, size=9, wrap=560)
+        self.about = label(self.hear, size=9, wrap=WIDTH)
         self.about.pack(fill="x", pady=(6, 0))
-        row = tk.Frame(hear, bg=hear["bg"])
+        label(self.hear, "A remark on the one last played, or on the comparison:", size=9,
+              color=SUBTLE).pack(fill="x", pady=(6, 0))
+        self.remark = tk.Entry(self.hear, font=(FONT, 10), relief="flat", bg=TILE, fg=INK, insertbackground=INK)
+        self.remark.pack(fill="x", ipady=4)
+        row = tk.Frame(self.hear, bg=self.hear["bg"])
         row.pack(fill="x", pady=(6, 0))
-        self.remark = tk.Entry(row, font=(FONT, 10), relief="flat", bg=TILE, fg=INK,
-                               insertbackground=INK)
-        self.remark.pack(side="left", fill="x", expand=True, ipady=4)
-        button(row, "Keep last played", self.keep).pack(side="left", padx=6)
-        row = tk.Frame(hear, bg=hear["bg"])
-        row.pack(fill="x", pady=(6, 0))
+        button(row, "Keep last played", self.keep).pack(side="left")
+        button(row, "Put the kept one on B", self.put_kept, quiet=True).pack(side="left", padx=4)
+        row = tk.Frame(self.hear, bg=self.hear["bg"])
+        row.pack(fill="x", pady=(4, 0))
         button(row, "Which was which?", self.reveal, quiet=True).pack(side="left")
-        button(row, "Put the kept one on B", self.put_kept, quiet=True).pack(side="left", padx=6)
-        button(row, "Note on this comparison", self.note, quiet=True).pack(side="right")
+        button(row, "Note on this comparison", self.note, quiet=True).pack(side="left", padx=4)
+        self.hear.pack_forget()
 
-        earlier = section(self.body, "Earlier comparisons")
-        self.earlier = listbox(earlier, height=5)
+        earlier_ones = disclosure(self.body, "Earlier comparisons")
+        self.earlier = listbox(earlier_ones, height=5)
         self.earlier.pack(fill="x")
-        self.earlier.bind("<Double-Button-1>", lambda _: self.open_earlier())
+        button(earlier_ones, "Open", self.open_earlier, quiet=True).pack(anchor="w", pady=(4, 0))
+        self.earlier.bind("<Double-Button-1>", lambda _: self.open_earlier())     # the same as Open
         self.kind_changed()
         self.list_earlier()
 
     def kind_changed(self):
         kind = self.kind.get()
-        self.control_menu.pack_forget()
+        for part in (self.typed, self.control_list, self.files, self.render_button):
+            part.pack_forget()
         self.argument.delete(0, "end")
         if kind == "Strengths":
             self.help.configure(text="A request in words, such as darker, more jazz or less delay. It is rendered at "
                                      "40 % and 85 % next to the sound as it is.")
+            self.typed.pack(fill="x")
         elif kind == "Sweep":
-            self.control_menu.pack(fill="x", pady=(6, 0), before=self.help)
-            self.help.configure(text="Choose a control, then type the values to compare, such as 3 5 7.")
+            self.help.configure(text="Choose a control of the selected sound, then type the values to compare, such "
+                                     "as 3 5 7.")
+            self.list_controls()
+            self.control_list.pack(fill="x", pady=(0, 4))
+            self.typed.pack(fill="x")
         elif kind == "WAV files":
-            self.help.configure(text="Render opens a file chooser for two or more recordings.")
+            self.help.configure(text="Two or more recordings from elsewhere: click each in the list, or paste a "
+                                     "path. No unit needed.")
+            self.files.look()
+            self.files.pack(fill="x")
+            return
         else:
             self.help.configure(text="Each scene the sound names, up to six.")
+        self.render_button.pack(anchor="w", pady=(6, 0))
+
+    def shown(self):
+        super().shown()
+        if self.kind.get() == "Sweep":
+            self.list_controls()        # of the sound selected now
 
     def list_controls(self):
-        self.control_options.delete(0, "end")
         sound = self.studio.sound(self.studio.state.side)
-        for name, row, column, index in controls(sound.chain) if sound else []:
-            self.control_options.add_radiobutton(label=name, value=f"{name}|{row}|{column}|{index}",
-                                                 variable=self.control)
+        self.control_rows = controls(sound.chain) if sound else []
+        self.control_list.delete(0, "end")
+        for name, *_ in self.control_rows:
+            self.control_list.insert("end", name)
 
     def versions(self, sound):
         kind, text = self.kind.get(), self.argument.get().strip()
@@ -315,9 +334,10 @@ class WorkbenchWindow(Window):
             if not text:
                 raise ValueError("Type a request first, such as darker.")
             return strength_versions(sound, text)
-        if not self.control.get():
-            raise ValueError("Choose a control first.")
-        _, row, column, index = self.control.get().split("|")
+        picked = self.control_list.curselection()
+        if not picked:
+            raise ValueError("Choose a control in the list first.")
+        _, row, column, index = self.control_rows[picked[0]]
         try:
             values = [float(value) for value in text.replace(",", " ").split()]
         except ValueError:
@@ -327,9 +347,6 @@ class WorkbenchWindow(Window):
         return sweep_versions(sound, int(row), int(column), int(index), values)
 
     def render(self):
-        if self.kind.get() == "WAV files":
-            self.imported()
-            return
         sound, taken = self.studio.sound(self.studio.state.side), phrase(self.studio)
         if sound is None or taken is None:
             self.say("Put a sound on the desk and choose a phrase first.")
@@ -350,12 +367,13 @@ class WorkbenchWindow(Window):
                   taken[1], done=rendered, working=f"Rendering {len(versions)} versions silently on the Quad Cortex…",
                   renders=True)
 
-    def imported(self):
-        from tkinter import filedialog
-
-        paths = filedialog.askopenfilenames(title="Choose two or more recordings", filetypes=[("WAV audio", "*.wav")],
-                                            parent=self.top)
-        if not paths:
+    def imported(self, paths):
+        """Compare recordings from elsewhere: the files chosen in the list, or the one whose path was typed added
+        to them."""
+        chosen = [self.files.found[index] for index in self.files.list.curselection()]
+        paths = list(dict.fromkeys([*chosen, *paths]))
+        if len(paths) < 2:
+            self.say("Choose at least two recordings: click each in the list, then Compare these.")
             return
         try:
             audios = [read_wave(path) for path in paths]
@@ -379,10 +397,10 @@ class WorkbenchWindow(Window):
         self.last = None
         for child in self.players.winfo_children():
             child.destroy()
-        for letter in self.auditions:
-            button(self.players, f"Play {letter}", lambda letter=letter: self.play(letter)).pack(side="left",
-                                                                                             padx=(0, 4))
-        button(self.players, "Stop", self.stop, quiet=True).pack(side="right")
+        flow(self.players, [button(self.players, f"Play {letter}", lambda letter=letter: self.play(letter))
+                            for letter in self.auditions] + [button(self.players, "Stop", self.silence, quiet=True)])
+        if not self.hear.winfo_manager():
+            self.hear.pack(fill="x", pady=(0, 10), after=self.body.winfo_children()[0])
         chosen = self.record.get("choice")
         self.about.configure(text=f"{len(self.auditions)} level-matched versions"
                                   + (f" of {self.record['sound']['name']}" if self.record.get("sound") else "")
@@ -397,7 +415,7 @@ class WorkbenchWindow(Window):
         self.last = letter
         self.say(f"Playing {letter}")
 
-    def stop(self):
+    def silence(self):
         silence()
 
     def keep(self):
@@ -453,4 +471,4 @@ class WorkbenchWindow(Window):
 
 
 def open(desk):  # noqa: A001
-    return WorkbenchWindow.open(desk)
+    return WorkbenchTool.open(desk)

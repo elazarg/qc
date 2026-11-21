@@ -1,5 +1,8 @@
 """Keeping a take as a phrase: the dry guitar alone, checked, with the processed return beside it."""
 
+import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
+import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
+
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -32,6 +35,16 @@ class KeepTest(unittest.TestCase):
             self.assertEqual((info["instrument"], info["setting"], info["seconds"]), ("Charvel", "Bridge", 1.0))
             self.assertEqual(read_wave(target / "wet.wav").shape, (48000, 2))
             self.assertEqual(info["wet"], {"sound": None, "name": "the preset on the unit"})
+
+    def test_what_was_played_is_kept_with_the_phrase_when_it_is_said(self):
+        # Before: the desk wrote it into phrase.json afterwards, a second writer of the same file.
+        with TemporaryDirectory() as folder:
+            info, _, _ = phrases.keep(folder, take(), instrument="Charvel", setting="Bridge",
+                                      gesture="open strings strummed once")
+            kept = json.loads((Path(folder) / "phrases" / info["id"] / "phrase.json").read_text(encoding="utf-8"))
+            self.assertEqual((info["gesture"], kept["gesture"]), ("open strings strummed once",) * 2)
+            plain, _, _ = phrases.keep(folder, take(), instrument="Charvel", setting="Neck")
+            self.assertNotIn("gesture", plain)
 
     def test_the_return_is_named_for_the_sound_it_was_heard_through_and_left_out_when_silent(self):
         with TemporaryDirectory() as folder:

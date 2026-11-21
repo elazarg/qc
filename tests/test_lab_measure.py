@@ -1,5 +1,8 @@
 """One measurement for everything, and the words for what a chain did to a phrase."""
 
+import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
+import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
+from functools import lru_cache
 import unittest
 
 import numpy as np
@@ -36,6 +39,25 @@ def shelf(corner, gain_db, high=True):
     return lambda sound: dsp.lfilter(np.array(b) / d[0], np.array(d) / d[0], sound, axis=0)
 
 
+@lru_cache(maxsize=None)
+def guitar_partials(pitch, samples):
+    """A made-up guitar note's partials, `samples` long. Worked out once for each pitch and length: summing them
+    is what these tests spent their time on."""
+    time = np.arange(samples) / RATE
+    tone = sum(np.sin(2 * np.pi * pitch * k * time + k * k) / k ** 1.5 for k in range(1, 41) if pitch * k < 15000)
+    tone.setflags(write=False)
+    return tone
+
+
+@lru_cache(maxsize=None)
+def bright_partials(count, samples):
+    """The first `count` partials of a G at 1/k, `samples` long, worked out once."""
+    time = np.arange(samples) / RATE
+    tone = sum(np.sin(2 * np.pi * 196 * k * time) / k for k in range(1, count + 1))
+    tone.setflags(write=False)
+    return tone
+
+
 def guitar(seconds=3.5, pitches=(110., 146.8, 196., 246.9, 329.6, 196.)):
     """A made-up dry guitar: notes half a second apart, partials falling off to 15 kHz."""
     total = round(seconds * RATE)
@@ -43,7 +65,7 @@ def guitar(seconds=3.5, pitches=(110., 146.8, 196., 246.9, 329.6, 196.)):
     for start, pitch in zip((.25, .75, 1.25, 1.75, 2.25, 2.75), pitches):
         begin = round(start * RATE)
         time = np.arange(total - begin) / RATE
-        tone = sum(np.sin(2 * np.pi * pitch * k * time + k * k) / k ** 1.5 for k in range(1, 41) if pitch * k < 15000)
+        tone = guitar_partials(pitch, total)[:total - begin]   # a later note is the same tone, cut shorter
         out[begin:] += .1 * tone * np.exp(-3 * time)
     return out[:, None]
 
@@ -240,7 +262,7 @@ def phrase(ramp_s=0., partials=60):
         begin = round(start * RATE)
         time = np.arange(total - begin) / RATE
         rise = np.minimum(1, time / ramp_s) if ramp_s else 1
-        tone = sum(np.sin(2 * np.pi * 196 * k * time) / k for k in range(1, partials + 1))
+        tone = bright_partials(partials, total)[:total - begin]
         out[begin:] += .15 * tone * np.exp(-3 * time) * rise
     return out[:, None]
 

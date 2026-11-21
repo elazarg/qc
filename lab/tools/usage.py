@@ -4,7 +4,8 @@
   old desk kept for its panels.
 - **The assistant's ledger** (`ledger.jsonl`, written by `lab.sound.assistant`) is read back day by day: how many
   calls, whose (the player's or the app's own), of which kind, how long they took, how much was sent, how
-  they ended, against the daily allowance.
+  they ended, against the daily allowance. A day is the player's own day (`assistant.local_day`), as the
+  allowance counts it.
 - **Feedback** is a note the player leaves about what is on the desk: it is kept with the sounds on A and
   B, the phrase and the round it was said about, so it can be read against them later. Notes about one
   blind comparison stay with that comparison (see `workbench.py`).
@@ -18,7 +19,7 @@ import tkinter as tk
 from uuid import uuid4
 
 from lab.desk.theme import FONT, INK, PAPER, SOFT, SUBTLE
-from lab.tools.common import Window, button, label, listbox, section
+from lab.tools.common import WIDTH, Tool, button, disclosure, label, listbox, section
 
 LOG = "ui-usage.jsonl"
 
@@ -69,13 +70,13 @@ def daily(folder, *, days=14, today=None):
     Each day: {"day", "calls", "player", "app", "web", "kinds": {kind: n}, "seconds", "characters",
     "ok", "cancelled", "failed", "refused"}. A call refused before it was made is not in the ledger.
     """
-    from lab.sound.assistant import DAILY
+    from lab.sound.assistant import DAILY, local_day
 
     found = defaultdict(lambda: {"calls": 0, "player": 0, "app": 0, "web": 0, "kinds": Counter(), "seconds": 0.,
                                  "characters": 0, "ok": 0, "cancelled": 0, "failed": 0})
     for row in _rows(Path(folder) / "ledger.jsonl"):
-        day = str(row.get("at", ""))[:10]
-        if len(day) != 10:
+        day = local_day(row.get("at"))      # the player's own day, as the daily allowance counts it
+        if day is None:
             continue
         entry = found[day]
         entry["calls"] += 1
@@ -86,7 +87,7 @@ def daily(folder, *, days=14, today=None):
         entry["characters"] += int(row.get("characters") or 0)
         outcome = str(row.get("outcome", ""))
         entry["ok" if outcome == "ok" else "cancelled" if outcome == "cancelled" else "failed"] += 1
-    today = today or _now().date().isoformat()
+    today = today or datetime.now().date().isoformat()
     result = []
     for day in sorted(found, reverse=True)[:days]:
         entry = found[day]
@@ -98,7 +99,7 @@ def daily(folder, *, days=14, today=None):
 def today_line(folder, today=None):
     from lab.sound.assistant import DAILY
 
-    today = today or _now().date().isoformat()
+    today = today or datetime.now().date().isoformat()
     entry = next((row for row in daily(folder, today=today) if row["day"] == today), None)
     used = entry["calls"] if entry else 0
     return f"Today: {used} of {DAILY} calls to the assistant" + (
@@ -142,45 +143,68 @@ def feedback_notes(folder):
     return found
 
 
-# ---- the window ----
+def day_line(row):
+    """One day of the ledger, short enough for the list."""
+    problems = row["failed"] + row["cancelled"]
+    return (f"{row['day']}  ·  {row['calls']} calls ({row['player']} yours, {row['app']} app)"
+            + (f"  ·  {problems} not answered" if problems else ""))
 
-class UsageWindow(Window):
+
+def day_detail(row):
+    """The rest of what the ledger says of a day: how long, how much, which kinds."""
+    kinds = ", ".join(f"{kind} {count}" for kind, count in sorted(row["kinds"].items()))
+    return f"{row['day']}: {row['seconds']:.0f} s with the assistant, {row['characters'] // 1000} k characters sent. {kinds}"
+
+
+# ---- the tool ----
+
+class UsageTool(Tool):
     TITLE = "Usage and feedback"
-    SIZE = "620x620"
 
     def build(self):
-        calls = section(self.body, "The assistant", "Calls by day, from the ledger every call is written to.")
-        self.today = label(calls, size=10, bold=True)
+        self.rows = []
+        calls = section(self.body, "The assistant", "Calls by day, from the ledger every call is written to. "
+                                                    "Choose a day for the rest.")
+        self.today = label(calls, size=10, bold=True, wrap=WIDTH)
         self.today.pack(fill="x")
-        self.days = listbox(calls, height=7)
+        self.days = listbox(calls, height=6)
         self.days.pack(fill="x", pady=(6, 0))
-
-        views = section(self.body, "Tools opened")
-        self.views = label(views, size=9, color=SOFT, wrap=540)
-        self.views.pack(fill="x")
-        self.unit = label(views, size=9, color=SUBTLE, wrap=540)
-        self.unit.pack(fill="x", pady=(4, 0))
-        button(views, "What the app keeps on the Quad Cortex", self.check_unit, quiet=True).pack(anchor="w",
-                                                                                                pady=(6, 0))
+        self.days.bind("<<ListboxSelect>>", lambda _: self.describe_day())
+        self.day = label(calls, size=9, color=SUBTLE, wrap=WIDTH)
+        self.day.pack(fill="x", pady=(4, 0))
 
         notes = section(self.body, "Feedback", "A note about what is on A and B now. It is kept with them.")
-        self.note = tk.Text(notes, height=3, bg=PAPER, fg=INK, insertbackground=INK, relief="flat",
+        self.note = tk.Text(notes, height=3, width=20, bg=PAPER, fg=INK, insertbackground=INK, relief="flat",
                             font=(FONT, 10), wrap="word")
         self.note.pack(fill="x")
         button(notes, "Keep this note", self.keep).pack(anchor="w", pady=(6, 0))
-        self.notes = listbox(notes, height=5)
+        self.notes = listbox(notes, height=4)
         self.notes.pack(fill="x", pady=(6, 0))
+
+        views = disclosure(self.body, "Tools opened, and what is kept on the unit")
+        self.views = label(views, size=9, color=SOFT, wrap=WIDTH)
+        self.views.pack(fill="x")
+        button(views, "What the app keeps on the Quad Cortex", self.check_unit, quiet=True).pack(anchor="w",
+                                                                                                pady=(6, 0))
+        self.unit = label(views, size=9, color=SUBTLE, wrap=WIDTH)
+        self.unit.pack(fill="x", pady=(4, 0))
         self.refresh()
+
+    def shown(self):
+        super().shown()
+        self.refresh()
+
+    def describe_day(self):
+        picked = self.days.curselection()
+        if picked:
+            self.day.configure(text=day_detail(self.rows[picked[0]]))
 
     def refresh(self):
         self.today.configure(text=today_line(self.folder))
         self.days.delete(0, "end")
-        for row in daily(self.folder):
-            kinds = ", ".join(f"{kind} {count}" for kind, count in sorted(row["kinds"].items()))
-            problems = row["failed"] + row["cancelled"]
-            self.days.insert("end", f"{row['day']}  ·  {row['calls']} calls ({row['player']} yours, {row['app']} app)"
-                                    f"  ·  {row['seconds']:.0f} s  ·  {row['characters'] // 1000} k chars"
-                                    + (f"  ·  {problems} not answered" if problems else "") + f"  ·  {kinds}")
+        self.rows = daily(self.folder)
+        for row in self.rows:
+            self.days.insert("end", day_line(row))
         counted = opens(self.folder)
         self.views.configure(text=" · ".join(f"{view} {count}" for view, count in counted.most_common(12))
                              or "No tool has been opened yet.")
@@ -209,4 +233,4 @@ class UsageWindow(Window):
 
 
 def open(desk):  # noqa: A001 - every tool opens with `open(desk)`
-    return UsageWindow.open(desk)
+    return UsageTool.open(desk)

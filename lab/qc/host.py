@@ -128,6 +128,7 @@ class Host:
         self.futures, self.ticket, self.lock = {}, 0, threading.Lock()
         self.progress = {}                  # ticket -> what to call with a command's progress
         self.failed = None                  # why the worker could not start or stopped, once it has
+        self.simulated = simulated          # a simulated unit: nothing here opens real hardware
         if local:
             from queue import Queue
 

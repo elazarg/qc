@@ -3,6 +3,8 @@
 Nothing here opens a desk, shows a message box or touches the real data folder: the desk, the box and the
 folder are stand-ins."""
 
+import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
+import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
 import os
 from pathlib import Path
 import runpy

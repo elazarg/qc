@@ -145,7 +145,7 @@ class SimUnit:
         if name == "Scene":
             return SimpleNamespace(selected_scene=self.scene)
         if name == "PresetDirty":
-            return SimpleNamespace(dirty=self.dirty, is_dirty=self.dirty)
+            return SimpleNamespace(is_dirty=self.dirty)
         if name == "SetlistPosition":
             return SimpleNamespace(**self.position)
         return None

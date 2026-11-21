@@ -124,13 +124,15 @@ def found(text):
 
 def bring_old(old=None, new=None):
     """Copy the learner's data from where the earlier app kept it (`old`, the program folder's `tone_sessions`)
-    into the data folder (`new`), once: only when `new` does not exist yet and `old` holds some of it.
+    into the data folder (`new`), once: only when `new` holds none of it yet and `old` holds some of it. An
+    empty `new` (made by something that only asked where it is) does not stop the copy; a `new` that already
+    holds any of the learner's folders does, since nothing is ever merged or written over.
 
     The copy is made in a temporary folder beside `new` and renamed into place when complete, so an interrupted
     copy is never mistaken for the data. `old` is left exactly as it was, with a note saying where the copy is.
     Returns True when data was copied."""
     old, new = Path(old or OLD), Path(new or root())
-    if new.exists() or not any((old / name).is_dir() for name in BROUGHT):
+    if any((new / name).exists() for name in BROUGHT) or not any((old / name).is_dir() for name in BROUGHT):
         return False
     new.parent.mkdir(parents=True, exist_ok=True)
     staging = new.with_name(new.name + ".copying")
@@ -140,7 +142,13 @@ def bring_old(old=None, new=None):
     for name in BROUGHT:
         if (old / name).is_dir():
             shutil.copytree(old / name, staging / name)
-    staging.replace(new)
+    if new.exists():
+        for name in BROUGHT:            # `new` is there but holds none of these: each goes in whole
+            if (staging / name).is_dir():
+                (staging / name).replace(new / name)
+        shutil.rmtree(staging)
+    else:
+        staging.replace(new)
     try:
         note = old / MOVED_NOTE
         if not note.exists():

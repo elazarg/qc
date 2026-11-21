@@ -6,10 +6,9 @@ core:
 - **Listening level.** One offset for both sides, from −40 dB up to the app's ceiling (`unit.CEILING_DB`),
   with Quieter, Louder, Reset and Mute. "Matched" keeps the desk's own A/B matching and moves both together;
   "manual" sets the level outright. The engine plays each side at a level of its own (`Engine.level`); the
-  tool's offset is added to whatever the desk asks for there, and never takes a row past the ceiling. The
-  offset and the mute last while this tool is open: closing it puts the desk back at its own levels, since
-  nothing on the desk would say that an offset or a mute was still on. While they are on they are kept in
-  `studio.listening` (None otherwise), for the desk to show.
+  tool's offset is added to whatever the desk asks for there, and never takes a row past the ceiling. While
+  an offset or a mute is on it is kept in `studio.listening` (None otherwise), and the desk says so under the
+  tiles with a way back to its own level, so it stays on when this tool is left.
 - **Matching a song's parts.** The phrase is played silently through each part's sound on the unit, each
   return measured (`hearing.measure`: gated loudness, true peak), and one common loudness planned: only cuts
   unless a lift is asked for, never past a true-peak ceiling, a sound at full scale left out with the reason.
@@ -27,9 +26,10 @@ import tkinter as tk
 from lab.sound import catalog
 from lab.hearing.measure import measure
 from lab.sound.chain import Block, COLUMNS, INTERNAL
-from lab.desk.theme import DIM, INK, PAPER
+from lab.desk.theme import DIM, INK, PAPER, SUBTLE
 from lab.qc.unit import CEILING_DB
-from lab.tools.common import Window, button, heard_chain, label, listbox, menu_choice, phrase, render_many, section
+from lab.tools.common import (WIDTH, Chips, Tool, button, heard_chain, label, listbox, phrase, render_many,
+                              section)
 
 FLOOR_DB = -40.
 DIGITAL_NOTE = ("These are levels of the sound returned over USB. Check the Quad Cortex input meter with your "
@@ -195,52 +195,60 @@ def clear(engine, *, stop=None):
     return engine.listen_at(None)
 
 
-# ---- the window ----
+# ---- the tool ----
 
-class LevelsWindow(Window):
+class LevelsTool(Tool):
     TITLE = "Levels"
-    SIZE = "620x640"
 
     def build(self):
-        self.settings = saved_settings(None)
+        self.settings = saved_settings(self.studio.listening)
         self.readings = self.planned = None
         self.targets_measured = {}
         listen = section(self.body, "Listening level", f"Both sides together, up to {CEILING_DB:+.0f} dB, the "
-                                                       "app's ceiling. Matched keeps A and B equally loud. It "
-                                                       "lasts while this is open.")
+                                                       "app's ceiling. Matched keeps A and B equally loud. While "
+                                                       "it is on, the desk says so and offers the way back.")
         row = tk.Frame(listen, bg=listen["bg"])
         row.pack(fill="x")
         button(row, "Quieter", lambda: self.command("quieter")).pack(side="left")
-        self.level = tk.IntVar(master=self.top)
-        self.slider = tk.Scale(row, from_=FLOOR_DB, to=CEILING_DB, orient="horizontal", resolution=1, length=220,
+        self.level = tk.IntVar(master=self.frame)
+        self.slider = tk.Scale(row, from_=FLOOR_DB, to=CEILING_DB, orient="horizontal", resolution=1, length=190,
                                showvalue=False, variable=self.level, bg=listen["bg"], fg=INK,
                                troughcolor=PAPER, highlightthickness=0, borderwidth=0)
         self.slider.pack(side="left", padx=6)
         self.slider.bind("<ButtonRelease-1>", lambda _: self.slid())
         button(row, "Louder", lambda: self.command("louder")).pack(side="left")
+        self.reading = label(listen, size=10, bold=True)
+        self.reading.pack(fill="x", pady=(6, 2))
         options = tk.Frame(listen, bg=listen["bg"])
-        options.pack(fill="x", pady=(6, 0))
-        self.reading = label(options, size=10, bold=True)
-        self.reading.pack(side="left")
-        button(options, "Reset", lambda: self.command("normal"), quiet=True).pack(side="right")
-        self.mute = button(options, "Mute", self.toggle_mute, quiet=True)
-        self.mute.pack(side="right", padx=4)
+        options.pack(fill="x")
         self.manual = button(options, "Manual", self.toggle_match, quiet=True)
-        self.manual.pack(side="right")
+        self.manual.pack(side="left")
+        self.mute = button(options, "Mute", self.toggle_mute, quiet=True)
+        self.mute.pack(side="left", padx=4)
+        button(options, "Reset", lambda: self.command("normal"), quiet=True).pack(side="left")
 
         match = section(self.body, "Match the loudness of a song's parts",
                         "The phrase is played silently through each part and the returns measured. " + TRIM_NOTE
                         + " A and B are matched by the desk itself whenever it plays.")
         row = tk.Frame(match, bg=match["bg"])
         row.pack(fill="x")
-        self.anchor = tk.StringVar(master=self.top, value="Quietest")
-        menu_choice(row, self.anchor, ("Quietest", "First")).pack(side="left")
-        button(row, "Measure", self.measure).pack(side="left", padx=6)
+        label(row, "Bring them to the", size=9, color=SUBTLE).pack(side="left")
+        self.anchor = tk.StringVar(master=self.frame, value="Quietest")
+        Chips(row, self.anchor, ("Quietest", "First"), width=140).pack(side="left", padx=(4, 0))
+        row = tk.Frame(match, bg=match["bg"])
+        row.pack(fill="x", pady=(4, 0))
+        button(row, "Measure", self.measure).pack(side="left")
         self.apply_button = button(row, "Apply", self.apply)
-        self.apply_button.pack(side="right")
-        self.rows = listbox(match, height=7)
+        self.apply_button.pack(side="left", padx=6)
+        self.rows = listbox(match, height=6)
         self.rows.pack(fill="x", pady=(8, 0))
-        label(match, DIGITAL_NOTE, size=8, color=DIM, wrap=540).pack(fill="x", pady=(6, 0))
+        label(match, DIGITAL_NOTE, size=8, color=DIM, wrap=WIDTH).pack(fill="x", pady=(6, 0))
+        self.sync()
+
+    def shown(self):
+        """On show again: with what the desk holds now (its own way back may have taken the offset off)."""
+        super().shown()
+        self.settings = saved_settings(self.studio.listening)
         self.sync()
 
     # listening
@@ -259,10 +267,16 @@ class LevelsWindow(Window):
         self.change(saved_settings({**self.settings, "match": not self.settings["match"]}))
 
     def change(self, settings):
+        """Play at these settings from now on (None: the desk's own levels). They stay on when the tool is left:
+        `studio.listening` holds them, and the desk shows them with a way back."""
         self.settings = saved_settings(settings)
         self.studio.listening = None if at_rest(self.settings) else self.settings
         self.sync()
-        self.call("lab.tools.levels.install", self.settings, done=lambda levels: None, working="Setting the level…")
+        if at_rest(self.settings):
+            self.call("lab.tools.levels.clear", done=lambda levels: None, working="Back to the desk's own level…")
+        else:
+            self.call("lab.tools.levels.install", self.settings, done=lambda levels: None,
+                      working="Setting the level…")
 
     def sync(self):
         settings = self.settings
@@ -272,14 +286,6 @@ class LevelsWindow(Window):
         self.reading.configure(text=reading(settings))
         self.mute.configure(text="Unmute" if settings["muted"] else "Mute")
         self.manual.configure(text="Matched" if not match else "Manual")
-
-    def close(self):
-        # Nothing on the desk says that an offset or a mute is on, so none outlives the tool that shows it.
-        if not at_rest(self.settings):
-            self.settings = saved_settings(None)
-            self.studio.listening = None
-            self.call("lab.tools.levels.clear", done=lambda levels: None, working="Back to the desk's own level…")
-        super().close()
 
     # matching
 
@@ -363,4 +369,4 @@ class LevelsWindow(Window):
 
 
 def open(desk):  # noqa: A001
-    return LevelsWindow.open(desk)
+    return LevelsTool.open(desk)
