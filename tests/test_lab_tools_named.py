@@ -3,7 +3,6 @@
 import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
 import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
 
-import gc
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -11,6 +10,7 @@ import threading
 import unittest
 from unittest import mock
 
+import support  # noqa: E402
 from lab import knowledge
 from lab.qc.engine import Engine
 from lab.qc.host import Host
@@ -29,7 +29,7 @@ def engine_on(device, folder):
 
 class NamedTest(unittest.TestCase):
     def setUp(self):
-        gc.collect()    # what other modules left of Tk is collected here, on its own thread, not the engine's
+        support.free_now()    # what other modules left of Tk is collected here, on its own thread, not the engine's
         folder = TemporaryDirectory()
         self.addCleanup(folder.cleanup)
         self.folder = Path(folder.name)

@@ -17,7 +17,7 @@ from lab.sound.knobs import KNOBS
 from lab.tools import field
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_lab_tools_support import DELAY, chain, host, phrase  # noqa: E402
+from support import DELAY, chain, host, phrase  # noqa: E402
 
 
 class FieldTest(unittest.TestCase):

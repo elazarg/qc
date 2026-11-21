@@ -15,7 +15,7 @@ from lab.qc.sim import FACTORY, MY_PRESETS
 from lab.tools import library, search
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_lab_tools_support import PLEXI, V30, chain, host, phrase  # noqa: E402
+from support import PLEXI, V30, chain, host, phrase  # noqa: E402
 
 
 def row(name, setlist, position, key=MY_PRESETS):

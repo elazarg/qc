@@ -24,7 +24,6 @@ import hidden_tk  # noqa: E402  (keeps every window off the screen and gives the
 import ast  # noqa: E402
 from functools import lru_cache  # noqa: E402
 import os  # noqa: E402
-import re  # noqa: E402
 from pathlib import Path  # noqa: E402
 import tempfile  # noqa: E402
 from tempfile import TemporaryDirectory  # noqa: E402
@@ -39,16 +38,6 @@ from lab.sound.assistant import Assistant  # noqa: E402
 
 TESTS = Path(__file__).resolve().parent
 REPO = TESTS.parent
-
-# Still to be done (part 2 of the review's fixes): the test files of the desk, the studio, the command line, the
-# side tools and the Guitar Learner were being worked on by someone else when the guards were added, so they
-# are let off here. Part 2 puts them right and empties this pattern; from then on no file is let off.
-NOT_YET = re.compile(r"test_lab_(studio|desk|cli|tools_|learner_)")
-
-
-def still_to_do(names):
-    return {name for name in names if not NOT_YET.match(name)}
-
 
 # Commands that take --simulated but only read the data folder, which is the tests' own.
 ONLY_READ_THE_DATA_FOLDER = {"latest-clip", "presets"}
@@ -176,16 +165,16 @@ def not_simulated():
 
 class FilesTest(unittest.TestCase):
     def test_every_test_module_of_the_app_imports_isolated_before_the_app(self):
-        self.assertEqual(still_to_do(not_isolated()), set())
+        self.assertEqual(not_isolated(), set())
 
     def test_every_test_file_that_can_make_a_window_imports_hidden_tk_first(self):
-        self.assertEqual(still_to_do(not_hidden()), set())
+        self.assertEqual(not_hidden(), set())
 
     def test_no_command_that_opens_the_unit_is_run_without_simulated(self):
         self.assertIn("reamp", unit_commands())                 # the reading of the parser still works
         self.assertNotIn("pod", unit_commands())
         found = not_simulated()
-        self.assertEqual(still_to_do(found), set(), found)
+        self.assertEqual(found, {})
 
     def test_the_reading_catches_what_it_is_for(self):
         tree = ast.parse("import unittest\nfrom lab.qc import sim\nimport isolated\n")
@@ -247,10 +236,45 @@ class GuardsTest(unittest.TestCase):
         self.addCleanup(root.destroy)
         window = tk.Toplevel(root)
         window.deiconify()
+        root.geometry("640x400+10+10")                          # a place on the screen is asked for
         root.update()
-        self.assertEqual(float(root.attributes("-alpha")), 0.)
-        self.assertTrue(window.winfo_ismapped())
+        for made in (root, window):
+            self.assertTrue(made.winfo_ismapped())
+            self.assertTrue(hidden_tk.is_cloaked(made))         # shown nowhere, wherever it is
+            self.assertLess(made.winfo_rootx(), -10000)         # and it is nowhere near the screen
+            self.assertLess(made.winfo_rooty(), -10000)
+        self.assertEqual((root.winfo_width(), root.winfo_height()), (640, 400))
+        self.assertEqual(hidden_tk.transparent, 0)
         self.assertFalse(hidden_tk.foreground_is_ours())
+        # Not for an instant either: no window of this run was ever found holding the foreground.
+        self.assertEqual(hidden_tk.handed_back, 0)
+
+    @unittest.skipUnless(os.name == "nt", "the wait is Windows' own")
+    def test_a_wait_for_a_message_ends_while_update_runs(self):
+        """Tcl's `update` can be left waiting for a message that Windows announced and then took back (see
+        `hidden_tk`). While it runs a timer ticks, so the wait it does, done here in its place, comes back."""
+        import ctypes
+        from ctypes import wintypes
+        import threading
+        import time
+
+        user32 = ctypes.WinDLL("user32")
+        message = wintypes.MSG()
+        main = threading.main_thread().native_id
+        # Should the tick ever be missing, this ends the wait after two seconds, and the test says so.
+        rescue = threading.Timer(2., lambda: user32.PostThreadMessageW(main, 0, 0, 0))
+        rescue.start()
+        self.addCleanup(rescue.cancel)
+        started = time.monotonic()
+        with hidden_tk._ticking():
+            user32.GetMessageW(ctypes.byref(message), None, 0x0113, 0x0113)      # only a timer's tick is taken
+        self.assertEqual(message.message, 0x0113)
+        self.assertLess(time.monotonic() - started, 1.)
+
+
+def tearDownModule():
+    parsed.cache_clear()            # hundreds of parsed files: not kept for the rest of the run
+    text_of.cache_clear()
 
 
 if __name__ == "__main__":

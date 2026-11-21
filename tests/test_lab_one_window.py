@@ -15,6 +15,7 @@ import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(_
 import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
 import hidden_tk  # noqa: E402,F401  (keeps every window off the screen)
 import ast
+from functools import lru_cache
 import json
 from pathlib import Path
 import re
@@ -25,7 +26,7 @@ from lab.qc.sim import FACTORY
 from lab.sound.sounds import Sound
 from lab.tools.menu import TOOLS
 
-from test_lab_tools_support import DELAY, PLEXI, V30, DeskCase, chain
+from support import DELAY, PLEXI, V30, DeskCase, chain
 
 LAB = Path(__file__).resolve().parents[1] / "lab"
 
@@ -72,8 +73,10 @@ def name_of(node):
     return node.attr if isinstance(node, ast.Attribute) else node.id if isinstance(node, ast.Name) else None
 
 
+@lru_cache(maxsize=None)
 def read(path):
-    """What a file of the app names and binds: (forbidden names with their lines, Tk roots made, events bound)."""
+    """What a file of the app names and binds: (forbidden names with their lines, Tk roots made, events bound).
+    Each file is read once for all the tests here."""
     tree = ast.parse(path.read_text(encoding="utf-8"))
     named, roots, bound = [], 0, []
     for node in ast.walk(tree):
@@ -317,7 +320,7 @@ class DeskPanelsTest(DeskCase):
 
     def test_nothing_a_panel_shows_is_pushed_out_of_it(self):
         from lab.desk.window import PANELS
-        from test_lab_tools_support import DEFAULT_SIZE, SMALLEST_SIZE, inside
+        from support import DEFAULT_SIZE, SMALLEST_SIZE, inside
 
         (self.home / "directory.json").write_text(json.dumps(
             {"read": "2026-11-21T10:00:00+00:00", "firmware": "4.1.1",
@@ -372,7 +375,7 @@ class FoldedIntoTheDeskTest(DeskCase):
 
     def assert_all_on_show(self):
         """Nothing in the open panel is pushed out of it, at the desk's smallest size either."""
-        from test_lab_tools_support import DEFAULT_SIZE, SMALLEST_SIZE, inside
+        from support import DEFAULT_SIZE, SMALLEST_SIZE, inside
 
         for size in (DEFAULT_SIZE, SMALLEST_SIZE):
             self.resize(size)

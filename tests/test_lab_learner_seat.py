@@ -4,6 +4,8 @@
 file inside a temporary folder.
 """
 
+import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
+import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
 from concurrent.futures import Future
 import os
 from pathlib import Path
@@ -249,6 +251,7 @@ class RealStudioTest(unittest.TestCase):
 
     def setUp(self):
         from lab.desk.studio import Studio
+        from lab.sound.assistant import Assistant
         from lab.qc.host import Host
 
         directory = TemporaryDirectory()
@@ -258,7 +261,7 @@ class RealStudioTest(unittest.TestCase):
         home = Path(directory.name)
         host = Host(home / "unit", simulated=True, local=True)
         host.ready.result(10)
-        self.studio = Studio(host, home)
+        self.studio = Studio(host, home, assistant=Assistant(home, automatic=False, run=lambda *a, **k: {}))
         self.addCleanup(self.studio.close)
         self.seat = LearnerSeat(SimpleNamespace(root=None, studio=self.studio))
         self.addCleanup(self.seat.worker.shutdown, wait=True)

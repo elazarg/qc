@@ -7,7 +7,6 @@ The player's own folders are made up (`DeskCase.player`); nothing of the real Do
 import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
 import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
 import hidden_tk  # noqa: E402,F401  (keeps every window off the screen)
-import gc
 import json
 import os
 from pathlib import Path
@@ -16,11 +15,12 @@ import tkinter as tk
 import unittest
 import zipfile
 
+import support  # noqa: E402
 from lab.hearing.audio import write_wave
 from lab.sound.sounds import Sound
 from lab.tools import common
 
-from test_lab_tools_support import PLEXI, V30, DeskCase, chain, phrase
+from support import PLEXI, V30, DeskCase, chain, phrase
 
 
 def wave(path, level=.2, seconds=1.5):
@@ -78,7 +78,7 @@ class WidgetsTest(unittest.TestCase):
         self.addCleanup(folder.cleanup)
         self.folder = Path(folder.name)
         self.root = tk.Tk()
-        self.addCleanup(gc.collect)
+        self.addCleanup(support.free_now)
         self.addCleanup(self.root.destroy)
 
     def test_chips_show_every_choice_light_the_chosen_one_and_wrap_within_their_width(self):

@@ -2,50 +2,24 @@
 
 import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
 import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
-from pathlib import Path
-from tempfile import TemporaryDirectory
-import sys
-import time
+from concurrent.futures import Future
+import json
 import unittest
 
-import numpy as np
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from lab.sound.assistant import Assistant
-from lab.qc.host import Host
-from lab.qc.sim import MY_PRESETS
-from lab.sound import catalog
 from lab.desk.studio import Studio
-from test_lab_design import CHARVEL, FUZZ, GREENBACK, HIWATT, PLEXI, V30, Scripted, answer, block, reply
+from lab.player import taste
+from lab.qc.host import Host
+from lab.sound.assistant import Assistant
+from lab.sound import catalog
+from lab.sound.chain import Block, Chain, Row
+from lab.sound.sounds import Sound
+
+from support import StudioCase, one_row, settle
+from test_lab_design import FUZZ, GREENBACK, HIWATT, PLEXI, V30, answer, block, reply
 
 
-def settle(studio, seconds=10):
-    deadline = time.monotonic() + seconds
-    while time.monotonic() < deadline:
-        studio.poll()
-        if not studio.jobs and not studio.host.busy:
-            studio.poll()
-            if not studio.jobs:
-                return
-        time.sleep(.02)
-    raise AssertionError("work did not finish")
-
-
-class StudioTest(unittest.TestCase):
-    def setUp(self):
-        folder = TemporaryDirectory()
-        self.addCleanup(folder.cleanup)
-        self.folder = Path(folder.name)
-        self.host = Host(self.folder / "unit", simulated=True, local=True)
-        self.host.ready.result(10)
-        self.script = Scripted()
-        self.studio = Studio(self.host, self.folder, assistant=Assistant(self.folder, automatic=False, run=self.script),
-                             phrase=("take", (np.sin(np.arange(24000) / 48000 * 2 * np.pi * 196) * .2)[:, None]))
-        self.studio.idle_seconds = 0.        # silent listening starts at once, not after the unit was left alone
-        self.addCleanup(self.studio.close)
-        self.studio.open()
-        settle(self.studio)
+class StudioTest(StudioCase):
+    idle_seconds = 0.        # silent listening starts at once, not after the unit was left alone
 
     def test_a_request_for_a_new_sound_brings_a_round_and_the_first_goes_on_b(self):
         self.script.answers.append(reply(
@@ -84,10 +58,8 @@ class StudioTest(unittest.TestCase):
         settle(self.studio)
 
     def test_a_saved_preset_is_brought_in_revised_and_saved_back(self):
-        unit = None
-        # Put a preset of the player's on the simulated unit, as if saved there.
         from lab.qc import sim
-        device = self.host  # local host: reach the engine's simulated unit through a command
+
         self.host.call("read", {"folder_key": sim.FACTORY, "position": 0, "is_factory": True}).result(10)
         self.studio.work_on({"folder_key": sim.FACTORY, "position": 0, "is_factory": True}, "Brit 2203")
         settle(self.studio)
@@ -198,25 +170,22 @@ class StudioTest(unittest.TestCase):
         self.assertIn("A was", self.studio.state.status)
 
     def test_a_preset_name_typed_as_a_request_brings_that_preset_in(self):
-        import json
-        (self.folder / "directory.json").write_text(json.dumps([
-            {"slot": {"folder_key": "/opt/neuraldsp/Factory Library", "position": 0, "is_factory": False},
-             "name": "Brit 2203", "setlist": "My Presets"}]), encoding="utf-8")
-        import lab.desk.studio as studio_module
-        original = studio_module.Studio._preset_named
-
-        def named(studio, text):
-            found = json.loads((studio.folder / "directory.json").read_text(encoding="utf-8"))
-            return next(((item["slot"], item["name"]) for item in found
-                         if item["name"].casefold() == text.strip().casefold()), None)
-
-        studio_module.Studio._preset_named = named
-        self.addCleanup(setattr, studio_module.Studio, "_preset_named", original)
-        self.studio.ask("brit 2203")
+        # A preset of the player's saved on the unit, and the unit's directory read as the Sounds panel reads it.
+        slot, _ = self.host.call("save", one_row(PLEXI, GREENBACK), "Stone Pulse").result(10)
+        self.host.call("lab.qc.library.directory", folder=str(self.folder)).result(10)
+        self.studio.ask("stone pulse ")
         settle(self.studio)
-        self.assertEqual(self.studio.sound("a").origin["kind"], "preset")
+        a, b = self.studio.sound("a"), self.studio.sound("b")
+        self.assertEqual((a.name, a.origin["kind"], a.origin["slot"]), ("Stone Pulse", "preset", slot))
+        self.assertEqual(b.parent, a.id)
         self.assertEqual(self.script.asked, [])
-        self.assertIn('ask "make Brit 2203"', self.studio.state.status)
+        self.assertIn('ask "make Stone Pulse"', self.studio.state.status)
+        # Part of a name, or the name of a factory preset, is a request like any other.
+        self.script.answers += [self.three("One", "Two", "Three"), self.three("Four", "Five", "Six")]
+        for request in ("make a stone pulse of my own", "make Brit 2203"):
+            self.studio.ask(request)
+            settle(self.studio, 20)
+        self.assertEqual(len(self.script.asked), 2)
 
     def test_a_part_can_be_one_scene_of_a_sound(self):
         self.studio.work_on({"folder_key": "/opt/neuraldsp/Factory Library", "position": 0, "is_factory": True},
@@ -337,9 +306,11 @@ class StudioTest(unittest.TestCase):
         settle(self.studio)
         self.studio.step(2)
         settle(self.studio)
-        lines = self.studio.difference()
-        self.assertTrue(lines)
-        self.assertNotIn("need to have been listened to", lines[0])
+        lines = self.studio.difference()                 # One, with its gain at 3, against Three, with it at 9
+        self.assertNotIn("need to have been listened to", " ".join(lines))
+        self.assertEqual([line for line in lines if line.startswith("Distortion: A edge of breakup")
+                          and "B saturated" in line], lines[1:2])
+        self.assertIn("B is more compressed", " ".join(lines))
 
 
     def test_an_ir_goes_into_bs_cab_and_a_capture_in_place_of_its_amp(self):
@@ -368,7 +339,6 @@ class StudioTest(unittest.TestCase):
 
 
     def test_a_keeper_given_while_comparing_is_a_choice_over_the_other_side(self):
-        import json
         self.script.answers.append(self.three("One", "Two", "Three"))
         self.studio.ask("make a classic rock crunch")
         settle(self.studio, 20)
@@ -381,10 +351,9 @@ class StudioTest(unittest.TestCase):
         lines = (self.folder / "choices.jsonl").read_text(encoding="utf-8").splitlines()
         choice = json.loads(lines[-1])
         self.assertEqual((choice["kept"], choice["over"], choice["how"]), (b.id, a.id, "a/b"))
-        self.assertTrue(self.studio.taste_lines())
+        self.assertIn("1 usable decision", self.studio.taste_lines()[0])
 
     def test_what_the_player_listens_to_reaches_an_open_request(self):
-        import json
         (self.folder / "personal").mkdir(exist_ok=True)
         (self.folder / "personal" / "listening.json").write_text(json.dumps({
             "summary": {"artists": [["Band A", 10.0]]},
@@ -426,39 +395,21 @@ class StudioTest(unittest.TestCase):
         self.assertEqual(again.round()["candidates"][2]["sound"], again.state.b)
 
     def test_sounds_that_no_longer_exist_are_not_put_back(self):
-        import json
         (self.folder / "session.json").write_text(json.dumps({"a": "gone", "b": "gone too", "side": "a"}),
                                                   encoding="utf-8")
         self.studio.restore()
         self.assertEqual((self.studio.state.a, self.studio.state.b, self.studio.state.side), (None, None, "a"))
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-class SongPartTest(unittest.TestCase):
+class SongPartTest(StudioCase):
     """A sound kept from a round the assistant understood as a song's part becomes that part, with no naming."""
 
     def test_a_kept_sound_from_a_song_round_is_filed_under_the_song_and_part(self):
-        import json
-        from pathlib import Path
-        from tempfile import TemporaryDirectory
-
-        from lab.desk.studio import Studio
-        from lab.qc.host import Host
-        from lab.sound.chain import Block, Chain, Row
-        from lab.sound.sounds import Sound
-
-        folder = TemporaryDirectory()
-        self.addCleanup(folder.cleanup)
-        home = Path(folder.name)
-        host = Host(home / "unit", simulated=True, local=True)
-        studio = Studio(host, home)
-        self.addCleanup(studio.close)
-        sound = studio.store.save(Sound("Gilmour Lead", Chain((Row((Block(GREENBACK),), inlet=1, outlet=19),)), {"kind": "designed"}))
-        (home / "rounds").mkdir(exist_ok=True)
-        (home / "rounds" / "r1.json").write_text(json.dumps({
+        studio = self.studio
+        sound = studio.store.save(Sound("Gilmour Lead", Chain((Row((Block(GREENBACK),), inlet=1, outlet=19),)),
+                                        {"kind": "designed"}))
+        (self.folder / "rounds").mkdir(exist_ok=True)
+        (self.folder / "rounds" / "r1.json").write_text(json.dumps({
             "id": "r1", "request": "comfortably numb second solo", "candidates": [{"sound": sound.id, "differs": ""}],
             "aim": {"song": {"artist": "Pink Floyd", "title": "Comfortably Numb", "part": "solo"}}}), encoding="utf-8")
         studio.set(b=sound.id, side="b")
@@ -466,3 +417,125 @@ class SongPartTest(unittest.TestCase):
         song = studio.store.song("Pink Floyd - Comfortably Numb")
         self.assertEqual(song["parts"], [{"name": "Solo", "sound": sound.id}])
         self.assertEqual(studio.state.song, "Pink Floyd - Comfortably Numb")
+
+
+# ---- Faults the reviews of 2026-11-20 found (docs/CODEBASE_REVIEW.md), each reproduced as it was found ----
+
+def switched():
+    """A sound whose second scene has more gain than the others."""
+    gain = catalog.model(PLEXI).index("GAIN")
+    return Chain((Row((Block(PLEXI).set(gain, (.3, .9) + (.3,) * 6), Block(V30)), inlet=1, outlet=19),))
+
+
+class JobsTest(StudioCase):
+    def test_a_job_finishing_between_two_looks_still_has_its_result_handled(self):
+        """(review 2026-11-20)"""
+        handled = []
+
+        class Flicker(Future):
+            looks = 0
+
+            def done(self):
+                Flicker.looks += 1
+                if Flicker.looks == 1:
+                    return False
+                if not super().done():
+                    self.set_result("late")
+                return True
+
+        self.studio.later(Flicker(), handled.append)
+        for _ in range(3):
+            self.studio.poll()
+        self.assertEqual(handled, ["late"])
+
+
+class UndoTest(StudioCase):
+    """(review 2026-11-20)"""
+
+    def test_undo_after_stopping_does_not_start_playing_again_and_puts_the_knob_back(self):
+        self.put_two()
+        self.studio.play("guitar")
+        self.settle()
+        self.studio.turn({"drive": .4})
+        self.studio.stop()
+        self.settle()
+        self.studio.undo()
+        self.settle()
+        self.assertIsNone(self.studio.state.mode)
+        self.assertEqual(self.studio.sound("b").knobs, {})
+
+    def test_undo_keeps_the_side_that_is_heard(self):
+        self.put_two()
+        self.studio.turn({"drive": .4}, "b")
+        self.studio.play("guitar", "b")
+        self.settle()
+        self.studio.select("a")
+        self.settle()
+        self.studio.undo()
+        self.settle()
+        self.assertEqual(self.studio.state.side, "a")
+        self.assertEqual(self.studio.state.mode, "guitar")
+
+    def test_undoing_the_only_sound_stops_the_sound(self):
+        self.studio.put("b", Sound("Hiwatt", one_row(HIWATT, GREENBACK), {"kind": "designed"}))
+        self.settle()
+        self.studio.play("guitar", "b")
+        self.settle()
+        self.studio.undo()
+        self.settle()
+        self.assertIsNone(self.studio.state.mode)
+        self.assertIsNone(self.studio.state.b)
+
+    def test_undo_keeps_the_scene_the_unit_is_on(self):
+        self.studio.put("b", Sound("Switched", switched(), {"kind": "designed"}))
+        self.settle()
+        self.studio.turn({"drive": .4}, "b")
+        self.studio.scene(1)
+        self.settle()
+        self.studio.undo()
+        self.settle()
+        self.assertEqual(self.studio.state.scene, 1)
+        self.assertEqual(self.host.call("scene", 1).result(5), 1)
+
+
+class SavedNameTest(StudioCase):
+    def test_the_name_given_is_saved_with_the_sound_it_was_given_for(self):
+        """(review 2026-11-20)"""
+        self.put_two()
+        b = self.studio.sound("b")
+        self.studio.select("a")
+        self.studio.save("Kept B", sound_id=b.id, knob_values={})
+        self.settle(30)
+        self.assertEqual(self.studio.store.sound(b.id).saved["name"], "Kept B")
+        self.assertIsNone(self.studio.sound("a").saved)
+
+
+class BlindTest(StudioCase):
+    """(review 2026-11-20)"""
+
+    def test_blind_play_keeps_the_names_hidden_and_a_choice_shows_them(self):
+        self.put_two()
+        self.studio.blind()
+        self.settle()
+        self.studio.play("guitar", "a")
+        self.settle()
+        names = {"Plexi", "Hiwatt"}
+        self.assertEqual([name for name in names if name in self.studio.state.status], [])
+        self.studio.mark("keeper", "a")
+        self.assertFalse(self.studio.state.blind)
+        self.assertIn("A was", self.studio.state.status)
+
+    def test_keep_on_a_sound_already_kept_is_still_a_blind_choice(self):
+        self.put_two()
+        self.studio.mark("keeper", "a")
+        self.studio.blind()
+        self.settle()
+        kept = self.studio.state.a
+        self.studio.mark("keeper", "a")
+        self.assertFalse(self.studio.state.blind)
+        self.assertIn("keeper", self.studio.store.sound(kept).marks)
+        self.assertEqual(taste.choices(self.folder)[-1]["how"], "blind")
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -14,7 +14,7 @@ import zipfile
 from lab.sound.sounds import Sound
 from lab.tools import listening
 
-from test_lab_tools_support import PLEXI, V30, DeskCase, chain
+from support import PLEXI, V30, DeskCase, chain
 
 ROWS = [{"ts": f"2026-0{m}-0{d}T20:00:00Z", "ms_played": 200_000, "master_metadata_track_name": "Song One",
          "master_metadata_album_artist_name": "Band A", "master_metadata_album_album_name": "Album",

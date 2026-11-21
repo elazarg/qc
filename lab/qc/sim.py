@@ -272,6 +272,10 @@ class SimAudio:
         self.unit = unit
 
     def reamp(self, dry, *, tail=2., cancel=None):
+        if cancel is not None and cancel.is_set():      # as the real driver: the unit is wanted elsewhere
+            from lab.hearing.audio import Cancelled
+
+            raise Cancelled("The replay was stopped.")
         rate = 48000
         signal = np.concatenate([dry[:, 0].astype(np.float64), np.zeros(round(tail * rate))])
         out = np.zeros_like(signal)

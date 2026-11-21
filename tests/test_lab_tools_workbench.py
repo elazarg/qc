@@ -16,13 +16,13 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from lab.sound import knobs
-from lab.sound.chain import Chain, Row
+from lab.sound.chain import Chain
 from lab.hearing.measure import measure
 from lab.sound.sounds import Sound, Store
 from lab.tools import controls, workbench
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_lab_tools_support import HIWATT, PLEXI, V30, chain, host, phrase  # noqa: E402
+from support import HIWATT, PLEXI, V30, chain, host, phrase  # noqa: E402
 
 
 def scenes_chain():

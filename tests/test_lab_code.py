@@ -125,5 +125,9 @@ class CodeTest(unittest.TestCase):
         self.assertEqual(never_used(files), [("lab/made_up_one.py", 1, "os"), ("lab/made_up_one.py", 3, "Path")])
 
 
+def tearDownModule():
+    parsed.cache_clear()            # the parsed app: not kept for the rest of the run
+
+
 if __name__ == "__main__":
     unittest.main()

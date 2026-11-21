@@ -18,6 +18,7 @@ from lab.qc.slots import Slots
 from lab.qc.unit import Moved
 from lab.sound.chain import Chain, Row
 
+import support
 from support import PLEXI, V30, fast, one_row
 
 LATENCY = 96
@@ -213,6 +214,31 @@ class MovedAwayTest(unittest.TestCase):
                 self.assertEqual(device.position["position"], 9)
                 self.assertFalse(device.dirty)               # and nothing was written to it
                 self.assertEqual(device.working.name, "Theirs")
+
+
+class RememberedTest(unittest.TestCase):
+    """The tests keep what listening worked out, by what went into it (`support.remember_what_was_heard`)."""
+
+    def test_what_is_remembered_is_what_working_it_out_again_gives(self):
+        with TemporaryDirectory() as folder:
+            engine = support.engine_on(SimUnit(), folder)
+            engine.open()
+            dry, crunch, clean = phrase(1.), one_row(PLEXI, V30), one_row(V30)
+            with support.listening_worked_out_each_time():
+                worked_out = engine.hear(crunch, dry).to_record()
+            first = engine.hear(crunch, dry).to_record()
+            again = engine.hear(crunch, dry).to_record()
+            self.assertEqual(first, worked_out)
+            self.assertEqual(again, worked_out)
+            # Another sound, or the same sound played another phrase, is not taken for it.
+            other = engine.hear(clean, dry).to_record()
+            softer = engine.hear(crunch, dry * .5).to_record()
+            self.assertGreater(worked_out["probe"]["distortion_db"], other["probe"]["distortion_db"] + 10)
+            self.assertLess(softer["level_db"], worked_out["level_db"])
+            with support.listening_worked_out_each_time():
+                self.assertEqual(engine.hear(clean, dry).to_record(), other)
+                self.assertEqual(engine.hear(crunch, dry * .5).to_record(), softer)
+            engine.close()
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 """What the simulated unit (`lab.qc.sim`) promises about the real one, checked as far as it can be without it.
 
 Every test of a write to the unit runs on the simulated unit, so the app is only as safe as the simulated unit
-is true. Four things are checked here:
+is true. Five things are checked here:
 
 - `ParityTest`: every call the simulated unit answers is a call of the device library with the same arguments,
   and every call the app makes on the device fits both. A change of the library (its commit is pinned in
@@ -12,6 +12,27 @@ is true. Four things are checked here:
   holds them unchanged. The files are looked for in the folder `TONE_LAB_CONTRACT_PRESETS` names (any `*.pb`
   under it, each a `BinaryPreset` as the unit returns it); without it the test is skipped. It never looks in a
   folder of its own choosing: preset reads are the player's.
+- `TraceTest`: a trace of what the real unit was asked and what it answered, replayed on the simulated unit.
+  The app writes one when TONE_LAB_TRACE names a file (`lab.qc.trace.recording`, put around the device in
+  `lab/qc/host.py`): every call is written to the file as it is made. The file is JSON, a line each:
+
+      {"trace": 1, "of": "Quad Cortex device calls", "firmware": "4.1.1", "recorded": "2026-11-22 10:15"}
+      {"call": "recall", "args": [], "options": {"folder_key": "...", "position": 255, "is_factory": false},
+       "value": null, "seconds": 0.0004}
+      {"call": "get_current_preset", "args": [], "options": {}, "preset": "<the BinaryPreset's bytes, base64>",
+       "seconds": 0.31}
+      {"call": "read_state", "args": ["PresetDirty"], "options": {}, "message": {"is_dirty": false}, ...}
+      {"call": "get_setlist_position", ..., "value": {"folder_key": "...", "position": 255, "is_factory": false}}
+      {"call": "read_state", "args": ["Scene"], "options": {}, "raised": "QCError: no response ...", ...}
+
+  `replayed(lines)` makes every write of the trace on a simulated unit and compares every read with what it
+  answers: the preset (within the tolerance for a rounded value), the position, the scene, the edit state and
+  the names in the directory. What the simulated unit cannot know (the state the unit was in to begin with,
+  and what the player's own presets hold) is taken over from the trace the first time it is read. A read that
+  differs and is followed, with no write in between, by one that agrees is a change the unit showed late: it
+  is counted apart. The trace is looked for in the file `TONE_LAB_CONTRACT_TRACE` names; without it the test
+  is skipped. A trace holds the player's presets: it belongs in the data folder or in `personal/`, not in
+  the repository.
 - `UnsteadyTest`: the simulated unit answers at once, exactly, every time. A real unit rounds what it is
   given, may show a change a few reads late, and may leave a read unanswered. `Unsteady` is a simulated unit
   with those manners, and the tests say what the guarded unit (`lab.qc.unit`) does then. Where it does not do
@@ -44,6 +65,7 @@ from test_lab_unit import lead_and_rhythm  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[1]
 CONTRACT_PRESETS = "TONE_LAB_CONTRACT_PRESETS"
+CONTRACT_TRACE = "TONE_LAB_CONTRACT_TRACE"
 
 # What a test does to the simulated unit in the player's place: not calls of the library.
 PLAYERS_HANDS = {"save_slot", "player_selects", "add_ir", "add_capture"}
@@ -256,6 +278,279 @@ class RealPresetsTest(unittest.TestCase):
         found, read = checked(os.environ[CONTRACT_PRESETS])
         self.assertGreater(read, 0, "no *.pb file under the folder")
         self.assertEqual(found, {}, f"{len(found)} of {read} presets")
+
+
+# ---- a trace of the real unit, replayed on the simulated one ----
+
+from lab.qc.trace import recording  # noqa: E402  (the app's own recorder: TONE_LAB_TRACE)
+
+
+READS = ("get_current_preset", "get_setlist_position", "read_state", "read_message", "list_directory",
+         "list_model_presets", "select_model_slot")
+NOT_REPLAYED = ("open", "close")
+
+
+def recorded_preset(entry):
+    import base64
+
+    message = wire.BinaryPreset()
+    message.ParseFromString(base64.b64decode(entry["preset"]))
+    return message
+
+
+def furthest(shown, held):
+    """How far apart the values of two readings of the same chain are at most (0 when they are the same)."""
+    widest = 0.
+    for one, other in zip(shown.rows, held.rows):
+        for a, b in zip(one.cells, other.cells):
+            if a is None or b is None or a.model != b.model:
+                continue
+            for index, value in a.params:
+                theirs = b.values.get(index)
+                pairs = zip(value, theirs) if isinstance(value, tuple) and isinstance(theirs, tuple) else [(value, theirs)]
+                for x, y in pairs:
+                    if isinstance(x, float) and isinstance(y, float):
+                        widest = max(widest, abs(x - y))
+    return widest
+
+
+def replayed(lines):
+    """Replay a trace on a simulated unit: every write is made on it, and every read is compared with what it
+    answers. Returns what was found:
+
+    - `compared`: reads compared; `adopted`: reads taken over because the simulated unit could not know the
+      answer (the unit's own presets, and the state it was in when the trace began);
+    - `problems`: where the simulated unit answered otherwise, as "line N: ...";
+    - `late`: (line, reads waited) where the real unit showed a change only some reads after the write;
+    - `rounding`: the furthest a value the unit showed was from the one the simulated unit holds.
+    """
+    import json
+
+    entries = [json.loads(line) for line in lines if line.strip()]
+    if not entries or entries[0].get("trace") != 1:
+        raise ValueError("Not a trace of device calls: its first line does not say so.")
+    sim = SimUnit()
+    found = {"compared": 0, "adopted": 0, "problems": [], "late": [], "rounding": 0., "firmware": entries[0].get("firmware")}
+    known = {"preset": False, "position": False, "dirty": False, "scene": False, "directory": False}
+    saved = set()               # slots whose contents the simulated unit knows: saved or read during the replay
+    behind = None               # (line, reads so far, what differed) of a read that does not show the last write yet
+
+    def here():
+        return (sim.position["folder_key"], int(sim.position["position"]))
+
+    def adopt(name):
+        known[name] = True
+        found["adopted"] += 1
+
+    for number, entry in enumerate(entries[1:], start=2):
+        call, args, options = entry["call"], entry.get("args", []), entry.get("options", {})
+        if call in NOT_REPLAYED or "raised" in entry:
+            continue
+        if call not in READS:
+            if behind is not None:
+                found["problems"].append(f"line {behind[0]}: {behind[2]}")
+                behind = None
+            getattr(sim, call)(*args, **options)
+            if call == "recall":
+                known["preset"] = here() in saved
+                known["position"] = True
+            elif call == "write_preset_file":
+                saved.add(here())
+            continue
+        if call == "get_current_preset" and "preset" in entry:
+            theirs = recorded_preset(entry)
+            if not known["preset"]:
+                sim.working = theirs
+                if here() in sim.slots:         # a preset saved there: now the simulated unit knows what it holds
+                    sim.slots[here()] = deepcopy(theirs)
+                    saved.add(here())
+                adopt("preset")
+                continue
+            shown, held = from_preset(theirs), from_preset(sim.get_current_preset())
+            differing = differences(shown, held) + differences(held, shown)
+            if theirs.name != sim.working.name:
+                differing.append(f"it is called {theirs.name!r}, the simulated unit's {sim.working.name!r}")
+            if differing:
+                behind = (behind[0] if behind else number, (behind[1] if behind else 0) + 1,
+                          "the preset read differs: " + "; ".join(differing[:3]))
+                continue
+            if behind is not None:
+                found["late"].append((behind[0], behind[1]))
+                behind = None
+            found["compared"] += 1
+            found["rounding"] = max(found["rounding"], furthest(shown, held))
+        elif call == "get_setlist_position" and isinstance(entry.get("value"), dict):
+            theirs = {key: entry["value"].get(key) for key in ("folder_key", "position", "is_factory")}
+            if not known["position"]:
+                sim.position = theirs
+                adopt("position")
+            else:
+                found["compared"] += 1
+                ours = sim.get_setlist_position()
+                if (theirs["folder_key"], theirs["position"]) != (ours["folder_key"], ours["position"]):
+                    found["problems"].append(f"line {number}: the unit is on {theirs}, the simulated unit on {ours}")
+        elif call == "read_state" and args and args[0] in ("Scene", "PresetDirty") and "message" in entry:
+            name, field = ("scene", "selected_scene") if args[0] == "Scene" else ("dirty", "is_dirty")
+            theirs = entry["message"].get(field)
+            if not known[name]:
+                setattr(sim, name, int(theirs) if name == "scene" else bool(theirs))
+                adopt(name)
+            else:
+                found["compared"] += 1
+                ours = sim.scene if name == "scene" else sim.dirty
+                if (int(theirs) if name == "scene" else bool(theirs)) != ours:
+                    found["problems"].append(f"line {number}: the unit says {field} {theirs}, the simulated unit {ours}")
+        elif call == "list_directory" and isinstance(entry.get("value"), dict):
+            listed = {(folder["key"], row["index"]): row.get("name") or "" for folder in entry["value"].get("presets", [])
+                      for row in folder.get("files", [])}
+            if not known["directory"]:
+                sim.folders = {folder["key"]: folder.get("name", "") for folder in entry["value"].get("presets", [])}
+                for slot, name in listed.items():
+                    if name and slot not in sim.slots:
+                        sim.slots[slot] = sim._preset(name, [])
+                for slot in [slot for slot in sim.slots if not listed.get(slot)]:
+                    del sim.slots[slot]
+                adopt("directory")
+            else:
+                found["compared"] += 1
+                ours = {(folder["key"], row["index"]): row.get("name") or "" for folder in sim.list_directory()["presets"]
+                        for row in folder["files"]}
+                wrong = sorted(slot for slot in set(listed) | set(ours) if listed.get(slot, "") != ours.get(slot, ""))
+                if wrong:
+                    key, index = wrong[0]
+                    found["problems"].append(f"line {number}: slot {index} of {key} holds {listed.get(wrong[0], '')!r} on "
+                                             f"the unit and {ours.get(wrong[0], '')!r} on the simulated unit"
+                                             + (f" (and {len(wrong) - 1} more)" if len(wrong) > 1 else ""))
+    if behind is not None:
+        found["problems"].append(f"line {behind[0]}: {behind[2]}")
+    return found
+
+
+class TraceTest(unittest.TestCase):
+    """A trace is made here from the simulated unit itself, by what the app does to a unit: borrow the player's
+    preset, build a chain with two paths and two scenes, cache it, save a sound with a knob, give the preset
+    back."""
+
+    def trace(self, device, folder):
+        from lab.qc.engine import Engine
+        from lab.qc.sim import SimAudio
+
+        path = Path(folder) / "trace.jsonl"
+        unit = fast(recording(device, path))
+        engine = Engine(unit, Slots(unit, Path(folder) / "records"), SimAudio(device))
+        engine.open()
+        engine.show(one_row(PLEXI, V30), lead_and_rhythm())
+        engine.play("b", "guitar")
+        engine.turn("b", {"drive": .4})
+        engine.save(one_row(PLEXI, V30), "Kept", {"drive": .3})
+        engine.close()
+        return path.read_text(encoding="utf-8").splitlines()
+
+    def test_a_trace_of_the_simulated_unit_replays_without_a_difference(self):
+        with TemporaryDirectory() as folder:
+            lines = self.trace(SimUnit(), folder)
+        found = replayed(lines)
+        self.assertEqual((found["problems"], found["late"], found["rounding"]), ([], [], 0.))
+        self.assertGreater(found["compared"], 40)
+        self.assertLessEqual(found["adopted"], 8)               # the state it began in, and the empty build slot
+        self.assertGreater(len(lines), 150)
+        self.assertEqual(found["firmware"], "4.1.1")
+
+    def test_the_app_writes_a_trace_of_a_session_when_asked_and_it_replays(self):
+        # TONE_LAB_TRACE names the file: the engine, where the unit is held, writes every call there.
+        from unittest import mock
+
+        from lab.qc.host import Host
+
+        with TemporaryDirectory() as folder:
+            path = Path(folder) / "session.jsonl"
+            with mock.patch.dict(os.environ, {"TONE_LAB_TRACE": str(path)}):
+                host = Host(Path(folder) / "home", simulated=True, local=True)
+                host.ready.result(10)
+                host.call("open").result(10)
+                host.call("show", one_row(PLEXI, V30), None).result(20)
+                host.call("play", "a", "guitar").result(10)
+                host.close()
+            found = replayed(path.read_text(encoding="utf-8").splitlines())
+        self.assertEqual((found["problems"], found["late"]), ([], []))
+        self.assertGreater(found["compared"], 10)
+
+    def test_a_unit_that_rounds_replays_within_what_counts_as_the_same_value(self):
+        with TemporaryDirectory() as folder:
+            found = replayed(self.trace(Unsteady(step=1 / 256), folder))
+        self.assertEqual((found["problems"], found["late"]), ([], []))
+        self.assertGreater(found["rounding"], 0.)
+        self.assertLessEqual(found["rounding"], 1 / 512 + 1e-6)
+        self.assertLess(found["rounding"], TOLERANCE)
+
+    def test_a_unit_that_shows_its_blocks_late_is_found_out(self):
+        with TemporaryDirectory() as folder:
+            found = replayed(self.trace(Unsteady(late=2, late_calls={"add", "delete"}), folder))
+        self.assertEqual(found["problems"], [])
+        self.assertGreater(len(found["late"]), 0)
+        self.assertEqual({reads for _, reads in found["late"]}, {2})
+
+    def test_a_read_the_simulated_unit_would_not_give_is_named_with_its_line(self):
+        import base64
+        import json
+
+        with TemporaryDirectory() as folder:
+            lines = self.trace(SimUnit(), folder)
+        entries = [json.loads(line) for line in lines]
+        last = max(number for number, entry in enumerate(entries) if "preset" in entry)
+        preset = recorded_preset(entries[last])
+        preset.chains[0].models[0].params[0].param_values[0].float_value += .1          # the unit holds another gain
+        entries[last]["preset"] = base64.b64encode(preset.SerializeToString()).decode("ascii")
+        moved = max(number for number, entry in enumerate(entries) if entry.get("call") == "get_setlist_position")
+        entries[moved]["value"]["position"] = 17                                        # and is somewhere else
+        found = replayed([json.dumps(entry) for entry in entries])
+        self.assertEqual(len(found["problems"]), 2)
+        self.assertEqual(sorted(problem.split(":")[0] for problem in found["problems"]),
+                         sorted([f"line {last + 1}", f"line {moved + 1}"]))
+        self.assertIn("parameter 0", " ".join(found["problems"]))
+        with self.assertRaisesRegex(ValueError, "Not a trace"):
+            replayed(lines[1:])
+
+    def test_the_units_own_messages_are_written_as_their_fields_and_a_failure_as_what_was_raised(self):
+        import json
+
+        class Device:
+            firmware = "4.1.1"
+
+            def read_state(self, name):
+                if name == "Scene":
+                    return protocol.message_class("Scene")(selected_scene=3)
+                if name == "PresetDirty":
+                    return protocol.message_class("PresetDirty")(is_dirty=True)
+                raise QCError(f"no response to {name} within 2500ms")
+
+        with TemporaryDirectory() as folder:
+            path = Path(folder) / "trace.jsonl"
+            device = recording(Device(), path)
+            self.assertEqual(device.firmware, "4.1.1")
+            self.assertEqual(device.read_state("Scene").selected_scene, 3)
+            device.read_state("PresetDirty")
+            with self.assertRaises(QCError):
+                device.read_state("Tuner")
+            head, scene, dirty, failed = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+        self.assertEqual((head["trace"], head["firmware"]), (1, "4.1.1"))
+        self.assertEqual((scene["call"], scene["args"], scene["message"]["selected_scene"]), ("read_state", ["Scene"], 3))
+        self.assertIs(dirty["message"]["is_dirty"], True)
+        self.assertEqual(failed["raised"], "QCError: no response to Tuner within 2500ms")
+        self.assertGreaterEqual(failed["seconds"], 0)
+
+    @unittest.skipUnless(os.environ.get(CONTRACT_TRACE), f"set {CONTRACT_TRACE} to a trace recorded from a real "
+                         "unit (see `recording`) to replay it on the simulated unit")
+    def test_a_trace_of_the_real_unit_replays_on_the_simulated_unit(self):
+        found = replayed(Path(os.environ[CONTRACT_TRACE]).read_text(encoding="utf-8").splitlines())
+        summary = (f"{found['compared']} reads compared, {found['adopted']} taken over, furthest value "
+                   f"{found['rounding']:.5f} apart, firmware {found['firmware']}")
+        self.assertGreater(found["compared"], 0, summary)
+        self.assertEqual(found["problems"], [], summary)
+        # The simulated unit shows every write at the next read. A real unit that does not is not a difference in
+        # what is held, but it is one in when: `Unsteady` and its tests are the place to make it part of the suite.
+        self.assertEqual(found["late"], [], summary)
+        self.assertLess(found["rounding"], TOLERANCE, summary)
 
 
 # ---- a unit that rounds, shows changes late, and leaves reads unanswered ----

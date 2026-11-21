@@ -1,7 +1,9 @@
 """The command line on the new core: the desk without a command, and each command on the simulated unit."""
 
+import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
+import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
+import hidden_tk  # noqa: E402,F401  (keeps every window off the screen)
 import contextlib
-import gc
 import io
 import json
 import os
@@ -16,6 +18,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))   # for the POD Go test's fixtures
 
+import support  # noqa: E402
 from lab import cli
 from lab.hearing.audio import read_wave, write_wave
 from lab.qc.engine import Engine
@@ -45,7 +48,7 @@ class Home(unittest.TestCase):
     def setUp(self):
         # Windows other test modules left for the collector are collected here, on Tk's thread: collected on
         # the engine's thread, Tcl aborts the process.
-        gc.collect()
+        support.free_now()
         folder = TemporaryDirectory()
         self.addCleanup(folder.cleanup)
         self.home = Path(folder.name)
@@ -280,7 +283,7 @@ class SimulatedUnitTest(Home):
 
         with mock.patch.object(setup, "checks", lambda home, again=False: []), \
                 mock.patch.object(cli, "call", unreachable):
-            code, out, _ = run("doctor", "--unit")
+            code, out, _ = run("doctor", "--unit", "--simulated")
         self.assertEqual(code, 1)
         self.assertEqual(json.loads(out)[0]["say"], "The Quad Cortex could not be reached: no device")
 
@@ -349,17 +352,17 @@ class RendersTest(Home):
         write_wave(dry, self.dry)
         out = self.home / "out"
         with mock.patch.object(cli, "call", self.fake_call):
-            found = result("sweep", str(dry), "--slot", "2F", "--row", "1", "--column", "2", "--parameter", "3",
+            found = result("sweep", str(dry), "--simulated", "--slot", "2F", "--row", "1", "--column", "2", "--parameter", "3",
                            "--values", "4", "4.5", "--out", str(out))
         self.assertEqual(self.called[1][3], [{"edit": (0, 1, 3, 4.), "scene": None},
                                              {"edit": (0, 1, 3, 4.5), "scene": None}])
         self.assertEqual(Path(found["folder"]), out)
         self.assertTrue((out / "value-4.5.wav").is_file())
-        code, _, err = run("sweep", str(dry), "--slot", "2F", "--row", "1", "--column", "1", "--parameter", "0",
+        code, _, err = run("sweep", str(dry), "--simulated", "--slot", "2F", "--row", "1", "--column", "1", "--parameter", "0",
                            "--values", "4")
         self.assertEqual(code, 1)
         self.assertIn("two to seven", err)
-        code, _, err = run("reamp", str(dry), "--slot", "2F", "--scenes", "AZ")
+        code, _, err = run("reamp", str(dry), "--simulated", "--slot", "2F", "--scenes", "AZ")
         self.assertIn("letters A to H", err)
 
     def test_sweep_takes_one_scene_letter(self):

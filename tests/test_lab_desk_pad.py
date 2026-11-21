@@ -11,6 +11,10 @@ import unittest
 from lab.desk import window as desk_module
 from lab.desk.window import Desk, pad_point, pad_values
 from lab.desk.theme import DARK
+from lab.sound.assistant import Assistant
+
+import support
+from test_lab_design import Scripted
 
 
 class PadGeometryTest(unittest.TestCase):
@@ -31,9 +35,7 @@ class PadPanelTest(unittest.TestCase):
         except tk.TclError as error:
             self.skipTest(f"No display: {error}")
         self.root.withdraw()
-        import gc
-
-        self.addCleanup(gc.collect)
+        self.addCleanup(support.free_now)
         self.addCleanup(lambda: setattr(self, "root", None))
         self.addCleanup(self.root.destroy)
 
@@ -81,9 +83,6 @@ class PadPanelTest(unittest.TestCase):
         self.assertEqual(len(self.slider_rows(tray)), 1)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class SessionDeskTest(unittest.TestCase):
     """The real desk on the simulated unit, its windows kept off the screen: what was open comes back."""
@@ -110,13 +109,11 @@ class SessionDeskTest(unittest.TestCase):
         (home / "session.json").write_text(json.dumps({"side": "a", "phrase": {"id": "take1", "start": 4800,
                                                                                  "end": 52800},
                                                        "desk": {"panel": "Chain"}}), encoding="utf-8")
-        import gc
-
-        self.addCleanup(gc.collect)             # the window is freed on this thread once the test has let go of it
+        self.addCleanup(support.free_now)             # the window is freed on this thread once the test has let go of it
         root = tk.Tk()
         host = Host(home / "unit", simulated=True, local=True)
         host.ready.result(10)
-        studio = Studio(host, home)
+        studio = Studio(host, home, assistant=Assistant(home, automatic=False, run=Scripted()))
         desk = Desk(root, studio)
         try:
             self.assertEqual(desk.panel, "Chain")
@@ -144,13 +141,11 @@ class QuietDeskTest(unittest.TestCase):
         self.root = tk.Tk()
         host = Host(home / "unit", simulated=True, local=True)
         host.ready.result(10)
-        self.studio = Studio(host, home)
+        self.studio = Studio(host, home, assistant=Assistant(home, automatic=False, run=Scripted()))
         self.desk = Desk(self.root, self.studio)
-        import gc
-
         # The window and its Tk variables are freed here, on this thread, not later on another one: the test lets
         # go of the desk first, so that the collection that follows finds it.
-        self.addCleanup(gc.collect)
+        self.addCleanup(support.free_now)
         self.addCleanup(lambda: [setattr(self, name, None) for name in ("desk", "root", "studio")])
         self.addCleanup(self.root.destroy)
         self.addCleanup(self.studio.close)
@@ -170,7 +165,24 @@ class QuietDeskTest(unittest.TestCase):
         self.assertIsNotNone(self.desk.learner)
 
     def test_saving_asks_for_the_name_in_place(self):
-        self.assertFalse(hasattr(__import__("lab.desk.window", fromlist=["x"]), "simpledialog"))
+        self.two_sounds()
+        self.root.update()
+        self.assertFalse(self.desk.save_row.winfo_ismapped())
+        self.desk.save()
+        self.root.update()
+        # The name is asked for in a row of the desk's own window, filled in with the sound's own. No dialog opens.
+        self.assertTrue(self.desk.save_row.winfo_ismapped())
+        self.assertIs(self.desk.save_name.winfo_toplevel(), self.root)
+        self.assertEqual([child for child in self.root.winfo_children() if isinstance(child, tk.Toplevel)], [])
+        self.assertEqual(self.desk.save_name.get(), "Hiwatt")
+        # Typed over and confirmed, the sound on show is saved to the unit under that name, and the row goes.
+        self.desk.save_name.delete(0, "end")
+        self.desk.save_name.insert(0, "Stage Hiwatt")
+        self.desk.saved()
+        support.settle(self.studio, 30, self.root)
+        self.assertFalse(self.desk.save_row.winfo_ismapped())
+        self.assertEqual(self.studio.sound("b").saved["name"], "Stage Hiwatt")
+        self.assertIsNone(self.studio.sound("a").saved)
 
     def two_sounds(self):
         from lab.sound.chain import Block, Chain, Row
@@ -205,3 +217,7 @@ class QuietDeskTest(unittest.TestCase):
         self.studio.phrase = ("new", np.zeros((48000, 1)))
         self.studio.set(status="Recorded.")
         self.assertIn("Bridge", self.desk.phrase_link["text"])
+
+
+if __name__ == "__main__":
+    unittest.main()

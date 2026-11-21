@@ -1,5 +1,7 @@
 """Live listening for the Guitar Learner: the rolling dry window, saving only on request, and the worker boundary."""
 
+import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
+import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
 from pathlib import Path
 from queue import Queue
 import sys

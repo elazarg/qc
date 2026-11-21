@@ -20,7 +20,7 @@ from lab.sound.sounds import Sound
 from lab.tools import search
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_lab_tools_support import DELAY, HIWATT, PLEXI, V30, chain, host, phrase  # noqa: E402
+from support import DELAY, HIWATT, PLEXI, V30, chain, host, phrase  # noqa: E402
 
 
 def item(name, sound_id, tags=(), heard=None, saved=False):

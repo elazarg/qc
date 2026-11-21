@@ -48,6 +48,19 @@ class Fault(RuntimeError):
         return self.kind in EXPECTED
 
 
+def _traced(device):
+    """The device as it is, or, when TONE_LAB_TRACE names a file, with every call on it written there
+    (`lab.qc.trace`). A trace holds the player's presets: keep it in the data folder or in `personal/`."""
+    import os
+
+    path = os.environ.get("TONE_LAB_TRACE")
+    if not path:
+        return device
+    from lab.qc.trace import recording
+
+    return recording(device, path)
+
+
 def _engine(simulated, folder, physical_input):
     from lab.qc.engine import Engine
     from lab.qc.slots import Slots
@@ -57,7 +70,7 @@ def _engine(simulated, folder, physical_input):
         from lab.qc.sim import SimAudio, SimUnit
 
         device = SimUnit()
-        unit = Unit(device, settle=.05, sleep=lambda seconds: None)
+        unit = Unit(_traced(device), settle=.05, sleep=lambda seconds: None)
         audio = SimAudio(device)
         context = None
     else:
@@ -65,12 +78,14 @@ def _engine(simulated, folder, physical_input):
         from lab.hearing.audio import Audio
 
         context = qc_device.connect(write=True)
-        unit = Unit(context.__enter__())
+        unit = Unit(_traced(context.__enter__()))
         audio = Audio()
     return Engine(unit, Slots(unit, folder), audio, physical_input=physical_input), context
 
 
 def _serve(commands, replies, stop, stopped_before, simulated, folder, physical_input):
+    from lab.hearing.audio import Cancelled
+
     try:
         engine, context = _engine(simulated, folder, physical_input)
     except Exception as error:  # noqa: BLE001
@@ -106,8 +121,9 @@ def _serve(commands, replies, stop, stopped_before, simulated, folder, physical_
                     result = getattr(engine, name)(*args, **options)
                 replies.put((ticket, True, result))
             except Exception as error:  # noqa: BLE001
-                replies.put((ticket, False, (type(error).__name__, str(error) or type(error).__name__,
-                                             traceback.format_exc())))
+                # A replay the audio driver ended because of a stop is a stop like one between two writes.
+                kind = "Stopped" if isinstance(error, Cancelled) else type(error).__name__
+                replies.put((ticket, False, (kind, str(error) or kind, traceback.format_exc())))
     finally:
         try:
             engine.close()

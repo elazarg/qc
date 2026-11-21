@@ -658,6 +658,14 @@ class PointedAtTest(unittest.TestCase):
         self.assertLessEqual({"Plini Clean", "Plini Lead"}, self.named("plini"))
         self.assertIn("US DLX Vibrato", self.named("blues with a deluxe reverb"))
 
+    def test_a_name_made_of_common_words_is_matched_whole(self):
+        self.assertIn("UK C30 TopBoost", self.named("something like The Edge"))
+        self.assertIn("UK C30 TopBoost", self.named("a U2 sound"))
+        import re
+
+        pattern = dict(design.NAMES)["the edge"]
+        self.assertIsNone(re.search(pattern, "on the edge of breakup"))     # a phrase, not the guitarist
+
     def test_a_remark_about_the_sound_points_at_nothing(self):
         for remark in ("a bit tighter", "too bright on the high strings", "make it sound like a clean guitar amp"):
             self.assertEqual(design.named_in(remark, "electric"), [], remark)

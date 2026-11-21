@@ -17,7 +17,7 @@ from lab.sound.sounds import Sound
 from lab.tools.menu import TOOLS, opener
 from lab.tools.usage import opens as usage_opens
 
-from test_lab_tools_support import DELAY, PLEXI, V30, DeskCase, chain
+from support import DELAY, PLEXI, V30, DeskCase, chain
 
 
 class ToolsTest(DeskCase):

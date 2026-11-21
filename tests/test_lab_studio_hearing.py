@@ -17,9 +17,13 @@ from lab.desk.listening import _checked_words
 from lab.desk.requests import reads_as_change
 from lab.hearing import profile as profile_module
 from lab.sound import words
+from lab.qc.sim import SimAudio
+from lab.sound import catalog
+from lab.sound.chain import Block, Chain, Row
 from lab.sound.sounds import Sound
 from lab.tools import phrases
 from test_lab_design import GREENBACK, HIWATT, PLEXI, V30
+from support import StudioCase
 from test_lab_studio_flow import FlowCase, one_row
 
 
@@ -104,6 +108,38 @@ class HeardAgainTest(FlowCase):
         self.assertEqual(self.studio.sound("a").heard["probe"]["version"], 2)
         self.settle()
         self.assertEqual(len([name for name, _ in sent if name == "hear"]), 2)       # and not again
+
+
+class StoppedReplayTest(FlowCase):
+    idle_seconds = 30.              # nothing is listened to until the test says so
+
+    def test_a_listening_stopped_while_the_phrase_replays_is_not_a_failed_listening(self):
+        # When Stop comes while a phrase is being replayed, the audio driver ends the replay with
+        # `lab.hearing.audio.Cancelled`. That is a stop like one between two writes (`lab/qc/host.py`): the
+        # sound is left to be listened to again later, with no failed measurement kept for it.
+        passes = []
+        reamp = SimAudio.reamp
+
+        def stopped_after_the_first_pass(audio, dry, **options):
+            returned = reamp(audio, dry, **options)
+            if options.get("cancel") is None:
+                return returned                         # measuring the round trip, which is not a listening
+            passes.append(len(dry))
+            if len(passes) == 1:
+                self.host.stop_flag.set()               # Stop, as the player's own playing sends it
+            return returned
+
+        self.studio.put("b", Sound("Plexi", one_row(PLEXI, V30), {"kind": "designed"}))
+        self.settle()
+        with mock.patch.object(SimAudio, "reamp", stopped_after_the_first_pass):
+            self.studio.idle_seconds = 0.
+            self.until(lambda: len(passes) >= 1 and not self.host.busy, 20, "the listening and its end")
+            self.studio.idle_seconds = 30.
+            self.settle()
+        self.assertEqual(len(passes), 1)                # the replay did end there
+        sound = self.studio.sound("b")
+        self.assertNotIn("Could not listen", self.studio.state.status)
+        self.assertNotIn("failed", sound.heard or {})
 
 
 class ChoiceTest(FlowCase):
@@ -201,6 +237,123 @@ class ListeningLevelTest(FlowCase):
         self.assertEqual(sent[-1][0], "lab.tools.levels.clear")
         self.settle()
         self.assertEqual(self.studio.state.status, "Back at the desk's own level.")
+
+
+# ---- Faults the reviews of 2026-11-20 found (docs/CODEBASE_REVIEW.md), each reproduced as it was found ----
+
+def switched():
+    """A sound whose second scene has more gain than the others."""
+    gain = catalog.model(PLEXI).index("GAIN")
+    return Chain((Row((Block(PLEXI).set(gain, (.3, .9) + (.3,) * 6), Block(V30)), inlet=1, outlet=19),))
+
+
+class EvidenceTest(StudioCase):
+    """What was measured holds only for what it was measured on. (review 2026-11-20)"""
+
+    def test_a_measurement_belongs_to_the_part_of_the_phrase_it_was_made_on(self):
+        self.put_two()
+        b = self.studio.sound("b")
+        b.heard = {"phrase": self.studio.phrase_key(), "digest": b.chain.digest(), "level_db": -20.,
+                   "loudness_lufs": -20.}
+        self.studio.store.save(b)
+        self.assertIsNotNone(self.studio.evidence(self.studio.store.sound(b.id)))
+        self.studio.phrase_whole = (self.studio.phrase[1], 0, 12000)
+        self.assertIsNone(self.studio.evidence(self.studio.store.sound(b.id)))
+
+    def test_a_measurement_of_the_first_scene_does_not_hold_for_another(self):
+        sound = Sound("Switched", switched(), {"kind": "designed"})
+        sound.heard = {"phrase": self.studio.phrase_key(), "digest": sound.chain.digest(), "scene": 0, "level_db": -20.}
+        self.assertIsNotNone(self.studio.evidence(sound))
+        self.studio.set(scene=1)
+        self.assertIsNone(self.studio.evidence(sound))
+
+    def test_difference_reads_the_sounds_as_they_are_set_now(self):
+        key = self.studio.phrase_key()
+
+        def heard(brightness, digest, shaped=None):
+            record = {"phrase": key, "digest": digest, "scene": 0, "level_db": -20., "compression": .3,
+                      "brightness_oct": brightness, "low_end_db": 0., "tail_db": -40., "distortion": "clean",
+                      "probe": {"distortion_db": -40.}}
+            if shaped is not None:
+                record["shaped"] = {**record, "phrase": key, "knobs": {"brightness": -.5},
+                                    "brightness_oct": shaped}
+            return record
+
+        a, b = one_row(PLEXI, V30), one_row(HIWATT, GREENBACK)
+        self.studio.put("a", Sound("A", a, {"kind": "designed"}, heard=heard(.0, a.digest())))
+        self.studio.put("b", Sound("B", b, {"kind": "designed"}, knobs={"brightness": -.5},
+                                   heard=heard(.1, b.digest(), shaped=-.4)))
+        self.settle()
+        lines = " ".join(self.studio.difference())
+        self.assertIn("0.4 octave darker", lines)
+
+
+class ShapeCheckTest(StudioCase):
+    """The check of a turned knob by listening. (review 2026-11-20)"""
+
+    def test_a_phrase_changed_during_the_check_changes_no_knob(self):
+        self.put_two()
+        self.studio.settle_seconds = 0.
+        call = self.host.call
+
+        def change_take_meanwhile(name, *args, **options):
+            if name == "hear_shaped":
+                self.studio.phrase_whole = (self.studio.phrase[1], 0, 12000)
+            return call(name, *args, **options)
+
+        self.host.call = change_take_meanwhile
+        self.studio.turn({"brightness": .3}, "b")
+        self.settle(30)
+        sound = self.studio.sound("b")
+        self.assertEqual(sound.knobs, {"brightness": .3})
+        self.assertNotIn("shaped", sound.heard or {})
+
+    def test_the_shape_check_measures_the_scene_heard(self):
+        self.studio.put("b", Sound("Switched", switched(), {"kind": "designed"}))
+        self.settle()
+        self.studio.scene(1)
+        self.settle()
+        self.studio.settle_seconds = 0.
+        asked, call = [], self.host.call
+
+        def noting(name, *args, **options):
+            if name in ("hear", "hear_shaped"):
+                asked.append((name, args[-1]))
+            return call(name, *args, **options)
+
+        self.host.call = noting
+        self.studio.turn({"brightness": .3}, "b")
+        self.settle(30)
+        self.assertEqual(asked, [("hear", 1), ("hear_shaped", 1)])
+        self.assertEqual(self.studio.sound("b").heard["scene"], 1)
+        self.assertEqual(self.studio.sound("b").heard["shaped"]["scene"], 1)
+
+    def test_a_check_is_current_only_for_its_own_sound(self):
+        self.studio.put("a", Sound("Same", one_row(PLEXI, V30), {"kind": "designed"}))
+        self.settle()
+        elsewhere = Sound("Same elsewhere", one_row(PLEXI, V30), {"kind": "designed"})
+        self.studio.store.save(elsewhere)
+        inputs_ = (self.studio.phrase_key(), self.studio.phrase[1], self.studio.state.scene,
+                   elsewhere.chain.digest(), elsewhere.id)
+        self.assertFalse(self.studio._current(inputs_))
+
+
+class RecordingTest(StudioCase):
+    def test_recording_keeps_the_dry_and_wet_takes_and_says_when_to_play(self):
+        """(review 2026-11-20)"""
+        self.put_two()
+        said = []
+        self.studio.listeners.append(lambda state: said.append(state.working))
+        self.studio.record("Neck", 1.)
+        self.settle()
+        self.assertIn("play now", " | ".join(said))
+        phrase_id = self.studio.phrase[0]
+        folder = self.folder / "phrases" / phrase_id
+        self.assertTrue((folder / "dry.wav").is_file(), "the dry take")
+        self.assertTrue((folder / "wet.wav").is_file(), "the wet take")
+        info = json.loads((folder / "phrase.json").read_text(encoding="utf-8"))
+        self.assertEqual(info["wet"]["name"], "Hiwatt")
+        self.assertEqual(len(self.studio.phrase[1]), 48000)
 
 
 if __name__ == "__main__":

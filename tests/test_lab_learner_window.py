@@ -14,6 +14,7 @@ from unittest.mock import patch
 
 import numpy as np
 
+import support  # noqa: E402
 from lab.hearing import audio
 from lab.learner import dataset as data, folders, gestures, inputs, worker
 from lab.learner.window import GuitarLearner, offered_for
@@ -21,7 +22,7 @@ from lab.learner.window import GuitarLearner, offered_for
 from test_lab_learner_gestures import note
 from test_lab_learner_seat import seat_for, settle
 from test_lab_learner_takes import four_inputs
-from test_lab_tools_support import hosting
+from support import hosting
 
 PACKAGE = Path(__file__).resolve().parents[1] / "lab" / "learner"
 
@@ -69,10 +70,8 @@ class WindowTest(unittest.TestCase):
         self.root.destroy()
         # Free the window's Tk variables here, on the main thread: if a later test's worker thread happens to run
         # the collector, Tk aborts the whole interpreter.
-        import gc
-
         self.learner = self.root = None
-        gc.collect()
+        support.free_now()
 
     def opened(self):
         self.learner = GuitarLearner(self.seat)
@@ -280,9 +279,7 @@ class WindowTest(unittest.TestCase):
 def tearDownModule():
     # Tk objects left as garbage here must be freed on the main thread: if a later test's worker thread runs
     # the collector, Tcl aborts the whole interpreter ("Tcl_AsyncDelete").
-    import gc
-
-    gc.collect()
+    support.free_now()
 
 
 if __name__ == "__main__":

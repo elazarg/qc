@@ -6,7 +6,6 @@ Each test here failed on the desk as the whole-codebase review found it (docs/WH
 import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
 import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
 import hidden_tk  # noqa: E402,F401  (keeps every window off the screen)
-import gc
 import json
 from pathlib import Path
 import socket
@@ -26,6 +25,7 @@ from lab.qc.host import Host
 from lab.sound.assistant import Assistant
 from lab.sound.chain import Block, Chain, Row
 from lab.sound.sounds import Sound
+import support
 from test_lab_design import GREENBACK, PLEXI, V30, Scripted, answer, block, reply
 
 
@@ -63,7 +63,7 @@ class DeskCase(unittest.TestCase):
         # The window and its Tk variables are freed here, on this thread, not later on another one: the workers are
         # waited for and the test lets go of the desk first, so that the collection that follows finds it.
         self.studio = self.desk = self.root = None
-        self.addCleanup(gc.collect)
+        self.addCleanup(support.free_now)
         self.addCleanup(self.let_go)
 
     def let_go(self):
@@ -86,15 +86,7 @@ class DeskCase(unittest.TestCase):
         return self.desk
 
     def settle(self, seconds=20):
-        deadline = time.monotonic() + seconds
-        while time.monotonic() < deadline:
-            self.studio.poll()
-            if not self.studio.jobs and not self.studio.host.busy:
-                self.studio.poll()
-                if not self.studio.jobs:
-                    return
-            time.sleep(.02)
-        raise AssertionError("work did not finish")
+        support.settle(self.studio, seconds)
 
     def a_round(self, *names):
         self.script.answers.append(three(*(names or ("One", "Two", "Three"))))
@@ -130,7 +122,7 @@ class ComingBackTest(DeskCase):
         self.desk.toggle("Chain")
         candidates = [item["sound"] for item in self.studio.round()["candidates"]]
         self.desk.close()
-        gc.collect()
+        support.free_now()
         return candidates
 
     def test_a_design_of_the_round_that_is_gone_leaves_a_and_b_and_drops_the_round(self):
@@ -212,7 +204,7 @@ class SecondLaunchTest(DeskCase):
         while knocking.is_alive() and time.monotonic() < deadline:
             if self.desk is not None and not self.desk.closing:
                 self.desk.come_forward()
-            time.sleep(.02)
+            time.sleep(.002)
         knocking.join(5)
         return found[0]
 
@@ -396,7 +388,7 @@ class DrawingTest(DeskCase):
         deadline = time.monotonic() + 10
         while time.monotonic() < deadline and (self.studio.host.busy or len(self.studio.jobs) > 1):
             self.studio.poll()
-            time.sleep(.02)
+            time.sleep(.002)
         self.assertEqual(self.desk.cancel_link.winfo_manager(), "pack")
         self.assertIn("Revising", self.desk.working["text"])
         self.studio.cancel()

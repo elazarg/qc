@@ -19,7 +19,7 @@ from lab.hearing.measure import measure
 from lab.tools import soundcheck
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_lab_tools_support import PLEXI, V30, chain, host, phrase  # noqa: E402
+from support import PLEXI, V30, chain, host, phrase  # noqa: E402
 
 
 class StageCheckTest(unittest.TestCase):

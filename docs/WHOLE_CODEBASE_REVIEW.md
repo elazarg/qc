@@ -237,3 +237,45 @@ Other points:
 ## How this was done
 
 Seven parts were read in full: the unit layer by the reviewer who wrote this document, and the desk, the sound package, hearing and player, the Guitar Learner, the tools with the command line and launcher, and the tests with the repository, each by a separate reviewer. Reproductions ran on the simulated unit, a hidden window, scripted replies and synthetic audio. I re-checked the items under "Do first" and "A session on the unit" against the code, and re-ran the write counts, the slug collision, the bass offer and the lost engine trace myself; the rest stand on the slice reviewers' scripts. The tests reviewer ran the suite three times, once under an audit hook that blocked the real unit and Codex; the repo and the data folder were unchanged afterwards.
+
+## Status after the fixes (November 22, 2026)
+
+Every section above was acted on. Each bug was reproduced on the simulated unit or on synthetic signals and fixed with a test that fails without the fix; the tests live with the modules they test. Nothing was run on the real unit, with the real assistant, or on a visible window, so the last section here lists what still needs those.
+
+### What was done
+
+- **Main flow.** A request starts a round unless it reads as a change to the sound on B. The app listens to the sounds on A and B, then to the round's designs, whenever the unit has been idle for two seconds; a sound that cannot be heard is noted and skipped. A play that fails clears the desk's state. The working line is no longer a lock. A remedy taken back by Undo is not inverted. A song no longer sticks to later rounds, and songs are filed by their letters in any script.
+- **Revisions and designs.** Kept blocks are matched by model; a second path gets its mixer; the assistant can switch a block on or off; bass is offered bass gear; knobs act on a block where it is on; a knob turned down never brings an effect in; the prompt and the validator agree.
+- **Taste.** One press is one decision. The model is five axes with an exact sign test corrected for the five: with random choices "strong" appears in under 1% of fits, eight unanimous decisions are "moderate", and ten are "strong".
+- **Measurements.** Brightness is the highs against the body (`brightness_db`); the tail and the decay come from the click (`late_energy_db`, `decay_rt60_s`); the softer tone is played first; intermodulation and movement are read only after the last echo, or not at all; movement is read over three seconds; a second tone near 740 Hz and how far the sound cleans up are reported as numbers without a word; compression is signed; the pick's attack is the first rise. The guitar profile uses held-note level and LUFS and compares settings only on takes marked as the same gesture. The Shape knobs are judged by the new measures, and by the old ones only for sounds heard before. Sounds measured with the old test signals are listened to again by themselves.
+- **`tone_lab/` can go.** The tables ship in `lab/tables` and a missing one is an error. The named settings, the start-up log and the Guitar Learner's data live in the data folder (copied once; the originals are untouched). `--old` says clearly when the earlier app is absent. Two research scripts were ported (`build_knowledge.py` still writes a byte-identical `gear.json`).
+- **Faults you can see.** A failure where the unit is held comes back with its kind and its own trace; expected outcomes (stopped, moved, unsaved edits, refused) are said and not logged; the Guitar Learner logs to `errors.log`; a session that cannot be restored is set aside; the app's own requests end when it closes; the door is claimed first and answers with a token.
+- **The hot path.** One click on A or B now costs 4 writes and 8 reads on the simulator, down from 17 reads: the preset is read once, an unchanged level is not written again, and the level read-back is made only when a level was written. The check before every write is kept. `python -m lab time-switch` times a switch on the unit.
+- **The unit layer.** Checks after a write wait for the change to show; a read left unanswered is asked again; an input is taken off after a failure without first asking the unit what it holds; a round trip that has changed is measured again.
+- **One window.** The nine side tools, the Guitar Learner and Teach a control (formerly "input calibration") open in the panel's place with a way back. There are no other windows, dialogs, pop-up menus or shortcuts in `lab/`, and `tests/test_lab_one_window.py` keeps it so. Files are chosen in place. The Library tool became part of the Sounds panel and measuring A and B part of Difference.
+- **The Guitar Learner.** It asks the engine for its channels; gestures use one cadence and re-arm; the audio input has one holder at a time; examples are kept as copies; the learner follows the desk's instrument.
+- **Structure.** `studio.py` is split into listening, requests and rounds, marks, the guitar and difference. One table holds the player's words. The dead code listed above is gone, and `tests/test_lab_code.py` fails on an unused import or a name defined twice.
+- **Tests.** `tests/isolated.py` gives every run its own data folder and closes the doors to the unit, the driver and Codex; `tests/test_isolation.py` enforces it. The simulated unit is held to the library's signatures and messages, and can be checked against a trace or preset reads of the real unit. There is one test of the whole main flow. The suite is 1,280-odd tests in about two minutes (`tests/in_parallel.py`: under a minute). Windows made in tests no longer take the keyboard.
+- **Repository.** `AGENTS.md` holds the standing rules. Old documents and the old desk concept are in `docs/archive`. `pywin32` is listed.
+
+### What was left, on purpose
+
+- **The check before every write on the switch path.** It was a deliberate fix of an earlier review; relaxing it trades a safety property for speed, and the timing that would justify it has not been taken. Run `time-switch` and decide.
+- **Deleting `tone_lab/`, `--old`, `lab/migrate.py` and the old tests.** Nothing in the app depends on them now, but removing them waits for the player to have used the new desk. Four research scripts that drive the unit (`measure_amps`, `measure_controls`, `measure_polarity`, `analyse_amps`) still import `tone_lab` and need porting, on the unit, before it goes.
+- **The words for distortion.** The thresholds were calibrated on the unit and are unchanged. The new numbers have no words until the ladder is measured again; the brightness and tail thresholds are provisional.
+- **Two estimators in the Guitar Learner.** They share one store and one vocabulary now; making gestures read the live tracker is planned in `docs/GUITAR_LEARNER_DESIGN.md`.
+- **A recall on a unit that reports its position before its content.** One expected failure in `tests/test_lab_sim_contract.py`; only a trace says whether the real unit does this.
+- **Two findings that could not be shown on the simulator**: rows fed from a return or leaving by a send, and scene values filled from catalog defaults.
+- **`studio.py` (1,100 lines) and `window.py` (1,400)** are still the largest modules.
+- **Owner's calls, untouched**: the preset names in some tests and the instruments shipped as defaults; forking `qc-mcp`.
+
+### What still needs the unit, the assistant or a look
+
+1. `python -m lab time-switch`: what one switch costs on the unit.
+2. Guitar Learner → Record clip with the desk open: it now gets its channels from the engine.
+3. Stop and the ownership check during playback, the level read-back, recording through ASIO (carried from the earlier review).
+4. A delay after a clean amp: it should now read no intermodulation and no movement. Then the distortion ladder again with the new test signals.
+5. A trace: start the app once with `TONE_LAB_TRACE` set, use it for a minute, and replay it (`AGENTS.md`). It answers whether the unit rounds values or shows them late.
+6. One real request to the assistant: the way its process is run and stopped changed.
+7. The taskbar button.
+8. A look at every hosted tool, the Guitar Learner (its photograph is now cropped) and Teach a control: their layouts were checked by measurement only.

@@ -20,7 +20,7 @@ from lab.tools import levels
 from lab.qc.unit import CEILING_DB
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_lab_tools_support import PLEXI, V30, chain, host, phrase  # noqa: E402
+from support import PLEXI, V30, chain, host, phrase  # noqa: E402
 
 
 def sine(hz=440, level=.2, seconds=1, phase=0):

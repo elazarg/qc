@@ -93,10 +93,16 @@ cab speaker heavy tight warm big full hard soft into over open edge back front a
 bit little touch way too not enough make something special standard original version model models hot solo song""")
 
 
+# Names made only of words too common or too short to point at anything one at a time, matched whole. "The Edge"
+# is a guitarist; "the edge of breakup" is not.
+NAMES = (("the edge", r"\bthe edge\b(?! of\b)"), ("u2", r"\bu2\b"))
+
+
 def named_in(text, kind):
     """Models a request points at by maker, model, artist, song or genre, the most specific first,
     with the boosts and cabs the research pairs with the amps found."""
     said = _words(text) - COMMON
+    names = [name for name, pattern in NAMES if re.search(pattern, (text or "").lower())]
     scored = {}
     for model in catalog.models():
         entry = knowledge.gear(model.id)
@@ -105,8 +111,9 @@ def named_in(text, kind):
         about = " ".join([model.name, str(entry.get("real", "")), str(entry.get("plugin", "")),
                           " ".join(map(str, entry.get("known_for", []))), " ".join(map(str, entry.get("tags", [])))])
         hits = said & (_words(about) - COMMON)
-        if hits:
-            scored[model.id] = len(hits)
+        whole = [name for name in names if name in about.lower()]
+        if hits or whole:
+            scored[model.id] = len(hits) + 2 * len(whole)
     ranked = sorted(scored, key=lambda model_id: (-scored[model_id], model_id))[:10]
     extra = []
     for model_id in ranked[:3]:

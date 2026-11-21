@@ -12,6 +12,35 @@ about them. This page holds the rules that are not in the code.
 - The app without hardware: `.\.venv\Scripts\python.exe -m lab --simulated`.
 - Set `PYTHONIOENCODING=utf-8` when output holds non-ASCII names.
 
+## Writing tests
+
+- Every `tests/test_lab_*.py` starts with `import isolated`, before anything of `lab`: it gives the run a
+  temporary data folder and closes the doors to the real unit, the audio driver and the Codex CLI. A file that
+  uses tkinter, or imports an app module that does, imports `hidden_tk` next. `tests/test_isolation.py`
+  enforces both, with no exceptions.
+- Shared helpers are in `tests/support.py`: `EngineCase`, `StudioCase`, `DeskCase`; `settle`, `settle_until`
+  and `until` in place of sleep loops; `free_now()` in place of `gc.collect()`.
+- A `Studio` in a test always gets `assistant=Assistant(folder, automatic=False, run=...)`.
+- Windows in tests are hidden by `hidden_tk`: do not set alpha or positions, and never call `mainloop` or
+  `wait_window`.
+- `tests/test_lab_one_window.py` and `tests/test_lab_code.py` read the source: no second window, dialog, menu
+  or key binding; nothing defined twice; no unused import.
+- An `expectedFailure` carries the fault in its comment; remove the marker with the fix.
+- A faster run of the same tests: `.\.venv\Scripts\python.exe tests\in_parallel.py`.
+- A scratch script that starts the suite needs `if __name__ == "__main__":`; the engine's own process imports
+  the main script again.
+
+## Checking the simulated unit against the real one
+
+The tests run on `lab/qc/sim.py`. Two checks hold it to the real unit, both skipped unless asked for, and both
+fed with files that hold the player's presets (keep them in the data folder or `personal/`):
+
+- `TONE_LAB_TRACE=<file>` makes the app write every call on the unit and its reply to that file
+  (`lab/qc/trace.py`). `TONE_LAB_CONTRACT_TRACE=<file>` then replays it on the simulated unit in
+  `tests/test_lab_sim_contract.py` and says where they differ.
+- `TONE_LAB_CONTRACT_PRESETS=<folder>` checks every `*.pb` preset read under it against what the simulated
+  unit takes a preset to be.
+
 ## What code and tests must never do
 
 - **Never reach the real unit, the audio driver or the Codex CLI from a test.** Use `lab.qc.sim` (`SimUnit`,

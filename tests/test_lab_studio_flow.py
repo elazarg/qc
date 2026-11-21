@@ -8,7 +8,6 @@ import isolated  # noqa: E402,F401  (a data folder of its own; no way to the rea
 from concurrent.futures import Future
 import json
 from pathlib import Path
-from tempfile import TemporaryDirectory
 import sys
 import threading
 import time
@@ -24,10 +23,10 @@ from lab.hearing.audio import write_wave
 from lab.qc import engine as engine_module
 from lab.qc.host import Host
 from lab.qc.unit import Stopped
-from lab.sound.assistant import Assistant
 from lab.sound.chain import Block, Chain, Row
 from lab.sound.sounds import Sound
-from test_lab_design import GREENBACK, PLEXI, V30, Scripted, answer, block, reply
+from support import StudioCase
+from test_lab_design import GREENBACK, PLEXI, V30, answer, block, reply
 
 FACTORY = {"folder_key": "/opt/neuraldsp/Factory Library", "position": 0, "is_factory": True}
 REVISION = {"name": "x", "target": "t", "explanation": "e", "differs": "", "scenes": [],
@@ -53,49 +52,14 @@ def with_scenes(count=2):
     return Chain((Row((gain, Block(GREENBACK)), inlet=1, outlet=19),))
 
 
-class FlowCase(unittest.TestCase):
-    automatic = False
-
-    def setUp(self):
-        folder = TemporaryDirectory()
-        self.addCleanup(folder.cleanup)
-        self.folder = Path(folder.name)
-        self.host = Host(self.folder / "unit", simulated=True, local=True)
-        self.host.ready.result(10)
-        self.script = Scripted()
-        self.studio = Studio(self.host, self.folder,
-                             assistant=Assistant(self.folder, automatic=self.automatic, run=self.script),
-                             phrase=("take", (np.sin(np.arange(24000) / 48000 * 2 * np.pi * 196) * .2)[:, None]))
-        self.studio.idle_seconds = 0.
-        self.addCleanup(self.studio.close)
-        self.studio.open()
-        self.settle()
-
-    def settle(self, seconds=20):
-        deadline = time.monotonic() + seconds
-        while time.monotonic() < deadline:
-            self.studio.poll()
-            if not self.studio.jobs and not self.host.busy:
-                self.studio.poll()
-                if not self.studio.jobs:
-                    return
-            time.sleep(.02)
-        raise AssertionError("work did not finish")
+class FlowCase(StudioCase):
+    idle_seconds = 0.        # silent listening starts at once, not after the unit was left alone
 
     def poll_for(self, seconds):
         deadline = time.monotonic() + seconds
         while time.monotonic() < deadline:
             self.studio.poll()
-            time.sleep(.02)
-
-    def until(self, test, seconds=10):
-        deadline = time.monotonic() + seconds
-        while time.monotonic() < deadline:
-            self.studio.poll()
-            if test():
-                return
-            time.sleep(.02)
-        raise AssertionError("it did not happen")
+            time.sleep(.002)
 
     def a_round(self, *names, request="make a classic rock crunch"):
         self.script.answers.append(three(*(names or ("One", "Two", "Three"))))
@@ -548,7 +512,7 @@ class BackgroundTest(FlowCase):
             while time.monotonic() < deadline and not gate.is_set():
                 if cancel is not None and cancel.is_set():
                     raise RuntimeError("withdrawn")
-                time.sleep(.02)
+                time.sleep(.002)
             return three(f"Later {len(calls)}a", f"Later {len(calls)}b", f"Later {len(calls)}c")
 
         self.studio.assistant.run = run
@@ -635,7 +599,7 @@ class FaultLogTest(FlowCase):
         deadline = time.monotonic() + 10
         while time.monotonic() < deadline and not again.opened:
             again.poll()
-            time.sleep(.02)
+            time.sleep(.002)
         self.assertIn("another firmware than the unit's 9.9.9", again.state.status)
 
 
@@ -807,6 +771,96 @@ class LinesTest(FlowCase):
         source = Path(studio_module.__file__).read_text(encoding="utf-8")
         for words in ("press N", "Z undoes", "press X", "the 0 key"):
             self.assertNotIn(words, source)
+
+
+# ---- Faults the reviews of 2026-11-20 found (docs/CODEBASE_REVIEW.md), each reproduced as it was found ----
+
+def held_back(gate, *, song=False):
+    """An assistant whose answer to "the first request" waits for `gate`; with "fails" in the request it then
+    fails. Its designs are called Late, the others' Soon."""
+    def answering(prompt, schema, **options):
+        first = "first request" in prompt
+        if first:
+            gate.wait(10)
+            if "fails" in prompt:
+                raise RuntimeError("the assistant failed")
+        found = reply(*[answer(f"{'Late' if first else 'Soon'} {n}", [block(PLEXI, 0, gain=n * 3),
+                                                                     block(GREENBACK, 1)], differs="d")
+                        for n in (1, 2, 3)])
+        if first and song:
+            found["song"] = {"artist": "Old Band", "title": "Old Song", "part": "solo"}
+        return found
+
+    return answering
+
+
+class OlderRequestTest(StudioCase):
+    """Two requests on their way at once: the later one counts. (reviews of 2026-11-20)"""
+
+    gate = threading.Event()        # holds the answer to the first request back until the test lets it go
+    answers = staticmethod(held_back(gate, song=True))
+
+    def setUp(self):
+        self.gate.clear()
+        self.addCleanup(self.gate.set)
+        super().setUp()
+
+    def later_answer(self):
+        """Wait for the later request's answer, which comes while the earlier one's is still held back."""
+        self.until(lambda: self.studio.sound("b") is not None, 30, "the later answer")
+        self.assertTrue(self.studio.sound("b").name.startswith("Soon"), self.studio.sound("b").name)
+
+    def test_cancel_drops_every_request_in_flight(self):
+        first, second = self.studio._request(), self.studio._request()
+        self.assertTrue(self.studio.cancel())
+        self.assertTrue(first.is_set(), "the first request's signal")
+        self.assertTrue(second.is_set(), "the second request's signal")
+
+    def test_cancel_shows_at_once_and_an_older_answer_does_not_take_b(self):
+        cancel_shown, said = [], []
+        self.studio.listeners.append(lambda state: cancel_shown.append(bool(state.working)
+                                                                       and self.studio.cancellable()))
+        self.studio.listeners.append(lambda state: said.append(state.status))
+        self.studio.ask("make the first request")
+        self.assertEqual(cancel_shown[-1:], [True])
+        self.studio.ask("make the second request")
+        self.later_answer()
+        self.gate.set()
+        self.settle(30)
+        self.assertTrue(self.studio.sound("b").name.startswith("Soon"), self.studio.sound("b").name)
+        self.assertIn("earlier request", " | ".join(said))
+
+    def test_an_older_answer_does_not_change_the_song(self):
+        self.studio.ask("make the first request")
+        self.studio.ask("make the second request")
+        self.later_answer()
+        song = self.studio.state.song
+        self.assertNotIn("Old Song", song or "")
+        self.gate.set()
+        self.settle(30)
+        self.assertEqual(self.studio.state.song, song)
+        self.assertTrue(self.studio.sound("b").name.startswith("Soon"), self.studio.sound("b").name)
+
+    def test_an_older_failure_keeps_cancel_while_the_latest_is_on_its_way(self):
+        latest = threading.Event()
+        self.addCleanup(latest.set)
+        script = self.studio.assistant.run
+
+        def second_waits(prompt, schema, **options):
+            if "second request" in prompt:
+                latest.wait(10)
+            return script(prompt, schema, **options)
+
+        self.studio.assistant.run = second_waits
+        self.studio.ask("make the first request, which fails")
+        self.studio.ask("make the second request")
+        self.gate.set()
+        self.until(lambda: "earlier request failed" in (self.studio.state.status or ""), 10,
+                   "word of the earlier failure")
+        self.assertNotEqual(self.studio.state.working, "")     # the latest request is still said to be on its way
+        self.assertTrue(self.studio.cancellable())
+        latest.set()
+        self.settle(30)
 
 
 if __name__ == "__main__":

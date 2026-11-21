@@ -13,13 +13,14 @@ from unittest.mock import patch
 
 import numpy as np
 
+import support  # noqa: E402
 from lab.hearing import audio
 from lab.learner import calibration, dataset, folders, gestures, inputs, state, taught, teach
 
 from test_lab_learner_gestures import note
 from test_lab_learner_seat import seat_for, settle
 from test_lab_learner_takes import four_inputs
-from test_lab_tools_support import hosting
+from support import hosting
 
 
 def phrase(kind, *, level=.08):
@@ -156,10 +157,8 @@ class TeachWindowTest(unittest.TestCase):
         teach._shown.clear()
         self.window.worker.shutdown(wait=True)
         self.root.destroy()
-        import gc
-
         self.window = self.panel = self.root = None
-        gc.collect()
+        support.free_now()
 
     def test_it_is_named_for_what_it_does_and_the_earlier_name_still_opens_it(self):
         self.assertEqual(self.window.TITLE, "Teach a control")
@@ -310,9 +309,7 @@ class TeachWindowTest(unittest.TestCase):
 def tearDownModule():
     # Tk objects left as garbage here must be freed on the main thread: if a later test's worker thread runs
     # the collector, Tcl aborts the whole interpreter ("Tcl_AsyncDelete").
-    import gc
-
-    gc.collect()
+    support.free_now()
 
 
 if __name__ == "__main__":

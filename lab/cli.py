@@ -667,7 +667,7 @@ def parser():
     pod_.add_argument("backup", type=Path)
     pod_.add_argument("--user-slot", help="One slot in full, such as 02B")
     pod_.add_argument("--setlist", default="User", help="The backup's setlist (default User)")
-    history_ = sub.add_parser("history", help="Rank songs by listening time from a Spotify data export")
+    history_ = sub.add_parser("history", help="The songs of a Spotify data export, by how often you chose them and came back")
     history_.add_argument("files", nargs="+", type=Path, help="JSON files, folders or the export's zip")
     history_.add_argument("--limit", type=int, default=50)
     history_.add_argument("--missing", action="store_true", help="Only songs the app has no song for yet")
