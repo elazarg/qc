@@ -22,10 +22,10 @@ import numpy as np
 
 from lab.hearing.audio import RATE
 from lab.sound.chain import routed
+from lab.qc.library import SCENES as SCENE_LETTERS   # "ABCDEFGH": the one place the scene letters are spelled
 from lab.qc.rig import USB
+from lab.qc.unit import Stopped
 from lab.desk.theme import DARK, DIM, FONT, INK, PAPER, RULE, SOFT, SUBTLE, TILE, WHITE
-
-SCENE_LETTERS = "ABCDEFGH"
 
 
 # ---- operations, run where the unit is held ----
@@ -62,7 +62,7 @@ def render_many(engine, items, dry, *, tail=1., stop=None):
     found = []
     for chain, scene in items:
         if stop is not None and stop.is_set():
-            raise RuntimeError("Stopped.")
+            raise Stopped("Stopped.")
         found.append(render(engine, chain, dry, scene=scene, tail=tail, stop=stop))
     return found
 
@@ -101,7 +101,7 @@ def heard_chain(sound):
 
 def phrase(studio):
     """The desk's phrase as (name, mono audio), or None."""
-    return getattr(studio, "phrase", None)
+    return studio.phrase
 
 
 # ---- hearing on the computer ----
@@ -188,20 +188,19 @@ def listbox(parent, height=10):
 
 
 class Window:
-    """One tool's window over the desk. Opening a tool that is open brings it forward."""
+    """One tool's window over the desk. Opening a tool that is open brings it forward.
+
+    A tool builds into `self.body`, says things with `self.say`, reaches the unit with `self.call` and keeps
+    time with `self.after`: nothing else of the window is the tool's business, so that where the body is shown
+    can change without the tools changing.
+    """
 
     TITLE = "Tool"
     SIZE = "600x560"
 
     @classmethod
     def open(cls, desk):
-        windows = getattr(desk, "tool_windows", None)
-        if windows is None:
-            windows = {}
-            try:
-                desk.tool_windows = windows
-            except AttributeError:
-                pass
+        windows = vars(desk).setdefault("tool_windows", {})
         found = windows.get(cls.TITLE)
         if found is not None and found.alive():
             found.top.deiconify()
@@ -212,8 +211,10 @@ class Window:
         return window
 
     def __init__(self, desk):
+        from lab.tools import usage
+
         self.desk, self.studio = desk, desk.studio
-        self.folder = Path(getattr(self.studio, "folder", Path(tempfile.gettempdir())))
+        self.folder = Path(self.studio.folder)
         self.pending = 0
         self.top = tk.Toplevel(desk.root)
         self.top.title(self.TITLE)
@@ -226,10 +227,12 @@ class Window:
         label(outer, variable=self.status, size=9, color=SOFT, wrap=560).pack(side="bottom", fill="x", pady=(6, 0))
         self.body = tk.Frame(outer, bg=PAPER)
         self.body.pack(fill="both", expand=True)
-        from lab.tools import usage
-
+        try:
+            self.build()
+        except Exception:
+            self.top.destroy()          # a tool that could not be built leaves no empty window behind
+            raise
         usage.record(self.folder, "open", self.TITLE)
-        self.build()
 
     def build(self):
         raise NotImplementedError
@@ -244,15 +247,35 @@ class Window:
         if self.alive():
             self.status.set(text)
 
+    def after(self, milliseconds, action):
+        return self.top.after(milliseconds, action)
+
+    def after_cancel(self, job):
+        self.top.after_cancel(job)
+
     @property
     def busy(self):
         return self.pending > 0
 
-    def call(self, name, *args, done, working="Working on the Quad Cortex…", failed=None):
-        """Run a tool operation on the engine; `done(result)` runs on the window's thread when it is back."""
+    def call(self, name, *args, done, working="Working on the Quad Cortex…", failed=None, renders=False):
+        """Run a tool operation on the engine; `done(result)` runs on the window's thread when it is back.
+        Returns whether the operation was sent.
+
+        `renders` says the operation plays through the unit. Such an operation is not started while something
+        else holds the audio input (the Guitar Learner, gestures); and since it stops whatever the desk was
+        playing and takes A and B off the unit, the desk is told so at once: it shows nothing as playing, and
+        makes A and B ready again the next time it plays.
+        """
+        if renders:
+            # Set by the desk while the Guitar Learner or gestures hold the audio input.
+            if getattr(self.studio, "audio_held_by", None):
+                self.say(f"{self.studio.held_words()} Stop it there first.")
+                return False
+            self.studio.set(mode=None, shown=None)
         self.pending += 1
         self.say(working)
-        self.studio.set(working=working) if hasattr(self.studio, "set") else None
+        # The tools' own line among whatever the desk itself is doing: the desk shows the newest, and keeps its own.
+        self.studio.set(working=working)
 
         def finished(result):
             self.pending -= 1
@@ -267,9 +290,16 @@ class Window:
             (failed or (lambda error: self.say(str(error))))(error)
 
         self.studio.later(self.studio.host.call(name, *args), finished, broke)
+        return True
+
+    def stop(self):
+        """End what the unit is doing for this tool at its next safe point (and whatever the desk was playing)."""
+        self.studio.stop()
 
     def _idle(self):
-        if not self.pending and hasattr(self.studio, "set"):
+        """Take the tools' working line off the desk once no tool is waiting for the unit. Only that line: what the
+        desk itself is doing stays on show."""
+        if not any(window.busy for window in vars(self.desk).get("tool_windows", {}).values()) and not self.pending:
             self.studio.set(working="")
 
     def close(self):

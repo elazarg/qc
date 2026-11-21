@@ -1,7 +1,7 @@
 """Levels: the listening level, measuring, one common loudness, and matching sounds on the simulated unit.
 
-Ported from test_level_plan and test_live_levels (the planning and the row trims; the old engine's
-phrase-by-phrase observing has no counterpart on the new core)."""
+Ported from test_level_plan (the planning). A and B are matched by the desk itself; the tool measures with
+`hearing.measure`, the one measurement."""
 
 from pathlib import Path
 import sys
@@ -9,10 +9,9 @@ from tempfile import TemporaryDirectory
 import unittest
 
 import numpy as np
-from qc_mcp import leveling
 
+from lab.hearing.measure import measure
 from lab.sound import catalog
-from lab.sound.chain import Chain, Row
 from lab.tools import levels
 from lab.qc.unit import CEILING_DB
 
@@ -44,75 +43,46 @@ class ListeningLevelTest(unittest.TestCase):
         self.assertEqual(levels.side_level(0., {**settings, "muted": True}), levels.FLOOR_DB)
 
 
-class MeasureTest(unittest.TestCase):
-    def test_true_peak_detects_between_sample_maxima_and_checks_the_whole_of_it(self):
-        samples = sine(12000, .8, phase=np.pi / 4)
-        samples[10, 0] = 1
-        found = levels.measure(samples, passage=(.45, .95))
-        self.assertEqual(found["near_rail_samples"], 1)
-        self.assertEqual(found["sample_peak_dbfs"], 0)
-        self.assertEqual(found["measured_seconds"], .5)
-        clean = levels.measure(sine(12000, .8, phase=np.pi / 4))
-        self.assertGreater(clean["true_peak_dbtp_estimate"] - clean["sample_peak_dbfs"], 2.5)
+class PlanTest(unittest.TestCase):
+    def readings(self, **amplitudes):
+        return {name: measure(sine(level=amplitude)).to_record() for name, amplitude in amplitudes.items()}
+
+    def test_the_plan_reads_the_one_measurement_of_the_app(self):
+        # Regression: the tool had a measurement of its own, with other names for the same quantities.
+        self.assertFalse(hasattr(levels, "measure") and levels.measure is not measure)
+        found = levels.plan(self.readings(A=.5, B=.25))
+        rows = {row["name"]: row for row in found["rows"]}
+        self.assertAlmostEqual(rows["A"]["trim_db"], -6., delta=.15)
+        self.assertEqual(rows["B"]["trim_db"], 0.)
+        self.assertIn("true_peak_db", rows["A"])
 
     def test_offsets_respect_the_common_headroom_and_a_clipped_sound_is_left_out(self):
-        readings = {name: levels.measure(sine(level=amplitude))
-                    for name, amplitude in (("A", .50), ("B", .55), ("C", 1.1))}
-        found = levels.plan(readings, reference="A", offsets={"B": 3}, ceiling_dbtp=-7)
+        found = levels.plan(self.readings(A=.50, B=.55, C=1.1), reference="A", offsets={"B": 3}, ceiling_dbtp=-7)
         rhythm, boost, rejected = found["rows"]
         self.assertTrue(found["lowered_for_headroom"])
         self.assertEqual(found["reference"], "A")
-        self.assertAlmostEqual(rhythm["sample_peak_dbfs"], -6.02, places=1)
+        self.assertAlmostEqual(rhythm["peak_db"], -6.02, places=1)
         self.assertAlmostEqual(boost["expected_lufs"] - rhythm["expected_lufs"], 3, delta=.11)
-        self.assertLessEqual(boost["expected_true_peak_dbtp"], -7)
+        self.assertLessEqual(boost["expected_true_peak_db"], -7)
         self.assertIsNone(rejected["trim_db"])
         self.assertIn("full scale", rejected["issue"])
 
     def test_without_a_reference_the_plan_only_cuts(self):
         quiet, loud = sine(level=.025, seconds=2), np.repeat(sine(level=.25, seconds=2), 2, axis=1)
-        found = levels.plan({"dry": levels.measure(quiet), "wet": levels.measure(loud)})
+        found = levels.plan({"dry": measure(quiet).to_record(), "wet": measure(loud).to_record()})
         self.assertTrue(all(row["trim_db"] <= 0 for row in found["rows"]))
         with self.assertRaisesRegex(ValueError, "two measurable"):
-            levels.plan({"dry": levels.measure(quiet)})
+            levels.plan({"dry": measure(quiet).to_record()})
 
+    def test_a_sound_too_quiet_to_read_is_left_out_with_the_reason(self):
+        found = levels.plan({**self.readings(A=.5, B=.25), "silent": measure(np.zeros((48000, 1))).to_record()})
+        silent = next(row for row in found["rows"] if row["name"] == "silent")
+        self.assertIsNone(silent["trim_db"])
+        self.assertIn("quiet", silent["issue"])
 
-class PairTest(unittest.TestCase):
-    def test_a_lift_is_limited_by_true_peak_and_by_each_sound_s_headroom(self):
-        a = {"lufs": -18., "peak_dbfs": -12., "true_peak_dbtp_estimate": -1.}
-        b = {"lufs": -22., "peak_dbfs": -10., "max_gain_db": 1.}
-        self.assertEqual(levels.loudness_plan([a, b]), {"reference_lufs": -23., "requested_lufs": -23.,
-                                                        "target_lufs": -23., "trims_db": [-5., -1.]})
-        self.assertEqual(levels.loudness_plan([a, b], offset_db=6., max_boost_db=6.),
-                         {"reference_lufs": -23., "requested_lufs": -17., "target_lufs": -21., "trims_db": [-3., 1.]})
-        self.assertEqual(levels.loudness_plan([a, b], offset_db=6.)["trims_db"], [-4., 0.])
-        self.assertEqual(levels.loudness_plan([a], offset_db=6., max_boost_db=6.)["target_lufs"], -20.)
-
-    def test_matching_needs_two_measurable_sounds_and_keeps_headroom(self):
-        a = {"clipped_samples": 0, "lufs": -17., "peak_dbfs": -2.}
-        b = {"clipped_samples": 0, "lufs": -24., "peak_dbfs": -8.}
-        self.assertEqual(levels.matched_pair({"a": a}), {})
-        trims = levels.matched_pair({"a": a, "b": b})
-        self.assertAlmostEqual(trims["a"], -7.)
-        self.assertAlmostEqual(trims["b"], 0.)
-        b["clipped_samples"] = 1
-        self.assertEqual(levels.matched_pair({"a": a, "b": b}), {})
-
-    def test_row_trims_keep_parallel_outputs_blended_and_existing_mutes(self):
-        norm = leveling.norm_of
-        rows = (Row(outlet=16, output={catalog.LANE_VOLUME: norm(0.)}),
-                Row(outlet=19, output={catalog.LANE_VOLUME: (norm(0.), norm(2.)) + (norm(0.),) * 6}),
-                Row(outlet=19, output={catalog.LANE_VOLUME: norm(-4.)}),
-                Row(outlet=19, output={catalog.LANE_VOLUME: norm(-2.), catalog.LANE_MUTE: 1.}))
-        lanes = levels.lanes(Chain(rows), scene=1)
-        self.assertEqual(set(lanes), {1, 2, 3})
-        applied, targets = levels.lane_targets(lanes, -6., False)
-        self.assertEqual(applied, -6.)
-        self.assertEqual({row: round(level, 2) for row, (level, _) in targets.items()}, {1: -4., 2: -10., 3: -8.})
-        self.assertEqual([targets[row][1] for row in (1, 2, 3)], [0., 0., 1.])
-        _, muted = levels.lane_targets(lanes, -6., True)
-        self.assertTrue(all(flag == 1. for _, flag in muted.values()))
-        lifted, _ = levels.lane_targets(lanes, 12., False, max_boost_db=12.)
-        self.assertEqual(lifted, CEILING_DB - 2.)   # the loudest row reaches the ceiling and stops there
+    def test_the_code_carried_over_for_the_old_live_engine_is_gone(self):
+        for name in ("loudness_plan", "matched_pair", "valid", "lane_targets", "lanes"):
+            self.assertFalse(hasattr(levels, name), name)
 
 
 class TrimTest(unittest.TestCase):
@@ -158,6 +128,8 @@ class OnTheUnitTest(unittest.TestCase):
                 played = unit.call("lab.tools.levels.install", {"loudness_db": 6}).result(10)
                 self.assertEqual(played["a"], CEILING_DB)
                 self.assertEqual(played["b"], -6.)
+                # Put back: each side at what the desk asked for it, no offset.
+                self.assertEqual(unit.call("lab.tools.levels.clear").result(10), {"a": 3., "b": -12.})
             finally:
                 unit.close()
 

@@ -7,9 +7,11 @@ marked A and B, jumped between, and swept from one to the other. Only knobs the 
 for move; a direction with none is greyed.
 
 The knobs are the desk's own (`lab.sound.knobs`), turned on the selected side through the studio, so the field and
-the Shape panel always agree. "Measure A and B" plays the phrase silently through both sounds on the unit and
-says how B differs from A, level aside: octave-band balance, brightness, how much the level moves, stereo
-sides and what rings on.
+the Shape panel always agree. A gesture (a drag from press to release, a sweep from A to B) is heard on the
+unit while it lasts and becomes the sound's knob positions once, at its end: one step for the desk's Undo,
+one write of the sound, one check by listening. "Measure A and B" plays the phrase silently through both
+sounds on the unit and says how B differs from A, level aside: octave-band balance, brightness, how much the
+level moves, stereo sides and what rings on.
 """
 
 from dataclasses import dataclass
@@ -164,15 +166,12 @@ class FieldWindow(Window):
         self.description = label(top, size=9, color=SUBTLE, wrap=420)
         self.description.pack(side="left", fill="x")
         self.canvas = tk.Canvas(self.body, bg=DARK, height=260, highlightthickness=1, highlightbackground=RULE,
-                                highlightcolor=ACCENT, cursor="crosshair", takefocus=True)
+                                highlightcolor=RULE, cursor="crosshair")
         self.canvas.pack(fill="both", expand=True)
         self.canvas.bind("<Configure>", lambda _: self.paint())
         self.canvas.bind("<Button-1>", self.push)
         self.canvas.bind("<B1-Motion>", self.drag)
         self.canvas.bind("<ButtonRelease-1>", lambda _: self.apply_point())
-        self.canvas.bind("<Home>", lambda _: self.set_point(0., 0.))
-        for key, dx, dy in (("Left", -.12, 0.), ("Right", .12, 0.), ("Down", 0., -.12), ("Up", 0., .12)):
-            self.canvas.bind(f"<{key}>", lambda _, x=dx, y=dy: self.set_point(self.point[0] + x, self.point[1] + y))
         self.controls = label(self.body, size=9, color=SUBTLE, wrap=600)
         self.controls.pack(fill="x", pady=(4, 0))
 
@@ -187,6 +186,7 @@ class FieldWindow(Window):
         self.sweep_button = button(row, "Sweep A → B", self.toggle_sweep, quiet=True)
         self.sweep_button.pack(side="left")
         button(row, "Use current as centre", self.recenter, quiet=True).pack(side="right")
+        button(row, "Back to the centre", lambda: self.set_point(0., 0.), quiet=True).pack(side="right", padx=4)
 
         measure = section(self.body, "The sounds on A and B", "Played silently through the unit with the phrase.")
         row = tk.Frame(measure, bg=measure["bg"])
@@ -210,9 +210,21 @@ class FieldWindow(Window):
     def available(self):
         return frozenset(self.studio.available(self.side)) if self.sound() else frozenset()
 
-    def apply_values(self, values):
-        if self.sound() is not None:
-            self.studio.turn(dict(values), self.side)
+    def hear(self, values, *, exact=False):
+        """Let these knob positions be heard without keeping them: sent to the unit, not written to the sound.
+        Every step of a gesture is heard this way."""
+        if (self.values != values) if exact else not equivalent(self.values, values):
+            self.values = dict(values)
+            if self.sound() is not None and self.studio.state.shown:
+                self.studio.later(self.studio.host.call("turn", self.side,
+                                                        {key: value for key, value in values.items() if value}),
+                                  lambda moves: None)
+
+    def keep(self):
+        """The end of a gesture: what is heard becomes the sound's knob positions, in one step."""
+        sound = self.sound()
+        if sound is not None and {key: value for key, value in self.values.items() if value} != sound.knobs:
+            self.studio.turn(dict(self.values), self.side)
 
     def sync(self):
         plane = PLANES[self.plane.get()]
@@ -220,7 +232,7 @@ class FieldWindow(Window):
         available = self.available()
         names = dict.fromkeys((*moves(plane.horizontal, available), *moves(plane.vertical, available)))
         caption = " · ".join(KNOBS[name][0] for name in names) or "The selected sound has nothing this field moves"
-        self.controls.configure(text=f"{caption}   |   Home returns to the centre")
+        self.controls.configure(text=caption)
         for slot, control in self.jump.items():
             control.configure(state="normal" if slot in self.marks else "disabled")
         self.sweep_button.configure(state="normal" if len(self.marks) == 2 else "disabled")
@@ -281,44 +293,48 @@ class FieldWindow(Window):
                 bounded(y) if moves(plane.vertical, available) else 0.)
 
     def set_point(self, x, y):
+        """A move made in one step: heard and kept."""
         self.stop_sweep()
         self.point = self.normal(x, y)
         self.apply_point()
-        return "break"
 
     def push(self, event):
-        self.canvas.focus_set()
-        return self.set_point(*self.unproject(event))
+        """The start of a drag: heard at once, kept when the button is let go."""
+        self.stop_sweep()
+        self.point = self.normal(*self.unproject(event))
+        self.hear_point()
 
     def drag(self, event):
         self.point = self.normal(*self.unproject(event))
         self.paint()
         if self.drag_job is None:
-            self.drag_job = self.top.after(160, self.apply_point)
+            self.drag_job = self.after(160, self.hear_point)
 
-    def apply_point(self):
+    def hear_point(self):
         if self.drag_job is not None:
-            self.top.after_cancel(self.drag_job)
+            self.after_cancel(self.drag_job)
         self.drag_job = None
         plane = PLANES[self.plane.get()]
-        self.publish(position_values(self.anchor, plane, *self.point, self.available()))
+        self.hear(position_values(self.anchor, plane, *self.point, self.available()))
         self.paint()
 
-    def publish(self, values, *, exact=False):
-        if (self.values != values) if exact else not equivalent(self.values, values):
-            self.values = dict(values)
-            self.apply_values(values)
+    def apply_point(self):
+        """The end of a drag, or a move in one step: the point is heard, and kept."""
+        self.hear_point()
+        self.keep()
 
     def mark(self, slot):
         self.marks[slot] = Mark(self.plane.get(), self.point, dict(self.anchor), dict(self.values))
         self.sync()
 
-    def recall(self, slot):
+    def recall(self, slot, *, keep=True):
         mark = self.marks[slot]
         self.stop_sweep()
         self.plane.set(mark.plane)
         self.anchor, self.point = dict(mark.anchor), mark.point
-        self.publish(mark.values, exact=True)
+        self.hear(mark.values, exact=True)
+        if keep:
+            self.keep()
         self.sync()
 
     def toggle_sweep(self):
@@ -326,14 +342,15 @@ class FieldWindow(Window):
             self.stop_sweep()
             return
         if len(self.marks) == 2:
-            self.recall("A")
+            self.recall("A", keep=False)        # the whole sweep is one gesture: kept where it ends
             self.sweep_button.configure(text="Stop sweep")
-            self.sweep_job = self.top.after(400, lambda: self.sweep_step(1))
+            self.sweep_job = self.after(400, lambda: self.sweep_step(1))
 
     def stop_sweep(self):
         if self.sweep_job is not None:
-            self.top.after_cancel(self.sweep_job)
+            self.after_cancel(self.sweep_job)
             self.sweep_job = None
+            self.keep()                         # stopped on the way: kept where it stopped
         if self.alive():
             self.sweep_button.configure(text="Sweep A → B")
 
@@ -341,7 +358,7 @@ class FieldWindow(Window):
         """A sweep in a few steps: each is a write to the unit, so it moves slower than the old one did."""
         self.sweep_job = None
         if index >= steps:
-            self.recall("B")
+            self.recall("B")                    # the end of the gesture: kept
             return
         a, b = self.marks["A"], self.marks["B"]
         ratio = index / steps
@@ -350,9 +367,9 @@ class FieldWindow(Window):
             self.point = tuple(left + (right - left) * ratio for left, right in zip(a.point, b.point))
         else:
             self.anchor, self.point = values, (0., 0.)
-        self.publish(values)
+        self.hear(values)
         self.paint()
-        self.sweep_job = self.top.after(400, lambda: self.sweep_step(index + 1, steps))
+        self.sweep_job = self.after(400, lambda: self.sweep_step(index + 1, steps))
 
     # measuring A and B
 
@@ -369,7 +386,7 @@ class FieldWindow(Window):
             self.paint_chart()
 
         self.call("lab.tools.field.contrast", heard_chain(a), heard_chain(b), taken[1], done=measured,
-                  working="Playing the phrase silently through A and B…")
+                  working="Playing the phrase silently through A and B…", renders=True)
 
     def paint_chart(self):
         chart = self.chart

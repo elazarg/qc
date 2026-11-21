@@ -34,15 +34,26 @@ class StageCheckTest(unittest.TestCase):
         self.assertEqual(low["post_eq"][0]["type"], "high_pass")
         self.assertEqual(high["post_eq"][0]["type"], "high_shelf")
         self.assertLess(measure(low_audio).rms_db, measure(high_audio).rms_db)
-        auditions = soundcheck.blind(soundcheck.level_matched(variants), seed=1)
-        self.assertEqual(set(auditions), set("ABC"))
-        loudness = [measure(audio).lufs for _, audio in auditions.values()]
-        self.assertLess(max(loudness) - min(loudness), .05)
         with TemporaryDirectory() as folder:
-            target = soundcheck.keep_preview(Path(folder), "Test", "mix", auditions)
-            record = json.loads((target / "preview.json").read_text(encoding="utf-8"))
+            # The stage versions are a blind comparison like any other: the workbench's, kept with the others.
+            from lab.tools import workbench
+
+            target, record = soundcheck.stage_comparison(Path(folder), wet, "mix", seed=1)
+            self.assertEqual(target.parent, Path(folder) / "comparisons")
+            self.assertEqual(json.loads((target / "comparison.json").read_text(encoding="utf-8")), record)
+            self.assertEqual((record["kind"], record["about"]["context"]), ("Stage EQ", "mix"))
             self.assertEqual(set(record["auditions"]), set("ABC"))
+            self.assertEqual({row["name"] for row in record["auditions"].values()},
+                             {"As it is", "Low-end cleanup", "Gentler top"})
+            cut = next(row for row in record["auditions"].values() if row["name"] == "Low-end cleanup")
+            self.assertEqual(cut["post_eq"][0]["type"], "high_pass")
+            auditions = workbench.auditions(target, record)
+            loudness = [measure(audio).lufs for audio in auditions.values()]
+            self.assertLess(max(loudness) - min(loudness), .05)
             self.assertEqual(read_wave(target / "audition-A.wav").shape[1], 2)
+            self.assertEqual([path for path, _ in workbench.earlier(folder)], [target])
+            for name in ("level_matched", "blind", "keep_preview"):     # the sound check's own copy is gone
+                self.assertFalse(hasattr(soundcheck, name), name)
 
     def test_a_clipped_or_silent_sound_is_refused(self):
         for value in (0., 1.):
@@ -66,6 +77,15 @@ class StageCheckTest(unittest.TestCase):
         self.assertEqual(quiet["checks"], [])
         self.assertGreater(quiet["headroom_db"], 20)
 
+    def test_the_take_is_measured_the_one_way_the_app_measures(self):
+        dry = phrase(level=.2)
+        wide = np.column_stack((dry[:, 0], -dry[:, 0]))             # out of phase: nothing left in mono
+        report = soundcheck.take_report(dry, wide)
+        self.assertEqual(report["dry"], measure(dry).to_record())
+        self.assertLess(report["wet"]["mono_fold_down_db"], -60)
+        self.assertIsNone(soundcheck.mono_fold_down_db(dry))
+        self.assertAlmostEqual(soundcheck.mono_fold_down_db(np.column_stack((dry[:, 0], dry[:, 0]))), 0., places=3)
+
 
 class OnTheUnitTest(unittest.TestCase):
     def test_the_dry_input_is_recorded_and_played_through_the_sound(self):
@@ -74,9 +94,9 @@ class OnTheUnitTest(unittest.TestCase):
             try:
                 report = unit.call("lab.tools.soundcheck.check", chain(PLEXI, V30), None, 1.).result(60)
                 self.assertIn("wet", report)
-                self.assertLess(report["dry"]["sample_peak_dbfs"], 0)
+                self.assertLess(report["dry"]["peak_db"], 0)
                 self.assertIsNotNone(report["wet"]["lufs"])
-                found = unit.call("lab.tools.soundcheck.unit_check").result(30)
+                found = unit.call("lab.tools.probe.unit_state").result(30)
                 self.assertEqual(found["firmware"], "4.1.1")
                 self.assertTrue(found["tone_lab"])
                 self.assertTrue(found["calibrated"])      # the check measured the round trip first

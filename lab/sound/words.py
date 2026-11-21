@@ -1,21 +1,21 @@
 """What guitarists mean by the words they use, and what players and engineers do about it.
 
-Each word carries its remedies in the order the community tries them. The first
-one the loaded chain can perform is applied, and the rest stay one step away as
-other ways to get there. docs/TONE_KNOWLEDGE.md gives the reasoning and the sources.
+This is the one table of the player's words. Each word carries its remedies in
+the order the community tries them. The first one the loaded chain can perform
+is applied, and the rest stay one step away as other ways to get there.
+docs/TONE_KNOWLEDGE.md gives the reasoning and the sources.
 
 A remedy is a set of Shape knob moves (`lab.sound.knobs.KNOBS`). `read` takes a short
-remark such as "the low end gets muddy when I palm mute" or "no fizz";
-`usable` keeps the remedies a chain can perform; `brief` tells the assistant
-about the loaded gear and the words a longer request uses. Plain requests for
-more or less of a knob ("a bit tighter") are `lab.sound.knobs.direction`'s.
+remark such as "the low end gets muddy when I palm mute", "a bit tighter" or
+"no fizz"; `usable` keeps the remedies a chain can perform. `direction` reads
+what is left for a table to read: a plain request for more or less of
+something a knob stands for and no word here covers ("more gain", "a bit less
+reverb", "too much treble"). The two never read the same remark, so they
+cannot disagree. Anything else goes to the assistant.
 """
 
 from dataclasses import dataclass
 import re
-
-from lab.sound import catalog, knobs
-from lab import knowledge
 
 
 @dataclass(frozen=True)
@@ -201,6 +201,7 @@ LEXICON = {
         r("longer tails", tail=.3),
         r("wider effects", width=.3))),
     "wide": Word(toward=(r("wider effects", width=.3),), away=(r("narrower effects", width=-.3),)),
+    "narrow": Word(toward=(r("narrower effects", width=-.3),), away=(r("wider effects", width=.3),)),
     # Noise
     "noisy": Word(away=(
         r("a higher gate threshold", gate=.3),
@@ -225,7 +226,7 @@ SYNONYMS = {
     "bite": "cut attack", "plinky": "clicky clanky", "stiff": "hard sterile lifeless",
     "spongy": "squishy", "compressed": "squashed choked", "dynamic": "responsive",
     "mushy": "smeared blurry undefined indistinct", "clear": "clarity definition defined articulate articulation",
-    "smooth": "creamy liquid", "singing": "sing violin", "dirty": "gritty crunchy aggressive angry saturated",
+    "smooth": "creamy liquid", "singing": "sing violin", "dirty": "gritty crunchy aggressive angry saturated distorted",
     "chunky": "chug chuggy", "washy": "swimmy distant cavernous drowned", "spacious": "ambient roomy lush dreamy",
     "noisy": "hissy hiss hum noise", "choppy": "gated", "buried": "lost",
 }
@@ -235,7 +236,7 @@ COMPARATIVES = {
     "rounder": "warm", "rougher": "harsh", "harsher": "harsh", "duller": "dark", "punchier": "punchy",
     "smoother": "smooth", "creamier": "smooth",
     "clearer": "clear", "dirtier": "dirty", "grittier": "dirty", "crunchier": "dirty", "cleaner": "clean",
-    "drier": "dry", "dryer": "dry", "wetter": "wet", "roomier": "spacious", "wider": "wide", "glassier": "glassy",
+    "drier": "dry", "dryer": "dry", "wetter": "wet", "roomier": "spacious", "wider": "wide", "narrower": "narrow", "glassier": "glassy",
     "chunkier": "chunky", "jazzier": "jazzy", "airier": "airy", "stiffer": "stiff",
 }
 ALIASES = {**{word: word for word in LEXICON}, **COMPARATIVES,
@@ -260,7 +261,12 @@ TECHNIQUES = {
 }
 TECHNIQUE_NAMES = {"palm": "on palm mutes", "chords": "on chords", "leads": "on single notes",
                    "hard": "when you dig in"}
-_AMOUNT = "|".join(sorted(map(re.escape, knobs.AMOUNTS), key=len, reverse=True))
+# How much: said before a comparative ("a bit tighter", "much brighter") it scales the wish; said before a plain
+# word ("a bit bright", "really dark") it says how far the sound is that way, and scales the cure.
+AMOUNTS = {"a touch": .5, "a tad": .5, "a bit": .5, "a little bit": .5, "a little": .5, "slightly": .5,
+           "just a bit": .5, "somewhat": .7, "a lot": 1.7, "much": 1.7, "way": 2., "far": 1.7, "really": 1.5,
+           "very": 1.5, "so much": 1.7}
+_AMOUNT = "|".join(sorted(map(re.escape, AMOUNTS), key=len, reverse=True))
 _SUBJECT = (r"(?:(?:the |my |this |that )?(?:tone|sound|guitar|amp|lows|bass|bottom|highs|treble|top|mids|midrange|"
             r"notes|strings|it|this|that|they|everything|low strings|high strings))")
 _STATES = r"(?:is|are|gets|get|got|sounds|sound|feels|feel|becomes|become|goes|go|seems|seem|'s)"
@@ -306,12 +312,12 @@ def read(text):
     lead = re.match(rf"(?:(?P<want>{_WANTS})|(?:{_SUBJECT} )?(?:(?P<state>{_STATES}) )?)", words)
     rest = words[lead.end():].strip()
     asked, described = bool(lead["want"]), bool(lead[0]) and not lead["want"]
-    scale = 1.
+    scale, degree = 1., False
     amount = re.match(rf"(?:just )?(?:{_AMOUNT}) ", rest)
     if amount:
-        scale = knobs.AMOUNTS.get(amount[0].strip().removeprefix("just "), 1.)
+        scale, degree = AMOUNTS.get(amount[0].strip().removeprefix("just "), 1.), True
         rest = rest[amount.end():]
-    shape = (re.fullmatch(r"(?P<too>too|way too|far too|really|very|so|kind of|kinda|pretty|quite) (?P<word>\w+)", rest)
+    shape = (re.fullmatch(r"(?P<too>too|so|kind of|kinda|pretty|quite) (?P<word>\w+)", rest)
              or re.fullmatch(r"(?P<more>more|less|no|not enough|too much|too little|lacks|lacking|needs more|needs less) "
                              r"(?P<word>\w+)", rest)
              or re.fullmatch(r"not (?P<word>\w+) enough", rest)
@@ -333,18 +339,23 @@ def read(text):
     elif groups.get("neg") or shape.re.pattern.startswith("not ") or quantity in (
             "more", "no", "not enough", "too little", "lacks", "lacking", "needs more") or comparative:
         wanted = True
-    elif quantity in ("less", "too much", "needs less") or groups.get("too") in ("too", "way too", "far too"):
+    elif quantity in ("less", "too much", "needs less") or groups.get("too") == "too":
         wanted = False
-    elif groups.get("too") or described:
-        # "It sounds bright" and "really dark" describe a fault when the word can be one.
+    elif asked:
+        # "Make it bright" and "I want it really tight" ask for it, however much.
+        wanted = bool(entry.toward) or not entry.away
+    elif groups.get("too") or described or degree:
+        # "It sounds bright", "really dark", "a bit bright" and "kind of boxy" say how the sound is: a fault
+        # when the word can be one. (With a comparative, "a bit brighter", the same words scale a wish.)
         wanted = not entry.away
     else:
-        # "Make it bright" and a bare "bright" ask for it. A bare "thin" or "muddy" complains.
-        wanted = bool(entry.toward) and (asked or not entry.fault) or not entry.away
+        # A bare "bright" asks for it. A bare "thin" or "muddy" complains.
+        wanted = bool(entry.toward) and not entry.fault or not entry.away
     chosen = entry.toward if wanted else entry.away
     if not chosen:
-        opposite = (entry.away if wanted else entry.toward)[0]
-        chosen = (Remedy({knob: -step for knob, step in opposite.moves.items()}, _inverse(opposite.say)),)
+        # The word has no remedies of its own this way round: the first remedy of the other way, turned over.
+        opposite = {knob: -step for knob, step in (entry.away if wanted else entry.toward)[0].moves.items()}
+        chosen = (Remedy(opposite, saying(opposite)),)
     first = () if wanted else (entry.when or {}).get(technique, ())
     taken = {frozenset(remedy.moves) for remedy in first}
     remedies = tuple(Remedy({knob: round(step * scale, 2) for knob, step in remedy.moves.items()}, remedy.say)
@@ -354,15 +365,28 @@ def read(text):
     return Reading(key, technique if first else None, wanted, remedies, tip)
 
 
-def _inverse(say):
-    swaps = (("less ", "more "), ("leaner ", "fuller "), ("softer ", "brighter "), ("lower ", "higher "),
-             ("shorter ", "longer "), ("narrower ", "wider "), ("rounder ", "rougher "), ("darker ", "brighter "))
-    for first, second in swaps:
-        if say.startswith(first):
-            return second + say[len(first):]
-        if say.startswith(second):
-            return first + say[len(second):]
-    return "the opposite of " + say
+# What a turn of each knob is called, down and up, for a remedy made by turning another over: it says what the
+# moves do, whatever the remedy it was made from said.
+TURNS = {
+    "jazz": ("less of the jazz direction", "a rounder, cleaner direction with more mids"),
+    "drive": ("less gain", "more gain"), "brightness": ("a darker top", "a brighter top"),
+    "texture": ("a rounder top", "a rougher top"), "space": ("less delay and reverb", "more delay and reverb"),
+    "tightness": ("fuller lows", "leaner lows"), "attack": ("a faster compressor attack", "a slower compressor attack"),
+    "sustain": ("less sustain", "more sustain"), "gate": ("a lower gate threshold", "a higher gate threshold"),
+    "body": ("less body", "more body"), "mids": ("less midrange", "more midrange"),
+    "presence": ("less presence", "more presence"), "delay": ("less delay", "more delay"),
+    "delay_time": ("shorter echoes", "longer echoes"), "reverb": ("less reverb", "more reverb"),
+    "modulation": ("less movement", "more movement"), "width": ("narrower effects", "wider effects"),
+    "compression": ("less compression", "more even dynamics"), "punch": ("less pick bite", "more pick bite"),
+    "tail": ("shorter tails", "longer tails"), "motion": ("slower movement", "faster movement"),
+    "bloom": ("less bloom", "more bloom"),
+    "band_fit": ("less of the midrange lift that cuts through a band", "a midrange lift with leaner lows and less ambience"),
+}
+
+
+def saying(moves):
+    """Knob moves in the words of `TURNS`: "less bloom and a rougher top"."""
+    return " and ".join(TURNS[knob][step > 0] for knob, step in moves.items())
 
 
 def usable(reading, available):
@@ -372,29 +396,40 @@ def usable(reading, available):
     return tuple(remedy for remedy in reading.remedies if all(knob in available for knob in remedy.moves))
 
 
-# ---- What the assistant is told ----
+# ---- More or less of what a knob stands for ----
 
-def brief(model_ids, text=""):
-    """What the assistant should know before answering: the loaded gear and how players treat the remark."""
-    blocks = []
-    for model_id in model_ids:
-        entry = knowledge.gear(model_id)
-        if not entry or entry["kind"] == "effect":
-            continue
-        info = catalog.model(model_id)
-        note = {"model": info.name if info else str(model_id), "is": entry.get("real", ""),
-                "sound": entry.get("voice") or entry.get("signature") or entry.get("character", "")}
-        controls = {name: item["does"] for name, item in entry.get("controls", {}).items()}
-        if controls:
-            note["controls"] = controls
-        if entry.get("watch_out"):
-            note["watch_out"] = entry["watch_out"]
-        blocks.append(note)
-    said = []
-    words = set(re.findall(r"[a-z']+", text.lower()))
-    for alias in sorted(words & set(ALIASES)):
-        entry = LEXICON[ALIASES[alias]]
-        remedies = entry.away or entry.toward
-        said.append({"word": alias, "where": entry.region,
-                     "players_try_in_order": [remedy.say for remedy in remedies]})
-    return {key: value for key, value in (("loaded_gear", blocks), ("remarks", said)) if value}
+# What a player may ask for more or less of that no word above covers: a knob, or (knob, -1) for one whose "more"
+# turns the knob down ("more warmth" is rounder). A word `read` reads ("fizz", "bite", "sustain") is not here.
+QUANTITIES = {
+    "gain": "drive", "drive": "drive", "distortion": "drive", "dirt": "drive", "saturation": "drive",
+    "crunch": "drive", "reverb": "reverb", "delay": "delay", "echo": "delay", "echoes": "delay", "repeats": "tail",
+    "roughness": "texture", "texture": "texture", "brightness": "brightness",
+    "smoothness": ("texture", -1), "warmth": ("texture", -1), "movement": "modulation",
+    "mids": "mids", "midrange": "mids", "body": "body", "bass": "body", "low end": "body",
+    "lows": "body", "presence": "presence",
+    "treble": "presence", "highs": "presence", "top end": "presence", "space": "space", "room": "space",
+    "ambience": "space", "compression": "compression", "modulation": "modulation", "tremolo": "modulation",
+    "chorus": "modulation", "width": "width", "jazz": "jazz", "tightness": "tightness",
+    "gate": "gate",
+}
+STEPS = {"jazz": .4, "delay": .3}
+_QUANTITY = "|".join(sorted(map(re.escape, QUANTITIES), key=len, reverse=True))
+_LEAD = (r"(?:(?:can you |could you |please )?(?:make (?:it|this|that|the tone|the sound) "
+         r"|it(?:'s| is| sounds| feels| has) |sounds |needs |i need |i want |give (?:me|it) )?)")
+
+
+def direction(text):
+    """A plain request for more or less of one quantity, as a bounded knob move, or None.
+
+    Only whole phrases are read: "more gain", "a bit less reverb", "way too much treble", "not enough mids".
+    A remark `read` reads is never read here.
+    """
+    words = " ".join(re.findall(r"[a-z']+", text.lower().replace("’", "'"))).replace("moar ", "more ")
+    words = re.sub(r"\s*(?:please|thanks|thank you)$", "", words)
+    found = re.fullmatch(rf"{_LEAD}(?:({_AMOUNT}) )?(more|less|too much|not enough|too little) ({_QUANTITY})", words)
+    if not found or read(text) is not None:
+        return None
+    found_knob = QUANTITIES[found[3]]
+    key, sign = found_knob if isinstance(found_knob, tuple) else (found_knob, 1)
+    step = STEPS.get(key, .3) * AMOUNTS.get(found[1], 1.) * sign
+    return {key: round(step if found[2] in ("more", "not enough", "too little") else -step, 2)}

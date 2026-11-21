@@ -11,7 +11,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tone_lab import models  # noqa: E402
+import catalog_rows as models  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 TARGET = HERE.parent / "lab" / "tables" / "gear.json"

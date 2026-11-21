@@ -1,5 +1,5 @@
 {
- "about": "What the Neural DSP Nano Cortex holds per preset, and which virtual devices each fixed slot accepts (NanOS 2.x). Read by lab/nano.py. Device names are as Neural DSP publishes them; based-on names are Neural DSP's own.",
+ "about": "What the Neural DSP Nano Cortex holds per preset, and which virtual devices each fixed slot accepts (NanOS 2.x). Read by lab/gear/nano.py. Device names are as Neural DSP publishes them; based-on names are Neural DSP's own.",
  "sources": {
   "manual": {"title": "Nano Cortex User Manual", "url": "https://neuraldsp.com/manual/nano-cortex", "publisher": "Neural DSP", "accessed": "2026-11-19",
              "used_for": "Signal path (Performance Mode > Signal Path): 2 pre-effect slots, 1 Neural Capture, 1 IR Loader, 3 post-effect slots; capture volume -24 to +12 dB; BASS/MID/TREBLE knobs act on the current capture; IR Loader HI PASS, LOW PASS and LEVEL faders; six mic positions per factory microphone; AMOUNT knob moves a predetermined parameter per device; device parameters are dialled in the Cortex Cloud app."},

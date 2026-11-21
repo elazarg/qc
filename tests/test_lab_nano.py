@@ -65,7 +65,40 @@ class Sheet(unittest.TestCase):
         lines = nano.sheet(chain(Block(BRIT_2203), Block(CAB_MESA_OS_A), Block(TAPE, (), SCENE_SWITCHED))).lines()
         self.assertTrue(lines[0].startswith("Capture: Brit 2203"))
         self.assertTrue(lines[1].startswith("IR Loader: 412 CA Stand OS A V30 '01"))
-        self.assertIn("switch by hand", lines[-1])
+        self.assertIn("switch by hand", lines[2])
+
+    def test_a_value_that_differs_by_scene_is_given_for_scene_a_and_marked(self):
+        # Regression: a value that differed by scene was dropped from a slot without a word, and shown raw on the
+        # capture, though the Nano has no scenes.
+        gain = (.2, .9) + (.2,) * 6
+        mix = (.1, .6) + (.1,) * 6
+        sheet = nano.sheet(Chain((Row((Block(BRIT_2203).set(0, gain), Block(CAB_MESA_OS_A), Block(TAPE).set(0, mix)),
+                                      1, 19),), ("Rhythm", "Lead") + ("",) * 6))
+        self.assertIn("scene A's", str(sheet.capture["settings"]["Brit 2203"]["GAIN"]))
+        tape = next(slot for slot in sheet.slots if slot["slot"] == "Post 2")
+        self.assertTrue(any("scene A's" in value for value in tape["values"].values()), tape["values"])
+        self.assertIn("the Nano has none", sheet.scenes)
+        self.assertIn("Rhythm", sheet.scenes)
+        self.assertTrue(any(line.startswith("Scenes: ") for line in sheet.lines()))
+        self.assertEqual(nano.sheet(chain(Block(BRIT_2203), Block(CAB_MESA_OS_A))).scenes, "")
+
+    def test_what_sat_between_a_captured_drive_and_the_amp_is_said_to_have_moved(self):
+        # Regression: the capture takes the drive with the amp, which puts a compressor between them before the
+        # drive; the sheet did not say so.
+        sheet = nano.sheet(chain(Block(GREEN_808), Block(OPTO), Block(BRIT_2203), Block(CAB_MESA_OS_A)))
+        self.assertEqual(sheet.capture["blocks"], ["Green 808", "Brit 2203"])
+        pre = next(slot for slot in sheet.slots if slot["slot"] == "Pre 1")
+        self.assertEqual(pre["ahead_of"], "Green 808")
+        self.assertTrue(any("moved" in line and "Green 808" in line for line in sheet.lines()))
+        before = nano.sheet(chain(Block(OPTO), Block(GREEN_808), Block(BRIT_2203), Block(CAB_MESA_OS_A)))
+        self.assertEqual(next(slot for slot in before.slots if slot["slot"] == "Pre 1")["ahead_of"], "")
+
+    def test_values_are_said_to_be_the_quad_cortex_s(self):
+        # Regression: that the Nano's device has the same controls is an assumption, and the sheet did not label it.
+        lines = nano.sheet(chain(Block(BRIT_2203), Block(CAB_MESA_OS_A), Block(TAPE).set_display(8, 420))).lines()
+        self.assertTrue(any("Quad Cortex's" in line and "Cortex Cloud" in line for line in lines))
+        bare = nano.sheet(chain(Block(BRIT_2203), Block(CAB_MESA_OS_A))).lines()
+        self.assertFalse(any("Cortex Cloud" in line for line in bare))      # no values given, nothing to label
 
     def test_research_slots_follow_the_manual(self):
         table = nano.research()

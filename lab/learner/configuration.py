@@ -1,25 +1,31 @@
-"""Infer a pickup and approximate knob positions from mixed DI examples."""
+"""Tell a guitar's pickup setting and roughly where its knobs are from dry audio, after labelled examples.
+
+`fit(guitar, examples)` keeps, for each taught pickup setting and each note, the harmonic shape and level at
+every knob position taught. `estimate(profile, dry)` compares a clip with those, note by note, and names a
+control only where the examples can tell it apart; otherwise it says why not.
+
+What the answer means: "match" is how close the clip is to the nearest taught example ("close", "near",
+"far", or "none"): a distance, not a chance of being right. A knob comes back as the range of taught
+positions about as close as the best. Volume is read mostly from the level of the dry signal, so it holds
+only for picking as hard as in the examples, at the same input gain.
+"""
 
 from collections import defaultdict
 from itertools import combinations, product
-import json
 import math
-from pathlib import Path
 
 import numpy as np
 from scipy.interpolate import LinearNDInterpolator
 from scipy.spatial import QhullError
 
 from lab.learner import state as guitar_state
-from lab.learner.folders import write_json
+from lab.learner.profiles import CATEGORY_KEYS, SCHEMA, SIGNATURE_SIZE, setup
 
-SCHEMA = 1
-SIGNATURE_SIZE = guitar_state.HARMONICS + 1
-CATEGORY_KEYS = ("pickup", "wiring")
 METADATA_KEYS = {"wav", "start", "end", "source_id", "role", "id"}
 LEVEL_WEIGHT = .4
 MAX_DISTANCE = 2.1
 NEAR_BEST = .66
+CLOSE, NEAR = .55, 1.25         # distances under which a match is called close, and near
 MIN_NOTE_COVERAGE = .35
 
 
@@ -27,21 +33,7 @@ def _configuration(example):
     config = example.get("configuration")
     if config is None:
         config = {key: value for key, value in example.items() if key not in METADATA_KEYS}
-    if not isinstance(config, dict):
-        raise ValueError("Enter a pickup and knob settings for each example.")
-    pickup, wiring = config.get("pickup"), config.get("wiring")
-    if isinstance(pickup, str):
-        pickup = pickup.strip()
-    if type(pickup) is not int and not (isinstance(pickup, str) and pickup):
-        raise ValueError("Choose a pickup position for each example.")
-    if wiring is not None and (not isinstance(wiring, str) or not wiring.strip()):
-        raise ValueError("Choose the wiring switch position for each example.")
-    knobs = {key: value for key, value in config.items() if key not in CATEGORY_KEYS}
-    if (not 1 <= len(knobs) <= 4 or any(not isinstance(key, str) or not key for key in knobs)
-            or any(type(value) not in (float, int) or not math.isfinite(value) or not 0 <= value <= 10
-                   for value in knobs.values())):
-        raise ValueError("Enter knob settings between 0 and 10.")
-    return pickup, wiring.strip() if wiring is not None else None, knobs
+    return setup(config)
 
 
 def _signatures(dry, start=None, end=None):
@@ -76,7 +68,7 @@ def _active_knobs(pickup, knobs):
     return list(knobs)
 
 
-def calibrate(guitar, examples):
+def fit(guitar, examples):
     """Fit note-dependent templates on the observed part of each pickup's knob ranges."""
     guitar = guitar.strip()
     if not guitar:
@@ -88,7 +80,7 @@ def calibrate(guitar, examples):
     count = 0
     for example in examples:
         if example.get("role") not in (None, "example"):
-            raise ValueError("Keep test performances out of the calibration examples.")
+            raise ValueError("Keep the checks out of the teaching examples.")
         pickup, wiring, labelled = _configuration(example)
         controls = sorted(labelled)
         if knobs is not None and knobs != controls:
@@ -120,45 +112,6 @@ def calibrate(guitar, examples):
     scales = {note: np.maximum(floor, np.median(values, axis=0)).tolist() for note, values in noise.items()}
     return {"schema": SCHEMA, "guitar": guitar, "knobs": knobs, "setups": setups, "scales": scales,
             "example_count": count, "source_ids": sorted(source_ids)}
-
-
-def _validate(profile):
-    try:
-        knobs, setups, scales = profile["knobs"], profile["setups"], profile["scales"]
-        if (profile["schema"] != SCHEMA or not profile["guitar"].strip()
-                or not 1 <= len(knobs) <= 4 or len(knobs) != len(set(knobs)) or not setups or not scales):
-            raise ValueError
-        for values in scales.values():
-            scale = np.asarray(values, dtype=float)
-            if scale.shape != (SIGNATURE_SIZE,) or not np.isfinite(scale).all() or np.min(scale) <= 0:
-                raise ValueError
-        for setup in setups:
-            _configuration({"configuration": {"pickup": setup["pickup"], "wiring": setup["wiring"],
-                                               **dict.fromkeys(setup["knobs"], 0)}})
-            if not set(setup["knobs"]) <= set(knobs) or not setup["notes"]:
-                raise ValueError
-            for note, anchors in setup["notes"].items():
-                positions = np.asarray(anchors["positions"], dtype=float)
-                centers = np.asarray(anchors["centers"], dtype=float)
-                if (note not in scales or positions.shape != (len(centers), len(setup["knobs"]))
-                        or centers.shape != (len(centers), SIGNATURE_SIZE) or not len(centers)
-                        or not np.isfinite(centers).all() or not np.isfinite(positions).all()
-                        or positions.min() < 0 or positions.max() > 10):
-                    raise ValueError
-    except (AttributeError, KeyError, TypeError, ValueError) as error:
-        raise ValueError("This guitar configuration profile could not be read.") from error
-    return profile
-
-
-def save_profile(path, profile):
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    write_json(path, _validate(profile))
-    return path
-
-
-def load_profile(path):
-    return _validate(json.loads(Path(path).read_text(encoding="utf-8")))
 
 
 def _grid(points):
@@ -323,14 +276,14 @@ def _paired_categories(setups, observations, scales, total_frames, min_notes):
 def estimate(profile, dry, *, start=None, end=None, source_id=None):
     """Return plausible settings in the taught ranges, or abstain when cues overlap."""
     if source_id and source_id in profile.get("source_ids", ()):
-        raise ValueError("Choose a fresh performance. This recording was used for calibration.")
+        raise ValueError("Choose a fresh performance. This recording was used to teach.")
     return _estimate_from_signatures(profile, _signatures(dry, start, end))
 
 
 def _estimate_from_signatures(profile, observed):
     knobs, setups = profile["knobs"], profile["setups"]
     result = {"pickup": None, "wiring": None, "tone": None, "volume": None, **dict.fromkeys(knobs),
-              "notes_used": [], "confidence": "uncertain", "evidence": {}, "nearest": None}
+              "notes_used": [], "match": "none", "evidence": {}, "nearest": None}
     if not observed:
         return {**result, "reason": "No sustained single notes detected."}
     scales = profile["scales"]
@@ -370,8 +323,8 @@ def _estimate_from_signatures(profile, observed):
     if result["evidence"]:
         result["notes_used"] = sorted({note for row in result["evidence"].values() for note in row["notes_used"]})
         complete = all(result[key] is not None for key in knobs) and result["pickup"] is not None
-        confidence = "strong" if best < .55 and complete else "good" if best < 1.25 else "tentative"
-        return {**result, "confidence": confidence, "reason": "Estimate from comparable notes. Picking and input gain affect the result."}
+        match = "close" if best < CLOSE and complete else "near" if best < NEAR else "far"
+        return {**result, "match": match, "reason": "Estimate from comparable notes. Picking and input gain affect the result."}
     if result["nearest"]:
         return {**result, "reason": "The nearest example is inconclusive. Teach the same notes at more distinct settings."}
     if _coverage(stable, total_frames) < .5:

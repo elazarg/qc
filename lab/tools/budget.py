@@ -2,12 +2,13 @@
 
 The unit answers one read (ModuleStats) with the processing and memory every
 model it can load needs, and what each of its processors offers. This writes
-that table where `knowledge.table("costs")` reads it (`costs.json`, beside the
-shared knowledge), with the firmware it was read on, so that `knowledge.stale`
-notices a firmware update. `knowledge.weigh` turns it into whether a chain
-fits; docs/TONE_KNOWLEDGE.md records how the limits per processor were found.
+that table where `knowledge.table("costs")` reads it (`costs.json`, with the
+tables that ship in `lab/tables`), with the firmware it was read on, so that
+`knowledge.stale` notices a firmware update. `knowledge.weigh` turns it into
+whether a chain fits; docs/TONE_KNOWLEDGE.md records how the limits per
+processor were found.
 
-Carried over from `tone_lab.budget.refresh`. It is an operation run where the
+Carried over from the earlier app's budget reader. It is an operation run where the
 unit is held: `host.call("lab.tools.budget.measure")`, or
 `python -m lab budget`. Nothing is written to the unit and nothing is loaded.
 """
@@ -17,6 +18,7 @@ import os
 from pathlib import Path
 
 from lab import knowledge
+from lab.qc.unit import Stopped
 
 FIELDS = {"cpu": "cpu_percent", "dm": "dm_heap_bytes", "pm": "pm_heap_bytes", "dmda": "dmda_bytes",
           "pmda": "pmda_bytes", "memory": "edma_percent", "latency": "latency"}
@@ -49,7 +51,7 @@ def table_of(stats, firmware):
 def measure(engine, *, stop=None, path=None):
     """Read every model's cost from the unit and write the costs table. Returns where, how many, which firmware."""
     if stop is not None and stop.is_set():
-        raise RuntimeError("Stopped.")
+        raise Stopped("Stopped.")
     engine.quiet()
     reply = engine.unit.device.read_message("ModuleStats", timeout_ms=6000)
     record = table_of(reply, engine.unit.firmware)

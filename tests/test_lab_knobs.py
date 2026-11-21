@@ -141,6 +141,29 @@ class ScenesTest(EvenAmps):
         self.assertLess(result.block(0, 0).display(0, 1), 7.)
         self.assertAlmostEqual(result.block(0, 0).display(0, 0), 3., places=4)
 
+    def test_without_a_scene_a_pedal_that_is_off_in_the_first_scene_still_answers(self):
+        from dataclasses import replace
+        fuzz, at = 22, index(22, "FUZZ")
+        lead_only = replace(block(fuzz, {"FUZZ": 5.}), bypass=(True, False) + (False,) * 6)   # off in A, on after
+        source = chain(lead_only, block(1084))
+        whole = knobs.targets(source, {"drive": .5})
+        self.assertEqual(whole[0, 0, at], knobs.targets(source, {"drive": .5}, scene=1)[0, 0, at])
+        self.assertGreater(knobs.apply(source, {"drive": .5}).block(0, 0).display(at), 5.)
+        self.assertNotIn((0, 0, at), knobs.targets(source, {"drive": .5}, scene=0))   # named, scene A leaves it be
+        off = chain(replace(block(fuzz, {"FUZZ": 5.}), bypass=True), block(1084))
+        self.assertNotIn((0, 0, at), knobs.targets(off, {"drive": .5}))               # off everywhere: left alone
+
+    def test_without_a_scene_the_filter_doing_the_work_is_judged_where_its_block_is_on(self):
+        from dataclasses import replace
+        cab = replace(block(12006, {"LPF": 6000.}), bypass=(True, False) + (False,) * 6)   # off in scene A only
+        source = chain(cab, block(4005, {"LPF": 12000.}))
+        whole = moves(source, {"texture": -.5})
+        self.assertLess(whole["412 Brit 60B GB 71 (M)", "LPF"], 0)        # the lower low-pass, where it is heard
+        self.assertNotIn(("Graphic-9", "LPF"), whole)
+        first = moves(source, {"texture": -.5}, scene=0)                   # in scene A the cab is off: the EQ's
+        self.assertLess(first["Graphic-9", "LPF"], 0)
+        self.assertNotIn(("412 Brit 60B GB 71 (M)", "LPF"), first)
+
 
 class FiltersTest(EvenAmps):
     def test_owned_ir_filters_participate_in_musical_directions(self):
@@ -189,6 +212,18 @@ class EffectsTest(EvenAmps):
         cut = knobs.moves(source, {"tail": .5, "delay": -1.})
         self.assertEqual([edit["name"] for edit in cut], ["FEEDBACK"])
         self.assertEqual(source.block(0, 0).get(0), 0.)
+
+    def test_a_knob_turned_down_never_brings_in_an_effect_that_was_not_heard(self):
+        room = chain(block(6011, {"MIX": 30.}), block(8000, {"MIX": 0.}))
+        shorter = {(edit["model"], edit["name"]): edit["to"] for edit in knobs.moves(room, {"tail": -.3})}
+        self.assertNotIn(("Room", "MIX"), shorter)                    # "shorter tails" adds no reverb
+        self.assertLess(shorter[("Room", "DECAY")], 1.)
+        self.assertEqual([edit["name"] for edit in knobs.moves(chain(block(6011, {"MIX": 0.})), {"width": -1.})],
+                         ["WIDTH", "STEREO WIDTH"])
+        self.assertEqual([edit["name"] for edit in knobs.moves(chain(block(6011, {"MIX": 0., "SYNC": 0.})),
+                                                               {"delay_time": -1.})], ["DELAY TIME"])
+        longer = {(edit["model"], edit["name"]): edit["to"] for edit in knobs.moves(room, {"tail": .5})}
+        self.assertAlmostEqual(longer[("Room", "MIX")], 8.)           # turned up, it is brought in to be heard
 
     def test_a_synced_delay_keeps_its_time(self):
         synced = chain(block(6011, {"SYNC": 1.}))
@@ -311,18 +346,29 @@ class AvailableTest(unittest.TestCase):
 
 
 class DirectionTest(unittest.TestCase):
-    def test_plain_directions_become_bounded_knob_moves(self):
-        for words, move in (("tighter", {"tightness": .3}), ("A bit tighter.", {"tightness": .15}),
-                            ("much brighter", {"brightness": .51}), ("more jazz", {"jazz": .4}),
-                            ("less delay", {"delay": -.3}), ("darker", {"brightness": -.35}),
-                            ("a little less reverb", {"reverb": -.15}), ("too bright", {"brightness": -.3}),
-                            ("it's too harsh", {"texture": -.3}), ("too much gain", {"drive": -.3}),
-                            ("not enough mids", {"mids": .3}), ("make it warmer", {"texture": -.3}),
-                            ("needs more sustain", {"sustain": .3}), ("brighter please", {"brightness": .3})):
-            self.assertEqual(knobs.direction(words), move, words)
-        for words in ("Less bite, keep the attack.", "the low end gets muddy when I palm mute", "tighter and brighter",
-                      "more Andy Timmons", "more", "too", "John Mayer Gravity", "undo"):
-            self.assertIsNone(knobs.direction(words), words)
+    def test_more_or_less_of_a_quantity_becomes_a_bounded_knob_move(self):
+        for said, move in (("more jazz", {"jazz": .4}), ("less delay", {"delay": -.3}),
+                           ("a little less reverb", {"reverb": -.15}), ("too much gain", {"drive": -.3}),
+                           ("way too much gain", {"drive": -.6}), ("not enough mids", {"mids": .3}),
+                           ("More gain, please", {"drive": .3}), ("needs more warmth", {"texture": -.3}),
+                           ("it has too much treble", {"presence": -.3}), ("a lot more dirt", {"drive": .51})):
+            self.assertEqual(knobs.direction(said), move, said)
+        for said in ("Less bite, keep the attack.", "the low end gets muddy when I palm mute", "tighter and brighter",
+                     "more Andy Timmons", "more", "too", "John Mayer Gravity", "undo"):
+            self.assertIsNone(knobs.direction(said), said)
+
+    def test_the_words_are_one_table_and_it_is_not_this_one(self):
+        from lab.sound import words
+
+        # Comparatives and complaints are `words.read`'s; what it reads is never read a second way here.
+        for said in ("tighter", "A bit tighter.", "much brighter", "darker", "too bright", "it's too harsh",
+                     "make it warmer", "brighter please", "heavier", "too boomy", "more attack", "needs more sustain",
+                     "more fizz", "too rough", "narrower", "too distorted"):
+            self.assertIsNotNone(words.read(said), said)
+            self.assertIsNone(knobs.direction(said), said)
+        for name in ("COMPARATIVES", "COMPLAINTS", "QUANTITIES", "AMOUNTS"):
+            self.assertFalse(hasattr(knobs, name), name)
+        self.assertIs(knobs.direction("more gain") == words.direction("more gain"), True)
 
     def test_every_knob_is_a_quality_heard_not_a_control_or_a_device(self):
         mechanisms = {"mic", "microphone", "position", "low cut", "high cut", "low-pass", "high-pass", "filter",
@@ -380,7 +426,7 @@ class CheckTest(unittest.TestCase):
         found = knobs.check(self.BEFORE, after, {"brightness": .5, "texture": .5, "body": .5, "space": .5,
                                                  "drive": .5, "mids": .4, "attack": .3, "sustain": 0.})
         self.assertEqual(found["brightness"], {"measure": "brightness_oct", "change": .2, "sign": 1,
-                                               "verdict": "as intended", "units": "octave"})
+                                               "verdict": "as intended", "units": "octave", "proxy": False})
         self.assertEqual(found["texture"]["verdict"], "as intended")       # tristimulus 3 rose
         self.assertEqual(found["body"]["verdict"], "too small")
         self.assertEqual(found["space"]["verdict"], "opposite")
@@ -403,6 +449,39 @@ class CheckTest(unittest.TestCase):
         self.assertEqual(knobs.check(self.BEFORE, {"brightness_oct": None}, {"brightness": .5})["brightness"]["verdict"],
                          "not measurable")
         self.assertEqual(set(knobs.EXPECTED) <= set(knobs.KNOBS), True)
+
+    def test_a_knob_is_judged_by_its_own_measure_and_by_a_stand_in_only_without_it(self):
+        # More low end with the highs untouched lowers the spectral centre: the highs' own measure says the
+        # Brightness knob did nothing, whatever the centre did.
+        before = {"brightness_db": 0., "brightness_oct": 0., "tail_db": -40., "attack_ms": 30., "first_rise_ms": 8.,
+                  "probe": {"late_energy_db": -30.}}
+        after = {"brightness_db": 0.1, "brightness_oct": .4, "tail_db": -20., "attack_ms": 10., "first_rise_ms": 8.,
+                 "probe": {"late_energy_db": -30.}}
+        found = knobs.check(before, after, {"brightness": .5, "reverb": .5, "attack": .5})
+        self.assertEqual((found["brightness"]["measure"], found["brightness"]["verdict"]),
+                         ("brightness_db", "too small"))
+        self.assertEqual((found["reverb"]["measure"], found["reverb"]["verdict"]), ("late_energy_db", "too small"))
+        self.assertEqual((found["attack"]["measure"], found["attack"]["verdict"]), ("first_rise_ms", "too small"))
+        # A sound heard before those were measured is still judged, by the stand-in.
+        old = knobs.check({"brightness_oct": 0.}, {"brightness_oct": .4}, {"brightness": .5})
+        self.assertEqual((old["brightness"]["measure"], old["brightness"]["verdict"]),
+                         ("brightness_oct", "as intended"))
+        for knob, measures in knobs.EXPECTED.items():
+            paths = [path for path, *_ in measures]
+            self.assertFalse(paths[0] in knobs.FALLBACK, knob)        # a stand-in never comes first
+
+    def test_a_knob_judged_by_another_qualitys_measurement_says_so(self):
+        # How long a note lasts is not measured: Sustain is judged by the compression measure, and marked.
+        self.assertEqual(knobs.PROXY, {"sustain": "compression"})
+        for key, measure in knobs.PROXY.items():
+            self.assertEqual([path for path, *_ in knobs.EXPECTED[key]], [measure])
+        after = {**self.BEFORE, "compression": .3}
+        found = knobs.check(self.BEFORE, after, {"sustain": .5, "compression": .5})
+        self.assertEqual((found["sustain"]["measure"], found["sustain"]["proxy"]), ("compression", True))
+        self.assertFalse(found["compression"]["proxy"])
+        self.assertTrue(knobs.check(None, None, {"sustain": .5})["sustain"]["proxy"])
+        self.assertTrue({path.removeprefix("probe.") for rows in knobs.EXPECTED.values() for path, *_ in rows}
+                        == set(knobs.MEASURES))                 # every measure has its words, and no words are spare
 
 
 if __name__ == "__main__":

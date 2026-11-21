@@ -79,6 +79,7 @@ class ControlsWindow(Window):
     def build(self):
         self.group, self.base = "Main", None
         self.scales = {}
+        self.shown = None               # what the board was last drawn from
         knobs_card = section(self.body, "Every knob")
         self.name = label(knobs_card, size=10, bold=True)
         self.name.pack(fill="x")
@@ -115,10 +116,8 @@ class ControlsWindow(Window):
         button(unit, "Read it back", self.read_back, quiet=True).pack(anchor="w")
         self.held = label(unit, size=9, wrap=560)
         self.held.pack(fill="x", pady=(4, 0))
-        self.listener = lambda state: self.top.after_idle(self.refresh) if self.alive() else None
-        listeners = getattr(self.studio, "listeners", None)
-        if listeners is not None:
-            listeners.append(self.listener)
+        self.listener = lambda state: self.after(0, self.refresh) if self.alive() else None
+        self.studio.listeners.append(self.listener)
         self.refresh()
 
     # the knobs
@@ -133,7 +132,7 @@ class ControlsWindow(Window):
         # The desk's state changes often (its working line); the board is rebuilt only when what it shows does.
         shown = (self.studio.state.side, sound.id if sound else None, tuple(sorted((sound.knobs if sound else {})
                                                                                    .items())), self.group, self.base)
-        if shown == getattr(self, "shown", None) and not force:
+        if shown == self.shown and not force:
             return
         self.shown = shown
         self.name.configure(text=f"{self.studio.state.side.upper()} · {sound.name}" if sound else
@@ -254,8 +253,7 @@ class ControlsWindow(Window):
             self.studio.put(self.studio.state.side, line[place])
 
     def save(self):
-        save = getattr(self.desk, "save", None)
-        (save or self.studio.save)()
+        self.desk.save()                # the desk asks for the name in place, as its own Save to QC does
 
     # the unit
 
@@ -266,9 +264,8 @@ class ControlsWindow(Window):
         self.call("lab.tools.controls.held", done=shown, working="Reading the Quad Cortex…")
 
     def close(self):
-        listeners = getattr(self.studio, "listeners", None)
-        if listeners is not None and self.listener in listeners:
-            listeners.remove(self.listener)
+        if self.listener in self.studio.listeners:
+            self.studio.listeners.remove(self.listener)
         super().close()
 
 

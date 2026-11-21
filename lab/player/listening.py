@@ -8,9 +8,11 @@ it played, when, and how it started and ended. Everything else in the export
 From that it works out:
 
 - how much each artist and song was listened to, over all and recently;
-- which songs were chosen deliberately (started by a click, not by shuffle or
-  autoplay, and played through) and how often they were come back to,
-  which says more about liking than time alone;
+- which songs were chosen (the play was started by the listener's own click on
+  the track, the play button or the back button, whatever the shuffle switch
+  said) and on how many days they were come back to, which says more about
+  liking than time alone. Only the extended export records how a play was
+  started; for the short one "chosen" is not recorded (None), never 0;
 - which songs were listened to in a live version as well as a studio one,
   since a recorded tone differs between them;
 - which songs already have a preset or a sound of the player's, by name;
@@ -30,11 +32,14 @@ from datetime import datetime, timedelta, timezone
 import json
 import re
 
-from lab.player.spotify import entries, song_key
+from lab.player.spotify import MINIMUM_MS, entries, song_key, track_of
 
+# Spotify's reason_start values for a play the listener started by hand: a click on the track, the play button,
+# the back button (playing it again). The rest ("trackdone", "fwdbtn", "appload", "remote", ...) are the queue
+# moving on or cannot be told. The export's own "shuffle" field is the state of the shuffle switch, not how this
+# play was started, so it is not looked at.
 DELIBERATE_STARTS = {"clickrow", "playbtn", "backbtn"}
 COMPLETE_ENDS = {"trackdone"}
-MINIMUM_MS = 30_000
 LIVE = re.compile(r"\blive\b|\(live|- live|unplugged|in concert", re.I)
 
 
@@ -45,7 +50,7 @@ class Play:
     album: str
     ms: int
     ts: str
-    deliberate: bool      # started by the listener's own click, not shuffle, autoplay or the next track
+    deliberate: bool | None   # started by the listener's own click; None when the export does not record it
     complete: bool        # played to the end
     skipped: bool
 
@@ -54,16 +59,14 @@ def plays(paths):
     """The music plays in an export: files, folders or the zip. Podcasts, audiobooks and video are left out."""
     found = []
     for row in entries(paths):
-        if not isinstance(row, dict):
+        track = track_of(row)
+        if track is None:
             continue
-        artist = row.get("master_metadata_album_artist_name") or row.get("artistName")
-        title = row.get("master_metadata_track_name") or row.get("trackName")
-        if not artist or not title:
-            continue
-        found.append(Play(artist=str(artist), title=str(title), album=str(row.get("master_metadata_album_album_name") or ""),
-                          ms=int(row.get("ms_played", row.get("msPlayed", 0)) or 0),
-                          ts=str(row.get("ts") or row.get("endTime") or ""),
-                          deliberate=row.get("reason_start") in DELIBERATE_STARTS and not row.get("shuffle"),
+        artist, title, ms = track
+        started = row.get("reason_start")
+        found.append(Play(artist=artist, title=title, album=str(row.get("master_metadata_album_album_name") or ""),
+                          ms=ms, ts=str(row.get("ts") or row.get("endTime") or ""),
+                          deliberate=None if not started else started in DELIBERATE_STARTS,
                           complete=row.get("reason_end") in COMPLETE_ENDS,
                           skipped=bool(row.get("skipped"))))
     return found
@@ -80,14 +83,16 @@ def _when(text):
 
 
 def summarize(found, *, recent_days=365, now=None, limit=40):
-    """Totals by year, top artists over all and recently, and the songs chosen and come back to most."""
+    """Totals by year, top artists (by hours) over all and recently, and the songs chosen and come back to most:
+    ordered by how often they were chosen, then by the days they were played on, then by hours. A song's "chosen"
+    is None when none of its plays records how it was started (the short export)."""
     heard = [play for play in found if play.ms >= MINIMUM_MS]
     stamps = [_when(play.ts) for play in heard]
     latest = now or max((stamp for stamp in stamps if stamp), default=datetime.now(timezone.utc))
     cutoff = latest - timedelta(days=recent_days)
     years, artists, recent_artists = Counter(), Counter(), Counter()
-    songs = defaultdict(lambda: {"ms": 0, "plays": 0, "chosen": 0, "complete": 0, "skipped": 0, "live": False,
-                                 "studio": False, "days": set(), "artist": "", "title": ""})
+    songs = defaultdict(lambda: {"ms": 0, "plays": 0, "chosen": None, "live": False, "studio": False, "days": set(),
+                                 "artist": "", "title": ""})
     for play, stamp in zip(heard, stamps):
         hours = play.ms / 3.6e6
         if stamp:
@@ -100,9 +105,8 @@ def summarize(found, *, recent_days=365, now=None, limit=40):
         song["artist"], song["title"] = song["artist"] or play.artist, song["title"] or play.title
         song["ms"] += play.ms
         song["plays"] += 1
-        song["chosen"] += play.deliberate
-        song["complete"] += play.complete
-        song["skipped"] += play.skipped
+        if play.deliberate is not None:
+            song["chosen"] = (song["chosen"] or 0) + bool(play.deliberate)
         live = bool(LIVE.search(play.title) or LIVE.search(play.album))
         song["live" if live else "studio"] = True
         if stamp:
@@ -111,10 +115,9 @@ def summarize(found, *, recent_days=365, now=None, limit=40):
     for song in songs.values():
         ranked.append({"artist": song["artist"], "title": song["title"], "hours": round(song["ms"] / 3.6e6, 1),
                        "plays": song["plays"], "chosen": song["chosen"], "days": len(song["days"]),
-                       "completion": round(song["complete"] / song["plays"], 2) if song["plays"] else 0,
                        "both_versions": song["live"] and song["studio"]})
-    # Coming back on many different days, by choice, is the strongest sign of liking a song.
-    ranked.sort(key=lambda song: (song["chosen"] + song["days"], song["hours"]), reverse=True)
+    # Choosing a song, again and again, is the strongest sign of liking it; then the days it was come back to.
+    ranked.sort(key=lambda song: (song["chosen"] or 0, song["days"], song["hours"]), reverse=True)
     return {"hours": round(sum(play.ms for play in heard) / 3.6e6), "plays": len(heard),
             "years": {year: round(hours) for year, hours in sorted(years.items())},
             "artists": [(artist, round(hours, 1)) for artist, hours in artists.most_common(limit)],
@@ -194,10 +197,13 @@ def report(summary, context=None, presets=None):
         lines.append(f"Of the top {len(context)} artists, {len(led)} make guitar-led music; their guitar tones lean "
                      f"to {', '.join(f'{tone} ({n})' for tone, n in tones.most_common(6))}.")
     songs = presets if presets is not None else summary["songs"]
-    lines.append("Songs chosen and come back to most:")
+    recorded = any(song.get("chosen") is not None for song in songs)
+    lines.append("Songs chosen and come back to most:" if recorded else
+                 "Songs come back to on the most days (this export does not record how a play was started, so "
+                 "which were chosen is not known):")
     for song in songs[:25]:
         extra = f"; you have a preset: {song['preset']}" if song.get("preset") else ""
         both = "; heard live and studio" if song.get("both_versions") else ""
-        lines.append(f"  {song['artist']} - {song['title']}: chosen {song['chosen']} times on "
-                     f"{song['days']} days, {song['hours']} h{both}{extra}")
+        chosen = "chosen: not recorded, played" if song.get("chosen") is None else f"chosen {song['chosen']} times, played"
+        lines.append(f"  {song['artist']} - {song['title']}: {chosen} on {song['days']} days, {song['hours']} h{both}{extra}")
     return lines

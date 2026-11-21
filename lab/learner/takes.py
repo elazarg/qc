@@ -1,4 +1,13 @@
-"""Recording a take: the guitar's dry input and the unit's processed return, saved together."""
+"""Recording a take: the guitar's dry input and the unit's processed return, saved together.
+
+    folder, said = record_take(1, "Charvel", stop, ready, routing=lambda: inputs.routing(host, 1))
+
+All four USB inputs are recorded while `routing` asks the engine which of them
+is the dry guitar. When the engine cannot say (no unit, or it is busy past
+the wait), the dry input is found from the signal itself where that is
+unambiguous, and otherwise all four inputs are kept as they came, for the
+routing to be settled later; the take's note says which happened.
+"""
 
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
@@ -42,8 +51,9 @@ def latest_clip():
     return clip_info(paths[0])
 
 
-def infer_editor_pair(samples, input_channel):
-    """Identify a pair only when the selected dry input has a quiet neighbour."""
+def infer_pair(samples, input_channel):
+    """(dry, wet left, wet right) from the signal alone: only when the chosen dry input has a quiet neighbour, in
+    exactly one of the two ways the unit can route its inputs to USB."""
     if input_channel not in (1, 2) or len(samples) < audio.RATE // 2:
         return None
     rms = np.sqrt(np.mean(np.square(samples, dtype=np.float64), axis=0))
@@ -57,55 +67,54 @@ def infer_editor_pair(samples, input_channel):
     return possible[0] if len(possible) == 1 else None
 
 
-def record_take(input_channel, guitar, stop, ready):
-    """Save one performance and return its folder and recording status."""
+def record_take(input_channel, guitar, stop, ready, *, routing):
+    """Save one performance and return its folder and what to say of it."""
     take_id = uuid4().hex[:6]
     LOG.info("Capture %s requested on physical input %d", take_id, input_channel)
-    # Capture both USB pairs immediately. Resolve their meaning while the take runs.
-    with ThreadPoolExecutor(max_workers=1, thread_name_prefix="clip-routing") as routing:
-        channel_mapping = routing.submit(inputs.recording_channels, input_channel, include_context=True)
-        LOG.info("Capture %s opening ASIO inputs 1–4 at %d Hz", take_id, audio.RATE)
-        samples = inputs.record_inputs(audio.MAX_SECONDS, (1, 2, 3, 4), stop=stop, ready=ready)
+    # Capture both USB pairs at once. The engine says what they are while the take runs.
+    with ThreadPoolExecutor(max_workers=1, thread_name_prefix="clip-routing") as asked:
+        answer = asked.submit(routing)
+        samples, dropouts = inputs.record_inputs(audio.MAX_SECONDS, (1, 2, 3, 4), stop=stop, ready=ready)
         try:
-            channels, context = channel_mapping.result()
-        except inputs.EditorActive:
-            channels = infer_editor_pair(samples, input_channel)
-            context = {"usb_mapping_source": "inferred-from-signal", "wet_preset_unverified": True}
-        except Exception:
-            LOG.exception("Capture %s could not verify dry/wet routing", take_id)
-            channels = None
-    LOG.info("Capture %s received %d frames", take_id, len(samples))
+            channels, context = answer.result()
+        except Exception as error:  # noqa: BLE001 - whatever stopped the engine answering, the take is kept
+            LOG.warning("Capture %s: the engine did not say which inputs are dry (%s)", take_id, error, exc_info=True)
+            channels = infer_pair(samples, input_channel)
+            context = {"usb_mapping_source": "inferred-from-signal", "wet_preset_unverified": True,
+                       "routing_unread": str(error)}
     if len(samples) < audio.RATE // 2:
         raise ValueError("Wait for Recording, then play for at least half a second.")
     folder = folders.recordings()
     folder.mkdir(parents=True, exist_ok=True)
     duration = len(samples) / audio.RATE
     destination = folder / f"clip-{datetime.now():%Y%m%d-%H%M%S}-{take_id}"
+    info = {"duration_seconds": duration, "sample_rate": audio.RATE, "guitar": guitar, "physical_input": input_channel}
+    if dropouts:
+        info["dropouts_seconds"] = dropouts
+        LOG.warning("Capture %s: the driver dropped input %d time(s); the take is kept", take_id, len(dropouts))
+    gaps = f" · {len(dropouts)} dropout{'s' if len(dropouts) != 1 else ''} in the audio" if dropouts else ""
     if channels is None:
         with TemporaryDirectory(dir=folder, prefix=".capture-") as directory:
             staging = Path(directory)
             audio.write_wave(staging / "inputs.wav", samples)
-            write_json(staging / "clip.json", {"duration_seconds": duration, "sample_rate": audio.RATE,
-                                               "guitar": guitar, "physical_input": input_channel,
-                                               "routing_unresolved": True})
+            write_json(staging / "clip.json", {**info, "routing_unresolved": True,
+                                               "routing_unread": context.get("routing_unread")})
             staging.rename(destination)
-        LOG.info("Capture %s saved all four raw inputs", take_id)
-        return destination, f"Clip saved · {duration:.1f}s · routing needs checking"
-    LOG.info("Capture %s dry/wet channels %s", take_id, channels)
+        return destination, (f"Clip saved · {duration:.1f}s · the unit did not say which input is dry and the signal "
+                             f"does not show it: all four inputs kept, routing needs checking{gaps}")
     dry = samples[:, [channels[0] - 1]]
     wet = samples[:, [channel - 1 for channel in channels[1:]]]
     dry_found, wet_found = measure(dry), measure(wet)
     if dry_found.lufs is None and wet_found.lufs is None:
         raise ValueError("No guitar signal detected. Check your Quad Cortex input.")
+    inferred = context.get("usb_mapping_source") == "inferred-from-signal"
     with TemporaryDirectory(dir=folder, prefix=".capture-") as directory:
         staging = Path(directory)
-        if context.get("usb_mapping_source") == "inferred-from-signal":
+        if inferred:
             audio.write_wave(staging / "inputs.wav", samples)
         audio.write_wave(staging / "dry.wav", dry)
         audio.write_wave(staging / "wet.wav", wet)
-        write_json(staging / "clip.json", {**context, "duration_seconds": duration, "sample_rate": audio.RATE,
-                                           "guitar": guitar, "physical_input": input_channel,
-                                           "dry_channel": channels[0], "wet_channels": channels[1:],
+        write_json(staging / "clip.json", {**context, **info, "dry_channel": channels[0], "wet_channels": channels[1:],
                                            "dry_peak_dbfs": dry_found.peak_db, "wet_peak_dbfs": wet_found.peak_db})
         staging.rename(destination)
     if dry_found.clipped or wet_found.clipped:
@@ -114,9 +123,9 @@ def record_take(input_channel, guitar, stop, ready):
         note = " · dry input quiet"
     elif wet_found.lufs is None:
         note = " · wet output quiet"
-    elif context.get("wet_preset_unverified"):
-        note = " · dry + processed · preset unverified"
+    elif inferred:
+        note = " · the unit did not say which input is dry: found from the signal, preset unverified"
     else:
         note = " · dry + wet"
     LOG.info("Capture %s saved %s (%.2f seconds%s)", take_id, destination.name, duration, note)
-    return destination, f"Clip saved · {duration:.1f}s{note}"
+    return destination, f"Clip saved · {duration:.1f}s{note}{gaps}"

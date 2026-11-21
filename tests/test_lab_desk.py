@@ -1,54 +1,62 @@
-"""The seat the Guitar Learner takes on the new desk: its jobs run on a worker and report back on the desk's clock."""
+"""The seat the Guitar Learner takes at the desk, on the real studio and the simulated unit: its one job at a time
+holds the audio input (`Studio.hold_audio`), runs on the seat's worker, reports back on the desk's clock, and
+gives the input back however it ends."""
 
-
-import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parent))
-import hidden_tk  # noqa: E402,F401  (keeps every window off the screen)
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 import unittest
 
+from lab.desk.studio import Studio
 from lab.desk.window import LearnerSeat
-
-
-class Studio:
-    def __init__(self):
-        self.state = SimpleNamespace(instrument="Charvel", status="")
-        self.store = SimpleNamespace(instrument=lambda name: {"name": name, "input": 2})
-        self.stopped = 0
-
-    def stop(self):
-        self.stopped += 1
-
-    def set(self, **changes):
-        self.state.status = changes.get("status", self.state.status)
+from lab.qc.host import Host
+from lab.sound.assistant import Assistant
 
 
 class SeatTest(unittest.TestCase):
-    def test_a_learner_job_stops_playback_runs_once_and_reports_back(self):
-        studio = Studio()
-        desk = SimpleNamespace(root=None, studio=studio)
-        seat = LearnerSeat(desk)
-        self.assertEqual(seat.input_channel, 2)
+    def setUp(self):
+        folder = TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        home = Path(folder.name)
+        host = Host(home / "unit", simulated=True, local=True)
+        host.ready.result(10)
+        self.studio = Studio(host, home, assistant=Assistant(home, automatic=False, run=lambda *a, **k: {}))
+        self.addCleanup(self.studio.close)
+        self.seat = LearnerSeat(SimpleNamespace(root=None, studio=self.studio))
+
+    def finish(self):
+        self.seat.job.result(30)
+        self.seat.tick()
+
+    def test_a_learner_job_holds_the_input_runs_once_and_gives_it_back(self):
         results = []
-        seat.submit("record", "Opening the dry input…", lambda x: x * 2, 21, done=results.append)
-        self.assertEqual((studio.stopped, studio.state.status), (1, "Opening the dry input…"))
-        self.assertTrue(seat.task_if_active("record"))
-        seat.submit("record", "again", lambda: 0, done=results.append)   # One at a time.
-        seat.job.result(5)
-        seat.tick()
-        self.assertEqual(results, [42])
-        self.assertIsNone(seat.job)
+        self.assertTrue(self.seat.submit("Opening the dry input…", lambda x: x * 2, 21, done=results.append))
+        self.assertEqual((self.studio.audio_held_by, self.studio.state.status), ("learner", "Opening the dry input…"))
+        self.studio.play("guitar")                        # the desk does not start playing while it works
+        self.assertIsNone(self.studio.state.mode)
+        self.assertIn("is using the input", self.studio.state.status)
+        self.assertFalse(self.seat.submit("again", lambda: 0, done=results.append))     # one at a time
+        self.finish()
+        self.assertEqual(results, [(42, None)])
+        self.assertIsNone(self.seat.job)
+        self.assertIsNone(self.studio.audio_held_by)
 
-    def test_a_failing_job_is_said_on_the_status_line(self):
-        studio = Studio()
-        seat = LearnerSeat(SimpleNamespace(root=None, studio=studio))
+    def test_a_failing_job_reports_why_and_gives_the_input_back(self):
+        results = []
 
-        def broken(_):
+        def broken():
             raise ValueError("no input")
 
-        seat.submit("record", "…", lambda: None, done=broken)
-        seat.job.result(5)
-        seat.tick()
-        self.assertEqual(studio.state.status, "Guitar Learner: no input")
+        self.seat.submit("…", broken, done=results.append)
+        self.finish()
+        self.assertEqual(results, [(None, "no input")])
+        self.assertIsNone(self.studio.audio_held_by)
+
+    def test_the_seat_does_not_start_while_someone_else_holds_the_input(self):
+        self.studio.hold_audio("gestures")
+        self.assertFalse(self.seat.submit("…", lambda: 0, done=lambda result: None))
+        self.assertIsNone(self.seat.job)
+        self.assertEqual(self.studio.audio_held_by, "gestures")
 
 
 if __name__ == "__main__":

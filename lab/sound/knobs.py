@@ -38,23 +38,30 @@ Beyond the rule table:
   measured to act, so a turn means the same on every amp (mids excepted).
 - Filter knobs move in octaves, and in each row only the filter doing the
   work (the lowest low-pass, the highest high-pass) takes the move.
-- A knob for some quality of an effect that is parked dry (MIX at 0) brings
-  it into the mix a little so the move can be heard, unless the player has
-  turned that effect down.
-- A value that differs by scene is moved only when a scene is named, and
-  then only in that scene.
-- Parameters under an expression pedal were skipped by the old code. A
-  `Chain` does not record expression assignments yet, so nothing is skipped
-  for that reason here; when it does, `_plan` is the one place to check it.
+- A knob for some quality of an effect that is parked dry (MIX at 0), turned
+  up, brings the effect into the mix a little so the move can be heard,
+  unless the player has turned that effect down. Turned down it never brings
+  in an effect that was not heard.
+- With a scene named, only that scene is moved: a block that is off there is
+  left alone, and a value that differs by scene changes in that scene only.
+  With no scene named the knob shapes the sound as a whole: a block is
+  judged in the first scene in which it is on, so a pedal that is off in
+  scene A and on in the lead scene still answers; its values shared by every
+  scene move once, and a value that differs by scene moves in each scene
+  where its block is on.
+- A `Chain` does not record expression-pedal assignments, so a parameter
+  under a pedal is moved like any other; `_move` is the place to leave one
+  alone when it does.
+
+The player's words for all of this are in `lab.sound.words`.
 """
 
 from dataclasses import replace
 import math
-import re
 
-from lab.sound import catalog
+from lab.sound import catalog, words
 from lab import knowledge
-from lab.sound.chain import in_scene
+from lab.sound.chain import SCENES, in_scene
 
 AMP, PEDAL, CAPTURE = "Guitar Amplifier", "Guitar Overdrive", "Neural Capture"
 GATE = 16003            # Simple Gate, the only Utility whose THRESHOLD the Gate knob moves
@@ -106,6 +113,10 @@ def scaled(rules, factor):
 
 # key: (title, lower limit, [(block category, parameter, move at full turn)]). Amp and pedal moves are
 # written for a 0-10 knob and scale to the control's own range; every other move is in display units.
+# The title is what the knob is: the quality the player hears. The key is only its name in saved sounds, and
+# several keys still name the mechanism the knob began as (`drive` is Distortion, `compression` Evenness, `delay`
+# Echoes, `reverb` Room, `gate` Quiet between notes, `punch` Pick bite, `attack` Pick attack). They are kept so
+# that saved sounds keep their shape; `compression` the knob is not `compression` the measurement (`EXPECTED`).
 KNOBS = {
     "jazz": ("Jazz", 0, JAZZ),
     "drive": ("Distortion", -1, []),  # Worked out by `_drive_delta`, not by rules.
@@ -161,6 +172,10 @@ RENAMED = {"low_cut": ("tightness", 1), "soft_top": ("texture", -1), "repeats": 
            "mic": ("brightness", -1), "warmth": ("brightness", -1), "smoothness": ("texture", -1)}
 
 
+def _is_position(value):
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
 def normalize(values):
     """Knob positions with any old knob carried over to the quality that now does its job, in its direction.
     Everything else is left as it is, for `targets` to check."""
@@ -169,11 +184,8 @@ def normalize(values):
         if old in found:
             moved = found.pop(old)
             held = found.get(new, 0.)
-            def position(value):
-                return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
-
-            if not (position(moved) and position(held)):
-                found[new] = held if position(moved) else moved     # not a position: left for `targets` to refuse
+            if not (_is_position(moved) and _is_position(held)):
+                found[new] = held if _is_position(moved) else moved     # not a position: left for `targets` to refuse
                 continue
             found[new] = round(max(KNOBS[new][1], min(1., held + sign * moved)), 3)
     return found
@@ -188,8 +200,8 @@ AMP_GAIN_ALIASES = {"GAIN 1", "GAIN 2", "GAIN I", "GAIN II", "INPUT GAIN", "GAIN
 AMP_INPUT_GAIN_NAMES = {"GAIN", *AMP_GAIN_ALIASES}
 PEDAL_LEVEL_NAMES = {"LEVEL", "VOLUME", "OUTPUT"}
 DRIVE_BYPASS = -0.98
-# A knob for a quality of a parked effect brings it in at this much MIX (%) at full turn, unless the
-# knob named here is turned down.
+# A knob for a quality of a parked effect, turned up, brings it in at this much MIX (%) at full turn, unless
+# the knob named here is turned down.
 DRY_EFFECT_MIX = {"Compressor": ("compression", 25), "Delay": ("delay", 16),
                   "Reverb": ("reverb", 16), "Modulation": ("modulation", 16)}
 DRY_EFFECT_DIRECTIONS = {"attack", "delay_time", "tail", "motion", "width"}
@@ -261,8 +273,8 @@ def _rules(values):
                 mix_knob, mix_percent = DRY_EFFECT_MIX[category]
                 explicit_cut = values.get(mix_knob, 0) < 0 or (
                     category in {"Delay", "Reverb"} and values.get("space", 0) < 0)
-                if value and parameter != "MIX" and not explicit_cut:
-                    previews[category, parameter] = max(previews.get((category, parameter), 0), abs(value) * mix_percent)
+                if value > 0 and parameter != "MIX" and not explicit_cut:
+                    previews[category, parameter] = max(previews.get((category, parameter), 0), value * mix_percent)
     return rules, previews
 
 
@@ -284,29 +296,40 @@ def _written(block, index, raw, scene):
     return raw
 
 
-def _sync_enabled(block, info, scene):
+def _heard_in(block, scene):
+    """The scene a block is judged in: the one named or, with none named, the first in which the block is on.
+    None when it is off there, or off in every scene."""
+    if scene is not None:
+        return None if in_scene(block.bypass, scene) else scene
+    if isinstance(block.bypass, tuple):
+        return next((each for each, off in enumerate(block.bypass) if not off), None)
+    return None if block.bypass else 0
+
+
+def _sync_enabled(block, info, at):
     for param in info.params:
         if param.name == "SYNC":
             stored = block.values.get(param.index)
-            value = None if stored is None else in_scene(stored, scene or 0)
+            value = None if stored is None else in_scene(stored, at)
             return isinstance(value, float) and value >= .5
     return False
 
 
 def _filter_owners(chain, scene):
-    """In each row, the column whose filter is doing the work: the lowest low-pass and the highest high-pass."""
+    """In each row, the column whose filter is doing the work: the lowest low-pass and the highest high-pass,
+    each block judged in the scene it is heard in (`_heard_in`)."""
     owners = {}
     for row, found in enumerate(chain.rows):
         best = {}
         for column, block in found.blocks:
-            info = block.info
-            if not info or in_scene(block.bypass, scene or 0):
+            info, at = block.info, _heard_in(block, scene)
+            if not info or at is None:
                 continue
             for param in info.params:
                 stage = FILTER_STAGE.get((info.category, param.name))
                 stored = block.values.get(param.index)
-                value = None if stored is None else in_scene(stored, scene or 0)
-                if not stage or not isinstance(value, float):
+                value = None if stored is None else in_scene(stored, at)
+                if not stage or param.kind not in ("float", "fader") or not isinstance(value, float):
                     continue
                 shown = catalog.to_display(block.model, param.index, value)
                 rank = shown if stage == "high" else -shown
@@ -355,98 +378,113 @@ def _hold_level(row, column, block, info, lift, scene):
     return None
 
 
+def _move(block, info, param, current, rules, drive, *, auditioned, synced, owns):
+    """Where the knob positions take one control of a block: (from, to, pushed) in display units, `pushed`
+    being what Drive's own taper added. None when the control is not one they move.
+
+    `current` is the control's stored value, `auditioned` whether a knob is bringing this block's kind of
+    effect into the mix, `synced` whether the block keeps time by tempo, and `owns` says whether the block's
+    filter of a stage ("low", "high") is the one doing the work in its row.
+    """
+    category, name = info.category, param.name
+    amp_volume = category == AMP and (
+        name in {"VOLUME BRIGHT", "VOLUME NORMAL"} or name == "VOLUME" and block.model in AMP_VOLUME_AS_DRIVE)
+    delta = rules.get((category, name), 0.)
+    if amp_volume or (category == AMP and name in AMP_GAIN_ALIASES):
+        delta += rules.get((category, "GAIN"), 0.)
+    if category == "Utility" and name == "THRESHOLD" and block.model != GATE:
+        return None
+    if not delta and not (drive and category in DRIVE_CATEGORIES) and not (name == "MIX" and auditioned):
+        return None
+    if category == "Delay" and name == "DELAY TIME" and synced:
+        return None
+    low, high = param.low, param.high
+    if category in SCALED_CATEGORIES:
+        delta *= (high - low) / 10
+    if category == AMP and delta:
+        # Amps differ widely in how much a tone control does, so the same turn is made to mean the same.
+        delta *= _scale(block.model, name, rising=delta > 0)
+    if category == "Compressor" and name == "ATTACK" and param.units != "ms":
+        delta *= (high - low) * .2 / 18
+    if category == "Reverb" and name == "DECAY" and param.units != "s":
+        delta *= (high - low) * .22 / .75
+    before = catalog.to_display(block.model, param.index, current)
+    stage = FILTER_STAGE.get((category, name))
+    if stage and delta:
+        if not owns(stage):
+            return None
+        start = (max(before, AUDIBLE_SPAN[0]) if stage == "low" and delta > 0
+                 else min(before, AUDIBLE_SPAN[1]) if stage == "high" and delta < 0 else before)
+        delta = start * 2 ** delta - before
+    # The bottom of a conventional 0-10 preamp input knob can mute the amp. Keep low-drive moves
+    # audible even when their offsets stack.
+    amp_input_gain = category in AMP_CATEGORIES and name in AMP_INPUT_GAIN_NAMES and (low, high) == (0, 10)
+    floor = min(before, low + .15 * (high - low)) if amp_volume or amp_input_gain else low
+    pushed = _drive_delta(category, name, drive, before, floor, high, param.units, amp_volume=amp_volume)
+    return before, min(high, max(floor, before + (delta + pushed))), pushed
+
+
+def _block_edits(row, column, block, rules, previews, drive, owners, scene):
+    """The edits the knob positions make to one block."""
+    info, at = block.info, _heard_in(block, scene)
+    if not info or at is None:
+        return []
+    category, edits = info.category, []
+    if drive <= DRIVE_BYPASS and category in PEDAL_CATEGORIES:
+        if not isinstance(block.bypass, tuple):
+            edits.append({"kind": "bypass", "row": row, "column": column, "model": block.name,
+                          "name": "BYPASS", "from": False, "to": True, "stored": True})
+        elif scene is not None:
+            edits.append({"kind": "bypass", "row": row, "column": column, "model": block.name,
+                          "name": "BYPASS", "from": False, "to": True,
+                          "stored": tuple(True if position == scene else flag
+                                          for position, flag in enumerate(block.bypass))})
+    auditioned = category in {kind for kind, _ in previews}
+    synced = _sync_enabled(block, info, at)
+    dry_mix, preview = None, 0.
+    lift = 0.  # dB the amp gets louder from the gain the Drive knob adds.
+    for param in info.params:
+        if param.kind not in ("float", "fader") or param.low is None or param.high is None:
+            continue
+        current = _number(block, param.index, scene)
+        if current is None:
+            continue
+        moved = _move(block, info, param, current, rules, drive, auditioned=auditioned, synced=synced,
+                      owns=lambda stage: owners.get((row, stage)) == column)
+        if moved is None:
+            continue
+        before, after, pushed = moved
+        name, low, high = param.name, param.low, param.high
+        if pushed > 0 and category == AMP and after > before:
+            louder = ((_effect(block.model, name) or {}).get("high") or {}).get("level") or 0.
+            lift += max(0., louder) * min(pushed, after - before) / ((high - low) / 10)
+        if name == "MIX" and param.units == "%" and low == 0 and abs(before) < 1e-6 and abs(after) < 1e-6:
+            dry_mix = param, high
+        if math.isclose(before, after, abs_tol=0.001):
+            continue
+        preview = max(preview, previews.get((category, name), 0.))
+        edits.append(_edit(row, column, block, param, before, after,
+                           catalog.to_norm(block.model, param.index, after), scene))
+    if dry_mix and preview:
+        param, high = dry_mix
+        after = min(high, preview)
+        edits.append(_edit(row, column, block, param, 0., after,
+                           catalog.to_norm(block.model, param.index, after), scene))
+    if lift > .05:
+        held = _hold_level(row, column, block, info, lift, scene)
+        if held:
+            edits.append(held)
+    return edits
+
+
 def _plan(chain, values, scene=None):
-    """Every edit the knob positions make, in the order the old desk listed them."""
+    """Every edit the knob positions make, block by block in the chain's order."""
     values = normalize(values)
     rules, previews = _rules(values)
     drive = float(values.get("drive", 0.))
-    preview_categories = {category for category, _ in previews}
     owners = _filter_owners(chain, scene)
-    edits = []
-    for row, column, block in chain.blocks:
-        info = block.info
-        if not info:
-            continue
-        category = info.category
-        if in_scene(block.bypass, scene or 0):
-            continue
-        if drive <= DRIVE_BYPASS and category in PEDAL_CATEGORIES:
-            if not isinstance(block.bypass, tuple):
-                edits.append({"kind": "bypass", "row": row, "column": column, "model": block.name,
-                              "name": "BYPASS", "from": False, "to": True, "stored": True})
-            elif scene is not None:
-                edits.append({"kind": "bypass", "row": row, "column": column, "model": block.name,
-                              "name": "BYPASS", "from": False, "to": True,
-                              "stored": tuple(True if position == scene else flag
-                                              for position, flag in enumerate(block.bypass))})
-        dry_mix, preview = None, 0.
-        lift = 0.  # dB the amp gets louder from the gain the Drive knob adds.
-        for param in info.params:
-            name = param.name
-            amp_volume = category == AMP and (
-                name in {"VOLUME BRIGHT", "VOLUME NORMAL"} or name == "VOLUME" and block.model in AMP_VOLUME_AS_DRIVE)
-            delta = rules.get((category, name), 0.)
-            if amp_volume or (category == AMP and name in AMP_GAIN_ALIASES):
-                delta += rules.get((category, "GAIN"), 0.)
-            if category == "Utility" and name == "THRESHOLD" and block.model != GATE:
-                continue
-            if param.kind not in ("float", "fader"):
-                continue
-            current = _number(block, param.index, scene)
-            if current is None:
-                continue
-            if not delta and not (drive and category in DRIVE_CATEGORIES) and not (
-                    name == "MIX" and category in preview_categories):
-                continue
-            if category == "Delay" and name == "DELAY TIME" and _sync_enabled(block, info, scene):
-                continue
-            low, high = param.low, param.high
-            if low is None or high is None:
-                continue
-            if category in SCALED_CATEGORIES:
-                delta *= (high - low) / 10
-            if category == AMP and delta:
-                # Amps differ widely in how much a tone control does, so the same turn is made to mean the same.
-                delta *= _scale(block.model, name, rising=delta > 0)
-            if category == "Compressor" and name == "ATTACK" and param.units != "ms":
-                delta *= (high - low) * .2 / 18
-            if category == "Reverb" and name == "DECAY" and param.units != "s":
-                delta *= (high - low) * .22 / .75
-            before = catalog.to_display(block.model, param.index, current)
-            stage = FILTER_STAGE.get((category, name))
-            if stage and delta:
-                if owners.get((row, stage)) != column:
-                    continue
-                start = (max(before, AUDIBLE_SPAN[0]) if stage == "low" and delta > 0
-                         else min(before, AUDIBLE_SPAN[1]) if stage == "high" and delta < 0 else before)
-                delta = start * 2 ** delta - before
-            # The bottom of a conventional 0-10 preamp input knob can mute the amp. Keep low-drive moves
-            # audible even when their offsets stack.
-            amp_input_gain = category in AMP_CATEGORIES and name in AMP_INPUT_GAIN_NAMES and (low, high) == (0, 10)
-            floor = min(before, low + .15 * (high - low)) if amp_volume or amp_input_gain else low
-            pushed = _drive_delta(category, name, drive, before, floor, high, param.units, amp_volume=amp_volume)
-            delta += pushed
-            after = min(high, max(floor, before + delta))
-            if pushed > 0 and category == AMP and after > before:
-                louder = ((_effect(block.model, name) or {}).get("high") or {}).get("level") or 0.
-                lift += max(0., louder) * min(pushed, after - before) / ((high - low) / 10)
-            if name == "MIX" and param.units == "%" and low == 0 and abs(before) < 1e-6 and abs(after) < 1e-6:
-                dry_mix = param, high
-            if math.isclose(before, after, abs_tol=0.001):
-                continue
-            preview = max(preview, previews.get((category, name), 0.))
-            edits.append(_edit(row, column, block, param, before, after,
-                               catalog.to_norm(block.model, param.index, after), scene))
-        if dry_mix and preview:
-            param, high = dry_mix
-            after = min(high, preview)
-            edits.append(_edit(row, column, block, param, 0., after,
-                               catalog.to_norm(block.model, param.index, after), scene))
-        if lift > .05:
-            held = _hold_level(row, column, block, info, lift, scene)
-            if held:
-                edits.append(held)
-    return edits
+    return [edit for row, column, block in chain.blocks
+            for edit in _block_edits(row, column, block, rules, previews, drive, owners, scene)]
 
 
 # ---- The interface ----
@@ -456,7 +494,8 @@ def targets(chain, values, *, scene=None):
 
     A bypass change is keyed (row, column, None). A value that differs by scene comes back as the whole
     eight: with `scene`, only that scene's entry changed; without one, each scene's entry moved as the knob
-    moves it in that scene, so a knob works on a scene-switched preset as a whole.
+    moves it in that scene, so a knob works on a scene-switched preset as a whole. Without a scene, a value
+    every scene shares moves once, its block judged in the first scene in which it is on.
     """
     def keyed(scene):
         return {(edit["row"], edit["column"], None if edit.get("kind") == "bypass" else edit["index"]): edit["stored"]
@@ -465,16 +504,17 @@ def targets(chain, values, *, scene=None):
     found = keyed(scene)
     if scene is not None:
         return found
-    per_scene = [keyed(each) for each in range(8)]
+    per_scene = [keyed(each) for each in range(SCENES)]
     for key in set().union(*per_scene):
-        moved = [per_scene[each].get(key) for each in range(8)]
+        moved = [per_scene[each].get(key) for each in range(SCENES)]
         if all(isinstance(value, tuple) for value in moved if value is not None) and key not in found:
             row, column, index = key
             block = chain.block(row, column)
             held = block.bypass if index is None else dict(block.params).get(index)   # all eight scenes
             if not isinstance(held, tuple):
                 continue
-            found[key] = tuple(moved[each][each] if moved[each] is not None else held[each] for each in range(8))
+            found[key] = tuple(moved[each][each] if moved[each] is not None else held[each]
+                               for each in range(SCENES))
     return found
 
 
@@ -506,12 +546,10 @@ def controls(chain, *, scene=None):
     """Which controls each knob moves on this chain, as {knob: ((model, Control), ...)}.
 
     One answer for a chain read from the unit and for a design not yet built: values a design leaves to the
-    unit are taken at the catalog's defaults. Each knob is tried at both ends, so this is exactly what
-    `targets` would move there. This replaces the old pair `available_knobs` and `draft_controls`, which
-    disagreed on bass amps: the estimate offered gain aliases on any amp, while the moves gave them only to
-    guitar amps. Here the moves decide. A bass amp's tone controls answer to no knob, because the rules are
-    written for guitar amps; Drive reaches its gain controls (GAIN, GAIN 1, GAIN 2), so a bass amp offers
-    Drive and nothing else of its own.
+    unit are taken at the catalog's defaults, and each knob is tried at both ends, so this is what `targets`
+    moves once the chain is on the unit with every value stated. A bass amp's tone controls answer to no
+    knob, because the rules are written for guitar amps; Drive reaches its gain controls (GAIN, GAIN 1,
+    GAIN 2), so a bass amp offers Drive and nothing else of its own.
     """
     chain = _filled(chain)
     found = {}
@@ -536,29 +574,37 @@ def available(chain, *, scene=None):
 # has alternative measures of one quality: it did as intended when any of them moved enough the intended way. Pick
 # attack turned up lets the pick through (a slower compressor attack), so the onset gets quicker: attack_ms down.
 EXPECTED = {
-    "brightness": (("brightness_oct", 1, .15, "octave"),),
+    # The highs against the body (provisional: about 1.5 dB for a full turn, not yet set on the unit).
+    "brightness": (("brightness_db", 1, 1.5, "dB"), ("brightness_oct", 1, .15, "octave")),
     # Texture moves the balance of high harmonic orders against low ones (measured on the unit, from -6 dB on a
     # Plexi at low gain to +4 dB on a Soldano lead), and, near hard clipping, their share.
     "texture": (("probe.order_balance_db", 1, 2., "dB"), ("probe.tristimulus3", 1, .03, "")),
     "drive": (("probe.distortion_db", 1, 3., "dB"), ("probe.distortion_soft_db", 1, 3., "dB")),
     "body": (("low_end_db", 1, 1.5, "dB"),),
     "tightness": (("low_end_db", -1, 1.5, "dB"),),
-    "space": (("tail_db", 1, 3., "dB"),),
-    "reverb": (("tail_db", 1, 3., "dB"),),
-    "delay": (("tail_db", 1, 3., "dB"),),
-    "tail": (("tail_db", 1, 3., "dB"),),
-    "sustain": (("compression", 1, .05, ""),),
+    "space": (("probe.late_energy_db", 1, 3., "dB"), ("tail_db", 1, 3., "dB")),
+    "reverb": (("probe.late_energy_db", 1, 3., "dB"), ("tail_db", 1, 3., "dB")),
+    "delay": (("probe.late_energy_db", 1, 3., "dB"), ("tail_db", 1, 3., "dB")),
+    "tail": (("probe.late_energy_db", 1, 3., "dB"), ("tail_db", 1, 3., "dB")),
+    "sustain": (("compression", 1, .05, ""),),       # judged by a proxy: see `PROXY`
     "compression": (("compression", 1, .05, ""),),
-    "attack": (("attack_ms", -1, 2., "ms"),),
+    "attack": (("first_rise_ms", -1, 2., "ms"), ("attack_ms", -1, 2., "ms")),
 }
+# Measures read only when the knob's own is in neither record (a sound heard before that one was measured). Each
+# stands in for the measure listed before it and can be moved by something else: the spectral centre by the low
+# end, the level after the phrase by how the phrase ends, the time to the highest peak by an echo.
+FALLBACK = frozenset({"brightness_oct", "tail_db", "attack_ms"})
+# Knobs judged by the measurement of another quality, because their own is not measured. How long a note
+# lasts is not measured, so Sustain is judged by the compression measure (how much of a drop in the playing the
+# chain gives back), which is how the knob works but not what it is for. `check` marks such a verdict.
+PROXY = {"sustain": "compression"}
 # What each measurement is, in words for the status line.
-MEASURES = {"brightness_oct": "spectral centre", "tristimulus3": "share of harmonics 5 and up",
-            "order_balance_db": "high harmonic orders against low ones",
-            "weighted_distortion_db": "order-weighted harmonics", "distortion_db": "harmonics played firmly",
+MEASURES = {"brightness_db": "highs against the body", "late_energy_db": "what rings after a click",
+            "first_rise_ms": "first rise of a picked note", "brightness_oct": "spectral centre", "tristimulus3": "share of harmonics 5 and up",
+            "order_balance_db": "high harmonic orders against low ones", "distortion_db": "harmonics played firmly",
             "distortion_soft_db": "harmonics 12 dB softer", "low_end_db": "low end", "tail_db": "tail",
             "compression": "compression", "attack_ms": "onset time"}
 SMALLEST_TURN = .25    # a turn smaller than this is held to the change a quarter turn must make
-VERDICTS = ("as intended", "too small", "opposite", "not measurable")
 
 
 def _reading(record, path):
@@ -576,10 +622,11 @@ def check(before, after, values):
     """Did each knob do what it is for? `before` is the sound heard without its knobs, `after` with them at
     `values`, both `Heard` records.
 
-    Returns {knob: {"measure", "change", "sign", "verdict", "units"}} for every knob turned: the measured change
-    (after minus before), the sign it should have, and "as intended", "too small" (the right way but less than
-    the knob's share of a full turn's minimum, or the wrong way by less than that), "opposite" (the wrong way by
-    at least that) or "not measurable" (no measurement for that knob, or one missing from either record)."""
+    Returns {knob: {"measure", "change", "sign", "verdict", "units", "proxy"}} for every knob turned: the
+    measured change (after minus before), the sign it should have, and "as intended", "too small" (the right way
+    but less than the knob's share of a full turn's minimum, or the wrong way by less than that), "opposite" (the
+    wrong way by at least that) or "not measurable" (no measurement for that knob, or one missing from either
+    record). "proxy" is True when the knob was judged by the measurement of another quality (`PROXY`)."""
     found = {}
     for key, value in (values or {}).items():
         if not isinstance(value, (int, float)) or not value:
@@ -587,6 +634,8 @@ def check(before, after, values):
         intended = 1 if value > 0 else -1
         readings = []
         for path, sign, full, units in EXPECTED.get(key, ()):
+            if path in FALLBACK and readings:
+                continue                    # the knob's own measure was read: the stand-in is not asked
             first, second = _reading(before, path), _reading(after, path)
             if first is None or second is None:
                 continue
@@ -595,11 +644,12 @@ def check(before, after, values):
             towards = change * sign * intended
             verdict = "as intended" if towards >= least else "opposite" if towards <= -least else "too small"
             readings.append((towards / least, {"measure": path.removeprefix("probe."), "change": round(change, 3),
-                                               "sign": sign * intended, "verdict": verdict, "units": units}))
+                                               "sign": sign * intended, "verdict": verdict, "units": units,
+                                               "proxy": key in PROXY}))
         if not readings:
             expected = EXPECTED.get(key)
             found[key] = {"measure": None, "change": None, "sign": expected[0][1] * intended if expected else None,
-                          "verdict": "not measurable", "units": ""}
+                          "verdict": "not measurable", "units": "", "proxy": key in PROXY}
             continue
         # The measure that moved furthest the intended way speaks for the knob.
         found[key] = max(readings, key=lambda pair: pair[0])[1]
@@ -608,76 +658,8 @@ def check(before, after, values):
 
 # ---- Plain words as knob moves ----
 
-AMOUNTS = {"a touch": .5, "a tad": .5, "a bit": .5, "a little bit": .5, "a little": .5, "slightly": .5,
-           "just a bit": .5, "somewhat": .7, "a lot": 1.7, "much": 1.7, "way": 2., "far": 1.7, "really": 1.5,
-           "very": 1.5, "so much": 1.7}
-COMPARATIVES = {
-    "brighter": ("brightness", .3), "darker": ("brightness", -.35), "duller": ("brightness", -.3),
-    # Warm is round against rough, not dark against bright (docs/TONE_RESEARCH.md, finding 1).
-    "warmer": ("texture", -.3), "rounder": ("texture", -.3), "smoother": ("texture", -.3),
-    "rougher": ("texture", .3), "harsher": ("texture", .3),
-    "tighter": ("tightness", .3), "looser": ("tightness", -.3),
-    "dirtier": ("drive", .3), "heavier": ("drive", .3), "crunchier": ("drive", .25), "cleaner": ("drive", -.3),
-    "drier": ("space", -.3), "dryer": ("space", -.3), "wetter": ("space", .3), "roomier": ("space", .3),
-    "fuller": ("body", .3), "thicker": ("body", .3), "fatter": ("body", .3), "thinner": ("body", -.3),
-    "punchier": ("punch", .3), "wider": ("width", .3), "narrower": ("width", -.3), "jazzier": ("jazz", .4),
-}
-# A quantity is a knob, or (knob, -1) for one whose "more" turns the knob down ("more warmth" is rounder).
-QUANTITIES = {
-    "gain": "drive", "drive": "drive", "distortion": "drive", "dirt": "drive", "saturation": "drive",
-    "crunch": "drive", "reverb": "reverb", "delay": "delay", "echo": "delay", "echoes": "delay", "repeats": "tail",
-    "fizz": "texture", "roughness": "texture", "texture": "texture", "brightness": "brightness",
-    "smoothness": ("texture", -1), "warmth": ("texture", -1), "movement": "modulation",
-    "sustain": "sustain", "mids": "mids", "midrange": "mids", "body": "body", "bass": "body", "low end": "body",
-    "lows": "body", "bite": "punch", "punch": "punch", "attack": "attack", "presence": "presence",
-    "treble": "presence", "highs": "presence", "top end": "presence", "space": "space", "room": "space",
-    "ambience": "space", "compression": "compression", "modulation": "modulation", "tremolo": "modulation",
-    "chorus": "modulation", "width": "width", "jazz": "jazz", "tightness": "tightness",
-    "gate": "gate",
-}
-COMPLAINTS = {
-    "bright": ("brightness", -.3), "shrill": ("brightness", -.3), "harsh": ("texture", -.3),
-    "rough": ("texture", -.3), "fizzy": ("texture", -.35), "dark": ("brightness", .3), "dull": ("brightness", .3),
-    "round": ("texture", .3), "muddy": ("tightness", .3), "boomy": ("tightness", .3),
-    "thin": ("body", .3), "dry": ("space", .3), "wet": ("space", -.3), "washy": ("space", -.3),
-    "dirty": ("drive", -.3), "distorted": ("drive", -.3), "clean": ("drive", .3), "noisy": ("gate", .3),
-    "compressed": ("compression", -.3),
-}
-STEPS = {"jazz": .4, "delay": .3}
-_AMOUNT = "|".join(sorted(map(re.escape, AMOUNTS), key=len, reverse=True))
-_QUANTITY = "|".join(sorted(map(re.escape, QUANTITIES), key=len, reverse=True))
-_LEAD = (r"(?:(?:can you |could you |please )?(?:make (?:it|this|that|the tone|the sound) "
-         r"|it(?:'s| is| sounds| feels) |sounds |needs |i need |i want |give (?:me|it) )?)")
-
-
-def _quantity(word):
-    found = QUANTITIES[word]
-    return found if isinstance(found, tuple) else (found, 1)
-
-
 def direction(text):
-    """Read a plain request for more or less of one quality as a bounded knob move, or None.
-
-    Only whole, unambiguous phrases are recognized, such as "a bit tighter", "much less reverb" or
-    "too bright". Anything else is left to the assistant.
-    """
-    words = " ".join(re.findall(r"[a-z']+", text.lower().replace("’", "'"))).replace("moar ", "more ")
-    words = re.sub(r"\s*(?:please|thanks|thank you)$", "", words)
-    simple = re.fullmatch(rf"{_LEAD}(?:({_AMOUNT}) )?(\w+)", words)
-    if simple and simple[2] in COMPARATIVES:
-        key, step = COMPARATIVES[simple[2]]
-        return {key: round(step * AMOUNTS.get(simple[1], 1.), 2)}
-    measured = re.fullmatch(rf"{_LEAD}(?:({_AMOUNT}) )?(more|less) ({_QUANTITY})", words)
-    if measured:
-        key, sign = _quantity(measured[3])
-        step = STEPS.get(key, .3) * AMOUNTS.get(measured[1], 1.) * sign
-        return {key: round(step if measured[2] == "more" else -step, 2)}
-    lacking = re.fullmatch(rf"{_LEAD}(too much|not enough|too little) ({_QUANTITY})", words)
-    if lacking:
-        key, sign = _quantity(lacking[2])
-        return {key: round(STEPS.get(key, .3) * sign * (-1 if lacking[1] == "too much" else 1), 2)}
-    complaint = re.fullmatch(rf"{_LEAD}(?:({_AMOUNT}) )?too (\w+)", words)
-    if complaint and complaint[2] in COMPLAINTS:
-        key, step = COMPLAINTS[complaint[2]]
-        return {key: round(step * AMOUNTS.get(complaint[1], 1.), 2)}
-    return None
+    """A plain request for more or less of something a knob stands for ("more gain", "a bit less reverb",
+    "too much treble"), as a bounded knob move, or None. The words are `lab.sound.words`'s, where every other
+    remark is read too (`words.read`); this is `words.direction` under the name the desk calls."""
+    return words.direction(text)

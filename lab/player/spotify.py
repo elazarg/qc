@@ -22,8 +22,10 @@ import re
 import zipfile
 
 MINIMUM_MS = 30_000
-VERSION = re.compile(r"\s*(\s-\s.*(remaster|live|version|edit|mix|mono|stereo|demo|acoustic|deluxe).*"
-                     r"|[(\[][^)\]]*(remaster|live|version|edit|mix|mono|stereo|demo|deluxe)[^)\]]*[)\]])\s*$", re.I)
+# A version mark at the end of a title: " - 2012 Remaster", "(Live at ...)", "[Mono]". Whole words only, so that
+# "Deliver Me" or "(Olive Branch)" are not taken for "live"; a remix is another recording and is not folded in.
+_MARK = r"\b(remaster(ed)?|live|version|edit|mix|mono|stereo|demo|acoustic|deluxe)\b"
+VERSION = re.compile(r"\s*(\s-\s.*" + _MARK + r".*|[(\[][^)\]]*" + _MARK + r"[^)\]]*[)\]])\s*$", re.I)
 DASH = "–"
 
 
@@ -58,40 +60,56 @@ def _entries(text, name):
 
 def _wanted(name):
     base = Path(name).name
-    return base.lower().endswith(".json") and base.startswith(("StreamingHistory", "Streaming_History_Audio",
-                                                               "Streaming_History"))\
+    return base.lower().endswith(".json") and base.startswith(("StreamingHistory", "Streaming_History"))\
         and "Video" not in base and "podcast" not in base.lower()
+
+
+def _sources(path):
+    """(name, text) of each listening-history file in a file, folder or zip archive, one at a time: a
+    multi-year export is over a hundred megabytes of text, and only one file of it is held at once."""
+    if path.is_dir():
+        for file in sorted(p for p in path.rglob("*.json") if _wanted(p.name)):
+            yield file.name, file.read_text(encoding="utf-8-sig")
+    elif zipfile.is_zipfile(path):
+        with zipfile.ZipFile(path) as archive:
+            for name in sorted(archive.namelist()):
+                if _wanted(name):
+                    yield name, archive.read(name).decode("utf-8-sig")
+    else:
+        yield path.name, path.read_text(encoding="utf-8-sig")
 
 
 def entries(paths):
     """Every entry of the listening-history files in the given files, folders or zip archives, as dicts.
     The one place an export is read; `history` here and `lab.player.listening.plays` both use it."""
     for path in map(Path, paths):
-        if path.is_dir():
-            files = sorted(p for p in path.rglob("*.json") if _wanted(p.name))
-            sources = [(p.name, p.read_text(encoding="utf-8-sig")) for p in files]
-        elif zipfile.is_zipfile(path):
-            with zipfile.ZipFile(path) as archive:
-                sources = [(name, archive.read(name).decode("utf-8-sig")) for name in sorted(archive.namelist())
-                           if _wanted(name)]
-        else:
-            sources = [(path.name, path.read_text(encoding="utf-8-sig"))]
-        for name, text in sources:
-            for entry in _entries(text, name):
+        for name, text in _sources(path):
+            found = _entries(text, name)
+            del text
+            for entry in found:
                 if isinstance(entry, dict):
                     yield entry
 
 
+def track_of(entry):
+    """(artist, title, milliseconds played) of an entry of either export, or None when it is not a music play
+    (a podcast or audiobook has no track name) or its play time is not a number."""
+    artist = entry.get("master_metadata_album_artist_name") or entry.get("artistName")
+    title = entry.get("master_metadata_track_name") or entry.get("trackName")
+    ms = entry.get("ms_played", entry.get("msPlayed", 0))
+    if isinstance(ms, str):
+        try:
+            ms = float(ms)
+        except ValueError:
+            return None
+    if not artist or not title or isinstance(ms, bool) or not isinstance(ms, (int, float)) or ms != ms:
+        return None
+    return str(artist).strip(), str(title).strip(), int(ms)
+
+
 def history(paths):
     """Every play in the given files, folders or zip archives, as (artist, title, ms) tuples."""
-    plays = []
-    for entry in entries(paths):
-        artist = entry.get("master_metadata_album_artist_name") or entry.get("artistName")
-        title = entry.get("master_metadata_track_name") or entry.get("trackName")
-        ms = entry.get("ms_played", entry.get("msPlayed", 0))
-        if artist and title and isinstance(ms, int) and not isinstance(ms, bool):
-            plays.append((str(artist).strip(), str(title).strip(), ms))
-    return plays
+    return [found for found in map(track_of, entries(paths)) if found]
 
 
 def song_key(title):

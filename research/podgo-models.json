@@ -1,5 +1,5 @@
 {
- "about": "Line 6 POD Go model ids (as stored in a .pgb backup) with the display name and the real gear Line 6 says each model is based on. Read by lab/podgo.py. certainty: 'published' = stated by Line 6; 'line6_original' = Line 6 lists it as its own design (based_on null unless an inspiration is published); 'community' = third-party only; 'unknown' = no source found. Display names are often inferred from the id; 'note' says so where they are.",
+ "about": "Line 6 POD Go model ids (as stored in a .pgb backup) with the display name and the real gear Line 6 says each model is based on. Read by lab/gear/podgo.py; an effect listed under its mono or stereo id stands for both. certainty: 'published' = stated by Line 6; 'line6_original' = Line 6 lists it as its own design (based_on null unless an inspiration is published); 'community' = third-party only; 'unknown' = no source found. Display names are often inferred from the id; 'note' says so where they are.",
  "built": "2026-11-19",
  "sources": {
   "podgo_models": {

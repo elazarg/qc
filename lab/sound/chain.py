@@ -7,8 +7,9 @@ values the unit stores (0 to 1 for numbers, text for microphones, impulse
 responses and captures). A value that differs by scene is a tuple of eight.
 
 The same type describes what was read from the unit, what a design asks
-for, and what a saved preset contains. `plan` works out the writes from one
-to another in the order the unit needs:
+for, and what a saved preset contains. The `plan_...` functions work out the
+writes from one to another, and `lab.qc.unit.Unit.apply` carries them out in
+the order the unit needs:
 
 1. Inputs of rows that are about to change are disconnected first, so that
    nothing half-built is heard.
@@ -16,7 +17,9 @@ to another in the order the unit needs:
    added. Adding or removing a block mutes all audio for about 0.2 s, so this
    is the only phase that interrupts sound.
 3. Values are written. A value that differs by scene is first assigned to
-   scenes, then written with each scene selected in turn.
+   scenes, then written with each scene selected in turn. A value the unit
+   already holds by scene, wanted the same in every scene, is written in each
+   scene too: nothing takes a value back off the scenes.
 4. The rows' output controls (volume, mute) are set before any input is
    connected.
 5. Inputs and outputs are routed last.
@@ -35,8 +38,7 @@ from lab.sound import catalog
 
 ROWS, COLUMNS, SCENES = 4, 8, 8
 TOLERANCE = .006        # stored values within this of each other are the same (the unit rounds to about 1/256)
-PORT_USB_IN, PORT_USB_OUT, PORT_MULTI_OUT = 12, 14, 19
-SILENT = (0, 0)
+MULTI_OUT = 19          # the port a row leaves the unit by: the main outputs
 
 
 def _value(value):
@@ -66,7 +68,7 @@ def same(a, b):
 # A capture block's file_name is the capture's 64-character key followed by a name the unit fills in; an IR
 # loader's IR NAME parameters only label the IR its IR PATH holds.
 KEYED = {(model, 5): 64 for model in catalog.CAPTURE_MODELS}
-LABELS = {(model, index) for model in (catalog.IR_LOADER, 29002) for index in (22, 23)}
+LABELS = {(model, index) for model in (catalog.IR_LOADER, catalog.IR_LOADER_STEREO) for index in (22, 23)}
 
 
 def agrees(model, index, have, want):
@@ -113,7 +115,6 @@ class Block:
 
     def set_display(self, index, display):
         return self.set(index, catalog.to_norm(self.model, index, display))
-
 
     @property
     def info(self):
@@ -202,7 +203,7 @@ class Chain:
                 states.append(tuple(float(flag) for flag in block.bypass))
             for state in states:
                 for scene in range(len(state) - 1, 0, -1):
-                    if isinstance(state[scene], float) and abs(state[scene] - state[0]) > .006:
+                    if isinstance(state[scene], float) and abs(state[scene] - state[0]) > TOLERANCE:
                         last = max(last, scene)
                         break
         return max(self.scenes, last + 1 if last else 0)
@@ -324,11 +325,6 @@ class Op:
     kind: str
     args: tuple = ()
 
-    @property
-    def interrupts(self):
-        """Whether the unit mutes all audio for a moment while it does this."""
-        return self.kind in ("add", "delete")
-
 
 def plan_structure(current, wanted, *, sounding=(), fresh=False):
     """Disconnect what is about to change, then remove, split and add blocks.
@@ -365,7 +361,10 @@ def plan_values(current, wanted):
     """The writes of values, assuming every wanted block is already in place.
 
     Values that differ by scene come last, grouped by scene, each group
-    preceded by a scene switch. The caller returns to the first scene.
+    preceded by a scene switch, and the first scene is selected again at the
+    end. A value held by scene on either side is written scene by scene: a
+    plain write to a value the unit holds by scene lands on the selected
+    scene only.
     """
     shared, assign, per_scene = [], [], {scene: [] for scene in range(SCENES)}
     for r, (now, want) in enumerate(zip(current.rows, wanted.rows)):
@@ -377,21 +376,21 @@ def plan_values(current, wanted):
                 before = have.get(index)
                 if before is not None and agrees(b.model, index, before, value):
                     continue
-                if isinstance(value, tuple):
-                    if not isinstance(before, tuple):
+                if isinstance(value, tuple) or isinstance(before, tuple):
+                    if isinstance(value, tuple) and not isinstance(before, tuple):
                         assign.append(Op("assign", (r, column, index)))
                     for scene in range(SCENES):
-                        if before is None or not same(in_scene(before, scene), value[scene]):
-                            per_scene[scene].append(Op("param", (r, column, index, value[scene])))
+                        if before is None or not same(in_scene(before, scene), in_scene(value, scene)):
+                            per_scene[scene].append(Op("param", (r, column, index, in_scene(value, scene))))
                 else:
                     shared.append(Op("param", (r, column, index, value)))
             before = a.bypass if a is not None and a.model == b.model else False
-            if isinstance(b.bypass, tuple):
-                if not isinstance(before, tuple):
+            if isinstance(b.bypass, tuple) or isinstance(before, tuple):
+                if isinstance(b.bypass, tuple) and not isinstance(before, tuple):
                     assign.append(Op("assign", (r, column, catalog.model(b.model).bypass_index)))
                 for scene in range(SCENES):
-                    if in_scene(before, scene) != b.bypass[scene]:
-                        per_scene[scene].append(Op("bypass", (r, column, b.bypass[scene])))
+                    if in_scene(before, scene) != in_scene(b.bypass, scene):
+                        per_scene[scene].append(Op("bypass", (r, column, in_scene(b.bypass, scene))))
             elif before != b.bypass:
                 shared.append(Op("bypass", (r, column, b.bypass)))
         if want.split:

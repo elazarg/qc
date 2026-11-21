@@ -118,6 +118,14 @@ class EngineTest(unittest.TestCase):
         self.engine.play("b", "guitar")
         self.assertEqual([block.model for _, _, block in self.unit.read().blocks], [HIWATT, GREENBACK])
 
+    def test_a_round_trip_that_has_changed_is_measured_again_and_the_sound_heard(self):
+        dry = (np.sin(np.arange(48000) / 48000 * 2 * np.pi * 196) * .2)[:, None].astype(np.float32)
+        self.engine.measure_round_trip()
+        self.engine.offset = SimAudio.LATENCY + 480           # measured under another buffer size: 10 ms too long
+        found = self.engine.hear(sound(PLEXI, V30), dry)
+        self.assertEqual(self.engine.offset, SimAudio.LATENCY)
+        self.assertIsNotNone(found.level_db)
+
     def test_hearing_a_sound_and_saving_it(self):
         dry = (np.sin(np.arange(48000) / 48000 * 2 * np.pi * 196) * .2)[:, None].astype(np.float32)
         self.engine.measure_round_trip()

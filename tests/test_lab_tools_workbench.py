@@ -52,6 +52,28 @@ class VersionsTest(unittest.TestCase):
         self.assertAlmostEqual(values[1], 8., places=2)
         with self.assertRaisesRegex(ValueError, "goes from"):
             workbench.sweep_versions(sound, row, column, index, [99.])
+        with self.assertRaisesRegex(ValueError, "holds no block"):
+            workbench.with_control(sound.chain, 3, 0, 0, 1.)
+        with self.assertRaisesRegex(ValueError, "no control"):
+            workbench.with_control(sound.chain, row, column, 999, 1.)
+
+    def test_scene_a_kept_from_a_comparison_is_tagged_as_scene_a(self):
+        # Regression: scene A is scene 0, which was taken for "no scene".
+        sound = Sound("Two scenes", scenes_chain(), {"kind": "designed"})
+        record = {"auditions": {"A": {"name": "Scene A", "scene": 0, "chain": sound.chain.to_record()}}}
+        self.assertEqual(workbench.as_sound(record, "A", sound).tags, ["scene A"])
+
+    def test_a_comparison_that_cannot_be_read_is_left_out_of_the_earlier_ones(self):
+        # Regression: the list skipped it but the paths behind the list did not, so a row opened the wrong one.
+        quiet, loud = phrase(level=.05), phrase(level=.4)
+        with TemporaryDirectory() as folder:
+            target, _ = workbench.comparison(folder, [{"name": "Quiet"}, {"name": "Loud"}], [quiet, loud], kind="WAV files")
+            bad = Path(folder) / "comparisons" / "99999999-000000-bad"
+            bad.mkdir()
+            (bad / "comparison.json").write_text("{not json", encoding="utf-8")
+            found = workbench.earlier(folder)
+            self.assertEqual([path for path, _ in found], [target])
+            self.assertEqual(set(workbench.auditions(*found[0])), {"A", "B"})
 
     def test_a_comparison_is_level_matched_blind_and_keeps_its_choice_and_notes(self):
         quiet, loud = phrase(level=.05), phrase(level=.4)
@@ -73,8 +95,8 @@ class VersionsTest(unittest.TestCase):
                 workbench.keep(target, "Z")
             kept = workbench.keep(target, letter, "more bite")
             self.assertEqual(workbench.load(target)["choice"], kept["choice"])
-            workbench.feedback(target, "the loud one is harsh", audition=letter)
-            self.assertEqual(workbench.notes(target)[0]["audition_name"], "Loud")
+            note = workbench.feedback(target, "the loud one is harsh", audition=letter)
+            self.assertEqual(json.loads(note.read_text(encoding="utf-8"))["audition_name"], "Loud")
             made = workbench.as_sound(kept, letter, sound)
             self.assertEqual(made.parent, sound.id)
             self.assertEqual(made.chain.digest(), versions[1]["chain"].digest())

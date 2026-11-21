@@ -1,9 +1,12 @@
-"""A dedicated recording and evaluation desk for guitar configuration learning.
+"""The Guitar Learner's window: record or open a dry clip, see what the learner makes of it, tag it.
 
-`GuitarLearner(desk)` opens on whatever desk seats it. The desk provides:
-root, read_state(path), set_status(text), submit(task, message, work, *args,
-done), job, task_if_active(name), stop(), stop_signal, ready, live_is_ready,
-leaving, takes and input_channel (see `lab.learner.seat.LearnerSeat`).
+`GuitarLearner(seat)` opens on the seat the desk gives it (`lab.learner.seat.LearnerSeat`): the guitar and
+input chosen on the desk, the one recording or listening at a time (`seat.submit`), work followed on the
+desk's clock (`seat.later`, `seat.watch`) and the status line. What it says of an estimate and of its
+checks is worded in `lab.learner.report`.
+
+`offered_for(instrument)` says whether the learner has a control layout, with its photograph, for an
+instrument; `show()` says so on the desk's line and stays closed when it has none.
 """
 
 from concurrent.futures import ThreadPoolExecutor
@@ -18,13 +21,13 @@ from uuid import uuid4
 
 import numpy as np
 
-from lab.learner import configuration as model, dataset as data, folders, gestures, takes as recorder, worker
+from lab.learner import configuration as model, dataset as data, folders, gestures, inputs, takes as recorder, worker
 from lab.learner.board import (ACCENT, ACTIVE_INK, ALERT, BG, FONT, INK, LINE, MUTED, PANEL, SURFACE,
-                    GuitarBoard, LAYOUTS_SHOWN, button, mark_button, setting, word)
+                    GuitarBoard, LAYOUTS_SHOWN, button, mark_button, word)
 from lab.learner.folders import LOG
+from lab.learner.report import (evaluate, guess_lines, prediction_value, purpose, report_score, setting,
+                                teaching_hint, training_coverage)
 
-
-GUITAR = "Charvel"
 
 
 def dark_title(window):
@@ -45,121 +48,16 @@ def dark_title(window):
     attribute(handle, 20, ctypes.byref(enabled), ctypes.sizeof(enabled))
 
 
-def summarize(layout, values):
-    parts = [data.LAYOUTS[layout]["pickups"][values["pickup"] - 1]]
-    if values.get("wiring"):
-        parts.append(values["wiring"])
-    parts.extend((f"Vol {setting(values['volume'])}", f"Tone {setting(values['tone'])}"))
-    return "  ·  ".join(parts)
-
-
-def prediction_value(key, value, layout):
-    if value is None:
-        return "Uncertain"
-    if key == "pickup":
-        return f"{value} · {data.LAYOUTS[layout]['pickups'][value - 1]}"
-    if key == "wiring":
-        return value
-    low, high = setting(value["low"]), setting(value["high"])
-    return low if low == high else f"{low}–{high}"
-
-
-def teaching_hint(layout, examples, current):
-    if not examples:
-        return "Start with a short phrase in a setup you know. Tag the actual settings on the guitar board."
-    setups = [row["configuration"] for row in examples]
-    pickup_pairs = {(row["wiring"], row["pickup"]) for row in setups} if "wiring" in current else {
-        (None, row["pickup"]) for row in setups}
-    pickup_seen = any(wiring == other and pickup != position for wiring, pickup in pickup_pairs
-                      for other, position in pickup_pairs)
-    wiring_seen = any(wiring != other and pickup == position for wiring, pickup in pickup_pairs
-                      for other, position in pickup_pairs)
-    if not pickup_seen:
-        return "To teach the blade, record the same notes at another pickup position with the other controls held fixed."
-    if "wiring" in data.LAYOUTS[layout] and not wiring_seen:
-        return "To teach the mini-toggle, repeat a recording with the same pickup and knobs, then flip only the toggle."
-    positions = {(row["tone"], row["volume"]) for row in setups
-                 if row["pickup"] == current["pickup"] and row.get("wiring") == current.get("wiring")}
-    if len(positions) < 3 or np.linalg.matrix_rank(np.asarray(sorted(positions)) - min(positions), tol=.15) < 2:
-        return "For knob estimates here, repeat the same notes while changing just tone or just volume. Keep input gain fixed."
-    return "Add another setup, or check a fresh performance in your usual playing style."
-
-
-def evaluate(layout):
-    """Keep labeled checks independent and recalculate their score after teaching."""
-    examples = data.records(GUITAR, layout, role="example")
-    tests = data.records(GUITAR, layout, role="test")
-    if len(examples) < 2:
-        return examples, tests, None, [], ""
-    try:
-        profile = model.calibrate(GUITAR, examples)
-    except ValueError as error:
-        return examples, tests, None, [], str(error)
-    checks = []
-    for row in tests:
-        try:
-            prediction = model.estimate(profile, row["wav"], source_id=row["source_id"])
-        except (OSError, ValueError):
-            continue
-        checks.append((row, prediction))
-    return examples, tests, profile, checks, ""
-
-
-def setup_key(configuration):
-    return configuration["pickup"], configuration.get("wiring")
-
-
-def training_coverage(examples):
-    if not examples:
-        return ""
-    settings = [row["configuration"] for row in examples]
-    positions = ", ".join(map(str, sorted({row["pickup"] for row in settings})))
-    knobs = []
-    for key in ("tone", "volume"):
-        values = sorted({row[key] for row in settings})
-        knobs.append(f"{key.title()} {setting(values[0])}" if len(values) == 1 else
-                     f"{key.title()} {setting(values[0])}–{setting(values[-1])}")
-    return f"Taught blade positions {positions}  ·  {'  ·  '.join(knobs)}"
-
-
-def report_score(checks, layout, examples):
-    if not checks:
-        return ""
-    taught_setups = {setup_key(row["configuration"]) for row in examples}
-    supported = [(row, guess) for row, guess in checks if setup_key(row["configuration"]) in taught_setups]
-    count = len(supported)
-    outside = len(checks) - count
-    parts = []
-    if count:
-        parts.append(f"{count} check{'s' if count != 1 else ''} on taught setups")
-    controls = ("pickup", "wiring") if "wiring" in data.LAYOUTS[layout] else ("pickup",)
-    for control in controls:
-        called = [(row, guess) for row, guess in supported if guess.get(control) is not None]
-        if called:
-            correct = sum(guess[control] == row["configuration"][control] for row, guess in called)
-            detail = f"{correct}/{len(called)} correct"
-            if len(called) != count:
-                detail += f", {count - len(called)} uncertain"
-            parts.append(f"{control.title()} {detail}")
-        elif count:
-            parts.append(f"{control.title()} uncertain")
-    for control in ("volume", "tone"):
-        estimates = [(abs(guess[control]["value"] - row["configuration"][control]),
-                      guess[control]["low"] <= row["configuration"][control] <= guess[control]["high"])
-                     for row, guess in supported if guess.get(control) is not None]
-        if estimates:
-            covered = sum(inside for _, inside in estimates)
-            error = float(np.mean([difference for difference, _ in estimates]))
-            parts.append(f"{control.title()} error {error:.1f} · in range {covered}/{count}")
-    if outside:
-        parts.append(f"{outside} outside taught setups")
-    return "  ·  ".join(parts)
+def offered_for(instrument):
+    """The control layouts the learner can show for an instrument: none means it is not offered for it."""
+    return [layout for layout in data.layouts_for(instrument or "") if layout in LAYOUTS_SHOWN]
 
 
 class GuitarLearner:
-    def __init__(self, desk):
-        self.desk = desk
-        self.window = tk.Toplevel(desk.root, background=BG)
+    def __init__(self, seat):
+        self.seat = seat
+        self.guitar = None
+        self.window = tk.Toplevel(seat.root, background=BG)
         self.window.withdraw()
         self.window.title("Guitar Learner · Tone Lab")
         self.window.minsize(1050, 680)
@@ -169,9 +67,10 @@ class GuitarLearner:
         self.window.bind("<Control-o>", lambda _: self.choose_wav())
         self.window.geometry("1130x748")
         self.worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix="guitar-learner")
-        self.job = self.on_result = None
+        self.job = None
         self.stop = self.ready = None
-        self.record_started = self.closed = False
+        self.record_started = False
+        self.queued = []
         self.layout = None
         self.source = self.excerpt = self.used_source = self.guess = None
         self.full_excerpt = self.drag_span = None
@@ -186,12 +85,32 @@ class GuitarLearner:
         self.dataset_rows = {}
         self.examples, self.tests, self.checks = [], [], []
         self.profile = None
-        self.prefs_path = folders.layout_choice()
         self.build()
-        saved = desk.read_state(self.prefs_path).get("layout")
-        self.change_layout(saved if saved in LAYOUTS_SHOWN else LAYOUTS_SHOWN[0], remember=False)
+        self.use_guitar(seat.guitar)
+
+    def use_guitar(self, guitar):
+        """Work on the guitar chosen on the desk. False, with the reason on the desk's line, when the learner
+        has no control layout for it."""
+        layouts = offered_for(guitar)
+        if not layouts:
+            self.seat.set_status(f"The Guitar Learner has no control layout for the {guitar} yet. Choose a guitar "
+                                 "it knows under More, Instrument.")
+            return False
+        if guitar == self.guitar:
+            return True
+        if self.job is not None or self.stop is not None or self.live_stop is not None:
+            self.status.set(f"Still on the {self.guitar}: finish what is running, then open the learner again.")
+            return True
+        self.guitar, self.layout = guitar, None
+        self.source = self.excerpt = self.full_excerpt = self.used_source = self.guess = None
+        self.wave_peaks = ()
+        saved = folders.read_json(folders.layout_choice()).get("layout")
+        self.change_layout(saved if saved in layouts else layouts[0], remember=False)
+        return True
 
     def show(self):
+        if not self.use_guitar(self.seat.guitar):
+            return
         self.window.deiconify()
         dark_title(self.window)
         self.window.lift()
@@ -203,16 +122,7 @@ class GuitarLearner:
         if self.live_stop:
             self.live_stop.set()
         self.window.withdraw()
-        self.desk.root.lift()
-
-    def shutdown(self):
-        self.closed = True
-        if self.stop:
-            self.stop.set()
-        if self.live_stop:
-            self.live_stop.set()
-        self.worker.shutdown(wait=False, cancel_futures=True)
-        self.window.destroy()
+        self.seat.root.lift()
 
     def build(self):
         page = tk.Frame(self.window, background=BG, padx=23, pady=18)
@@ -346,7 +256,7 @@ class GuitarLearner:
         self.table.heading("#0", text="Recording")
         self.table.column("#0", width=320, minwidth=210)
         for key, title, width in zip(columns, ("Pickup", "Mini-toggle", "Volume", "Tone", "Used for"),
-                                     (138, 105, 80, 80, 157)):
+                                     (138, 105, 70, 70, 215)):
             self.table.heading(key, text=title)
             self.table.column(key, width=width, minwidth=60, anchor="w")
         scroll = ttk.Scrollbar(body, orient="vertical", command=self.table.yview)
@@ -395,7 +305,7 @@ class GuitarLearner:
         for handle in self.table.get_children():
             self.table.delete(handle)
         self.dataset_rows = {}
-        rows = data.dataset_sources(GUITAR, self.layout)
+        rows = data.dataset_sources(self.guitar, self.layout)
         if self.source and all(source.path != self.source.path for source, _ in rows) and self.used_source is None:
             rows.insert(0, (self.source, ()))
         tally = {"example": 0, "test": 0, "untagged": 0}
@@ -407,12 +317,9 @@ class GuitarLearner:
                 record = source.label
                 if label and len(labels) > 1:
                     record += f" · {label['source_start']:.1f}–{label['source_end']:.1f}s"
-                purpose = {"example": "Teaching example", "test": "Independent check", "untagged": "Untagged"}[use]
-                if label and not label.get("score_eligible", True) and use == "test":
-                    purpose = "Check · heard in training"
                 settings = (prediction_value("pickup", values["pickup"], self.layout), values.get("wiring", "—"),
                             setting(values["volume"]), setting(values["tone"])) if values else ("—",) * 4
-                row_id = self.table.insert("", "end", text=record, values=(*settings, purpose), tags=(use,))
+                row_id = self.table.insert("", "end", text=record, values=(*settings, purpose(label)), tags=(use,))
                 self.dataset_rows[row_id] = (source, label)
         self.dataset_summary.set(f"{tally['example']} examples  ·  {tally['test']} saved checks  ·  {tally['untagged']} untagged")
         self.sync_dataset_buttons()
@@ -444,8 +351,8 @@ class GuitarLearner:
         label = row[1]
 
         def unlabel():
-            data.unlabel(GUITAR, self.layout, label["id"])
-            return evaluate(self.layout)
+            data.unlabel(self.guitar, self.layout, label["id"])
+            return evaluate(self.guitar, self.layout)
 
         def removed(result):
             if self.used_source and self.used_source["id"] == label["id"]:
@@ -460,8 +367,8 @@ class GuitarLearner:
             return
         if remember:
             try:
-                self.prefs_path.parent.mkdir(parents=True, exist_ok=True)
-                folders.write_json(self.prefs_path, {"layout": layout})
+                folders.layout_choice().parent.mkdir(parents=True, exist_ok=True)
+                folders.write_json(folders.layout_choice(), {"layout": layout})
             except OSError:
                 LOG.warning("Guitar Learner layout could not be saved", exc_info=True)
         self.layout = layout
@@ -475,7 +382,8 @@ class GuitarLearner:
             self.source_detail.set("Dry input")
             self.draw_wave()
         self.board.show(layout)
-        self.work("Reading labeled recordings…", evaluate, lambda result: self.loaded(result, use_last=True), layout)
+        self.work("Reading labeled recordings…", evaluate, lambda result: self.loaded(result, use_last=True),
+                  self.guitar, layout)
 
     def loaded(self, result, use_last=False):
         self.examples, self.tests, self.profile, self.checks, message = result
@@ -533,7 +441,7 @@ class GuitarLearner:
         if available:
             if not self.tag_row.winfo_manager():
                 self.tag_row.pack(fill="x", pady=(7, 3))
-            self.tag_hint.set("Use to teach moves this recording out of the independent score."
+            self.tag_hint.set("Use to teach takes this recording out of the checks."
                               if role == "test" else "Tag the actual settings shown on the guitar board.")
         else:
             self.tag_row.pack_forget()
@@ -559,16 +467,16 @@ class GuitarLearner:
 
     def list_takes(self):
         self.takes.delete(0, tk.END)
-        sources = data.take_sources(GUITAR)
+        sources = data.take_sources(self.guitar)
         if not sources:
-            self.takes.add_command(label="No verified Charvel dry takes", state="disabled")
-        labeled = {Path(row["source"]) for row in data.records(GUITAR, self.layout)}
+            self.takes.add_command(label=f"No verified {self.guitar} dry takes", state="disabled")
+        labeled = {folders.found(row["source"]).resolve() for row in data.records(self.guitar, self.layout)}
         for source in sources[:18]:
             title = source.label if source.path in labeled else f"{source.label} · unlabelled"
             self.takes.add_command(label=title, command=lambda picked=source: self.select_source(picked))
 
     def review_label(self, row):
-        source = data.DrySource(Path(row["wav"]), row["source_label"], guitar=GUITAR, kind="saved-excerpt")
+        source = data.DrySource(Path(row["wav"]), row["source_label"], guitar=self.guitar, kind="saved-excerpt", session=data.session_of(row))
         self.select_source(source, known_label=row)
 
     def choose_wav(self):
@@ -583,8 +491,8 @@ class GuitarLearner:
                 self.status.set(str(error))
 
     def select_source(self, source, *, known_label=None):
-        if source.guitar and source.guitar.casefold() != GUITAR.casefold():
-            self.status.set(f"This take used {source.guitar}. Choose a recording of {GUITAR}.")
+        if source.guitar and source.guitar.casefold() != self.guitar.casefold():
+            self.status.set(f"This take used {source.guitar}. Choose a recording of the {self.guitar}.")
             return
         self.follow_live = False
         self.work("Reading the clip and checking its settings…", self.inspect_clip,
@@ -592,13 +500,13 @@ class GuitarLearner:
 
     def inspect_clip(self, source, start=None, end=None, known_label=None):
         excerpt = data.inspect(source, start=start, end=end)
-        label = known_label or data.find_label(GUITAR, self.layout, excerpt)
+        label = known_label or data.find_label(self.guitar, self.layout, excerpt)
         guess, reason = None, ""
         if excerpt.clipped:
             reason = "This recording clips. Select a cleaner passage or use another dry take."
         elif label and label["role"] == "example":
             reason = "Teaching example. Adjust the board and update its tag if needed."
-        elif (label and not label.get("score_eligible", True)) or not data.is_independent(GUITAR, self.layout, excerpt):
+        elif (label and not label.get("score_eligible", True)) or not data.never_taught(self.guitar, self.layout, excerpt):
             reason = "The learner has heard this audio in training."
         elif self.profile:
             guess = model.estimate(self.profile, excerpt.samples, source_id=excerpt.source_id)
@@ -705,55 +613,54 @@ class GuitarLearner:
             self.work("Checking the full passage…", self.inspect_clip, self.use_excerpt, self.source)
 
     def record(self):
+        """Start a take; pressed again, stop and save it."""
         if self.stop:
             self.stop.set()
             self.status.set("Saving the dry recording…")
             self.sync()
             return
-        if self.job or self.desk.leaving or self.live_stop:
+        if self.job or self.seat.leaving or self.live_stop:
             return
-        if self.desk.job is not None and not self.desk.task_if_active("monitor"):
+        if self.seat.job is not None:
             self.status.set("Tone Lab is using the recorder. Wait for that action to finish.")
             return
         self.stop, self.ready = Event(), Event()
         self.record_started = False
-        if self.desk.task_if_active("monitor"):
-            self.desk.stop()
-            self.status.set("Releasing the Quad Cortex playback loop…")
         if gestures.running():
-            gestures.stop()
+            gestures.stop()             # it holds the input; the take starts when it has let go
             self.status.set("Ending gesture listening first…")
-        self.poll_capture()
+        self.seat.watch(self.watch_capture)
+        self.watch_capture()
 
-    def poll_capture(self):
-        if self.closed or self.stop is None:
-            return
+    def watch_capture(self):
+        """Start the take once the input is free, and say how it is going. On the desk's clock."""
+        if self.stop is None:
+            return False
         if not self.record_started:
-            if self.stop.is_set() or self.desk.leaving:
+            if self.stop.is_set() or self.seat.leaving:
                 self.stop = self.ready = None
                 self.status.set("Recording cancelled.")
                 self.sync()
-                return
-            if self.desk.job is None and not gestures.running():
+                return False
+            if self.seat.job is None and not gestures.running():
+                channel, host, guitar, stop, ready = self.seat.input_channel, self.seat.host, self.guitar, self.stop, self.ready
+
+                def record_take():
+                    return recorder.record_take(channel, guitar, stop, ready,
+                                                routing=lambda: inputs.routing(host, channel))
+
+                if not self.seat.submit("Opening the Quad Cortex dry input for Guitar Learner…", record_take,
+                                        done=self.recorded, stop=stop):
+                    self.stop = self.ready = None
+                    self.status.set("The audio input is in use. Try again when it is free.")
+                    self.sync()
+                    return False
                 self.record_started = True
-                self.desk.ready = self.ready
-                self.desk.stop_signal = self.stop
-                self.desk.live_is_ready = False
-                self.desk.submit("record", "Opening the Quad Cortex dry input for Guitar Learner…",
-                                 self.capture, self.desk.input_channel, self.stop, self.ready, done=self.recorded)
                 self.status.set("Connecting… wait for Recording.")
         elif self.ready.is_set() and not self.stop.is_set():
             self.status.set("Recording… play the notes, then press Stop.")
         self.sync()
-        self.window.after(100, self.poll_capture)
-
-    @staticmethod
-    def capture(channel, stop, ready):
-        try:
-            return recorder.record_take(channel, GUITAR, stop, ready), None
-        except Exception as error:
-            LOG.exception("Guitar Learner recording failed")
-            return None, str(error)
+        return True
 
     def recorded(self, outcome):
         self.stop = self.ready = None
@@ -761,55 +668,18 @@ class GuitarLearner:
         self.sync()
         if error:
             self.status.set(error)
-            self.desk.set_status(error)
+            self.seat.set_status(error)
             return
-        self.desk.takes = recorder.clip_paths()
-        self.desk.set_status(result[1])
+        self.seat.set_status(result[1])
         try:
-            self.select_source(data.source_from_result(GUITAR, result))
+            self.select_source(data.source_from_result(self.guitar, result))
         except (OSError, ValueError) as error:
             self.status.set(str(error))
 
     def show_guess(self, guess, label=None, *, stale=False):
-        keys = ["pickup", "volume", "tone"]
-        if "wiring" in data.LAYOUTS[self.layout]:
-            keys.insert(1, "wiring")
-        predicted = [key for key in keys if guess.get(key) is not None]
-        control_names = {"pickup": "Pickup", "wiring": "Mini-toggle", "tone": "Tone", "volume": "Volume"}
-        held = {key for key in ("volume", "tone") if len({row["configuration"][key] for row in self.examples}) <= 1}
-        present = [f"{control_names[key]}  {prediction_value(key, guess[key], self.layout)}" for key in predicted]
-        unresolved = [control_names[key] for key in keys if key not in predicted and key not in held]
-        if present and unresolved:
-            present.append(f"{' and '.join(unresolved)} uncertain")
-        confidence = guess["confidence"].title()
-        if len(predicted) == 1:
-            headline = f"{confidence} {control_names[predicted[0]].lower()} estimate"
-        elif predicted:
-            headline = f"{confidence} estimate"
-        else:
-            headline = "Insufficient evidence"
-        if stale:
-            headline = "Last estimate"
+        headline, details, notes = guess_lines(guess, self.layout, self.examples, label, stale=stale)
         self.headline.set(headline)
-        self.details.set("  ·  ".join(present))
-        notes = [guess["reason"]]
-        if len(predicted) == 1 and (evidence := guess.get("evidence", {}).get(predicted[0])):
-            count = len(evidence["notes_used"])
-            notes.append(f"{count} comparable pitch{'es' if count != 1 else ''} supported this estimate.")
-        if guess.get("nearest") and not predicted:
-            nearest = guess["nearest"]
-            reference = prediction_value("pickup", nearest["pickup"], self.layout)
-            if nearest.get("wiring"):
-                reference += f" · {nearest['wiring']}"
-            notes.append(f"Closest taught setup · {reference}")
-        if held:
-            notes.append(f"{' and '.join(control_names[key] for key in keys if key in held)} need examples at different settings.")
-        if label is not None:
-            actual = label["configuration"]
-            caption = f"Actual · {summarize(self.layout, actual)}"
-            if setup_key(actual) not in {setup_key(row["configuration"]) for row in self.examples}:
-                caption += " · outside taught setups"
-            notes.insert(0, caption)
+        self.details.set(details)
         self.note.set("\n".join(notes))
         if not self.report.winfo_manager():
             self.report.pack(after=self.status_line, fill="x", pady=(6, 0))
@@ -818,15 +688,16 @@ class GuitarLearner:
         if self.job or self.stop or self.source is None or self.follow_live or self.snapshot_request:
             return
         source, values, layout, excerpt, old = self.source, dict(self.board.values), self.layout, self.excerpt, self.used_source
+        guitar = self.guitar
 
         def label():
             if role == "example" and not model.usable_notes(excerpt.samples):
                 raise ValueError("No sustained single notes detected. Select a clearer passage or record again.")
             if old:
-                row = data.retag(GUITAR, layout, old["id"], values, role=role, promote=role == "example")
+                row = data.retag(guitar, layout, old["id"], values, role=role, promote=role == "example")
             else:
-                row = data.add(GUITAR, layout, source, values, role=role, start=excerpt.source_start, end=excerpt.source_end)
-            return row, evaluate(layout)
+                row = data.add(guitar, layout, source, values, role=role, start=excerpt.source_start, end=excerpt.source_end)
+            return row, evaluate(guitar, layout)
 
         def saved(result):
             self.used_source, fit = result
@@ -847,23 +718,21 @@ class GuitarLearner:
             self.live_status.set("Closing the dry input…")
             self.sync()
             return
-        if self.stop or self.job or self.desk.leaving:
+        if self.stop or self.job or self.seat.leaving:
             return
-        if self.desk.job is not None and not self.desk.task_if_active("monitor"):
+        if self.seat.job is not None:
             self.status.set("Tone Lab is using the audio input. Wait for that action to finish.")
             return
         self.live_stop = Event()
         self.live_events, self.live_commands = Queue(), Queue()
         self.live_started = False
         self.live_state = self.live_change = self.last_live_guess = None
-        if self.desk.task_if_active("monitor"):
-            self.desk.stop()
-            self.live_status.set("Releasing the current Tone Lab playback loop…")
         if gestures.running():
-            gestures.stop()
+            gestures.stop()             # it holds the input; listening starts when it has let go
             self.live_status.set("Ending gesture listening first…")
         self.follow()
-        self.poll_live()
+        self.seat.watch(self.watch_listening)
+        self.watch_listening()
 
     def follow(self):
         self.follow_live = True
@@ -871,35 +740,37 @@ class GuitarLearner:
         self.draw_wave()
         self.sync()
 
-    def poll_live(self):
-        if self.closed or self.live_stop is None:
-            return
+    def watch_listening(self):
+        """Start listening once the input is free, and take in what the worker says. On the desk's clock."""
+        if self.live_stop is None:
+            return False
         if not self.live_started:
-            if self.live_stop.is_set() or self.desk.leaving:
+            if self.live_stop.is_set() or self.seat.leaving:
                 self.live_finished((None, None))
-                return
-            if self.desk.job is None and not gestures.running():
+                return False
+            if self.seat.job is None and not gestures.running():
+                config = {"physical_input": self.seat.input_channel, "guitar": self.guitar, "profile": self.profile}
+                host, stop, commands, said = self.seat.host, self.live_stop, self.live_commands, self.live_events.put
+
+                def listen():
+                    channels, _ = inputs.routing(host, config["physical_input"])
+                    return worker.run({**config, "dry_channel": channels[0]}, stop, commands, said)
+
+                if not self.seat.submit("Opening Guitar Learner dry input…", listen, done=self.live_finished,
+                                        stop=stop):
+                    self.live_finished((None, "The audio input is in use. Try again when it is free."))
+                    return False
                 self.live_started = True
-                self.desk.stop_signal = self.live_stop
-                config = {"physical_input": self.desk.input_channel, "guitar": GUITAR, "profile": self.profile}
-                self.desk.submit("learner-listen", "Opening Guitar Learner dry input…", self.listen_worker,
-                                 config, self.live_stop, self.live_commands, self.live_events.put, done=self.live_finished)
                 self.live_status.set("Opening the dry input…")
         try:
             while True:
                 self.live_event(self.live_events.get_nowait())
         except Empty:
             pass
+        if self.live_stop is None:
+            return False
         self.sync()
-        self.window.after(100, self.poll_live)
-
-    @staticmethod
-    def listen_worker(config, stop, commands, report):
-        try:
-            return worker.run(config, stop, commands, report), None
-        except Exception as error:
-            LOG.exception("Guitar Learner live input failed")
-            return None, str(error)
+        return True
 
     def live_event(self, message):
         if isinstance(message, str):
@@ -914,7 +785,7 @@ class GuitarLearner:
                 self.live_change = message["change"]
                 self.last_live_guess = None
             estimate = message.get("estimate")
-            if estimate and estimate.get("confidence") != "uncertain":
+            if estimate and estimate.get("match") != "none":
                 self.last_live_guess = estimate
             if not self.live_stop.is_set():
                 note = (f" · {message['reason']}" if message.get("mode") in ("silent", "listening") else "")
@@ -925,7 +796,7 @@ class GuitarLearner:
             self.snapshot_request = None
             if message.get("path"):
                 try:
-                    self.select_source(data.source_from_take(GUITAR, message["folder"]))
+                    self.select_source(data.source_from_take(self.guitar, message["folder"]))
                 except (OSError, ValueError) as error:
                     self.status.set(str(error))
             else:
@@ -937,7 +808,7 @@ class GuitarLearner:
         self.live_started = self.follow_live = False
         self.live_status.set("")
         self.status.set(error or "Live listening stopped.")
-        self.desk.set_status(self.status.get())
+        self.seat.set_status(self.status.get())
         self.draw_wave()
         self.sync()
 
@@ -958,7 +829,7 @@ class GuitarLearner:
         self.source_title.set("Recent dry guitar")
         self.source_detail.set("Rolling audio · Keep a clip to save it")
         estimate = state.get("estimate")
-        if estimate and estimate["confidence"] != "uncertain":
+        if estimate and estimate["match"] != "none":
             self.show_guess(estimate)
         elif self.last_live_guess and state.get("mode") == "silent":
             self.show_guess(self.last_live_guess, stale=True)
@@ -984,25 +855,26 @@ class GuitarLearner:
             self.note.set(f"{caption}\n{self.note.get()}")
 
     def work(self, progress, fn, done, *args):
-        if self.closed or self.job is not None:
+        """Run `fn(*args)` off the window's thread and hand its result to `done` on the desk's clock. Asked while
+        another piece of work runs, it waits its turn: nothing asked for is dropped."""
+        if self.job is not None:
+            self.queued.append((progress, fn, done, args))
             return
         self.job = self.worker.submit(fn, *args)
-        self.on_result = done
         self.status.set(progress)
         self.sync()
-        self.window.after(60, self.poll_job)
+        self.seat.later(self.job, lambda result: self.worked(done, result), lambda error: self.worked(None, error))
 
-    def poll_job(self):
-        if self.closed or self.job is None:
-            return
-        if not self.job.done():
-            self.window.after(60, self.poll_job)
-            return
-        job, self.job = self.job, None
-        callback, self.on_result = self.on_result, None
+    def worked(self, done, result):
+        self.job = None
         try:
-            callback(job.result())
-        except Exception as error:
+            if done is None:
+                raise result
+            done(result)
+        except Exception as error:  # noqa: BLE001
             LOG.info("Guitar Learner action did not finish: %s", error)
             self.status.set(str(error))
         self.sync()
+        if self.queued and self.job is None:
+            progress, fn, then, args = self.queued.pop(0)
+            self.work(progress, fn, then, *args)

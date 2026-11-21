@@ -1,6 +1,6 @@
 # Tone Lab codebase review
 
-[Current findings for `68cbd78`](#re-review-of-68cbd78)
+Three rounds on the desk and the unit layer, each followed by its fixes; the last status is [after the fixes for `68cbd78`](#status-after-the-fixes-for-68cbd78). The review of everything else is [WHOLE_CODEBASE_REVIEW.md](WHOLE_CODEBASE_REVIEW.md).
 
 November 20, 2026. Reviewed the default `lab/` rewrite at `ceb9a6e`, its Windows launcher, and its interfaces with the older `tone_lab/` app. Compared with `main` at `1f1a4c3`. The rewrite has a useful split between the desk, the Quad Cortex worker, and audio analysis. I would keep it out of `main` until Stop, preset protection, and playback routing are reliable.
 

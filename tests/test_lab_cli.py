@@ -54,7 +54,7 @@ class Home(unittest.TestCase):
         self.addCleanup(patcher.stop)
 
 
-class DispatchTest(unittest.TestCase):
+class DispatchTest(Home):
     def test_no_command_opens_the_desk_with_its_own_flags(self):
         opened = []
         self.assertEqual(cli.main([], desk=opened.append), 0)
@@ -74,7 +74,7 @@ class DispatchTest(unittest.TestCase):
                      ["reamp", "d.wav", "--slot", "2F", "--scenes", "AB"],
                      ["sweep", "d.wav", "--slot", "2F", "--row", "1", "--column", "1", "--parameter", "0",
                       "--values", "4", "5"],
-                     ["budget"], ["named-settings", "--only", "1001", "6011"]):
+                     ["budget"], ["named-settings", "--only", "1001", "6011"], ["time-switch", "--switches", "4"]):
             self.assertEqual(parser.parse_args(line).action, line[0])
         self.assertEqual(set(cli.RUN), set(cli.COMMANDS))
 
@@ -90,6 +90,60 @@ class DispatchTest(unittest.TestCase):
             with self.assertRaises(cli.Refused):
                 with cli.session(False):
                     pass
+
+    def listener(self, answer):
+        """Something listening on a port of its own (never the desk's real one), answering each knock with `answer`
+        (None: it says nothing and hangs up)."""
+        import socket
+        import threading
+
+        from lab.desk import window
+
+        door = socket.socket()
+        door.bind(("127.0.0.1", 0))
+        door.listen(4)
+        door.settimeout(.2)
+        closing = threading.Event()
+
+        def serve():
+            while not closing.is_set():
+                try:
+                    knock, _ = door.accept()
+                except OSError:
+                    continue
+                with knock:
+                    if answer is not None:
+                        knock.sendall(answer)
+
+        thread = threading.Thread(target=serve, daemon=True)
+        thread.start()
+        patcher = mock.patch.object(window, "PORT", door.getsockname()[1])
+        patcher.start()
+        self.addCleanup(lambda: (closing.set(), thread.join(2), door.close(), patcher.stop()))
+        return window
+
+    def test_only_a_desk_s_own_answer_makes_the_port_a_desk(self):
+        # Regression: anything listening on the desk's port was taken for a desk, and every unit command refused.
+        window = self.listener(None)
+        with mock.patch.object(cli, "WAIT_FOR_DESK", .3):
+            self.assertFalse(cli.desk_open())               # a listener that says nothing
+        self.listener(b"HTTP/1.1 400 Bad")
+        with mock.patch.object(cli, "WAIT_FOR_DESK", .3):
+            self.assertFalse(cli.desk_open())               # one that says something else
+        self.listener(window.HERE)
+        self.assertTrue(cli.desk_open())                    # a desk
+
+    def test_nobody_on_the_port_is_no_desk(self):
+        import socket
+
+        from lab.desk import window
+
+        free = socket.socket()
+        free.bind(("127.0.0.1", 0))
+        port = free.getsockname()[1]
+        free.close()
+        with mock.patch.object(window, "PORT", port):
+            self.assertFalse(cli.desk_open())
 
     def test_ctrl_c_stops_at_the_next_safe_point(self):
         class Host:
@@ -156,11 +210,41 @@ class SimulatedUnitTest(Home):
         self.assertTrue(Path(phrase["dry"]).is_file())
         latest = result("latest-clip", "--simulated")
         self.assertEqual(latest["id"], phrase["id"])
+        # Regression: the phrase's dry.wav held the processed return too, and the peak was the return's.
+        dry = read_wave(phrase["dry"])
+        self.assertEqual(dry.shape, (48000, 1))
+        self.assertAlmostEqual(phrase["peak_db"], 20 * np.log10(float(np.abs(dry).max())), delta=.1)
+        self.assertTrue((Path(phrase["dry"]).parent / "wet.wav").is_file())    # the return is kept beside it
+
+    def test_time_switch_times_the_switches_and_counts_the_reads(self):
+        found = result("time-switch", "--simulated", "--switches", "3")
+        self.assertEqual((found["compared"], found["switches"], found["made_ready_by"]), ("pair", 3, "building it"))
+        self.assertEqual([row["to"] for row in found["each"]], ["b", "a", "b"])
+        self.assertGreaterEqual(found["switch_ms"]["worst"], found["switch_ms"]["median"])
+        self.assertGreater(found["preset_reads_per_switch"]["median"], 0)
+        self.assertGreater(found["position_reads_per_switch"]["median"], 0)
+        again = result("time-switch", "--simulated", "--switches", "1")
+        self.assertEqual(again["made_ready_by"], "recalling what an earlier run built")
+        code, _, err = run("time-switch", "--simulated", "--switches", "0")
+        self.assertEqual(code, 1)
+        self.assertIn("at least once", err)
+
+    def test_time_switch_leaves_the_unit_quiet_and_as_it_was(self):
+        device = SimUnit()
+        unit = Unit(device, settle=.05, sleep=lambda seconds: None)
+        engine = Engine(unit, Slots(unit, self.home / "lab"), SimAudio(device))
+        engine.open()
+        found = cli.time_switch(engine, 2)
+        self.assertIs(unit.device, device)                      # the counting stand-in is taken off again
+        self.assertIsNone(engine.mode)
+        self.assertTrue(all(row.inlet == 0 for row in unit.read().rows))    # no input left connected
+        self.assertEqual(len(found["each"]), 2)
+        engine.close()
 
     def test_record_to_a_file_refuses_one_that_exists(self):
         target = self.home / "di.wav"
         self.assertEqual(result("record", str(target), "--simulated", "--seconds", "1")["file"], str(target.resolve()))
-        self.assertEqual(len(read_wave(target)), 48000)
+        self.assertEqual(read_wave(target).shape, (48000, 1))       # the dry guitar alone, not the wet return too
         code, _, err = run("record", str(target), "--simulated")
         self.assertEqual(code, 1)
         self.assertIn("new .wav", err)
@@ -169,14 +253,17 @@ class SimulatedUnitTest(Home):
         from lab import setup
 
         fine = lambda: setup.finding("x", True, "fine")   # noqa: E731
-        with mock.patch.object(setup, "checks", lambda home: [fine()]):
+        asked = []
+        with mock.patch.object(setup, "checks", lambda home, again=False: asked.append(again) or [fine()]):
             code, out, err = run("doctor", "--unit", "--simulated")
         self.assertEqual(code, 0, err)
+        self.assertEqual(asked, [True])         # asked for: checked now, not read from the first run's record
         found = {item["check"]: item for item in json.loads(out)}
         self.assertTrue(found["unit"]["ok"])
         self.assertIn("firmware 4.1.1", found["unit"]["say"])
         self.assertTrue(found["setlist"]["ok"])
         self.assertEqual(found["usb"]["say"], "The dry guitar arrives on USB channel 1.")
+        self.assertEqual(setup.recorded(self.home), [fine()])       # and the record is brought up to date
 
     def test_doctor_says_when_the_unit_cannot_be_reached(self):
         from lab import setup
@@ -184,7 +271,8 @@ class SimulatedUnitTest(Home):
         def unreachable(*args, **options):
             raise RuntimeError("no device")
 
-        with mock.patch.object(setup, "checks", lambda home: []), mock.patch.object(cli, "call", unreachable):
+        with mock.patch.object(setup, "checks", lambda home, again=False: []), \
+                mock.patch.object(cli, "call", unreachable):
             code, out, _ = run("doctor", "--unit")
         self.assertEqual(code, 1)
         self.assertEqual(json.loads(out)[0]["say"], "The Quad Cortex could not be reached: no device")
@@ -209,12 +297,27 @@ class RendersTest(Home):
         self.engine.close()
 
     def test_a_value_out_of_range_or_a_missing_preset_is_refused(self):
-        with self.assertRaisesRegex(RuntimeError, "goes from 0 to 10"):
+        with self.assertRaisesRegex(ValueError, "goes from 0 to 10"):
             cli.renders(self.engine, "2F", "My Presets", self.dry, [{"edit": (0, 0, 0, 11.)}])
-        with self.assertRaisesRegex(RuntimeError, "holds no block"):
+        with self.assertRaisesRegex(ValueError, "Vai: Row 2, column 1 holds no block"):
             cli.renders(self.engine, "2F", "My Presets", self.dry, [{"edit": (1, 0, 0, 1.)}])
         with self.assertRaisesRegex(RuntimeError, "No saved preset"):
             cli.renders(self.engine, "3A", "My Presets", self.dry, [{"scene": 0}])
+
+    def test_a_stop_is_a_stop_and_not_a_fault(self):
+        from types import SimpleNamespace
+
+        from lab.qc.unit import Stopped
+        from lab.tools import common
+
+        stop = SimpleNamespace(is_set=lambda: True)
+        with self.assertRaises(Stopped):
+            cli.renders(self.engine, "2F", "My Presets", self.dry, [{"scene": 0}], stop=stop)
+        with self.assertRaises(Stopped):
+            common.render_many(self.engine, [(None, None)], self.dry, stop=stop)
+        with self.assertRaises(Stopped):
+            cli.time_switch(self.engine, 2, stop=stop)
+        self.assertIsNone(self.engine.mode)             # and the inputs were taken off again
 
     def fake_call(self, simulated, name, *args, **options):
         self.called = (name, args)
@@ -252,6 +355,16 @@ class RendersTest(Home):
         code, _, err = run("reamp", str(dry), "--slot", "2F", "--scenes", "AZ")
         self.assertIn("letters A to H", err)
 
+    def test_sweep_takes_one_scene_letter(self):
+        # Regression: `--scene BC` meant B (found as a substring), and `--scene Z` said "substring not found".
+        sweep = ["sweep", "x.wav", "--slot", "2F", "--row", "1", "--column", "1", "--parameter", "0",
+                 "--values", "1", "2", "--scene"]
+        for wrong in ("BC", "Z"):
+            with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()) as err:
+                cli.parser().parse_args([*sweep, wrong])
+            self.assertIn("--scene", err.getvalue())
+        self.assertEqual(cli.parser().parse_args([*sweep, "c"]).scene, "C")
+
 
 class LocalTest(Home):
     def test_pod_lists_starting_points_and_shows_one_slot(self):
@@ -266,6 +379,9 @@ class LocalTest(Home):
         self.assertEqual(one["name"], "Time")
         self.assertTrue(one["chain"][0].startswith("Row 1"))
         self.assertTrue(any(piece.get("quad_cortex") for piece in one["pieces"]))
+        self.assertTrue(any("Brit J45 Nrm → Brit TM45 Normal (same gear)" in line for line in one["became"]))
+        amp = next(piece for piece in one["pieces"] if piece["name"] == "Brit J45 Nrm")
+        self.assertEqual(amp["set_from_the_pod_go"]["BASS"], 3.8)
         code, _, err = run("pod", str(backup), "--user-slot", "02B")
         self.assertEqual(code, 1)
         self.assertIn("empty or missing", err)
@@ -277,11 +393,13 @@ class LocalTest(Home):
                         encoding="utf-8")
         ranked = result("history", str(path))
         self.assertEqual([item["title"] for item in ranked], ["For the Love of God", "Limelight"])
+        self.assertEqual({"chosen", "days", "hours", "preset"} - set(ranked[0]), set())   # the Songs window's ranking
         from lab.sound.sounds import Store
 
         Store(self.home).save_song({"name": "Steve Vai – For the Love of God"})
         missing = result("history", str(path), "--missing")
         self.assertEqual([item["title"] for item in missing], ["Limelight"])
+        self.assertEqual(result("history", str(path))[0]["preset"], "Steve Vai – For the Love of God")
 
     def test_migrate_dry_run_prints_the_summary(self):
         old = self.home / "old"
@@ -291,13 +409,30 @@ class LocalTest(Home):
         with mock.patch.object(migrate, "OLD", old), mock.patch.object(migrate.migrate, "__defaults__", (old,)):
             code, out, _ = run("migrate", "--dry-run")
         self.assertEqual(code, 0)
-        self.assertTrue(out.startswith("0 designs and 0 presets as sounds"))
+        self.assertEqual(out.strip(), "Nothing to bring in from the earlier app.")
         self.assertFalse((self.home / "sounds").exists())
 
     def test_latest_clip_with_none(self):
         code, _, err = run("latest-clip", "--simulated")
         self.assertEqual(code, 1)
         self.assertIn("No phrase", err)
+        code, _, err = run("latest-clip")                   # nothing is looked for in the earlier app's folder
+        self.assertEqual(code, 1)
+        self.assertIn("No phrase", err)
+
+    def test_a_failure_nobody_asked_for_is_logged_with_its_trace_and_a_refusal_is_not(self):
+        def broken(args):
+            raise KeyError("the table")
+
+        with mock.patch.dict(cli.RUN, {"presets": broken}):
+            code, _, err = run("presets")
+        self.assertEqual(code, 1)
+        log = (self.home / "errors.log").read_text(encoding="utf-8")
+        self.assertIn("KeyError", log)
+        self.assertIn("Traceback", log)
+        with mock.patch.dict(cli.RUN, {"presets": lambda args: (_ for _ in ()).throw(cli.Refused("The desk is open."))}):
+            run("presets")
+        self.assertEqual((self.home / "errors.log").read_text(encoding="utf-8"), log)
 
     def test_shortcut_passes_the_chosen_desk(self):
         chosen = []

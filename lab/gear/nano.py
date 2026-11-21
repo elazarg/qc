@@ -24,7 +24,16 @@ The slot rules and device names are in `research/nano-cortex.json`. The Nano's
 devices carry the names of Quad Cortex devices, so a value is given as the
 Quad Cortex shows it, only for controls the same-named Quad Cortex device has.
 The manual does not list each device's parameters; they are set in the Cortex
-Cloud app.
+Cloud app. That the Nano's device has the same controls is an assumption, and
+the sheet says so wherever it gives values.
+
+What the sheet cannot carry over, it says:
+
+- the Nano has no scenes: every value given is scene A's, a value that differs
+  by scene is marked, and a block switched by scenes is to be switched by hand;
+- a capture holds the amp and the drives before it as one block, so whatever
+  sat between such a drive and the amp now comes before the drive, and is
+  marked as moved.
 """
 
 from dataclasses import asdict, dataclass, field
@@ -129,8 +138,20 @@ def _same_model(device):
     return None
 
 
+def _scene_a(value):
+    """A stated value as (its value in scene A, whether it differs by scene). `sounds.settings` gives a value
+    that differs by scene as text: the first scene's, then the scenes where it differs."""
+    if isinstance(value, str):
+        try:
+            return float(value.split()[0]), True
+        except (ValueError, IndexError):
+            return None, True
+    return value, False
+
+
 def _values(block, device):
-    """The block's stated values that the same-named device has, in Quad Cortex display units."""
+    """The block's stated values that the same-named device has, in Quad Cortex display units, scene A's.
+    One that differs by scene on the Quad Cortex is marked: the Nano holds one value."""
     shown = stated(block)
     model = _same_model(device)
     if model is None:
@@ -139,12 +160,30 @@ def _values(block, device):
     kept = {}
     for name, value in shown.items():
         param = names.get(name)
+        value, varies = _scene_a(value)
         if param is None or not isinstance(value, (int, float)):
             continue
         if param.low is not None and param.high is not None and not param.low <= value <= param.high:
             continue
-        kept[name] = f"{value:g}{(' ' + param.units) if param.units and param.units != '%' else param.units}"
+        kept[name] = (f"{value:g}{(' ' + param.units) if param.units and param.units != '%' else param.units}"
+                      + (" (scene A's; it differs by scene)" if varies else ""))
     return kept
+
+
+def _capture_settings(block):
+    """The settings to capture a block at: scene A's, one that differs by scene marked."""
+    found = {}
+    for name, value in stated(block).items():
+        value, varies = _scene_a(value)
+        if value is not None:
+            found[name] = f"{value:g} (scene A's; it differs by scene)" if varies else value
+    return found
+
+
+def _by_scene(blocks):
+    """Whether anything in these blocks differs by scene: a value, or being on."""
+    return any(isinstance(block.bypass, tuple) or any(isinstance(value, tuple) for _, value in block.params)
+               for block in blocks)
 
 
 def _scenes_off(block):
@@ -197,9 +236,11 @@ def _nano_cab(cab_block):
 class Sheet:
     capture: dict                     # {"blocks": [...], "settings": {name: {...}}, "note": str}
     ir: dict                          # {"cab": str | None, "match": ..., "note": str}
-    slots: list = field(default_factory=list)  # [{"slot", "device", "based_on", "match", "from", "values", "off", "moved"}]
+    # [{"slot", "device", "based_on", "match", "from", "values", "off", "moved", "ahead_of"}]
+    slots: list = field(default_factory=list)
     input_gate: str = ""
     left_out: list = field(default_factory=list)
+    scenes: str = ""                  # what the chain's scenes come to on a unit that has none
 
     def to_record(self):
         return asdict(self)
@@ -224,6 +265,9 @@ class Sheet:
                 text += f" (nearest to {slot['from']})"
             if slot.get("moved"):
                 text += " (before the amp in the chain; the Nano has it only after the capture)"
+            if slot.get("ahead_of"):
+                text += (f" (moved: it came after {slot['ahead_of']} in the chain, and {slot['ahead_of']} is in "
+                         "the capture)")
             if slot["values"]:
                 text += " - " + ", ".join(f"{key} {value}" for key, value in slot["values"].items())
             if slot["off"]:
@@ -231,6 +275,11 @@ class Sheet:
             out.append(text)
         for note in self.left_out:
             out.append("Not on the Nano: " + note)
+        if self.scenes:
+            out.append("Scenes: " + self.scenes)
+        if any(slot["values"] for slot in self.slots):
+            out.append("Values are the Quad Cortex's, taken to hold for the Nano device of the same name; the "
+                       "manual does not list the Nano's controls, so check each in Cortex Cloud.")
         return out
 
 
@@ -248,6 +297,13 @@ def sheet(chain: Chain) -> Sheet:
         amp = blocks[amp_at]
         drives = [block for block in before if _kind(block) in ("drive", "bass_drive") and block.bypass is False]
         captured = drives + [amp]
+        # Whatever sat between a captured drive and the amp comes before that drive on the Nano.
+        ahead, latest = {}, None
+        for block in before:
+            if block in drives:
+                latest = block.name
+            elif latest:
+                ahead[id(block)] = latest
         before = [block for block in before if block not in drives]
         if _scenes_off(amp):
             capture_note = "the amp is off in some scenes; a capture is always on"
@@ -258,9 +314,10 @@ def sheet(chain: Chain) -> Sheet:
                 left_out.append(f"{extra.name}: a second amp; the Nano holds one capture")
         after = [block for block in after if _kind(block) != "amp"]
         capture = {"blocks": [block.name for block in captured],
-                   "settings": {block.name: dict(stated(block)) for block in captured},
+                   "settings": {block.name: _capture_settings(block) for block in captured},
                    "note": capture_note or "capture the amp alone, cab off"}
     else:
+        ahead = {}
         capture = {"blocks": [], "settings": {},
                    "note": "the chain has no amp; leave the capture slot empty or capture a drive pedal"}
 
@@ -316,7 +373,8 @@ def sheet(chain: Chain) -> Sheet:
     kept = sorted(chosen[:len(PRE)], key=lambda item: (item[4] != "pitch", before.index(item[0])))
     for slot, (block, device, based_on, match, _) in zip(PRE, kept):
         slots.append({"slot": slot, "device": device, "based_on": based_on, "match": match, "from": block.name,
-                      "values": _values(block, device), "off": _scenes_off(block), "moved": False})
+                      "values": _values(block, device), "off": _scenes_off(block), "moved": False,
+                      "ahead_of": ahead.get(id(block), "")})
 
     # After the capture.
     taken = {}
@@ -330,7 +388,7 @@ def sheet(chain: Chain) -> Sheet:
         device_kind = next(k for k, name, _ in _devices()[_base(device)] if name == device)
         entry = {"device": device, "based_on": based_on, "match": match, "from": block.name,
                  "values": _values(block, device), "off": _scenes_off(block),
-                 "moved": block in moved}
+                 "moved": block in moved, "ahead_of": ""}
         slot = FIXED_POST.get(device_kind)
         if slot is None:
             flexible.append(entry)
@@ -345,4 +403,10 @@ def sheet(chain: Chain) -> Sheet:
             continue
         taken[free] = entry
     slots += [{"slot": slot, **taken[slot]} for slot in POST if slot in taken]
-    return Sheet(capture, ir, slots, gate, left_out)
+    scenes = ""
+    if chain.scenes or _by_scene(blocks):
+        named = [label for label in chain.labels if label]
+        scenes = ("the Nano has none. This sheet is scene A" + (f" ({named[0]})" if named else "")
+                  + (": a value that differs by scene is marked, and a block the scenes switch is switched by hand."
+                     if _by_scene(blocks) else "."))
+    return Sheet(capture, ir, slots, gate, left_out, scenes)

@@ -9,7 +9,7 @@ On the computer alone:
     doctor [--unit]                     what the app needs, and with --unit the connection to the unit
     migrate [--dry-run]                 bring the earlier app's history into the data folder
     pod BACKUP [--user-slot 02B]        POD Go presets as Quad Cortex starting points, read locally
-    history FILE ... [--missing]        songs by listening time from a Spotify export
+    history FILE ... [--missing]        the songs chosen and come back to most in a Spotify export
     latest-clip                         the newest recorded phrase
     presets                             the presets kept as sounds (see `snapshot`)
     test-compensation REF ROLLED OUT    whether a small EQ offsets a rolled-back tone pot, offline
@@ -26,6 +26,7 @@ With the unit (each takes --simulated to use the simulated unit instead):
     sweep DRY.wav --slot 12B ...        the same, with one parameter at several values
     budget                              read each model's processing cost from the unit
     named-settings [--only ID ...]      read Neural DSP's named settings for each model from the unit
+    time-switch [--switches N]          how long switching between A and B takes, and what it reads
 
 A command that uses the unit runs the engine as the desk does (`host.Host`),
 on a thread of this process, and closes it after, which gives back the
@@ -33,10 +34,11 @@ player's preset. It refuses while the desk is open: the desk holds the unit.
 Ctrl+C stops a long command at its next safe point.
 
 Results are printed as JSON, a file path, or lines of text. Errors go to
-stderr with exit code 1.
+stderr with exit code 1, in one line; the trace of one that was not expected
+is added to `errors.log` in the data folder.
 
 This module also holds the few engine operations the commands need that no
-other module has (`connection`, `inspect`, `renders`), run where the unit is
+other module has (`inspect`, `renders`, `time_switch`), run where the unit is
 held as `host.call("lab.cli.<name>")`.
 """
 
@@ -49,9 +51,14 @@ from pathlib import Path
 import subprocess
 import sys
 
-SCENES = "ABCDEFGH"
+from lab.qc.library import SCENES       # "ABCDEFGH"
+
 COMMANDS = ("doctor", "migrate", "pod", "history", "latest-clip", "presets", "test-compensation", "shortcut",
-            "directory", "inspect", "snapshot", "record", "calibrate", "reamp", "sweep", "budget", "named-settings")
+            "directory", "inspect", "snapshot", "record", "calibrate", "reamp", "sweep", "budget", "named-settings",
+            "time-switch")
+
+
+WAIT_FOR_DESK = 5.      # seconds a command waits for a listener on the desk's port to say whether it is a desk
 
 
 class Refused(RuntimeError):
@@ -71,16 +78,41 @@ def data_folder(simulated=False):
 
 
 def desk_open():
-    """Whether a desk is open on this computer. Asking brings it forward, which is what the player wants."""
+    """Whether a desk is open on this computer. Asking brings it forward, which is what the player wants.
+
+    A desk answers a knock on its port with its name (`window.HERE`). Another program that happens to listen
+    on that port does not, and is not taken for a desk: it would keep every command from the unit for nothing.
+    A listener that says nothing may be a desk on its way out, still giving the unit back: it is asked again
+    for a few seconds before it is taken for something else.
+    """
     import socket
+    import time
 
-    from lab.desk.window import PORT
+    from lab.desk import window
 
-    try:
-        with socket.create_connection(("127.0.0.1", PORT), timeout=.5):
-            return True
-    except OSError:
-        return False
+    deadline = time.monotonic() + WAIT_FOR_DESK
+    while True:
+        try:
+            door = socket.create_connection(("127.0.0.1", window.PORT), timeout=.5)
+        except OSError:
+            return False                    # nobody there
+        try:
+            with door:
+                door.settimeout(1.)
+                door.sendall(b"raise")
+                answer = b""
+                while len(answer) < len(window.HERE):
+                    part = door.recv(len(window.HERE) - len(answer))
+                    if not part:
+                        break
+                    answer += part
+                if answer == window.HERE:
+                    return True
+        except OSError:
+            pass
+        if time.monotonic() > deadline:
+            return False                    # something else has that port
+        time.sleep(.25)
 
 
 # ---- the unit, through the engine ----
@@ -127,27 +159,6 @@ def call(simulated, name, *args, open_session=False, physical_input=1, **options
 
 # ---- engine operations of the commands, run where the unit is held ----
 
-def connection(engine, *, stop=None):
-    """What the unit says about itself and the app's place on it. Reads only."""
-    from lab.qc.device import recording_channels
-    from lab.hearing.listen import calibration
-
-    unit = engine.unit
-    found = {"firmware": unit.firmware, "preset": unit.name(), "position": unit.position(), "scene": unit.scene(),
-             "unsaved": unit.dirty(), "calibrated": calibration(engine.slots.folder, unit.firmware) is not None}
-    try:
-        engine.slots.refresh()
-        found["tone_lab"] = True
-    except RuntimeError as error:
-        found["tone_lab"] = str(error)
-    try:
-        dry = recording_channels(unit.device, engine.physical_input)[0]
-        found["dry_channel"] = dry
-    except (RuntimeError, ValueError) as error:
-        found["dry_channel"] = str(error)
-    return found
-
-
 def inspect(engine, *, stop=None):
     """The selected preset as the unit holds it, unsaved changes included: its chain and where it is."""
     unit = engine.unit
@@ -174,28 +185,106 @@ def renders(engine, place, setlist, dry, variants, *, stop=None):
     """
     import numpy as np
 
+    from lab.qc.unit import Stopped
     from lab.tools.common import render
+    from lab.tools.workbench import with_control
 
     slot = find_slot(engine, place, setlist)
     chain, name = engine.read(slot)
     found = []
     for variant in variants:
         if stop is not None and stop.is_set():
-            raise RuntimeError("Stopped.")
+            raise Stopped("Stopped.")
         changed = chain
         if variant.get("edit"):
-            row, column, index, display = variant["edit"]
-            block = chain.block(row, column)
-            if block is None:
-                raise RuntimeError(f"Row {row + 1}, column {column + 1} of {name} holds no block.")
-            param = next((p for p in block.info.params if p.index == index), None) if block.info else None
-            if param is None or param.kind not in ("float", "fader") or param.low is None or param.high is None:
-                raise RuntimeError(f"{block.name} has no continuous parameter {index}. See `inspect`.")
-            if not param.low <= display <= param.high:
-                raise RuntimeError(f"{block.name} {param.name} goes from {param.low:g} to {param.high:g}.")
-            changed = chain.with_block(row, column, block.set_display(index, display))
+            try:
+                changed, _, _ = with_control(chain, *variant["edit"])       # refused with the reason; see `inspect`
+            except ValueError as error:
+                raise ValueError(f"{name}: {error}") from None
         found.append(np.asarray(render(engine, changed, dry, scene=variant.get("scene"), stop=stop)))
     return {"name": name, "slot": slot, "renders": found}
+
+
+def time_switch(engine, switches=10, *, stop=None):
+    """How long switching between A and B takes on this unit, and what the unit is asked to do it.
+
+    Two small sounds (a Gain block each) are made ready as A and B, A is played from the phrase input, and the
+    side is switched `switches` times. The routing is the real one, to the unit's outputs; the phrase is a
+    10 Hz tone 58 dB below full scale, played 12 dB lower still, so there is nothing to hear. The device is wrapped for the while, to count how often the unit is asked where it is (a position
+    read) and what it holds (a preset read) for each switch. Returns the times and the counts; the inputs are
+    taken off again at the end.
+    """
+    from statistics import median
+    import time
+
+    import numpy as np
+
+    from lab.sound import catalog
+    from lab.sound.chain import Block, Chain, Row
+    from lab.qc.engine import MULTI_OUT, pair
+    from lab.qc.unit import Stopped
+
+    class Counting:
+        """The device, with its reads of the position and of the preset counted."""
+
+        def __init__(self, device):
+            self._device, self.counts = device, {"position": 0, "preset": 0}
+
+        def __getattr__(self, name):
+            return getattr(self._device, name)
+
+        def get_setlist_position(self, *args, **options):
+            self.counts["position"] += 1
+            return self._device.get_setlist_position(*args, **options)
+
+        def get_current_preset(self, *args, **options):
+            self.counts["preset"] += 1
+            return self._device.get_current_preset(*args, **options)
+
+    def small(gain_db):
+        return Chain((Row((Block(catalog.GAIN_BLOCK).set_display(0, gain_db),), 1, MULTI_OUT),))
+
+    if switches < 1:
+        raise ValueError("Switch at least once.")
+    a, b = small(0.), small(-6.)
+    # Not digital silence, which the loop refuses: below what can be heard, in pitch and in level.
+    silence = (.0012 * np.sin(2 * np.pi * 10 * np.arange(48000) / 48000)).astype(np.float32)[:, None]
+    unit, clock = engine.unit, time.perf_counter
+    device = unit.device
+    counting = unit.device = Counting(device)
+    try:
+        cached = engine.slots.cached(pair(a, b).digest()) is not None
+        began = clock()
+        compared = engine.show(a, b, stop=stop)
+        ready = clock() - began
+        began = clock()
+        engine.play("a", "phrase", silence)
+        first = clock() - began
+        rows = []
+        for index in range(switches):
+            if stop is not None and stop.is_set():
+                raise Stopped("Stopped.")
+            side = "b" if index % 2 == 0 else "a"
+            counting.counts.update(position=0, preset=0)
+            began = clock()
+            engine.play(side, "phrase", silence)
+            rows.append({"to": side, "ms": round(1000 * (clock() - began), 1),
+                         "position_reads": counting.counts["position"], "preset_reads": counting.counts["preset"]})
+    finally:
+        try:
+            engine.quiet()
+        finally:
+            unit.device = device
+
+    def spread(key):
+        values = [row[key] for row in rows]
+        return {"median": median(values), "worst": max(values)}
+
+    return {"compared": compared, "made_ready_s": round(ready, 2),
+            "made_ready_by": "recalling what an earlier run built" if cached else "building it",
+            "first_play_ms": round(1000 * first, 1), "switches": len(rows), "switch_ms": spread("ms"),
+            "position_reads_per_switch": spread("position_reads"), "preset_reads_per_switch": spread("preset_reads"),
+            "each": rows}
 
 
 # ---- the commands ----
@@ -203,23 +292,27 @@ def renders(engine, place, setlist, dry, variants, *, stop=None):
 def doctor(args):
     from lab import setup
 
-    findings = setup.checks(data_folder())
+    folder = data_folder()
+    findings = setup.checks(folder, again=True)         # asked for: checked now, whatever the first run found
+    setup.record(folder, findings)
     if args.unit:
         try:
-            found = call(args.simulated, "lab.cli.connection")
+            found = call(args.simulated, "lab.tools.probe.unit_state")
         except Exception as error:  # noqa: BLE001  every failure to reach the unit is a finding
             findings.append(setup.finding("unit", False, f"The Quad Cortex could not be reached: {error}"))
         else:
             where = found["position"]
+            unsaved = {True: ", with unsaved changes", False: ""}.get(found["unsaved"],
+                                                                      ", and it did not say whether it has unsaved changes")
             findings.append(setup.finding(
                 "unit", True, f"The Quad Cortex answers: firmware {found['firmware']}, {found['preset']!r} selected "
                               f"({where.get('folder_key', '')} {where.get('position', '')}), scene "
-                              f"{SCENES[found['scene']]}" + (", with unsaved changes" if found["unsaved"] else "")
+                              f"{SCENES[found['scene']]}" + unsaved
                               + ". " + ("The USB round trip is measured." if found["calibrated"]
                                         else "The USB round trip is not measured yet: `python -m lab calibrate`.")))
-            ok = found["tone_lab"] is True
+            ok = found["tone_lab"]
             findings.append(setup.finding("setlist", ok, 'The "Tone Lab" setlist is there.' if ok
-                                          else found["tone_lab"]))
+                                          else found["problem"]))
             ok = isinstance(found["dry_channel"], int)
             findings.append(setup.finding("usb", ok, f"The dry guitar arrives on USB channel {found['dry_channel']}."
                                           if ok else found["dry_channel"]))
@@ -230,7 +323,8 @@ def doctor(args):
 def migrate(args):
     from lab import migrate as moving
 
-    return moving.summary(moving.migrate(data_folder(), dry_run=args.dry_run))
+    lines = [line for line in moving.summary(moving.migrate(data_folder(), dry_run=args.dry_run)) if line]
+    return lines or ["Nothing to bring in from the earlier app."]
 
 
 def _pod_slot(text):
@@ -244,7 +338,8 @@ def _piece(piece):
     from lab.sound import catalog
 
     found = {"position": piece.position, "name": piece.name, "category": piece.category, "based_on": piece.based_on,
-             "relation": piece.relation, "why": piece.why, "on": list(piece.on), "params": piece.params}
+             "relation": piece.relation, "why": piece.why, "on": list(piece.on), "params": piece.params,
+             "set_from_the_pod_go": piece.carried, "left_out": piece.dropped}
     if piece.qc:
         found["quad_cortex"] = catalog.model(piece.qc).name if catalog.model(piece.qc) else piece.qc
     return found
@@ -252,9 +347,9 @@ def _piece(piece):
 
 def pod(args):
     from lab.gear import podgo
-    from lab.sound.sounds import describe
+    from lab.sound.sounds import Store, describe
 
-    presets = podgo.import_backup(args.backup, args.setlist)
+    presets = podgo.import_backup(args.backup, args.setlist, instruments=Store(data_folder()).instruments())
     if args.user_slot:
         slot = _pod_slot(args.user_slot)
         chosen = next((item for item in presets if item.slot == slot), None)
@@ -262,6 +357,7 @@ def pod(args):
             raise ValueError(f"{args.setlist} slot {slot} is empty or missing.")
         return {"setlist": chosen.setlist, "slot": chosen.slot, "name": chosen.name,
                 "description": chosen.description, "problems": chosen.problems,
+                "became": chosen.lines(),
                 "chain": describe(chosen.sound.chain) if chosen.sound else None,
                 "pieces": [_piece(piece) for piece in chosen.pieces]}
     return {"setlists": sorted(podgo.read_backup(args.backup)["setlists"]), "setlist": args.setlist,
@@ -270,19 +366,19 @@ def pod(args):
 
 
 def history(args):
-    from lab.player import spotify
+    """The songs of an export as the Songs window lists them: the one ranking, by choice and coming back."""
+    from lab.sound.sounds import Store
+    from lab.tools.listening import preset_names, songs
 
+    folder = data_folder()
+    _, ranked = songs(args.files, preset_names(Store(folder), folder), limit=max(40, args.limit))
     if args.missing:
-        from lab.sound.sounds import Store
-
-        tracks = spotify.proposals(args.files, Store(data_folder()), limit=args.limit)
-    else:
-        tracks = spotify.rank(spotify.history(args.files))[:args.limit]
-    return [track.to_record() for track in tracks]
+        ranked = [song for song in ranked if not song["preset"]]
+    return ranked[:args.limit]
 
 
 def latest_clip(args):
-    """The newest phrase recorded on the desk, else the newest take the earlier app recorded."""
+    """The newest phrase recorded."""
     found = []
     for path in (data_folder(args.simulated) / "phrases").glob("*/phrase.json"):
         try:
@@ -294,12 +390,6 @@ def latest_clip(args):
     if found:
         _, _, info, dry = max(found, key=lambda item: (item[0], item[1]))
         return {**info, "dry": str(dry)}
-    from lab.knowledge import REPO
-
-    takes = sorted((take for take in (REPO / "tone_sessions" / "recordings").glob("clip-*")
-                    if (take / "dry.wav").is_file()), reverse=True)
-    if takes and not args.simulated:
-        return {"id": takes[0].name, "dry": str(takes[0] / "dry.wav"), "from": "the earlier app"}
     raise RuntimeError("No phrase has been recorded yet.")
 
 
@@ -375,29 +465,24 @@ def snapshot(args):
 
 
 def record(args):
-    import numpy as np
-
-    from lab.hearing.audio import db, write_wave
-    from lab.sound.sounds import new_id
+    """The dry guitar alone, to a WAV or as a phrase: a take is the dry input and the processed return, and only
+    its dry column is the DI. A take in which nothing came in, or which clipped, is refused (`phrases`)."""
+    from lab.hearing.audio import write_wave
+    from lab.tools import phrases
 
     if args.output is not None and (args.output.suffix.lower() != ".wav" or args.output.exists()):
         raise ValueError("Choose a new .wav filename for the DI.")
-    dry = call(args.simulated, "record", args.seconds, physical_input=args.input)
-    if not len(dry):
+    take = call(args.simulated, "record", args.seconds, physical_input=args.input)
+    if not len(take):
         raise RuntimeError("Nothing was recorded.")
-    described = {"seconds": round(len(dry) / 48000, 2), "peak_db": round(db(float(np.max(np.abs(dry)))), 1)}
     if args.output is not None:
+        dry, level = phrases.dry_of(take)
         args.output.parent.mkdir(parents=True, exist_ok=True)
         write_wave(args.output, dry)
-        return {"file": str(args.output.resolve()), **described}
-    phrase_id = new_id()
-    folder = data_folder(args.simulated) / "phrases" / phrase_id
-    folder.mkdir(parents=True)
-    write_wave(folder / "dry.wav", dry)
-    info = {"id": phrase_id, "instrument": args.instrument, "setting": args.setting,
-            "recorded": datetime.now(timezone.utc).isoformat(timespec="seconds"), "seconds": described["seconds"]}
-    (folder / "phrase.json").write_text(json.dumps(info, indent=1), encoding="utf-8")
-    return {**info, "dry": str(folder / "dry.wav"), "peak_db": described["peak_db"]}
+        return {"file": str(args.output.resolve()), "seconds": round(len(dry) / 48000, 2), "peak_db": round(level, 1)}
+    folder = data_folder(args.simulated)
+    info, _, level = phrases.keep(folder, take, instrument=args.instrument, setting=args.setting)
+    return {**info, "dry": str(folder / "phrases" / info["id"] / "dry.wav"), "peak_db": round(level, 1)}
 
 
 def calibrate(args):
@@ -447,8 +532,10 @@ def reamp(args):
 def sweep(args):
     if not 2 <= len(args.values) <= 7:
         raise ValueError("Give two to seven values.")
+    if args.row < 1 or args.column < 1:
+        raise ValueError("Rows and columns are counted from 1, as `inspect` shows them.")
     edit = (args.row - 1, args.column - 1, args.parameter)
-    scene = SCENES.index(args.scene.upper()) if args.scene else None
+    scene = SCENES.index(args.scene) if args.scene else None
     variants = [{"edit": (*edit, value), "scene": scene} for value in args.values]
     found = call(args.simulated, "lab.cli.renders", args.slot, args.setlist, _dry(args.dry), variants,
                  open_session=True)
@@ -467,6 +554,10 @@ def named_settings(args):
     report = (lambda text: print(text, file=sys.stderr, flush=True))
     return call(args.simulated, "lab.tools.named.harvest", only=args.only or None, report=report,
                 path=None if path is None else str(path), open_session=True)
+
+
+def time_switch_command(args):
+    return call(args.simulated, "lab.cli.time_switch", args.switches, open_session=True)
 
 
 # ---- the Windows shortcut ----
@@ -615,19 +706,23 @@ def parser():
             task.add_argument("--column", type=int, required=True, help="Column from inspect, from 1")
             task.add_argument("--parameter", type=int, required=True, help="Parameter index from inspect")
             task.add_argument("--values", type=float, nargs="+", required=True, help="Values in display units")
-            task.add_argument("--scene", help="Scene letter to hear (default: the preset's own)")
+            task.add_argument("--scene", type=str.upper, choices=tuple(SCENES), metavar="LETTER",
+                              help="Scene to hear, A to H (default: the preset's own)")
     budget_ = unit_command("budget", "Read each model's processing cost from the unit")
     budget_.add_argument("--path", type=Path, help="Write the table here instead of where the app reads it")
     named_ = unit_command("named-settings", "Read Neural DSP's named settings for each model (about half an hour)")
     named_.add_argument("--only", type=int, nargs="+", help="Only these model ids")
     named_.add_argument("--path", type=Path, help="Write the table here instead of where the app reads it")
+    timing = unit_command("time-switch", "Time switching between A and B, and count what the unit is asked for it")
+    timing.add_argument("--switches", type=int, default=10, help="How many times to switch (default 10)")
     return command
 
 
 RUN = {"doctor": doctor, "migrate": migrate, "pod": pod, "history": history, "latest-clip": latest_clip,
        "presets": presets, "test-compensation": test_compensation, "shortcut": shortcut_command,
        "directory": directory, "inspect": inspect_command, "snapshot": snapshot, "record": record,
-       "calibrate": calibrate, "reamp": reamp, "sweep": sweep, "budget": budget, "named-settings": named_settings}
+       "calibrate": calibrate, "reamp": reamp, "sweep": sweep, "budget": budget, "named-settings": named_settings,
+       "time-switch": time_switch_command}
 
 
 def run(args):
@@ -669,5 +764,22 @@ def main(arguments=None, *, desk=None):
         return 1
     except Exception as error:  # noqa: BLE001  one line for the player, not a traceback
         print(f"Tone Lab: {error}", file=sys.stderr)
+        log_fault(error)
         return 1
     return 1 if args.failed else 0
+
+
+def log_fault(error):
+    """The trace of a failure nobody asked for, in `errors.log` in the data folder, where the desk writes its own.
+    What the player can put right (a refusal, a wrong argument, a stop) is said and not logged."""
+    import traceback
+
+    if isinstance(error, (Refused, ValueError)) or getattr(error, "expected", False):
+        return
+    trace = getattr(error, "trace", "") or "".join(traceback.format_exception(error))
+    try:
+        with (data_folder() / "errors.log").open("a", encoding="utf-8") as log:
+            log.write(f"\n--- {datetime.now(timezone.utc).isoformat(timespec='seconds')} python -m lab: "
+                      f"{type(error).__name__}: {error}\n{trace}")
+    except OSError:
+        pass

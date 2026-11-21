@@ -248,6 +248,26 @@ class MigrateTest(unittest.TestCase):
         lines = migrate.summary(self.run_it())
         self.assertIn("3 designs and 1 presets as sounds, 1 rounds", lines[0])
         self.assertTrue(any(line.startswith("Skipped 5") for line in lines))
+        again = migrate.summary(self.run_it())
+        self.assertEqual(again[0], "")                      # nothing new: nothing to announce
+        self.assertTrue(any(line.startswith("Already there") for line in again))
+
+    def test_a_run_that_got_to_its_end_is_noted_and_a_dry_run_is_not(self):
+        self.assertFalse(migrate.done(self.home))
+        self.run_it(dry_run=True)
+        self.assertFalse(migrate.done(self.home))
+        self.run_it()
+        self.assertTrue(migrate.done(self.home))
+
+    def test_a_draft_in_a_shape_nobody_expected_is_skipped_and_the_rest_come_across(self):
+        # Regression: a draft whose chain or settings held a string ended the whole migration.
+        for name, chain_ in (("odd1", ["not a block"]), ("odd2", [{"model_id": 1081, "settings": ["x"]}])):
+            (self.old / "drafts" / f"{name}.json").write_text(json.dumps({"id": name, "name": name, "chain": chain_}),
+                                                              encoding="utf-8")
+        report = self.run_it()
+        self.assertEqual(report["sounds"]["designed"], 3)
+        skipped = {item["what"] for item in report["skipped"]}
+        self.assertTrue({"draft odd1", "draft odd2"} <= skipped)
 
     def test_an_empty_or_missing_old_folder_brings_nothing(self):
         report = migrate.migrate(self.home, Path(self.temporary.name) / "nothing-here")

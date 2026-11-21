@@ -152,12 +152,136 @@ class Backup(unittest.TestCase):
         ir = next(piece for piece in item.pieces if piece.category == "ir")
         self.assertEqual(ir.relation, "kind")
         self.assertIn("impulse response", item.description)
-        self.assertEqual(item.sound.tags, ["POD Go", "Charvel"])
+        self.assertEqual(item.sound.tags, ["POD Go"])       # no instruments given: none is guessed
+        mine = [{"name": "Charvel", "kind": "electric"}, {"name": "Les Paul", "kind": "electric"},
+                {"name": "Bass", "kind": "bass"}]
+        self.assertEqual(podgo.import_backup(self.path, instruments=mine)[2].sound.tags, ["POD Go", "Charvel"])
 
     def test_another_setlist_can_be_imported(self):
         self.assertEqual([item.name for item in podgo.import_backup(self.path, "Factory")], ["Factory One"])
         with self.assertRaises(ValueError):
             podgo.import_backup(self.path, "Missing")
+
+    def imported(self, *presets):
+        return podgo.import_backup(write_backup(self.folder.name, {"User": list(presets)}))
+
+    def test_one_preset_in_a_shape_nobody_expected_is_named_and_the_others_come_across(self):
+        # Regression: one such preset failed the whole backup with a bare Python error and no preset's name.
+        import copy
+
+        odd = {}
+        for name, change in (("no snapshot blocks", lambda tone: tone["snapshot1"].update(blocks=None)),
+                             ("no controllers", lambda tone: tone.update(controller=None)),
+                             ("a time in words", lambda tone: tone["dsp0"]["block4"].update(Time="fast")),
+                             ("a place in words", lambda tone: tone["dsp0"]["block3"].update({"@position": "3"}))):
+            odd[name] = copy.deepcopy(time_preset())
+            change(odd[name])
+        found = self.imported(("Good", time_preset()), *odd.items(), ("No tone", None), (None, time_preset()))
+        self.assertEqual([item.name for item in found], ["Good", *odd, "No tone", "Preset 02C"])
+        self.assertTrue(found[0].confident and found[-1].confident)
+        for item in found[1:-1]:
+            self.assertFalse(item.confident)
+            self.assertEqual(item.pieces, [])
+            self.assertRegex(item.problems[0], rf'User {item.slot} "{item.name}" could not be read \(\w+Error: ')
+
+    def test_a_folder_that_cannot_be_read_says_which_and_why(self):
+        # Regression: a damaged archive raised zlib's own error, which nothing caught.
+        import struct
+
+        junk = b"not compressed at all"
+        raw = (b"AF6L\x01\0\0\0" + struct.pack("<I", 48 + len(junk)) + b"\0" * 36 + junk
+               + struct.pack("<4sQQIQ4x", b"00LS", 48, len(junk), 1, 100))
+        bad = Path(self.folder.name) / "damaged.pgb"
+        bad.write_bytes(raw)
+        with self.assertRaisesRegex(ValueError, "folder SL00 of the POD Go backup could not be read"):
+            podgo.read_backup(bad)
+        body = zlib.compress(json.dumps({"data": {"presets": []}}).encode())       # no name for the setlist
+        raw = (b"AF6L\x01\0\0\0" + struct.pack("<I", 48 + len(body)) + b"\0" * 36 + body
+               + struct.pack("<4sQQIQ4x", b"00LS", 48, len(body), 1, len(json.dumps({"data": {"presets": []}}))))
+        bad.write_bytes(raw)
+        with self.assertRaisesRegex(ValueError, "SL00.*KeyError"):
+            podgo.read_backup(bad)
+
+    def ten_blocks(self):
+        tone = time_preset()
+        more = {"block6": {"@model": "HD2_ChorusStereo", "@enabled": True, "@position": 6, "Mix": .5},
+                "block7": {"@model": "HD2_CompressorDeluxeCompMono", "@enabled": True, "@position": 7},
+                "block8": {"@model": "HD2_TremoloOpticalTremStereo", "@enabled": True, "@position": 8},
+                "block9": {"@model": "HD2_EQGraphic10BandStereo", "@enabled": True, "@position": 9}}
+        tone["dsp0"].update(more)
+        for i in range(4):
+            tone[f"snapshot{i}"]["blocks"]["dsp0"].update({key: True for key in more})
+        return tone
+
+    def test_a_block_left_out_for_room_is_said_to_be_and_is_not_in_the_explanation_as_if_it_were_there(self):
+        # Regression: the explanation listed all the matched blocks, the ninth included, though a row holds eight.
+        item = self.imported(("Many", self.ten_blocks()))[0]
+        self.assertTrue(item.confident, item.problems)
+        self.assertEqual(len(item.sound.chain.blocks), 8)
+        self.assertNotIn("10 Band Graphic ->", item.sound.explanation)
+        self.assertIn("Left out, as a row holds eight blocks: 10 Band Graphic.", item.sound.explanation)
+        self.assertIn("10 Band Graphic: left out, as a row holds eight blocks", item.lines())
+
+    def test_each_block_says_what_it_became_and_which_values_came_across(self):
+        item = podgo.import_backup(self.path)[0]
+        lines = item.lines()
+        self.assertEqual(len(lines), len(item.pieces))
+        amp = next(line for line in lines if line.startswith("Brit J45 Nrm"))
+        self.assertIn("→ Brit TM45 Normal (same gear)", amp)
+        self.assertIn("Set from the POD Go: ", amp)
+        self.assertIn("MID 9.1", amp)
+        self.assertIn("the rest is the Quad Cortex's own", amp)
+        self.assertTrue(lines[0].startswith("Volume Pedal: left out") or "left out" in lines[0])
+        self.assertIn("starting point", item.sound.explanation)
+        self.assertIn("the Quad Cortex's own elsewhere", item.sound.explanation)
+        refused = podgo.import_backup(self.path)[1]             # no chain: what each block matched, and no values
+        self.assertTrue(any("nothing stands in" in line for line in refused.lines()))
+        self.assertFalse(any("Set from the POD Go" in line for line in refused.lines()))
+
+    def test_the_same_preset_is_the_same_sound_each_time_the_backup_is_read(self):
+        # Regression: each reading gave the sound a new id, so putting it on B again made another sound of it.
+        first, again = podgo.import_backup(self.path)[0].sound, podgo.import_backup(self.path)[0].sound
+        self.assertEqual(first.id, again.id)
+        self.assertNotEqual(first.id, podgo.import_backup(self.path)[2].sound.id)
+
+    def test_an_effect_under_its_other_id_is_the_same_effect(self):
+        # Regression: the table lists an effect as mono or as stereo, and the other id was "not in the table".
+        tone = time_preset()
+        tone["dsp0"]["block1"]["@model"] = "HD2_DistScream808Stereo"
+        tone["dsp0"]["block4"]["@model"] = "HD2_DelaySimpleDelayMono"
+        self.assertNotIn("HD2_DistScream808Stereo", podgo.research()["models"])
+        item = self.imported(("Twin", tone))[0]
+        self.assertTrue(item.confident, item.problems)
+        self.assertEqual(item.sound.chain.block(0, 0).name, GREEN_808)
+        self.assertEqual(podgo.model_info("HD2_DistScream808Stereo")["name"], "Scream 808")
+        self.assertEqual(podgo.model_info("HD2_NoSuchThingStereo")["certainty"], "unknown")
+
+    def one(self, name, *models):
+        blocks = {f"block{i}": {"@model": model, "@enabled": True, "@position": i} for i, model in enumerate(models)}
+        tone = {"dsp0": blocks, "snapshot0": snapshot("SNAPSHOT 1", {key: True for key in blocks})}
+        return podgo.translate(podgo.Preset("User", "01A", name, tone))
+
+    def test_a_drive_the_quad_cortex_has_no_model_of_gets_one_of_its_kind(self):
+        # Regression: any such drive left the whole preset without a chain.
+        item = self.one("Timmy", "HD2_DistTeemahMono", "HD2_AmpUSDoubleVib", "HD2_ImpulseResponse1024Mono")
+        self.assertTrue(item.confident, item.problems)
+        drive = item.pieces[0]
+        self.assertEqual((drive.relation, catalog.model(drive.qc).name), ("kind", GREEN_808))
+        self.assertIn("same kind", item.sound.explanation)
+        bass = self.one("x", "HD2_DistObsidian7000Mono").pieces[0]
+        self.assertTrue(catalog.model(bass.qc).category.startswith("Bass"))
+
+    def test_a_cab_the_quad_cortex_has_nothing_like_takes_the_cab_paired_with_the_amp(self):
+        # Regression: an impulse response got the paired stock cab, a cab without a counterpart got nothing.
+        lost = next(model for model, info in podgo.research()["models"].items()
+                    if info.get("category") == "cab" and podgo.find_qc(info) is None)
+        item = self.one("Twin", "HD2_AmpUSDoubleVib", lost)
+        self.assertTrue(item.confident, item.problems)
+        cab = item.pieces[1]
+        self.assertEqual(cab.relation, "kind")
+        self.assertTrue(catalog.model(cab.qc).is_stock_cab)
+        self.assertIn("the cab the research pairs with", cab.why)
+        self.assertEqual(self.one("No amp", lost).pieces[0].relation, "none")     # nothing to pair it with
 
 
 class Matching(unittest.TestCase):
@@ -177,6 +301,39 @@ class Matching(unittest.TestCase):
         found = podgo.find_qc({"category": "cab", "based_on": '4x12" Park 75 G12 H30', "maker": "Park"})
         self.assertEqual(found[1], "kind")
         self.assertEqual(catalog.model(found[0]).name.split()[0], "412")
+
+    def test_an_amp_whose_channel_line_6_does_not_name_is_not_called_the_same_gear_by_guessing(self):
+        # Regression: the lowest-numbered model won: the Überschall's clean channel for Line 6's high-gain Ubersonic.
+        models = podgo.research()["models"]
+        uber = podgo._override("HD2_AmpGermanUbersonic")
+        self.assertEqual((catalog.model(uber[0]).name, uber[1]), ("Bogna Uber Lead", "same"))
+        self.assertEqual(podgo._override("HD2_AmpGermanMahadeva")[1], "family")
+        panama = next(info for info in models.values() if info["name"] == "PV Panama")
+        model_id, relation, why = podgo.find_qc(panama)
+        self.assertEqual((catalog.model(model_id).name, relation), ("PV-505 Lead", "family"))
+        self.assertIn("names no channel", why)
+        named = next(info for info in models.values() if info["name"] == "Brit J45 Nrm")
+        self.assertEqual(podgo.find_qc(named)[1], "same")           # a channel that is named still is
+
+    def test_a_preset_is_for_bass_when_its_name_says_bass(self):
+        # Regression: any name beginning "bas" was taken for a bass preset ("Basket Case", "Basic Clean").
+        self.assertEqual([podgo.for_bass(name) for name in ("Bass Clean", "BAS: fuzz", "Slap bass", "Basket Case",
+                                                            "Basic Clean", "Bassman Crunch")],
+                         [True, True, True, False, False, False])
+
+    def test_the_instrument_is_one_of_the_player_s_own_by_how_the_preset_is_named(self):
+        # Regression: two instruments of one player were written into the code ("lp", "ch").
+        mine = [{"name": "Stratocaster", "kind": "electric"}, {"name": "Les Paul", "kind": "electric"},
+                {"name": "Jazz Bass", "kind": "bass"}]
+
+        def instrument(name):
+            return podgo._instrument(podgo.Preset("User", "01A", name, {}), [], mine)
+
+        self.assertEqual([instrument(name) for name in ("LP Crunch", "Strat clean", "les paul lead", "Bass: slap",
+                                                        "Crunch", "S")],
+                         ["Les Paul", "Stratocaster", "Les Paul", "Jazz Bass", None, None])
+        self.assertIsNone(podgo._instrument(podgo.Preset("User", "01A", "CH Lead", {}), []))   # no instruments, no guess
+        self.assertEqual(podgo._instrument(podgo.Preset("User", "01A", "Bass", {}), []), "Bass")
 
     def test_research_table_is_sourced(self):
         table = podgo.research()

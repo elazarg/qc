@@ -11,6 +11,7 @@ import tkinter as tk
 
 from lab.desk.theme import FONT
 from lab.learner.dataset import LAYOUTS
+from lab.learner.report import setting
 
 
 BG = "#141518"
@@ -57,10 +58,6 @@ def defaults(layout):
     if layout == "dk24_hh_toggle":
         value["wiring"] = "Parallel"
     return value
-
-
-def setting(value):
-    return f"{float(value):g}"
 
 
 class Dial(tk.Canvas):

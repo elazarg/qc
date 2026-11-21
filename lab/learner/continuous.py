@@ -144,7 +144,7 @@ def _settled(previous, current, knobs):
     output["evidence"] = {key: value for key, value in current["evidence"].items() if output[key] is not None}
     output["notes_used"] = sorted({note for item in output["evidence"].values() for note in item["notes_used"]})
     if not any(output.get(key) is not None for key in keys):
-        output["confidence"] = "uncertain"
+        output["match"] = "none"
         if current["evidence"]:
             output["reason"] = "The estimate is still settling."
     return output

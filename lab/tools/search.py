@@ -15,27 +15,32 @@ Carried over from the old search and match (`tone_search`, the search side of `l
 
 On the old desk results were recordings in session folders. On the new core they are sounds, so a result
 goes on A or B to be heard through the unit, and the descriptions of rendered sounds are kept in
-`search-cache.json` by chain digest and phrase, so a sound is rendered for matching once per phrase.
+`search-cache.json` by the digest of the chain as heard (its Shape knobs applied) and the phrase, so a sound
+is rendered for matching once per phrase and again when its knobs move. Each description is written as soon
+as its sound is rendered, where the unit is held: stopping, closing the window or one sound that cannot be
+built costs nothing already rendered. A sound the unit will not build is noted and left out of the ranking.
+
+The reference is played on the computer at the level of the app's other previews, never louder.
 """
 
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
-from hashlib import sha256
 import json
 import math
 from pathlib import Path
 import re
 import tkinter as tk
-from uuid import uuid4
 
 import numpy as np
 from scipy import signal, stats
 
 from lab.hearing.audio import RATE, read_wave
+from lab.hearing.measure import match as match_levels, measure
+from lab.qc.unit import Mismatch, Refused, Stopped
 from lab.sound.sounds import describe as describe_chain
 from lab.desk.theme import FONT, INK, SOFT, SUBTLE, TILE, WHITE
-from lab.tools.common import (Window, button, heard_chain, label, listbox, menu_choice, phrase, play, render, section,
-                     write_pcm16)
+from lab.tools.common import (Window, button, gained, heard_chain, label, listbox, menu_choice, phrase, play, render,
+                              section)
 
 BANDS = (65, 125, 250, 500, 1_000, 2_000, 4_000, 8_000, 12_000)
 MATCH_PRIORITIES = {
@@ -220,7 +225,9 @@ def entry(sound):
         tags += [sound.heard.get(key) or "" for key in ("distortion", "compressed", "brightness", "tail")]
     if sound.saved:
         tags.append(f"saved {sound.saved.get('name', '')}")
-    return {"title": sound.name, "sound": sound.id, "digest": sound.chain.digest(), "target": origin.get("song", ""),
+    # The digest of the chain as it is heard and rendered: with its Shape knobs applied.
+    return {"title": sound.name, "sound": sound.id, "digest": heard_chain(sound).digest(),
+            "target": origin.get("song", ""),
             "tags": [str(tag) for tag in tags if tag], "heard": sound.heard, "saved": bool(sound.saved)}
 
 
@@ -304,44 +311,52 @@ def references(folder):
     return found
 
 
-def audition(path, folder, selection=None):
-    """A level-normalized 16-bit copy of a recording for playing on the computer, made once."""
-    from lab.tools.levels import measure
-
-    path = Path(path)
-    stamp = path.stat()
-    key = sha256(repr((str(path.resolve()), stamp.st_mtime_ns, stamp.st_size, selection)).encode()).hexdigest()[:20]
-    target = Path(folder) / "search-previews" / f"{key}.wav"
-    if target.is_file():
-        return target
-    samples = read_wave(path)
-    if selection:
-        samples = samples[round(selection[0] * RATE):round(selection[1] * RATE)]
+def at_preview_level(samples):
+    """The audio at the level of the app's previews (−23 LUFS, true peak under −3 dB) when it is louder than
+    that; never turned up."""
     found = measure(samples)
-    if found["lufs"] is None:
-        raise ValueError("The recording is too quiet to audition.")
-    gain = min(12, -23 - found["lufs"], -3 - found["sample_peak_dbfs"])
-    return write_pcm16(target.with_name(f"{uuid4().hex}.wav"), samples * 10 ** (gain / 20)).replace(target)
+    if found.lufs is None:
+        return np.asarray(samples, dtype=np.float32)
+    return gained(samples, min(0., match_levels([found])[0]))
 
 
 # ---- operations, run where the unit is held ----
 
 def describe_sounds(engine, chains, dry, *, stop=None):
-    """{key: Tone record or {"issue"}} for {key: chain}, each the phrase played silently through it."""
-    found = {}
+    """Describe {cache key: chain}, each the phrase played silently through it, into the cache in the data folder.
+
+    Each description is written as soon as it is made. A sound the unit will not build, or that returns
+    silence, is noted in the cache with the reason and not tried again; one that failed for a passing reason
+    is only reported. Returns {"described": how many, "issues": {key: why}}. Stopping, or the player choosing
+    another preset on the unit, ends it with what was described so far kept.
+    """
+    folder = engine.slots.folder
+    described, issues = 0, {}
     for key, chain in chains.items():
         if stop is not None and stop.is_set():
-            raise RuntimeError("Stopped.")
+            raise Stopped("Stopped.")
         try:
-            found[key] = describe(render(engine, chain, dry, tail=1., stop=stop)).to_record()
-        except ValueError as error:
-            found[key] = {"issue": str(error)}
-    return found
+            record = describe(render(engine, chain, dry, tail=1., stop=stop)).to_record()
+        except (ValueError, Refused) as error:
+            record = {"issue": str(error)}          # this chain, whenever it is tried: remembered
+            issues[key] = str(error)
+        except Mismatch as error:
+            issues[key] = str(error)                # the unit did not show it this time: tried again next time
+            continue
+        else:
+            described += 1
+        cache = load_cache(folder)
+        cache.pop(key, None)                        # the newest last: the oldest are the ones dropped
+        cache[key] = record
+        save_cache(folder, cache)
+    return {"described": described, "issues": issues}
 
 
 # ---- the window ----
 
-SCOPES = ("Every sound", "Saved on the unit", "This round", "The last 20")
+# The narrowest first: matching renders every sound in the scope that has not been rendered with this phrase,
+# and a sound not yet in the cache takes the unit a quarter of a minute to build.
+SCOPES = ("The last 20", "This round", "Saved on the unit", "Every sound")
 
 
 class SearchWindow(Window):
@@ -377,6 +392,7 @@ class SearchWindow(Window):
         self.priority = tk.StringVar(master=self.top, value="Balanced")
         menu_choice(row, self.priority, tuple(MATCH_PRIORITIES)).pack(side="left", padx=4)
         button(row, "Find the closest", self.match).pack(side="left")
+        button(row, "Stop", self.stop, quiet=True).pack(side="left", padx=4)
         button(row, "Hear the reference", self.hear_reference, quiet=True).pack(side="right")
 
         found = section(self.body, "Results")
@@ -485,11 +501,11 @@ class SearchWindow(Window):
             return
         self.call("lab.tools.common.render", heard_chain(sound), taken[1],
                   done=lambda wet: self.set_reference(wet, f"{sound.name} (on A)", taken[0]),
-                  working=f"Playing the phrase silently through {sound.name}…")
+                  working=f"Playing the phrase silently through {sound.name}…", renders=True)
 
     def hear_reference(self):
         if self.reference:
-            play(self.reference["samples"], self.folder / "previews")
+            play(at_preview_level(self.reference["samples"]), self.folder / "previews")
 
     def match(self):
         taken = phrase(self.studio)
@@ -506,16 +522,23 @@ class SearchWindow(Window):
                 missing[cache_key(item["digest"], taken[0])] = heard_chain(self.studio.store.sound(item["sound"]))
         if missing:
             def described(found):
-                cache.update(found)
-                save_cache(self.folder, cache)
                 self.rank()
+                if found["issues"]:
+                    self.say(f"{len(found['issues'])} of these sounds could not be played through the unit and "
+                             "are left out: " + next(iter(found["issues"].values())))
 
-            self.call("lab.tools.search.describe_sounds", missing, taken[1], done=described,
-                      working=f"Playing the phrase silently through {len(missing)} sounds…")
+            def ended(error):
+                self.rank()             # what was described before it ended is kept, and ranked
+                self.say(f"{error} The sounds described so far are ranked.")
+
+            self.call("lab.tools.search.describe_sounds", missing, taken[1], done=described, failed=ended,
+                      working=f"Playing the phrase silently through {len(missing)} sounds…", renders=True)
         else:
             self.rank()
 
     def rank(self):
+        if not self.alive():
+            return
         taken = phrase(self.studio)
         same = bool(self.reference.get("phrase") and taken and self.reference["phrase"] == taken[0])
         self.results = search(self.entries(), self.query.get().strip(), tones=self.tones(),

@@ -9,6 +9,8 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
+import json
+
 import numpy as np
 
 from lab.hearing import audio
@@ -45,7 +47,14 @@ class LiveDryTest(unittest.TestCase):
         window.append(np.array([8., 9., 10., 11.]), 7.)
         np.testing.assert_equal(window.latest(generation)[2], [7, 8, 9, 10, 11])
 
-    def test_verified_dry_channel_rolls_and_only_saves_on_request(self):
+    def setUp(self):
+        directory = TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.folder = Path(directory.name)
+        folders.use(self.folder)
+        self.addCleanup(folders.use, None)
+
+    def test_the_dry_channel_the_desk_named_rolls_and_only_saves_on_request(self):
         stop, commands, events = Event(), Queue(), []
         dry = np.linspace(-.06, .1, audio.RATE, dtype=np.float32)[:, None]
         stream = Mock(active=True)
@@ -67,23 +76,32 @@ class LiveDryTest(unittest.TestCase):
                 self.assertEqual(event["dry_channel"], 4)
                 self.assertFalse(guitar_dataset.live_recordings().exists())
                 commands.put({"event": "learner-snapshot", "request_id": "one", "seconds": .75})
-            if event["event"] == "learner-state":
+                commands.put({"event": "learner-snapshot", "request_id": "two", "seconds": .5})
+            kinds = [seen["event"] for seen in events]
+            if kinds.count("learner-snapshot") == 2 and "learner-state" in kinds:
                 stop.set()
 
-        with (TemporaryDirectory() as folder, patch.object(folders, "SESSIONS", Path(folder)),
-              patch.object(guitar_live, "continuous", analyzer),
-              patch.object(inputs, "asio_device", return_value=(sd, 8)),
-              patch.object(inputs, "recording_channels", return_value=(4, 1, 2)) as channels):
-            result = guitar_live.run({"physical_input": 2, "guitar": "Charvel"}, stop, commands, report)
-            saved = next(event for event in events if event["event"] == "learner-snapshot")
+        folder = self.folder
+        with (patch.object(guitar_live, "continuous", analyzer),
+              patch.object(inputs, "asio_device", return_value=(sd, 8))):
+            result = guitar_live.run({"physical_input": 2, "guitar": "Charvel", "dry_channel": 4}, stop, commands,
+                                     report)
+            saved, again = (event for event in events if event["event"] == "learner-snapshot")
             saved_path = Path(saved["path"])
             self.assertEqual(saved["request_id"], "one")
             self.assertEqual(saved["seconds"], .75)
             np.testing.assert_array_equal(audio.read_wave(saved_path), dry[-round(.75 * audio.RATE):])
-            self.assertEqual([source.path for source in guitar_dataset.take_sources("Charvel")], [saved_path])
+            self.assertEqual({source.path for source in guitar_dataset.take_sources("Charvel")},
+                             {saved_path, Path(again["path"])})
+            # Both clips are of the same run of listening, each with where it starts in it: one performance.
+            notes = [json.loads(Path(event["folder"], "clip.json").read_text(encoding="utf-8")) for event in (saved, again)]
+            self.assertEqual(notes[0]["live_run"], notes[1]["live_run"])
+            self.assertAlmostEqual(notes[1]["run_start_seconds"] - notes[0]["run_start_seconds"], .25, places=2)
+            first, second = (guitar_dataset.inspect(guitar_dataset.source_from_take("Charvel", event["folder"]))
+                             for event in (saved, again))
+            self.assertEqual(first.source_id, second.source_id)
             self.assertFalse((Path(folder) / "recordings").exists())
             self.assertFalse(guitar_dataset.records("Charvel", "dk24_hh_toggle"))
-        channels.assert_called_once_with(2)
         sd.AsioSettings.assert_called_once_with([3])
         self.assertEqual(sd.InputStream.call_args.kwargs["channels"], 1)
         stream.close.assert_called_once()
@@ -96,25 +114,32 @@ class LiveDryTest(unittest.TestCase):
         marked = guitar_live._marked_change(snapshot, {"start": 8.1, "end": 9.7, "at": 9.})
         window = DryWindow(len(dry))
         events = []
-        with TemporaryDirectory() as folder, patch.object(folders, "SESSIONS", Path(folder)):
-            guitar_live._save_request({"request_id": "mark", "change_id": marked[0], "part": "after"},
-                                      window, marked, "Charvel", 1, 1, events.append)
-            saved = events[-1]
-            self.assertEqual(saved["request_id"], "mark")
-            self.assertAlmostEqual(saved["seconds"], .7)
-            self.assertIsNone(saved["boundary_seconds"])
-            np.testing.assert_array_equal(audio.read_wave(saved["path"])[:, 0], dry[audio.RATE:round(1.7 * audio.RATE)])
+        guitar_live._save_request({"request_id": "mark", "change_id": marked[0], "part": "after"},
+                                  window, marked, "Charvel", 1, 1, events.append, ("run-a", 2.))
+        saved = events[-1]
+        self.assertEqual(saved["request_id"], "mark")
+        self.assertAlmostEqual(saved["seconds"], .7)
+        self.assertIsNone(saved["boundary_seconds"])
+        np.testing.assert_array_equal(audio.read_wave(saved["path"])[:, 0], dry[audio.RATE:round(1.7 * audio.RATE)])
+        note = json.loads(Path(saved["folder"], "clip.json").read_text(encoding="utf-8"))
+        # The window ends at 10 s and is 2 s long; the change is at 9 s; listening began at 2 s.
+        self.assertEqual((note["live_run"], note["run_start_seconds"]), ("run-a", 7.))
 
     def test_stream_is_closed_when_native_start_fails(self):
         stream = Mock()
         stream.start.side_effect = RuntimeError("driver failed")
         sd = SimpleNamespace(AsioSettings=Mock(), InputStream=Mock(return_value=stream))
         with (patch.object(guitar_live, "continuous", SimpleNamespace()),
-              patch.object(inputs, "asio_device", return_value=(sd, 8)),
-              patch.object(inputs, "recording_channels", return_value=(1, 3, 4))):
+              patch.object(inputs, "asio_device", return_value=(sd, 8))):
             with self.assertRaisesRegex(RuntimeError, "driver failed"):
-                guitar_live.run({"physical_input": 1}, Event(), Queue(), Mock())
+                guitar_live.run({"physical_input": 1, "dry_channel": 1}, Event(), Queue(), Mock())
         stream.close.assert_called_once()
+
+    def test_listening_never_opens_the_unit_and_needs_the_channel_from_the_desk(self):
+        self.assertFalse(hasattr(inputs, "connect") or hasattr(inputs, "recording_channels"))
+        with patch.object(inputs, "asio_device", side_effect=AssertionError("the driver must not be opened")):
+            with self.assertRaisesRegex(ValueError, "which USB channel"):
+                guitar_live.run({"physical_input": 1, "guitar": "Charvel"}, Event(), Queue(), Mock())
 
 
 # A stand-in for the worker process: it says it is ready, answers a kept clip, and stops when told.
@@ -163,6 +188,43 @@ class WorkerBoundaryTest(unittest.TestCase):
 
         self.assertEqual(worker.supervise([sys.executable, "-c", script], stop, Queue(), report), {})
         self.assertEqual(events, [{"event": "guitar-state", "label": "Neck"}])
+
+    def test_the_worker_process_keeps_its_data_and_writes_its_faults_where_the_desk_said(self):
+        # Before: the worker's faults went to a log with no handler, and its stderr was thrown away.
+        said = []
+        with TemporaryDirectory() as directory:
+            home = Path(directory)
+            settings = home / "session.json"
+            settings.write_text(json.dumps({"mode": "gestures", "physical_input": 1, "dry_channel": 1,
+                                            "profile": str(home / "missing.json"), "folder": str(home / "learner"),
+                                            "log": str(home / "errors.log")}), encoding="utf-8")
+            self.addCleanup(folders.use, None)
+            self.addCleanup(folders.log_to, None)
+            with patch.object(worker, "emit", said.append), patch.object(worker, "read_commands"):
+                self.assertEqual(worker.main([str(settings)]), 1)
+            self.assertEqual(folders.root(), home / "learner")
+            self.assertTrue((home / "learner" / "live-driver.log").is_file())
+            written = (home / "errors.log").read_text(encoding="utf-8")
+            self.assertIn("Learner live worker failed", written)
+            self.assertIn("missing.json", written)
+            self.assertEqual(said[-1]["event"], "error")
+
+    def test_the_settings_sent_to_the_worker_say_where_data_and_faults_go(self):
+        sent = {}
+
+        def supervise(argv, stop, commands, report):
+            sent.update(json.loads(Path(argv[-1]).read_text(encoding="utf-8")))
+            return {}
+
+        with TemporaryDirectory() as directory:
+            folders.use(Path(directory) / "learner")
+            folders.log_to(Path(directory) / "errors.log")
+            self.addCleanup(folders.use, None)
+            self.addCleanup(folders.log_to, None)
+            with patch.object(worker, "supervise", supervise):
+                worker.run({"guitar": "Charvel", "dry_channel": 2}, Event(), Queue(), Mock())
+            self.assertEqual((sent["folder"], sent["log"], sent["dry_channel"]),
+                             (str(Path(directory) / "learner"), str(Path(directory) / "errors.log"), 2))
 
     def test_a_worker_error_is_raised_to_the_window(self):
         failing = 'import json; print(json.dumps({"event": "error", "text": "no dry input"}), flush=True)'

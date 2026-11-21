@@ -1,4 +1,18 @@
-"""Labeled DI excerpts for one guitar and physical control layout."""
+"""Labelled dry excerpts: the one store of examples the learner is taught from and checked against.
+
+An excerpt is kept as a copy, `<folder>/<id>/dry.wav`, beside its `record.json` (`keep_excerpt`); the take it
+came from is never changed. The Guitar Learner keeps a configuration with each (`add`, per guitar and control
+layout); teaching one control keeps a setting name (`lab.learner.taught`), in the same form.
+
+Names of pickup settings are the instrument's own, from `lab.sound.sounds.INSTRUMENTS`: a layout's
+"pickups" are that instrument's settings in blade order, and `setting_name` writes a configuration as the
+desk writes a phrase's setting ("Neck · Series").
+
+Two things keep a check honest. A recording used to teach can never be a check (`source_id`: the whole
+recording, or the whole run of live listening a kept clip came from). And a check counts as from a separate
+recording session only when it was recorded on another day than every teaching example (`session`: the day
+in the take's name).
+"""
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -16,26 +30,27 @@ import numpy as np
 from lab.hearing import audio
 from lab.learner import folders
 from lab.learner.folders import write_json
+from lab.sound.sounds import INSTRUMENTS
 
 SCHEMA = 1
 ROLES = ("example", "test")
+def _instrument_settings(name):
+    item = next(item for item in INSTRUMENTS if item["name"] == name)
+    return tuple(item["settings"]), tuple(item["wiring"])
+
+
+def _layout_of(name, instrument, knobs, *, wiring=False):
+    pickups, switch = _instrument_settings(instrument)
+    layout = {"name": name, "instrument": instrument, "pickups": pickups, "knobs": knobs}
+    if wiring:
+        layout["wiring"] = switch
+    return layout
+
+
 LAYOUTS = {
-    "dk24_hh_toggle": {
-        "name": "DK24 · 5-way + mini-toggle",
-        "pickups": ("Bridge", "Outer coils", "Both humbuckers", "Inner coils", "Neck"),
-        "knobs": ("volume", "tone"),
-        "wiring": ("Series", "Parallel"),
-    },
-    "dk24_blade": {
-        "name": "DK24 · 5-way",
-        "pickups": ("Bridge", "Position 2", "Position 3", "Position 4", "Neck"),
-        "knobs": ("volume", "tone"),
-    },
-    "les_paul": {
-        "name": "Les Paul · 3-way",
-        "pickups": ("Bridge", "Both", "Neck"),
-        "knobs": ("bridge_volume", "bridge_tone", "neck_volume", "neck_tone"),
-    },
+    "dk24_hh_toggle": _layout_of("DK24 · 5-way + mini-toggle", "Charvel", ("volume", "tone"), wiring=True),
+    "dk24_blade": _layout_of("DK24 · 5-way", "Charvel", ("volume", "tone")),
+    "les_paul": _layout_of("Les Paul · 3-way", "Les Paul", ("bridge_volume", "bridge_tone", "neck_volume", "neck_tone")),
 }
 _WRITE = Lock()
 
@@ -49,6 +64,10 @@ class DrySource:
     kind: str = "wav"
     mapping: str | None = None
     duration: float | None = None
+    # The recording session (the day it was recorded), when known.
+    session: str | None = None
+    # For a clip kept from live listening: that run of listening, and where the clip starts in it (seconds).
+    run: tuple[str, float] | None = None
     # Original recording hash, start in that recording, and saved excerpt hash.
     origin: tuple[str, float, str] | None = None
 
@@ -66,8 +85,22 @@ class DryExcerpt:
     clipped: bool
 
 
-def layouts():
-    return {key: dict(layout) for key, layout in LAYOUTS.items()}
+def layouts_for(instrument):
+    """The control layouts of one instrument, by key; none for an instrument the learner has no layout for."""
+    key = instrument.strip().casefold()
+    return [name for name, layout in LAYOUTS.items() if layout["instrument"].casefold() == key]
+
+
+def pickup_settings(instrument):
+    """The names of an instrument's pickup settings, as the desk names them; () when it has none."""
+    key = instrument.strip().casefold()
+    return next((tuple(item["settings"]) for item in INSTRUMENTS if item["name"].casefold() == key), ())
+
+
+def setting_name(layout, values):
+    """A configuration's pickup setting in the desk's words: "Neck", or "Neck · Series" with a toggle."""
+    place = _layout(layout)["pickups"][values["pickup"] - 1]
+    return f"{place} · {values['wiring']}" if values.get("wiring") else place
 
 
 def _instrument(value):
@@ -120,8 +153,7 @@ def _role(role):
 def dataset_folder(instrument, layout):
     _, key = _instrument(instrument)
     _layout(layout)
-    slug = re.sub(r"[^a-z0-9]+", "-", key).strip("-")[:35] or "guitar"
-    return folders.learner() / f"{slug}-{sha256(key.encode()).hexdigest()[:8]}" / layout
+    return folders.learner() / folders.slug(key) / layout
 
 
 def _check_instrument(instrument, source):
@@ -164,9 +196,24 @@ def _take_source(folder):
     if duration is not None:
         label = f"{label} · {duration:.1f}s"
     guitar = info.get("guitar")
+    run, begins = info.get("live_run"), info.get("run_start_seconds")
+    run = ((run, float(begins)) if isinstance(run, str) and run and type(begins) in (int, float)
+           and math.isfinite(begins) else None)
     return DrySource(path, str(label), tuple(passage) if passage else None,
                      guitar if isinstance(guitar, str) and guitar.strip() else None, "take",
-                     info.get("usb_mapping_source"), duration)
+                     info.get("usb_mapping_source"), duration, session=_day(folder.name), run=run)
+
+
+def _day(name):
+    """The day a take was recorded, from its folder's name: the recording session it belongs to."""
+    named = re.match(r"clip-(\d{8})-", str(name))
+    return named.group(1) if named else None
+
+
+def session_of(row):
+    """The recording session of a label: as written, or for an earlier label the day in its take's name."""
+    session = row.get("session")
+    return session if isinstance(session, str) and session else _day(Path(str(row.get("source", ""))).parent.name)
 
 
 def source_from_result(instrument, result):
@@ -211,8 +258,7 @@ def label_history(instrument, layout):
     """Read active and retired labels, including their configuration edits."""
     folder = dataset_folder(instrument, layout)
     result = []
-    paths = (*folder.glob("*/record.json"), *folder.glob(".removed/*/record.json"))
-    for path in paths:
+    for path in folder.glob("*/record.json"):
         if not re.fullmatch("[0-9a-f]{32}", path.parent.name):
             continue
         try:
@@ -251,6 +297,7 @@ def records(instrument, layout, *, role=None):
 
 def _active_records(rows, role):
     sources, excerpts = _exposure(rows)
+    taught = {session_of(row) for row in rows if row["active"] and row["role"] == "example"}
     result = []
     for row in rows:
         if not row["active"] or (role is not None and row["role"] != role):
@@ -261,6 +308,10 @@ def _active_records(rows, role):
             if role == "test":
                 continue
             row["score_eligible"] = False
+        if row["role"] == "test":
+            # Known to be from another recording session than everything taught: only then is it called independent.
+            session = session_of(row)
+            row["separate_session"] = session is not None and None not in taught and session not in taught
         result.append(row)
     return result
 
@@ -272,7 +323,7 @@ def dataset_sources(instrument, layout, *, include_unknown=False):
     labeled = {row["id"]: row for row in _active_records(history, None)}
     saved = {Path(row["wav"]): row for row in history}
     for row in history:
-        original = Path(row["source"])
+        original = folders.found(row["source"]).resolve()
         if original in groups:
             key = original
         elif original in saved and original.is_file():
@@ -297,7 +348,7 @@ def dataset_sources(instrument, layout, *, include_unknown=False):
 def _saved_source(instrument, row):
     origin = row["source_id"], row["source_start"] + row.get("source_offset", 0.), row["excerpt_id"]
     return DrySource(Path(row["wav"]), row["source_label"], guitar=instrument, kind="saved-excerpt",
-                     mapping=row.get("mapping"), duration=row["seconds"], origin=origin)
+                     mapping=row.get("mapping"), duration=row["seconds"], origin=origin, session=session_of(row))
 
 
 def find_label(instrument, layout, excerpt):
@@ -329,7 +380,7 @@ def _check_reuse(existing, source_id, excerpt_id, start, end, role):
         if row["source_id"] != source_id and row["excerpt_id"] != excerpt_id:
             continue
         if row["role"] != role:
-            raise ValueError("This recording is already used for the other role. Use a fresh take for an independent test.")
+            raise ValueError("This recording is already used for the other role. Use a fresh take for a check.")
         offset = row.get("source_offset", 0.)
         if row["excerpt_id"] == excerpt_id or max(start, row["source_start"] + offset) < min(end, row["source_end"] + offset):
             raise ValueError("This part of the dry recording already has a configuration label.")
@@ -351,20 +402,36 @@ def inspect(source, *, start=None, end=None):
         if source_id != saved_excerpt_id:
             raise ValueError("The saved dry excerpt no longer matches its recording label.")
         source_id = origin_id
+    elif source.run:
+        # Every clip kept from one run of live listening is the same performance: one source.
+        source_id = sha256(f"live-run:{source.run[0]}".encode()).hexdigest()
     return DryExcerpt(excerpt, source_id, _digest(excerpt), first / audio.RATE, last / audio.RATE,
                       len(raw) / audio.RATE, audio.db(peak), peak < .001, peak >= .999)
 
 
-def is_independent(instrument, layout, excerpt):
-    """Check whether this performance has ever been used to teach this dataset."""
+def never_taught(instrument, layout, excerpt):
+    """Whether this performance has never been used to teach this dataset (the least a check must be)."""
     sources, excerpts = _exposure(label_history(instrument, layout))
     return excerpt.source_id not in sources and excerpt.excerpt_id not in excerpts
 
 
 def check_test(instrument, layout, excerpt):
-    """Refuse an independent check on audio previously used to teach."""
-    if not is_independent(instrument, layout, excerpt):
-        raise ValueError("This recording helped train the learner. Choose a new performance for an independent test.")
+    """Refuse a check on audio previously used to teach."""
+    if not never_taught(instrument, layout, excerpt):
+        raise ValueError("This recording helped train the learner. Choose a new performance for a check.")
+
+
+def keep_excerpt(folder, row, samples):
+    """Keep one labelled excerpt as `<folder>/<id>/dry.wav` beside its record. Written in a staging folder and
+    renamed into place, so a half-written label is never read. Returns the saved WAV."""
+    folder = Path(folder)
+    folder.mkdir(parents=True, exist_ok=True)
+    with TemporaryDirectory(prefix=".label-", dir=folder) as directory:
+        stage = Path(directory)
+        audio.write_wave(stage / "dry.wav", samples)
+        write_json(stage / "record.json", row)
+        stage.rename(folder / row["id"])
+    return (folder / row["id"] / "dry.wav").resolve()
 
 
 def add(instrument, layout, source, values, *, role="example", start=None, end=None):
@@ -383,24 +450,20 @@ def add(instrument, layout, source, values, *, role="example", start=None, end=N
     identity = uuid4().hex
     row = {"schema": SCHEMA, "id": identity, "instrument": name, "layout": layout, "role": role,
            "configuration": selected, "source_id": excerpt.source_id, "excerpt_id": excerpt.excerpt_id,
-           "source": str(source.path), "source_label": source.label, "source_kind": source.kind, "mapping": source.mapping,
+           "source": folders.stored(source.path), "source_label": source.label, "source_kind": source.kind, "mapping": source.mapping,
            "source_start": excerpt.source_start, "source_end": excerpt.source_end, "seconds": len(excerpt.samples) / audio.RATE,
-           "peak_dbfs": excerpt.peak_dbfs, "quiet": excerpt.quiet, "created_at": datetime.now(timezone.utc).isoformat()}
-    offset = source.origin[1] if source.origin else 0.
-    if source.origin:
+           "peak_dbfs": excerpt.peak_dbfs, "quiet": excerpt.quiet, "created_at": datetime.now(timezone.utc).isoformat(),
+           "session": source.session}
+    offset = source.origin[1] if source.origin else source.run[1] if source.run else 0.
+    if source.origin or source.run:
         row["source_offset"] = offset
     with _WRITE:
         _check_reuse(records(name, layout), excerpt.source_id, excerpt.excerpt_id,
                      offset + excerpt.source_start, offset + excerpt.source_end, role)
         if role == "test":
             check_test(name, layout, excerpt)
-        folder.mkdir(parents=True, exist_ok=True)
-        with TemporaryDirectory(prefix=".label-", dir=folder) as directory:
-            stage = Path(directory)
-            audio.write_wave(stage / "dry.wav", excerpt.samples)
-            write_json(stage / "record.json", row)
-            stage.rename(folder / identity)
-    return {**row, "wav": str((folder / identity / "dry.wav").resolve())}
+        wave = keep_excerpt(folder, row, excerpt.samples)
+    return {**row, "wav": str(wave)}
 
 
 def _active_label(instrument, layout, identity):
@@ -417,7 +480,7 @@ def _update_label(row, action, **updates):
               "role": row["role"], "configuration": row["configuration"]}
     updated = {**row, **updates, "history": [*row.get("history", []), before]}
     manifest = Path(row["wav"]).with_name("record.json")
-    write_json(manifest,{key: value for key, value in updated.items() if key != "wav"})
+    write_json(manifest, {key: value for key, value in updated.items() if key != "wav"})
     return updated
 
 
@@ -429,9 +492,9 @@ def retag(instrument, layout, identity, values, *, role=None, promote=False):
         target = row["role"] if role is None else _role(role)
         if target != row["role"]:
             if target == "test":
-                raise ValueError("This recording helped train the learner. Choose a new performance for an independent test.")
+                raise ValueError("This recording helped train the learner. Choose a new performance for a check.")
             if not promote:
-                raise ValueError("Use this saved check to teach explicitly. It will leave the independent score.")
+                raise ValueError("Use this saved check to teach explicitly. It will no longer count as a check.")
             if row.get("quiet"):
                 raise ValueError("The excerpt is too quiet to teach a configuration. Play an audible dry example.")
             offset = row.get("source_offset", 0.)
@@ -448,7 +511,3 @@ def unlabel(instrument, layout, identity):
     """Retire a label while retaining the source, excerpt and earlier settings."""
     with _WRITE:
         _update_label(_active_label(instrument, layout, identity), "unlabel", active=False)
-
-
-def remove(instrument, layout, identity):
-    unlabel(instrument, layout, identity)

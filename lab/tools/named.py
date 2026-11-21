@@ -15,15 +15,23 @@ file is resumed: models already read on the same firmware are skipped, so a
 stopped harvest carries on where it left off. A whole harvest takes about
 half an hour.
 
+A model the unit would not load is locked out of every design, and so are the
+other models of its plugin (`knowledge.locked`), so "unavailable" is never
+recorded lightly or for good: a model that does not appear is tried once more
+before it is recorded so; every model recorded unavailable is tried again on
+each run (a plugin bought since then comes back); and the models named with
+`only` are read again whatever the table holds.
+
 The player's preset is given back afterwards. When the engine's session was
 opened (`engine.open`, which notes the player's preset on disk) the session
 gives it back when it closes, or after a crash when the app next starts; the
 harvest only leaves the build slot. When it was not, the harvest borrows the
 preset itself (`Slots.borrowed`) and gives it back when it ends. Either way a
-preset with unsaved changes is refused first, since leaving it would lose
-them.
+preset with unsaved changes, or whose state the unit did not tell, is refused
+first (`Slots.may_leave`, as everywhere the app leaves a preset), since leaving
+it would lose them.
 
-Carried over from `tone_lab.device_presets.harvest`. It is an operation run
+Carried over from the earlier app's harvest of device presets. It is an operation run
 where the unit is held: `host.call("lab.tools.named.harvest")`, or
 `python -m lab named-settings`.
 """
@@ -149,11 +157,9 @@ def _index(device, categories, only):
     return index
 
 
-def _one(engine, model_id, rows):
-    """Add one model, read its default and each named setting, and remove it. Returns its entry."""
+def _place(engine, model_id, info):
+    """Add the model to the empty build slot. Returns its cell once the unit shows it there, or None."""
     unit, device = engine.unit, engine.unit.device
-    info = catalog.model(model_id)
-    entry = {"name": info.name, "category": info.category, "available": False, "presets": []}
     unit.guard()
     device.add_block(model_id, row=0, column=0)
 
@@ -162,10 +168,35 @@ def _one(engine, model_id, rows):
         return found if found is not None and found.hash == model_id else None
 
     try:
-        cell = unit.until(placed, f"{info.name} on the build slot")
+        return unit.until(placed, f"{info.name} on the build slot")
     except Mismatch:
         unit.guard()          # A block missing from another preset was not refused: the player moved.
-        cell = _cell(device)
+        return placed()
+
+
+def _clear(engine):
+    """Empty the build slot's first cell again."""
+    unit, device = engine.unit, engine.unit.device
+    if _cell(device) is not None:
+        unit.guard()
+        device.delete_block(0, 0)
+        try:
+            unit.until(lambda: _cell(device) is None, "the build slot cleared")
+        except Mismatch:
+            raise RuntimeError("The build slot did not clear between models.") from None
+
+
+def _one(engine, model_id, rows):
+    """Add one model, read its default and each named setting, and remove it. Returns its entry."""
+    unit, device = engine.unit, engine.unit.device
+    info = catalog.model(model_id)
+    entry = {"name": info.name, "category": info.category, "available": False, "presets": []}
+    cell = _place(engine, model_id, info)
+    if cell is None:
+        # Once more before it is recorded as unavailable: a slow answer is not a refusal, and the record locks
+        # the model, and its plugin's others, out of every design.
+        _clear(engine)
+        cell = _place(engine, model_id, info)
     if cell is not None and cell.hash == model_id and stored_as_listed(cell, info):
         entry["available"] = True
         entry["presets"].append({"id": DEFAULT_ID, "name": "Default", "values": values(cell, info)})
@@ -178,18 +209,14 @@ def _one(engine, model_id, rows):
             cell = _cell(device)
             if confirmed and cell is not None and cell.hash == model_id:
                 entry["presets"].append({"id": row["id"], "name": row["name"], "values": values(cell, info)})
-    if _cell(device) is not None:
-        unit.guard()
-        device.delete_block(0, 0)
-        try:
-            unit.until(lambda: _cell(device) is None, "the build slot cleared")
-        except Mismatch:
-            raise RuntimeError("The build slot did not clear between models.") from None
+    _clear(engine)
     return entry
 
 
 def harvest(engine, *, stop=None, categories=CATEGORIES, only=None, report=None, path=None):
-    """Record every factory named setting of the chosen categories (`only`: these model ids alone).
+    """Record every factory named setting of the chosen categories (`only`: these model ids alone, read again
+    whatever the table holds). Models not yet recorded on this firmware are read, and those recorded as
+    unavailable are tried again.
 
     Writes the table after each model, so a stopped or failed harvest keeps what it read. Returns a summary:
     where it was written, the firmware, how many models were read now and in all, which ones the unit would
@@ -206,13 +233,15 @@ def harvest(engine, *, stop=None, categories=CATEGORIES, only=None, report=None,
     record["firmware"] = unit.firmware
     record["plugins"] = licences(device)
     index = _index(device, categories, only)
-    todo = [model_id for model_id in sorted(index) if str(model_id) not in record["models"]]
+    todo = [model_id for model_id in sorted(index)
+            if only is not None or not record["models"].get(str(model_id), {}).get("available")]
     say(f"{len(todo)} models to read, {len(index) - len(todo)} already recorded")
     read, stopped = [], False
     if todo:
-        if engine.borrowed is not None and unit.dirty() and not slots.ours(unit.position()):
-            raise RuntimeError("The preset on the Quad Cortex has unsaved changes. Save or discard them first.")
-        # Without a session that gives the player's preset back, borrow it for the harvest alone.
+        # Without a session that gives the player's preset back, borrow it for the harvest alone. Either way the
+        # preset on the unit is left only when it has no unsaved edits (`borrowed` asks the same itself).
+        if engine.borrowed is not None:
+            slots.may_leave()
         borrowing = slots.borrowed() if engine.borrowed is None else nullcontext()
         with borrowing:
             slots.claim(BUILD, BUILD_NAME)

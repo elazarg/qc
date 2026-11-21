@@ -1,7 +1,7 @@
-"""The side tools for the desk's ⋯ menu, in the order they are listed. Each module has `open(desk)`.
+"""The side tools the desk lists in its More panel, in the order they are listed. Each module has `open(desk)`:
 
     for title, name in TOOLS:
-        menu.add_command(label=title, command=lambda name=name: opener(name)(desk))
+        ...a chip that calls opener(name)(desk)...
 """
 
 from importlib import import_module

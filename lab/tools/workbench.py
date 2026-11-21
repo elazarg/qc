@@ -16,6 +16,10 @@ played on the computer. "Keep" notes the last one played with a remark; "Which w
 order; "Put the kept one on B" brings that version to the desk as a sound of its own. Each comparison is
 kept under `comparisons/` in the data folder with its notes (the old `feedback` was tied to a comparison
 the same way).
+
+`comparison` and `auditions` are the one blind comparison of rendered audio in the tools: the sound check's
+stage EQ versions go through them too. `with_control` is the one way a control of a block is set to a value
+in display units and checked against its range; the command line's `sweep` uses it.
 """
 
 from datetime import datetime, timezone
@@ -30,8 +34,8 @@ from lab.hearing.audio import read_wave
 from lab.hearing.measure import match, measure
 from lab.sound.sounds import Sound
 from lab.desk.theme import FONT, INK, SUBTLE, TILE, WHITE
-from lab.tools.common import (SCENE_LETTERS, Window, button, gained, heard_chain, label, listbox, menu_choice, phrase, play,
-                     section, with_knobs, write_pcm16)
+from lab.tools.common import (SCENE_LETTERS, Window, button, gained, heard_chain, label, listbox, menu_choice, phrase,
+                              play, section, silence, with_knobs, write_pcm16)
 
 STRENGTHS = (.4, .85)
 KINDS = ("Scenes", "Strengths", "Sweep", "WAV files")
@@ -92,17 +96,26 @@ def controls(chain):
     return found
 
 
-def sweep_versions(sound, row, column, index, values):
-    chain = heard_chain(sound)
+def with_control(chain, row, column, index, value):
+    """The chain with one control of one block at `value`, in the units the unit shows (rows and columns from 0).
+    Returns (chain, block, parameter); a block that is not there, a control without a range and a value out of
+    range are refused with the reason."""
     block = chain.block(row, column)
     if block is None:
-        raise ValueError("That block is not in the sound.")
-    param = next(param for param in block.info.params if param.index == index)
+        raise ValueError(f"Row {row + 1}, column {column + 1} holds no block.")
+    param = next((param for param in block.info.params if param.index == index), None) if block.info else None
+    if param is None or param.kind not in ("float", "fader", "int") or param.low is None or param.high is None:
+        raise ValueError(f"{block.name} has no control {index} with a range.")
+    if not param.low <= value <= param.high:
+        raise ValueError(f"{block.name} {param.name} goes from {param.low:g} to {param.high:g}.")
+    return chain.with_block(row, column, block.set_display(index, value)), block, param
+
+
+def sweep_versions(sound, row, column, index, values):
+    chain = heard_chain(sound)
     versions = []
     for value in values:
-        if not param.low <= value <= param.high:
-            raise ValueError(f"{param.name} goes from {param.low:g} to {param.high:g}.")
-        changed = chain.with_block(row, column, block.set_display(index, value))
+        changed, block, param = with_control(chain, row, column, index, value)
         versions.append({"name": f"{block.name} {param.name} {value:g}{param.units and ' ' + param.units}",
                          "chain": changed, "scene": None, "knobs": dict(sound.knobs),
                          "change": {"row": row, "column": column, "index": index, "to": value}})
@@ -122,8 +135,9 @@ def matched(audios, *, ceiling_db=-3.):
     return [gained(audio, trim) for audio, trim in zip(audios, trims)], trims, found
 
 
-def comparison(folder, versions, audios, *, sound=None, phrase_name=None, kind="", seed=None):
-    """Level-match the versions, shuffle them under letters, and keep it all under `comparisons/`."""
+def comparison(folder, versions, audios, *, sound=None, phrase_name=None, kind="", seed=None, about=None):
+    """Level-match the versions, shuffle them under letters, and keep it all under `comparisons/`.
+    `about` is anything else to keep with the comparison (what it was made for, notes on judging it)."""
     if len(versions) < 2:
         raise ValueError("Compare at least two versions.")
     leveled, trims, found = matched(audios)
@@ -133,7 +147,8 @@ def comparison(folder, versions, audios, *, sound=None, phrase_name=None, kind="
     target = Path(folder) / "comparisons" / f"{stamp:%Y%m%d-%H%M%S}-{kind.lower().replace(' ', '-')}-{uuid4().hex[:6]}"
     target.mkdir(parents=True)
     record = {"created": stamp.isoformat(timespec="seconds"), "kind": kind, "phrase": phrase_name,
-              "sound": {"id": sound.id, "name": sound.name} if sound else None, "auditions": {}, "choice": None}
+              "sound": {"id": sound.id, "name": sound.name} if sound else None, "auditions": {}, "choice": None,
+              **({"about": about} if about else {})}
     for place, index in enumerate(order):
         letter = SCENE_LETTERS[place]
         version = versions[index]
@@ -141,7 +156,8 @@ def comparison(folder, versions, audios, *, sound=None, phrase_name=None, kind="
         record["auditions"][letter] = {
             "name": version["name"], "file": f"audition-{letter}.wav", "trim_db": round(trims[index], 2),
             "lufs": found[index].lufs, **{key: version[key] for key in ("scene", "knobs", "request", "amount",
-                                                                        "change", "source") if key in version}}
+                                                                        "change", "source", "post_eq",
+                                                                        "post_eq_trim_db") if key in version}}
         if "chain" in version:
             record["auditions"][letter]["chain"] = version["chain"].to_record()
     (target / "comparison.json").write_text(json.dumps(record, indent=1), encoding="utf-8")
@@ -150,6 +166,26 @@ def comparison(folder, versions, audios, *, sound=None, phrase_name=None, kind="
 
 def load(target):
     return json.loads((Path(target) / "comparison.json").read_text(encoding="utf-8"))
+
+
+def auditions(target, record):
+    """{letter: the level-matched audio} of a comparison, read from where it is kept."""
+    return {letter: read_wave(Path(target) / row["file"]) for letter, row in record["auditions"].items()}
+
+
+def earlier(folder, limit=30):
+    """[(folder, record)] of the comparisons kept, newest first. One that cannot be read is left out."""
+    found = []
+    for path in sorted((Path(folder) / "comparisons").glob("*/comparison.json"), reverse=True):
+        try:
+            record = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if isinstance(record, dict) and isinstance(record.get("auditions"), dict):
+            found.append((path.parent, record))
+        if len(found) >= limit:
+            break
+    return found
 
 
 def keep(target, letter, notes=""):
@@ -181,10 +217,6 @@ def feedback(target, text, *, audition=None):
     return path
 
 
-def notes(target):
-    return [json.loads(path.read_text(encoding="utf-8")) for path in sorted((Path(target) / "feedback").glob("*.json"))]
-
-
 def as_sound(record, letter, parent):
     """A kept version as a sound of its own, revised from the one it was made from."""
     from lab.sound.chain import Chain
@@ -197,7 +229,7 @@ def as_sound(record, letter, parent):
     # The chain was rendered with the knobs written in; the copy starts with them at rest.
     sound = Sound(f"{parent.name} · {audition['name']}"[:60], chain, origin, parent=parent.id,
                   explanation=parent.explanation)
-    if audition.get("scene"):
+    if audition.get("scene") is not None:
         sound.tags = [f"scene {SCENE_LETTERS[audition['scene']]}"]
     return sound
 
@@ -315,7 +347,8 @@ class WorkbenchWindow(Window):
             self.made(versions, audios, sound, taken[0])
 
         self.call("lab.tools.common.render_many", [(version["chain"], version["scene"]) for version in versions],
-                  taken[1], done=rendered, working=f"Rendering {len(versions)} versions silently on the Quad Cortex…")
+                  taken[1], done=rendered, working=f"Rendering {len(versions)} versions silently on the Quad Cortex…",
+                  renders=True)
 
     def imported(self):
         from tkinter import filedialog
@@ -342,9 +375,7 @@ class WorkbenchWindow(Window):
         self.list_earlier()
 
     def show(self):
-        from lab.hearing.audio import read_wave as read
-
-        self.auditions = {letter: read(self.target / row["file"]) for letter, row in self.record["auditions"].items()}
+        self.auditions = auditions(self.target, self.record)
         self.last = None
         for child in self.players.winfo_children():
             child.destroy()
@@ -367,8 +398,6 @@ class WorkbenchWindow(Window):
         self.say(f"Playing {letter}")
 
     def stop(self):
-        from lab.tools.common import silence
-
         silence()
 
     def keep(self):
@@ -408,23 +437,18 @@ class WorkbenchWindow(Window):
         self.studio.put("b", made)
 
     def list_earlier(self):
-        self.found = sorted((self.folder / "comparisons").glob("*/comparison.json"), reverse=True)[:30]
+        self.found = earlier(self.folder)       # the rows of the list, one for one
         self.earlier.delete(0, "end")
-        for path in self.found:
-            try:
-                record = json.loads(path.read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                continue
+        for _, record in self.found:
             chosen = record.get("choice")
-            self.earlier.insert("end", f"{record['created'][:16]}  {record['kind']}"
+            self.earlier.insert("end", f"{str(record.get('created', ''))[:16]}  {record.get('kind', '')}"
                                        + (f" · {record['sound']['name']}" if record.get("sound") else "")
                                        + (f" · kept {chosen['name']}" if chosen else ""))
 
     def open_earlier(self):
         chosen = self.earlier.curselection()
         if chosen:
-            self.target = self.found[chosen[0]].parent
-            self.record = load(self.target)
+            self.target, self.record = self.found[chosen[0]]
             self.show()
 
 

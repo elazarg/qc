@@ -1,12 +1,12 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
-from unittest.mock import patch
 
 import numpy as np
 
 from lab.hearing import audio
 from lab.learner import dataset as data, folders
+from lab.sound.sounds import INSTRUMENTS
 
 
 class GuitarDatasetTest(unittest.TestCase):
@@ -14,9 +14,8 @@ class GuitarDatasetTest(unittest.TestCase):
         folder = TemporaryDirectory()
         self.addCleanup(folder.cleanup)
         self.root = Path(folder.name)
-        guard = patch.object(folders, "SESSIONS", self.root)
-        guard.start()
-        self.addCleanup(guard.stop)
+        folders.use(self.root)
+        self.addCleanup(folders.use, None)
         self.layout = "dk24_hh_toggle"
         self.config = {"pickup": 5, "wiring": " parallel ", "volume": 9.5, "tone": 10}
 
@@ -26,8 +25,8 @@ class GuitarDatasetTest(unittest.TestCase):
         audio.write_wave(filename, np.repeat(signal, 2, axis=1) if stereo else signal)
         return filename
 
-    def take(self, key, *, guitar="Charvel", unresolved=False):
-        folder = self.root / "recordings" / f"clip-20261118-{key}-abcdef"
+    def take(self, key, *, guitar="Charvel", unresolved=False, day="20261118"):
+        folder = self.root / "recordings" / f"clip-{day}-{key}-abcdef"
         folder.mkdir(parents=True)
         self.wave(folder / "dry.wav")
         folders.write_json(folder / "clip.json", {"guitar": guitar, "duration_seconds": 2,
@@ -65,7 +64,7 @@ class GuitarDatasetTest(unittest.TestCase):
         self.assertEqual(data.records("Les Paul", self.layout), [])
         self.assertEqual(data.records("Charvel", "dk24_blade"), [])
         self.assertEqual(source.path.read_bytes(), before)
-        data.remove("Charvel", self.layout, row["id"])
+        data.unlabel("Charvel", self.layout, row["id"])
         self.assertFalse(data.records("Charvel", self.layout))
         self.assertEqual(source.path.read_bytes(), before)
 
@@ -81,7 +80,7 @@ class GuitarDatasetTest(unittest.TestCase):
         data.add("Charvel", self.layout, copy, {**self.config, "volume": 5}, start=1, end=1.8)
         fresh = self.wave(self.root / "fresh.wav", frequency=232)
         kept = data.add("Charvel", self.layout, fresh, self.config, role="test")
-        self.assertEqual(data.records("Charvel", self.layout, role="test"), [kept])
+        self.assertEqual(data.records("Charvel", self.layout, role="test"), [{**kept, "separate_session": False}])
         self.assertEqual(len(data.records("Charvel", self.layout, role="example")), 2)
 
     def test_blind_reading_is_unlabeled_and_recognizes_an_exported_training_excerpt(self):
@@ -145,7 +144,7 @@ class GuitarDatasetTest(unittest.TestCase):
 
         data.unlabel("Charvel", self.layout, first["id"])
         self.assertFalse(data.find_label("Charvel", self.layout, data.inspect(original, start=0, end=.8)))
-        self.assertFalse(data.is_independent("Charvel", self.layout, data.inspect(original)))
+        self.assertFalse(data.never_taught("Charvel", self.layout, data.inspect(original)))
         history = next(row for row in data.label_history("Charvel", self.layout) if row["id"] == first["id"])
         self.assertFalse(history["active"])
         self.assertEqual(history["history"][-1]["action"], "unlabel")
@@ -175,11 +174,77 @@ class GuitarDatasetTest(unittest.TestCase):
                               if source.path == Path(probe["wav"]))
         self.assertFalse(active)
         self.assertEqual(data.inspect(source).source_id, example["source_id"])
-        self.assertFalse(data.is_independent("Charvel", self.layout, data.inspect(source)))
+        self.assertFalse(data.never_taught("Charvel", self.layout, data.inspect(source)))
         added = data.add("Charvel", self.layout, source, self.config)
         self.assertEqual(added["source_offset"], 1.)
         library = {source.path: labels for source, labels in data.dataset_sources("Charvel", self.layout)}
         self.assertEqual(library[Path(probe["wav"])], (added,))
+
+    # ---- one performance, one source ----
+
+    def kept_clip(self, key, run, begins, *, seconds=2):
+        folder = self.root / "guitar_learner" / "live_recordings" / f"clip-20261118-{key}-abcdef"
+        folder.mkdir(parents=True)
+        frames = np.arange(round(audio.RATE * (begins + seconds)), dtype=np.float32)
+        playing = (.05 * np.sin(frames * (220 * 2 * np.pi / audio.RATE)) * (1 + .3 * np.sin(frames / 9000)))[:, None]
+        audio.write_wave(folder / "dry.wav", playing[round(audio.RATE * begins):])
+        folders.write_json(folder / "clip.json", {"guitar": "Charvel", "duration_seconds": seconds,
+                                                  "live_run": run, "run_start_seconds": begins})
+        return data.source_from_take("Charvel", folder)
+
+    def test_clips_kept_from_one_run_of_live_listening_are_one_performance(self):
+        first, second = self.kept_clip("010000", "run-a", 0., seconds=5), self.kept_clip("010001", "run-a", 1., seconds=5)
+        self.assertNotEqual(first.path.read_bytes(), second.path.read_bytes())
+        self.assertEqual(data.inspect(first).source_id, data.inspect(second).source_id)
+        taught = data.add("Charvel", self.layout, first, self.config, start=0, end=3)
+        self.assertEqual(taught["source_offset"], 0.)
+        self.assertFalse(data.never_taught("Charvel", self.layout, data.inspect(second)))
+        with self.assertRaisesRegex(ValueError, "other role"):
+            data.add("Charvel", self.layout, second, self.config, role="test")
+        with self.assertRaisesRegex(ValueError, "already has a configuration"):
+            data.add("Charvel", self.layout, second, self.config, start=0, end=1.5)      # 1.0-2.5 s of the run
+        later = data.add("Charvel", self.layout, second, self.config, start=2.5, end=4)      # 3.5-5.0 s of the run
+        self.assertEqual(later["source_offset"], 1.)
+        other_run = self.kept_clip("010002", "run-b", 0.)
+        self.assertTrue(data.never_taught("Charvel", self.layout, data.inspect(other_run)))
+        data.add("Charvel", self.layout, other_run, self.config, role="test")
+
+    def test_a_check_is_from_a_separate_session_only_when_recorded_on_another_day_than_all_teaching(self):
+        taught = data.add("Charvel", self.layout, data.source_from_take("Charvel", self.take("010000")), self.config)
+        self.assertEqual((taught["session"], data.session_of(taught)), ("20261118", "20261118"))
+        same_day = self.take("020000")
+        self.wave(same_day / "dry.wav", frequency=233)
+        next_day = self.take("030000", day="20261119")
+        self.wave(next_day / "dry.wav", frequency=247)
+        for folder in (same_day, next_day):
+            data.add("Charvel", self.layout, data.source_from_take("Charvel", folder), self.config, role="test")
+        checks = {row["session"]: row["separate_session"] for row in data.records("Charvel", self.layout, role="test")}
+        self.assertEqual(checks, {"20261118": False, "20261119": True})
+        # A label written before sessions were recorded takes the day from its take's name.
+        self.assertEqual(data.session_of({"source": "C:/old/tone_sessions/recordings/clip-20261101-101010-abcdef/dry.wav"}),
+                         "20261101")
+        # Teaching from a recording of unknown day leaves no check known to be separate.
+        data.add("Charvel", self.layout, self.wave(self.root / "imported.wav", frequency=262), self.config)
+        self.assertEqual({row["separate_session"] for row in data.records("Charvel", self.layout, role="test")}, {False})
+
+    def test_a_label_names_its_take_relative_to_the_data_folder(self):
+        take = self.take("010000")
+        row = data.add("Charvel", self.layout, data.source_from_take("Charvel", take), self.config)
+        self.assertEqual(row["source"], "recordings/clip-20261118-010000-abcdef/dry.wav")
+        library = dict(data.dataset_sources("Charvel", self.layout))
+        self.assertEqual([labels[0]["id"] for source, labels in library.items() if source.path == take / "dry.wav"],
+                         [row["id"]])
+
+    def test_pickup_settings_are_named_as_the_desk_names_them(self):
+        charvel = next(item for item in INSTRUMENTS if item["name"] == "Charvel")
+        for layout in ("dk24_hh_toggle", "dk24_blade"):
+            self.assertEqual(list(data.LAYOUTS[layout]["pickups"]), charvel["settings"])
+        self.assertEqual(list(data.LAYOUTS["dk24_hh_toggle"]["wiring"]), charvel["wiring"])
+        self.assertEqual(data.layouts_for(" charvel "), ["dk24_hh_toggle", "dk24_blade"])
+        self.assertEqual(data.layouts_for("Bass"), [])
+        self.assertEqual(data.setting_name("dk24_hh_toggle", {"pickup": 5, "wiring": "Series"}), "Neck · Series")
+        self.assertEqual(data.setting_name("dk24_blade", {"pickup": 2}), "Outer coils")
+        self.assertEqual(data.pickup_settings("Les Paul"), ("Bridge", "Both", "Neck"))
 
 
 if __name__ == "__main__":

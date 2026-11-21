@@ -50,7 +50,7 @@ class GuitarContinuousTest(unittest.TestCase):
     def test_taught_pickup_states_support_the_observation(self):
         examples = [{"pickup": pickup, "tone": 7, "volume": 10, "wav": held_note((pickup, pickup))}
                     for pickup in (1, 5)]
-        profile = guitar_configuration.calibrate("Charvel", examples)
+        profile = guitar_configuration.fit("Charvel", examples)
         rows = replay(guitar_continuous.Tracker(profile), held_note((1, 5)))
         changes = [row["change"] for row in rows if row["change"]]
         self.assertEqual(len(changes), 1, rows)
@@ -70,7 +70,7 @@ class GuitarContinuousTest(unittest.TestCase):
     def test_one_live_match_waits_for_a_second_look(self):
         examples = [{"pickup": pickup, "tone": 7, "volume": 10, "wav": held_note((pickup, pickup))}
                     for pickup in (1, 5)]
-        tracker = guitar_continuous.Tracker(guitar_configuration.calibrate("Charvel", examples))
+        tracker = guitar_continuous.Tracker(guitar_configuration.fit("Charvel", examples))
         rows = replay(tracker, held_note((5, 5)))
         self.assertIsNone(rows[0]["estimate"]["pickup"])
         self.assertEqual(rows[0]["estimate"]["nearest"]["pickup"], 5)

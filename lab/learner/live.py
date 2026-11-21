@@ -1,8 +1,13 @@
-"""Read-only Quad Cortex DI monitoring for the guitar configuration learner.
+"""Listening to the dry guitar as it is played, for the Guitar Learner.
 
 `run` is what the live worker process runs (see `lab.learner.worker`): it
-holds the dry input open, follows the playing with `continuous.Tracker`, and
+holds the dry input open on the USB channel its settings name (the desk asked
+the engine which one), follows the playing with `continuous.Tracker`, and
 keeps a clip of the recent audio only when asked.
+
+Every clip kept from one run is marked with that run and with where it starts
+in it, so that two clips of the same playing are known to be one performance
+(`lab.learner.dataset`).
 """
 
 from datetime import datetime
@@ -16,7 +21,7 @@ from uuid import uuid4
 import numpy as np
 
 from lab.hearing import audio
-from lab.learner import configuration as guitar_configuration, continuous, dataset as guitar_dataset, inputs
+from lab.learner import continuous, dataset as guitar_dataset, inputs, profiles
 from lab.learner.folders import write_json
 
 WINDOW_SECONDS = 3.
@@ -68,7 +73,7 @@ class DryWindow:
             return self.generation, self.time, values, self.discontinuities, self.filled
 
 
-def save_recent(dry, guitar, physical_input, usb_input, *, boundary=None):
+def save_recent(dry, guitar, physical_input, usb_input, *, boundary=None, run=None):
     if len(dry) < audio.RATE // 2 or not np.isfinite(dry).all():
         raise ValueError("Wait for at least half a second of dry audio before saving.")
     root = guitar_dataset.live_recordings()
@@ -84,13 +89,15 @@ def save_recent(dry, guitar, physical_input, usb_input, *, boundary=None):
                     "dry_peak_dbfs": audio.db(np.max(np.abs(dry)))}
         if boundary is not None:
             metadata["change_seconds"] = boundary
+        if run is not None:
+            metadata["live_run"], metadata["run_start_seconds"] = run[0], round(run[1], 3)
         write_json(stage / "clip.json", metadata)
         stage.rename(destination)
     return destination, seconds
 
 
 def _profile(profile):
-    return guitar_configuration._validate(profile) if profile is not None else None
+    return profiles.validate(profile) if profile is not None else None
 
 
 def _marked_change(snapshot, change):
@@ -101,7 +108,7 @@ def _marked_change(snapshot, change):
     if end - start < audio.RATE // 2:
         return None
     boundary = min((end - start) / audio.RATE, max(0., change["at"] - origin - start / audio.RATE))
-    return uuid4().hex[:12], samples[start:end].copy(), boundary, change["at"]
+    return uuid4().hex[:12], samples[start:end].copy(), boundary, change["at"], origin + start / audio.RATE
 
 
 def _after_change(window, at):
@@ -110,24 +117,27 @@ def _after_change(window, at):
         _, latest, samples, _, _ = snapshot
         first = round((at - latest) * audio.RATE) + len(samples)
         if 0 <= first < len(samples):
-            return samples[first:first + round(3 * audio.RATE)]
-    return np.empty(0, dtype=np.float32)
+            return samples[first:first + round(3 * audio.RATE)], latest - (len(samples) - first) / audio.RATE
+    return np.empty(0, dtype=np.float32), at
 
 
-def _save_request(message, window, marked, guitar, physical, usb, report):
+def _save_request(message, window, marked, guitar, physical, usb, report, run):
     event = {"event": "learner-snapshot", "request_id": message.get("request_id")}
     try:
         boundary = None
         if marker := message.get("change_id"):
             if not marked or marker != marked[0]:
                 raise ValueError("That live change is no longer available. Save the recent dry audio instead.")
-            _, samples, boundary, at = marked
+            _, samples, boundary, at, begins = marked
             part = message.get("part")
             if part in ("before", "after"):
                 split = round(boundary * audio.RATE)
-                samples = samples[:split] if part == "before" else samples[split:]
-                if part == "after" and len(samples) < audio.RATE // 2:
-                    samples = _after_change(window, at)
+                if part == "after":
+                    samples, begins = samples[split:], begins + split / audio.RATE
+                    if len(samples) < audio.RATE // 2:
+                        samples, begins = _after_change(window, at)
+                else:
+                    samples = samples[:split]
                 boundary = None
             elif part is not None:
                 raise ValueError("Choose the whole live change, before, or after.")
@@ -139,7 +149,9 @@ def _save_request(message, window, marked, guitar, physical, usb, report):
             if not snapshot:
                 raise ValueError("Wait for at least half a second of dry audio before saving.")
             samples = snapshot[2]
-        folder, duration = save_recent(samples, guitar, physical, usb, boundary=boundary)
+            begins = snapshot[1] - len(samples) / audio.RATE
+        folder, duration = save_recent(samples, guitar, physical, usb, boundary=boundary,
+                                       run=(run[0], begins - run[1]))
     except (OSError, TypeError, ValueError) as error:
         report({**event, "reason": str(error), "path": None})
     else:
@@ -155,9 +167,9 @@ def run(config, stop, commands, report):
         raise ValueError("Choose the guitar and Quad Cortex input 1 or 2.")
     if stop.is_set():
         return {}
-    usb = inputs.recording_channels(physical)[0]
-    if stop.is_set():
-        return {}
+    usb = config.get("dry_channel")
+    if type(usb) is not int or not 1 <= usb <= 4:
+        raise ValueError("The desk did not say which USB channel carries the dry guitar.")
     audio_device, index = inputs.asio_device()
     window = DryWindow(round(RECENT_SECONDS * audio.RATE))
 
@@ -175,6 +187,7 @@ def run(config, stop, commands, report):
         stream.start()
         tracker = continuous.Tracker(profile=profile)
         start = time.monotonic()
+        run_of_listening = uuid4().hex, start
         checked = analyzed = reported = start
         while not stop.is_set():
             try:
@@ -187,7 +200,7 @@ def run(config, stop, commands, report):
                 tracker.set_profile(_profile(message.get("profile")))
                 last_state = None
             elif message and message["event"] == "learner-snapshot":
-                _save_request(message, window, marked, guitar, physical, usb, report)
+                _save_request(message, window, marked, guitar, physical, usb, report, run_of_listening)
             now = time.monotonic()
             if not ready or now - checked >= .8:
                 recent = window.recent(1)

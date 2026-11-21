@@ -27,7 +27,7 @@ MIC_SELECTOR = "ir selector"
 # Blocks and lane controls the app itself relies on.
 GAIN_BLOCK = 16005      # a clean level trim, used as the app's own output control
 MIXER = 11000           # the mixer that joins two paths: LEVEL A 0, PAN A 1, LEVEL B 2, PAN B 3, PHASE 4
-IR_LOADER = 29001
+IR_LOADER, IR_LOADER_STEREO = 29001, 29002
 CAPTURE_MODELS = (14000, 14001)
 LANE_VOLUME, LANE_MUTE = 0, 2   # parameters of a row's output control
 

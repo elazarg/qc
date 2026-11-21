@@ -61,7 +61,11 @@ class DesignTest(unittest.TestCase):
         found = design.card(HIWATT)
         self.assertEqual(found["controls"]["GAIN"], [0, 10])
         self.assertNotIn("OUTPUT", found["controls"])   # The amp's clean level is the app's.
-        self.assertIn("crest_by_gain", found)
+        # What was measured is the crest factor; the distortion word after it is labelled as what it suggests.
+        self.assertEqual(found["crest_by_gain"],
+                         "GAIN 2: 20 dB (suggests clean), 5: 20 dB (suggests clean), 8: 20 dB (suggests clean)")
+        self.assertIn("crest factor", design.sections("craft"))
+        self.assertIn("inference", design.sections("craft"))
         self.assertIn("cpu", found)
         self.assertIn("about", found)
         self.assertEqual(design.card(FUZZ)["controls"]["FUZZ"], [0, 10])
@@ -108,7 +112,7 @@ class DesignTest(unittest.TestCase):
         _, problems = design.to_chain(answer("No cab", [block(RECTIFIER, 1), block(V30, 2)],
                                              second=[block(PLEXI, 1)], split=(1, 3)),
                                       offered_ids=set(self.models) | {RECTIFIER, PLEXI})
-        self.assertIn("The amp on the second path needs its own cab.", problems)
+        self.assertIn("The amp on the second path needs its own cab, or a cab on row 0 after the join.", problems)
 
     def test_a_round_is_checked_and_a_bad_answer_is_repaired_once(self):
         good = answer("Fuzz", [block(FUZZ, 0, fuzz=10), block(HIWATT, 1), block(V30, 2)], differs="Documented")
@@ -298,6 +302,344 @@ class ListeningPriorTest(unittest.TestCase):
         prompt = script.asked[-1][0]
         self.assertIn('"player_listening"', prompt)
         self.assertIn("names no artist, song, player or sound", prompt)
+
+
+CAPTURE, COMP, EQ, ROOM = catalog.CAPTURE_MODELS[0], 5005, 4005, 8000
+DARK_JAZZ = Asset("capture", "a" * 64, "Dark Jazz", "user", 1)
+
+
+def given_back(chain, irs=None, **changed):
+    """A chain as the assistant would return it unchanged: the form it was shown, completed as the schema asks."""
+    form = json.loads(json.dumps(design.as_form(chain, irs)))
+    return {"name": "x", "target": "t", "explanation": "e", "differs": "", "sources": [],
+            "blend": {"level_db": 0, "spread": 0}, **form, **changed}
+
+
+def shifted(reply, by=1, *, first=None):
+    """The reply with row 0's blocks moved right to make room, and `first` put in front."""
+    blocks = [dict(entry, column=entry["column"] + by) for entry in reply["rows"][0]["blocks"]]
+    reply["rows"][0]["blocks"] = ([first] if first else []) + blocks
+    return reply
+
+
+def new_block(model_id, column, **settings):
+    return {**block(model_id, column, **settings), "off": False}
+
+
+class RevisionTest(unittest.TestCase):
+    """A1, A2, A5, A6: what a revision keeps, and what it can now say."""
+
+    def test_a_block_moved_to_make_room_keeps_what_the_assistant_never_sees(self):
+        fuzz = Block(FUZZ, bypass=True).set_display(0, 5.)
+        capture = assets.block_for(DARK_JAZZ).set_display(0, 3.)
+        cab = Block(V30).set(1, "Dynamic 57").set(9, "Ribbon 121").set_display(5, 3.).set_display(13, 7.)
+        saved = Chain((Row((fuzz, capture, cab), inlet=1, outlet=19),))
+        reply = shifted(given_back(saved), first=new_block(COMP, 0))
+        chain, problems = design.to_chain(reply, offered_ids={FUZZ, CAPTURE, V30, COMP}, base=saved)
+        self.assertEqual(problems, [])
+        self.assertEqual([found.model for _, found in chain.rows[0].blocks], [COMP, FUZZ, CAPTURE, V30])
+        self.assertEqual(chain.block(0, 1), fuzz)                      # still off, as it was
+        self.assertEqual(assets.bound(chain.block(0, 2)).key, DARK_JAZZ.key)     # the capture went with its block
+        self.assertEqual(chain.block(0, 3), cab)                       # microphones, and each one's own position
+
+    def test_blocks_of_one_model_are_told_apart_and_a_block_may_move_to_the_other_path(self):
+        first, second = Block(DELAY).set_display(0, 20.), Block(DELAY).set_display(0, 50.)
+        saved = Chain((Row((first, second, Block(PLEXI)), inlet=1, outlet=19),))
+        reply = given_back(saved)
+        del reply["rows"][0]["blocks"][0]                              # the first delay goes; the second stays put
+        chain, problems = design.to_chain(reply, offered_ids={DELAY, PLEXI}, base=saved)
+        self.assertEqual((problems, chain.block(0, 1), chain.block(0, 0)), ([], second, None))
+        reply = given_back(saved)
+        moved = reply["rows"][0]["blocks"].pop(1)
+        reply["rows"].append({"row": 1, "split_at": -1, "join_at": -1, "blocks": [dict(moved, column=0)]})
+        reply["rows"][0].update(split_at=0, join_at=1)
+        chain, problems = design.to_chain(reply, offered_ids={DELAY, PLEXI}, base=saved)
+        self.assertEqual(chain.block(1, 0), second)                    # onto the second path, with all it held
+
+    def test_a_capture_block_that_ends_up_with_no_capture_is_a_problem(self):
+        saved = Chain((Row((assets.block_for(DARK_JAZZ), Block(V30)), inlet=1, outlet=19),))
+        reply = given_back(saved)
+        reply["rows"][0]["blocks"].append(new_block(CAPTURE, 4))      # a second capture block, from nowhere
+        _, problems = design.to_chain(reply, offered_ids={CAPTURE, V30}, base=saved)
+        self.assertTrue(any("holds no capture" in problem for problem in problems), problems)
+        _, problems = design.to_chain(answer("New", [block(CAPTURE, 0), block(V30, 1)]), offered_ids={CAPTURE, V30})
+        self.assertTrue(any("holds no capture" in problem for problem in problems), problems)
+
+    def test_a_second_path_added_by_a_revision_gets_its_mixer_blend_and_polarity(self):
+        saved = Chain((Row((Block(FUZZ), Block(PLEXI).set_display(0, 5.), Block(V30)), inlet=1, outlet=19),))
+        reply = given_back(saved, blend={"level_db": -6, "spread": 60})
+        reply["rows"][0].update(split_at=1, join_at=3)
+        reply["rows"].append({"row": 1, "split_at": -1, "join_at": -1,
+                              "blocks": [new_block(RECTIFIER, 1, gain=4), new_block(GREENBACK, 2)]})
+        offered = {FUZZ, PLEXI, V30, RECTIFIER, GREENBACK}
+        chain, problems = design.to_chain(reply, offered_ids=offered, base=saved)
+        mixer = dict(chain.rows[0].mixer)
+        self.assertEqual(problems, [])
+        self.assertAlmostEqual(catalog.to_display(catalog.MIXER, 2, mixer[2]), -6., places=1)
+        self.assertAlmostEqual(catalog.to_display(catalog.MIXER, 3, mixer[3]) - catalog.to_display(catalog.MIXER, 1, mixer[1]),
+                               6., places=1)
+        self.assertEqual(mixer[4], 1.)                 # a Plexi against a Rectifier: measured to oppose
+        fresh, _ = design.to_chain({**reply, "scenes": []}, offered_ids=offered)
+        self.assertEqual(chain.rows[0].mixer, fresh.rows[0].mixer)     # as the same answer gets as a new design
+        # The rules of a split hold for a path a revision adds.
+        reply["rows"][1]["blocks"] = [new_block(RECTIFIER, 1, gain=4)]
+        _, problems = design.to_chain(reply, offered_ids=offered, base=saved)
+        self.assertTrue(any("needs its own cab" in problem for problem in problems))
+
+    def test_a_revision_of_two_paths_keeps_the_join_until_the_amps_or_the_blend_change(self):
+        odd = ((1, .31), (2, .5), (3, .62), (4, 0.), (0, .77))
+        saved = Chain((Row((Block(FUZZ), Block(PLEXI), Block(V30)), inlet=1, outlet=19, split=(1, 3), mixer=odd),
+                       Row((None, Block(HIWATT), Block(GREENBACK)))))
+        offered = {FUZZ, PLEXI, V30, HIWATT, GREENBACK, RECTIFIER}
+        form = design.as_form(saved)
+        self.assertEqual(set(form["blend"]), {"level_db", "spread"})
+        chain, problems = design.to_chain(given_back(saved), offered_ids=offered, base=saved)
+        self.assertEqual((problems, chain.rows[0].mixer), ([], saved.rows[0].mixer))     # untouched, phase and all
+        louder = given_back(saved, blend={"level_db": form["blend"]["level_db"] + 3, "spread": form["blend"]["spread"]})
+        chain, _ = design.to_chain(louder, offered_ids=offered, base=saved)
+        mixer = dict(chain.rows[0].mixer)
+        self.assertAlmostEqual(catalog.to_display(catalog.MIXER, 2, mixer[2]) - catalog.to_display(catalog.MIXER, 2, .5),
+                               3., places=1)
+        self.assertEqual((mixer[4], mixer[0]), (0., .77))              # the amps are the same: the phase stays
+        swapped = given_back(saved)
+        swapped["rows"][1]["blocks"][0] = new_block(RECTIFIER, 1)      # another amp on the second path
+        chain, problems = design.to_chain(swapped, offered_ids=offered, base=saved)
+        self.assertEqual((problems, dict(chain.rows[0].mixer)[4]), ([], 1.))   # worked out again: now opposed
+        gone = given_back(saved)
+        gone["rows"][0].update(split_at=-1, join_at=-1)
+        _, problems = design.to_chain(gone, offered_ids=offered, base=saved)
+        self.assertTrue(any("nothing reaches them" in problem for problem in problems))
+
+    def test_the_assistant_can_switch_a_block_on_and_off(self):
+        saved = Chain((Row((Block(FUZZ, bypass=True), Block(DELAY, bypass=(False, True) + (False,) * 6), Block(PLEXI)),
+                           inlet=1, outlet=19),), ("A", "B"))
+        block_schema = design.design_schema([FUZZ])["properties"]["rows"]["items"]["properties"]["blocks"]["items"]
+        self.assertEqual(block_schema["properties"]["off"], {"type": "boolean"})
+        self.assertIn("off", block_schema["required"])
+        self.assertIn("off is true", design.sections("chain"))
+        reply = given_back(saved)
+        self.assertEqual([entry["off"] for entry in reply["rows"][0]["blocks"]], [True, False, False])
+        chain, problems = design.to_chain(reply, offered_ids={FUZZ, DELAY, PLEXI}, base=saved)
+        self.assertEqual((problems, differences(chain, saved)), ([], []))
+        reply["rows"][0]["blocks"][0]["off"] = False                   # "turn the fuzz on"
+        reply["rows"][0]["blocks"][1]["off_in_scenes"] = []            # "the delay in every scene"
+        reply["rows"][0]["blocks"][2]["off"] = True                    # "and the amp off"
+        chain, problems = design.to_chain(reply, offered_ids={FUZZ, DELAY, PLEXI}, base=saved)
+        self.assertEqual(problems, [])
+        self.assertEqual([found.bypass for _, found in chain.rows[0].blocks], [False, False, True])
+        reply["rows"][0]["blocks"][1]["off_in_scenes"] = [9]
+        _, problems = design.to_chain(reply, offered_ids={FUZZ, DELAY, PLEXI}, base=saved)
+        self.assertIn("A block is switched off in a scene the design does not have.", problems)
+
+    def test_a_control_that_differs_by_scene_is_shown_with_its_first_scenes_value(self):
+        gain = catalog.model(PLEXI).index("GAIN")
+        clean, lead = catalog.to_norm(PLEXI, gain, 3.), catalog.to_norm(PLEXI, gain, 8.)
+        amp = Block(PLEXI, ((gain, (clean, lead, clean, lead) + (clean,) * 4),))
+        saved = Chain((Row((amp, Block(V30)), inlet=1, outlet=19),), ("Clean", "Lead"))
+        shown = design.as_form(saved)["rows"][0]["blocks"][0]
+        self.assertEqual(shown["settings"], [{"name": "GAIN", "value": 3.}])
+        self.assertEqual(shown["scene_settings"], [{"scene": 1, "name": "GAIN", "value": 8.},
+                                                   {"scene": 3, "name": "GAIN", "value": 8.}])    # past the names too
+        chain, problems = design.to_chain(given_back(saved), offered_ids={PLEXI, V30}, base=saved)
+        self.assertEqual((problems, chain), ([], saved))
+        # A setting holds in every scene: with its scene settings left out, the control is the same everywhere.
+        reply = given_back(saved)
+        reply["rows"][0]["blocks"][0]["scene_settings"] = []
+        chain, problems = design.to_chain(reply, offered_ids={PLEXI, V30}, base=saved)
+        self.assertEqual((problems, chain.block(0, 0).values[gain]), ([], clean))
+        # The first scene's value changed, the lead scene's kept.
+        reply = given_back(saved)
+        reply["rows"][0]["blocks"][0]["settings"] = [{"name": "GAIN", "value": 4}]
+        chain, _ = design.to_chain(reply, offered_ids={PLEXI, V30}, base=saved)
+        self.assertEqual([round(chain.block(0, 0).display(gain, scene), 2) for scene in range(4)], [4., 8., 4., 8.])
+        self.assertEqual(chain.block(0, 0).values[gain][1], lead)      # to the last digit
+
+    def test_no_chain_is_shown_in_a_form_that_would_be_refused(self):
+        level = catalog.model(V30).index("OUTPUT VOLUME")
+        sync = catalog.model(7040).index("SYNC NOTE")
+        awkward = {
+            "one named scene": Chain((Row((Block(PLEXI), Block(V30)), inlet=1, outlet=19),), ("Lead",)),
+            "names with a gap": Chain((Row((Block(PLEXI), Block(V30)), inlet=1, outlet=19),), ("A", "", "C")),
+            "a level past what a design may ask": Chain((Row((Block(PLEXI), Block(V30).set_display(level, -20.)),
+                                                             inlet=1, outlet=19),)),
+            "a switch between its steps": Chain((Row((Block(7040).set(sync, .55), Block(PLEXI)), inlet=1, outlet=19),)),
+            "a model the catalog does not know": Chain((Row((Block(987654, ((0, .5),), bypass=True), Block(PLEXI)),
+                                                            inlet=1, outlet=19),)),
+            "more than the budget says fits": Chain((Row((Block(RECTIFIER),) * 3 + (Block(V30),), inlet=1, outlet=19),)),
+            "an odd split": Chain((Row((Block(FUZZ), Block(HIWATT)), inlet=1, outlet=16, split=(5, 5)),
+                                   Row((Block(HIWATT),)))),
+            "an empty loader": Chain((Row((Block(PLEXI), Block(catalog.IR_LOADER)), inlet=1, outlet=19),)),
+        }
+        for what, saved in awkward.items():
+            held = [found.model for _, _, found in saved.blocks]
+            models = design.offered("x", "electric", saved)
+            self.assertTrue(set(held) <= set(models), what)
+            design.facts("x", CHARVEL, chain=saved, models=models)     # the cards and the form are made without fault
+            chain, problems = design.to_chain(given_back(saved), offered_ids=set(models), base=saved)
+            self.assertEqual((problems, chain), ([], saved), what)
+        # What is out of range stays a problem once the answer changes it.
+        reply = given_back(awkward["a level past what a design may ask"])
+        reply["rows"][0]["blocks"][1]["settings"] = [{"name": "OUTPUT VOLUME", "value": -19}]
+        _, problems = design.to_chain(reply, offered_ids={PLEXI, V30}, base=awkward["a level past what a design may ask"])
+        self.assertTrue(any("OUTPUT VOLUME -19 is outside -6 to 6" in problem for problem in problems), problems)
+
+    def test_a_revision_carries_the_assistants_account_of_what_it_changed(self):
+        saved = Sound("Mine", Chain((Row((Block(PLEXI), Block(V30)), inlet=1, outlet=19),)), {"kind": "preset"})
+        script = Scripted(given_back(saved.chain, explanation="Opened the cab's low-pass.",
+                                     sources=[{"title": "t", "url": "https://example.org/x"}]))
+        with TemporaryDirectory() as folder:
+            revised = design.revise(Assistant(folder, run=script), saved, "brighter", CHARVEL)
+        self.assertEqual((revised.name, revised.explanation), ("Mine", "Opened the cab's low-pass."))
+        self.assertEqual(revised.sources, [{"title": "t", "url": "https://example.org/x"}])
+        self.assertIn("what you changed", design.sections("revise"))
+
+
+class OfferedTest(unittest.TestCase):
+    """A3 and A7: what the assistant is offered and told agrees with what an answer may hold."""
+
+    def test_a_bass_is_offered_bass_amps_cabs_and_drives(self):
+        for text in ("motown bass", "Ampeg SVT rock bass with grit", "a bass sound for Tool"):
+            categories = {catalog.model(model_id).category for model_id in design.offered(text, "bass")}
+            self.assertTrue({"Bass Amplifier", "Cabsim Bass (M)", "Bass Overdrive"} <= categories, text)
+            self.assertFalse({"Guitar Amplifier", "Cabsim Guitar (M)"} & categories, text)
+        every = [model.id for model in catalog.models() if model.category == "Bass Amplifier" and design.usable(model.id, "bass")]
+        self.assertTrue(every and set(every) <= set(design.offered("x", "bass")))
+        self.assertIn("Bass Amplifier", design.sections("bass"))
+        amp, cab = every[0], next(model.id for model in catalog.models() if model.category == "Cabsim Bass (M)"
+                                  and design.usable(model.id, "bass"))
+        chain, problems = design.to_chain(answer("Bass", [block(amp, 0), block(cab, 1)]),
+                                          offered_ids=set(design.offered("x", "bass")))
+        self.assertEqual(problems, [])
+        self.assertNotIn(amp, design.offered("x", "electric"))
+        for kind in ("acoustic", "classical"):                         # no amp and no cab, as their sections say
+            categories = {catalog.model(model_id).category for model_id in design.offered("warm fingerstyle", kind)}
+            self.assertFalse({category for category in categories if "Amplifier" in category or "Cabsim" in category})
+            self.assertIn("none is in available_models", design.sections(kind))
+
+    def test_a_stock_cab_offers_its_microphones_filters_and_a_bounded_level_and_nothing_internal(self):
+        found = design.card(V30)
+        self.assertEqual(found["controls"], {"DISTANCE": [0., 10.], "POSITION": [0., 10.], "HPF": [20., 500.],
+                                             "LPF": [500., 20000.], "OUTPUT VOLUME": [-6., 6.]})
+        self.assertEqual(found["switches"], {})
+        _, problems = design.to_chain(answer("Cab", [block(PLEXI, 0), {**block(V30, 1), "settings": [
+            {"name": "bypass", "value": 1}, {"name": "OUTPUT VOLUME", "value": 12}]}]), offered_ids={PLEXI, V30})
+        self.assertTrue(any("no control 'bypass'" in problem for problem in problems))
+        self.assertTrue(any("OUTPUT VOLUME 12 is outside -6 to 6" in problem for problem in problems))
+        self.assertEqual(design.card(EQ)["controls"]["OUTPUT"], [-6., 6.])
+        self.assertEqual(design.ir_card(design.ASSET_IDS, MIX04)["controls"]["LEVEL"], [-3., 9.])
+
+    def test_the_lead_scenes_level_is_the_control_the_instructions_name(self):
+        said = design.sections("scenes")
+        self.assertIn("OUTPUT VOLUME", said)
+        self.assertNotIn("OUTPUT", design.card(PLEXI)["controls"])     # the amp's own is the app's, and is not offered
+        self.assertIn("not among its controls", design.sections("chain"))
+        lead = {**block(V30, 1), "scene_settings": [{"scene": 1, "name": "OUTPUT VOLUME", "value": 3}]}
+        chain, problems = design.to_chain(answer("Lead", [block(PLEXI, 0, gain=6), lead], scenes=("Rhythm", "Lead")),
+                                          offered_ids={PLEXI, V30})
+        level = catalog.model(V30).index("OUTPUT VOLUME")
+        self.assertEqual(problems, [])
+        self.assertEqual([round(chain.block(0, 1).display(level, scene), 1) for scene in range(3)], [0., 3., 0.])
+
+    def test_two_amps_may_share_one_cab_after_the_join_as_the_instructions_say(self):
+        self.assertIn("one cab on row 0 after the join", design.sections("paths"))
+        shared = answer("Shared", [block(PLEXI, 0, gain=5), block(V30, 1)], second=[block(RECTIFIER, 0, gain=4)],
+                        split=(0, 1))
+        chain, problems = design.to_chain(shared, offered_ids={PLEXI, V30, RECTIFIER})
+        self.assertEqual(problems, [])
+        self.assertEqual(dict(chain.rows[0].mixer)[4], 1.)             # and their polarity is still looked after
+
+    def test_a_split_needs_a_block_on_the_second_path(self):
+        self.assertIn("at least one block", design.sections("chain"))
+        for second in (None, []):
+            _, problems = design.to_chain(answer("Dry", [block(FUZZ, 0), block(HIWATT, 1), block(V30, 2)],
+                                                 second=second, split=(1, 3)), offered_ids={FUZZ, HIWATT, V30})
+            self.assertTrue(any("at least one block on the second path" in problem for problem in problems), second)
+
+    def test_scene_settings_hold_a_switch_to_whole_steps_as_settings_do(self):
+        for part in ("settings", "scene_settings"):
+            entry = {"name": "PING PONG", "value": .5, **({"scene": 1} if part == "scene_settings" else {})}
+            _, problems = design.to_chain(answer("Delay", [{**block(DELAY, 0), part: [entry]}], scenes=("a", "b")),
+                                          offered_ids={DELAY})
+            self.assertTrue(any("PING PONG 0.5 is outside 0 to 1 in whole steps." in problem for problem in problems), part)
+
+
+class AnswersTest(unittest.TestCase):
+    """B4: answers out of form, too many designs, and keeping what can be used."""
+
+    def setUp(self):
+        folder = TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.folder = Path(folder.name)
+
+    def test_an_answer_out_of_form_is_a_problem_and_not_a_fault(self):
+        good = [block(PLEXI, 0)]
+        cases = {
+            "blend of text": {**answer("x", [block(PLEXI, 0), block(V30, 1)], second=[block(RECTIFIER, 0), block(GREENBACK, 1)],
+                                       split=(0, 2)), "blend": {"level_db": "loud", "spread": 0}},
+            "rows of text": {**answer("x", good), "rows": ["x"]},
+            "rows not a list": {**answer("x", good), "rows": {"row": 0}},
+            "blocks not a list": {**answer("x", good), "rows": [{"row": 0, "split_at": -1, "join_at": -1, "blocks": 3}]},
+            "a block of text": answer("x", ["plexi"]),
+            "a column of text": answer("x", [{"column": "0", "model_id": PLEXI}]),
+            "a model as a list": answer("x", [{"column": 0, "model_id": [1]}]),
+            "a model as a name": answer("x", [{"column": 0, "model_id": "Plexi"}]),
+            "scenes as a number": {**answer("x", good), "scenes": 3},
+            "scenes of numbers": {**answer("x", good), "scenes": [1, 2]},
+            "a value that is true": answer("x", [block(PLEXI, 0, gain=True)]),
+            "a value that is not a number": answer("x", [block(PLEXI, 0, gain=float("nan"))]),
+            "a setting of text": answer("x", [{**block(PLEXI, 0), "settings": ["GAIN 5"]}]),
+            "settings not a list": answer("x", [{**block(PLEXI, 0), "settings": {"GAIN": 5}}]),
+            "a split of text": {**answer("x", good), "rows": [{"row": 0, "split_at": "1", "join_at": "3", "blocks": good}]},
+            "the same row twice": {**answer("x", good), "rows": [
+                {"row": 0, "split_at": -1, "join_at": -1, "blocks": good},
+                {"row": 0, "split_at": -1, "join_at": -1, "blocks": [block(RECTIFIER, 0)]}]},
+            "off as text": answer("x", [{**block(PLEXI, 0), "off": "yes"}]),
+            "not a design at all": ["x"],
+        }
+        for what, reply_ in cases.items():
+            _, problems = design.to_chain(reply_, offered_ids={PLEXI, V30, RECTIFIER, GREENBACK})
+            self.assertTrue(problems, what)
+        _, problems = design.to_chain(cases["the same row twice"], offered_ids={PLEXI, RECTIFIER})
+        self.assertIn("Row 0 is given twice.", problems)
+
+    def test_a_reply_that_is_not_a_round_at_all_is_repaired_like_any_other(self):
+        good = answer("One", [block(PLEXI, 0, gain=5), block(V30, 1)])
+        other = answer("Two", [block(RECTIFIER, 0, gain=5), block(V30, 1)])
+        for broken in ({"aim": "loud", "designs": []}, {"designs": [good]}, ["x"], {**reply(good, other), "designs": 7},
+                       {**reply(good), "aim": {"distortion": "extreme", "brightness": "balanced", "tail": "dry"}}):
+            script = Scripted(broken, reply(good, other))
+            _, designs = design.round_of_three(Assistant(self.folder, run=script), "plexi crunch", CHARVEL)
+            self.assertEqual((len(designs), len(script.asked)), (2, 2), broken)
+
+    def test_a_round_is_three_designs_at_most(self):
+        many = [answer(f"D{gain}", [block(PLEXI, 0, gain=gain), block(V30, 1)]) for gain in range(1, 7)]
+        script = Scripted(reply(*many))
+        _, designs = design.round_of_three(Assistant(self.folder, run=script), "plexi crunch", CHARVEL)
+        self.assertEqual([sound.name for sound, _ in designs], ["D1", "D2", "D3"])
+        self.assertIn("no more", design.sections("round"))
+
+    def test_the_one_design_that_can_be_used_is_kept(self):
+        good = answer("Good", [block(PLEXI, 0, gain=5), block(V30, 1)])
+        broken = answer("Bad", [block(HIWATT, 0, gain=99)])
+        script = Scripted(reply(good, broken, broken), reply(broken, broken, good))
+        _, designs = design.round_of_three(Assistant(self.folder, run=script), "plexi crunch", CHARVEL)
+        self.assertEqual([sound.name for sound, _ in designs], ["Good"])           # after the repair: one is a round
+        script = Scripted(reply(good, broken), reply(broken, broken))
+        _, designs = design.round_of_three(Assistant(self.folder, run=script), "plexi crunch", CHARVEL)
+        self.assertEqual([sound.name for sound, _ in designs], ["Good"])           # the first answer's, not thrown away
+
+        def once(prompt, schema, **options):
+            if once.asked:
+                raise RuntimeError("The assistant did not answer in time.")
+            once.asked.append(prompt)
+            return reply(good, broken)
+
+        once.asked = []
+        _, designs = design.round_of_three(Assistant(self.folder, run=once), "plexi crunch", CHARVEL)
+        self.assertEqual([sound.name for sound, _ in designs], ["Good"])           # no repair to be had: still kept
+        script = Scripted(reply(broken), reply(broken))
+        with self.assertRaisesRegex(ValueError, "could not be used"):
+            design.round_of_three(Assistant(self.folder, run=script), "plexi crunch", CHARVEL)
 
 
 if __name__ == "__main__":

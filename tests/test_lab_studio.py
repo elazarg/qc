@@ -40,6 +40,7 @@ class StudioTest(unittest.TestCase):
         self.script = Scripted()
         self.studio = Studio(self.host, self.folder, assistant=Assistant(self.folder, automatic=False, run=self.script),
                              phrase=("take", (np.sin(np.arange(24000) / 48000 * 2 * np.pi * 196) * .2)[:, None]))
+        self.studio.idle_seconds = 0.        # silent listening starts at once, not after the unit was left alone
         self.addCleanup(self.studio.close)
         self.studio.open()
         settle(self.studio)

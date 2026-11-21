@@ -1,14 +1,22 @@
+"""The earlier app's own desktop integration (`tone_lab.desktop`), reached with `--old`.
+
+These tests are the earlier app's and go when it goes: without `tone_lab/` they are skipped. The launcher's own
+side, which does not need the earlier app, is tested in test_lab_launcher.py.
+"""
+
 from pathlib import Path
 import runpy
 import sys
-from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import Mock, patch
 
-from tone_lab import desktop
+try:
+    from tone_lab import desktop
+except ImportError:         # the earlier app has been removed
+    desktop = None
 
 
-@unittest.skipUnless(sys.platform == "win32", "Windows desktop integration")
+@unittest.skipUnless(sys.platform == "win32" and desktop is not None, "the earlier app, on Windows")
 class DesktopStartupTest(unittest.TestCase):
     def test_second_launch_raises_the_existing_workspace(self):
         import win32event
@@ -24,38 +32,12 @@ class DesktopStartupTest(unittest.TestCase):
             release.assert_not_called()
             create.return_value.Close.assert_called_once()
 
-    def test_repair_updates_only_shortcuts_with_tone_labs_id(self):
-        from win32com.propsys import propsys
-        from win32com.shell import shell
-
-        with TemporaryDirectory() as folder:
-            appdata = Path(folder)
-            pins = appdata / "Microsoft/Internet Explorer/Quick Launch/User Pinned/TaskBar"
-            pins.mkdir(parents=True)
-            old_pin, other_pin = pins / "Python.lnk", pins / "Another App.lnk"
-            old_pin.touch()
-            other_pin.touch()
-
-            def candidate(path):
-                store = Mock()
-                store.GetValue.return_value.GetValue.return_value = (
-                    desktop.APP_ID if Path(path) == old_pin else "OtherApp"
-                )
-                return store
-
-            file = Mock()
-            with (patch.object(propsys, "SHGetPropertyStoreFromParsingName", side_effect=candidate),
-                  patch.object(shell, "SHChangeNotify") as notify):
-                desktop.repair_taskbar_links(file, appdata)
-                file.Save.assert_called_once_with(str(old_pin), False)
-                self.assertEqual(notify.call_args.args[2], str(old_pin))
-
-    def test_bootstrap_logs_and_displays_an_initialization_failure(self):
+    def test_old_opens_the_earlier_desk_and_a_failure_of_it_is_logged_and_shown(self):
         bootstrap = runpy.run_path(str(desktop.ROOT / "desktop_launcher" / "start.pyw"))
         main = bootstrap["main"]
         log = Path("startup.log")
         dialog = Mock()
-        with (patch.dict(main.__globals__, {"write_log": Mock(return_value=log)}),
+        with (patch.dict(main.__globals__, {"write_log": Mock(return_value=log), "take_identity": Mock()}),
               patch.object(sys, "path", list(sys.path)),
               patch.object(desktop, "open_desk", side_effect=ValueError("Initialization failed")),
               patch.object(bootstrap["ctypes"].windll.user32, "MessageBoxW", dialog)):
@@ -64,3 +46,7 @@ class DesktopStartupTest(unittest.TestCase):
             self.assertIn("ValueError: Initialization failed", failure)
         self.assertIn("Initialization failed", dialog.call_args.args[1])
         self.assertIn(str(log), dialog.call_args.args[1])
+
+
+if __name__ == "__main__":
+    unittest.main()

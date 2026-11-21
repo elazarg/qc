@@ -1,6 +1,6 @@
 """What do Neural DSP's own preset names say each parameter does?
 
-Pooled contrasts over the device presets harvested by `python -m tone_lab.device_presets`.
+Pooled contrasts over the device presets harvested by `python -m lab named-settings`.
 Run from the repository root: python research/analyse_factory_settings.py
 """
 import collections, json, re, sys
@@ -9,9 +9,11 @@ import numpy as np
 from scipy import stats
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from tone_lab import models  # noqa: E402
+import catalog_rows as models  # noqa: E402
 
-data = json.loads((ROOT / "tone_sessions" / "device-presets.json").read_text(encoding="utf-8"))["models"]
+from lab import knowledge  # noqa: E402
+
+data = json.loads(knowledge.device_path().read_text(encoding="utf-8"))["models"]
 PAIRS = {
     "bright_vs_dark": (r"\b(bright|brite|brighten|brighter|sparkl\w*|glass\w*|chim\w*|crisp\w*|treble)\b", r"\b(dark|darker|warm|mellow|dull|muffl\w*|wool\w*)\b"),
     "tight_vs_loose": (r"\b(tight|chug\w*|percussive|focus\w*|lean)\b", r"\b(flub\w*|fat|thick\w*|weighty|massive|boom\w*|bassy|big|loose|huge)\b"),

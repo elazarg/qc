@@ -82,8 +82,10 @@ class BudgetTest(unittest.TestCase):
         self.assertEqual(json.loads(path.read_text(encoding="utf-8")), {"kept": True})
 
     def test_stopped_before_it_begins(self):
+        from lab.qc.unit import Stopped
+
         stop = SimpleNamespace(is_set=lambda: True)
-        with self.assertRaisesRegex(RuntimeError, "Stopped"):
+        with self.assertRaises(Stopped):          # a stop, told apart from a fault where the unit is held
             budget.measure(self.engine, stop=stop, path=self.folder / "costs.json")
 
     def test_runs_where_the_unit_is_held(self):

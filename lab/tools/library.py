@@ -18,19 +18,15 @@ import tkinter as tk
 from uuid import uuid4
 
 from lab.desk.theme import FONT, INK, SUBTLE, TILE
+from lab.qc import library
+from lab.qc.library import place
 from lab.tools.common import SCENE_LETTERS, Window, button, label, listbox, menu_choice, phrase, render, section
 
-SCENES = ("Default scene", *(f"Scene {letter}" for letter in SCENE_LETTERS))
-
-
-def slot_name(slot):
-    """A slot as the unit shows it: bank and letter, "32G" for position 254."""
-    position = int(slot.get("position", 0))
-    return f"{position // 8 + 1}{SCENE_LETTERS[position % 8]}"
+SCENE_CHOICES = ("Default scene", *(f"Scene {letter}" for letter in SCENE_LETTERS))
 
 
 def text_of(row):
-    return f"{row['name']} {row.get('setlist', '')} {slot_name(row['slot'])}"
+    return f"{row['name']} {row.get('setlist', '')} {place(int(row['slot']['position']))}"
 
 
 def filtered(rows, query):
@@ -45,22 +41,14 @@ def ordered(rows):
 
 
 def cached(folder):
-    try:
-        from lab.qc import library
-    except ImportError:
-        return []
-    try:
-        return list(library.cached(folder) or [])
-    except (OSError, ValueError, KeyError):
-        return []
+    """The presets from the last directory read, or none when none has been read."""
+    return list(library.cached(folder) or [])
 
 
 # ---- operations, run where the unit is held ----
 
 def directory(engine, *, stop=None):
     """Every preset in the unit's user setlists, read now."""
-    from lab.qc import library
-
     engine.quiet()
     # Kept beside the engine's own records, which is the desk's data folder, for `cached` to read there.
     return list(library.directory(engine, stop=stop, folder=engine.slots.folder))
@@ -74,8 +62,12 @@ def capture(engine, slot, dry, scene=None, *, stop=None):
 
 
 def leave(engine, slot, *, stop=None):
-    """Select a saved preset and make it the one given back when the app closes."""
+    """Select a saved preset and make it the one given back when the app closes.
+
+    As everywhere the app moves the unit: a preset with unsaved edits (one the player chose and changed on the
+    unit meanwhile) is not recalled over."""
     engine.quiet()
+    engine.slots.may_leave()
     engine.unit.slot = None
     engine.unit.recall(slot)
     record = {"position": engine.unit.position(), "scene": engine.unit.scene(), "name": engine.unit.name()}
@@ -123,8 +115,8 @@ class LibraryWindow(Window):
         actions.pack(fill="x", pady=(8, 0))
         button(actions, "Work on this", self.work_on).pack(side="left")
         button(actions, "Use as reference", self.reference, quiet=True).pack(side="left", padx=6)
-        self.scene = tk.StringVar(master=self.top, value=SCENES[0])
-        menu_choice(actions, self.scene, SCENES).pack(side="left")
+        self.scene = tk.StringVar(master=self.top, value=SCENE_CHOICES[0])
+        menu_choice(actions, self.scene, SCENE_CHOICES).pack(side="left")
         button(actions, "Leave it on the unit", self.leave, quiet=True).pack(side="right")
         self.hint = label(self.body, size=9, color=SUBTLE, wrap=520)
         self.hint.pack(fill="x", pady=(6, 0))
@@ -136,7 +128,7 @@ class LibraryWindow(Window):
         self.visible = filtered(self.rows, self.query.get())
         self.box.delete(0, "end")
         for row in self.visible:
-            self.box.insert("end", f"{row['name']}  ·  {row.get('setlist', '')} {slot_name(row['slot'])}")
+            self.box.insert("end", f"{row['name']}  ·  {row.get('setlist', '')} {place(int(row['slot']['position']))}")
 
     def selected(self):
         chosen = self.box.curselection()
@@ -163,7 +155,7 @@ class LibraryWindow(Window):
             self.say("Record or choose a phrase on the desk first.")
             return
         choice = self.scene.get()
-        scene = None if choice == SCENES[0] else SCENE_LETTERS.index(choice[-1])
+        scene = None if choice == SCENE_CHOICES[0] else SCENE_LETTERS.index(choice[-1])
 
         def captured(found):
             keep_reference(self.folder, row, scene, found, taken[0])
@@ -171,7 +163,7 @@ class LibraryWindow(Window):
                                      + ". Tone search can match against it.")
 
         self.call("lab.tools.library.capture", row["slot"], taken[1], scene, done=captured,
-                  working=f"Playing the phrase silently through {row['name']}…")
+                  working=f"Playing the phrase silently through {row['name']}…", renders=True)
 
     def leave(self):
         row = self.selected()

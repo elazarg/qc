@@ -106,9 +106,57 @@ class NamedTest(unittest.TestCase):
         self.assertEqual(list(self.record()["models"]), [str(AMP)])
         again = named.harvest(self.engine, path=self.path)
         self.assertEqual((again["read"], again["recorded"]), (2, 3))
-        self.assertEqual(named.harvest(self.engine, path=self.path)["read"], 0)
+        self.device.refuse = lambda grid, model_id: False       # nothing refused from here on
+        self.assertEqual(named.harvest(self.engine, path=self.path)["read"], 1)    # the one that was unavailable
+        self.assertEqual(named.harvest(self.engine, path=self.path)["read"], 0)    # all there: nothing to read
         self.engine.unit.firmware = "4.2.0"
         self.assertEqual(named.harvest(self.engine, path=self.path)["read"], 3)
+
+    def test_a_model_recorded_as_unavailable_is_tried_again_on_each_run(self):
+        # Regression: once recorded unavailable, a model (and its plugin's others) stayed locked for good.
+        self.engine.open()
+        self.assertEqual(named.harvest(self.engine, path=self.path)["unavailable"], [DELAY])
+        self.device.refuse = lambda grid, model_id: False       # the plugin was bought since
+        found = named.harvest(self.engine, path=self.path)
+        self.assertEqual((found["read"], found["unavailable"]), (1, []))
+        self.assertTrue(self.record()["models"][str(DELAY)]["available"])
+
+    def test_only_reads_the_named_models_again_whatever_is_recorded(self):
+        # Regression: `--only ID` on a model already in the table read nothing.
+        self.engine.open()
+        named.harvest(self.engine, path=self.path)
+        record = self.record()
+        record["models"][str(AMP)]["presets"] = []
+        self.path.write_text(json.dumps(record), encoding="utf-8")
+        found = named.harvest(self.engine, path=self.path, only=[AMP])
+        self.assertEqual(found["read"], 1)
+        self.assertEqual(len(self.record()["models"][str(AMP)]["presets"]), 3)
+        self.assertEqual(len(self.record()["models"]), 3)       # the others are kept as they were
+
+    def test_a_model_that_does_not_appear_at_once_is_tried_once_more_before_it_is_called_unavailable(self):
+        # Regression: one slow answer locked the model out of every design.
+        self.engine.open()
+        tries = []
+
+        def refuse_the_first_try(grid, model_id):
+            tries.append(model_id)
+            return model_id == AMP and tries.count(AMP) == 1
+
+        self.device.refuse = refuse_the_first_try
+        named.harvest(self.engine, path=self.path, only=[AMP])
+        self.assertEqual(tries.count(AMP), 2)
+        self.assertTrue(self.record()["models"][str(AMP)]["available"])
+
+    def test_a_unit_that_does_not_say_whether_there_are_unsaved_edits_is_left_alone(self):
+        # Regression: with a session open, "did not say" was taken for "no edits" here and nowhere else.
+        from lab.qc.slots import Unsaved
+
+        self.engine.open()
+        self.device.player_selects(MY_PRESETS, 3)
+        with mock.patch.object(self.engine.unit, "dirty", lambda: None):
+            with self.assertRaises(Unsaved):
+                named.harvest(self.engine, path=self.path)
+        self.assertEqual(self.where, [])
 
     def test_stopping_keeps_what_was_read(self):
         self.engine.open()

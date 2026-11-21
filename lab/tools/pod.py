@@ -7,6 +7,11 @@ One that does not arrives as a description of the original chain: **Ask for
 this** sends that description to the designer, which makes a round from it
 (one call to the assistant).
 
+Selecting a preset says what became of each of its blocks: the Quad Cortex
+model that stands in, how close a match that is (same gear, same family, same
+kind) and why, which settings were set from the POD Go's values, and what was
+left out. A chain made this way is a starting point, not a copy.
+
 The backup's path is remembered in the data folder.
 """
 
@@ -20,9 +25,18 @@ from lab.tools.common import Window, button, label, listbox
 REMEMBERED = "podgo.json"
 
 
+def account(item):
+    """What a preset became, in words: the summary, why there is no chain if there is none, and each block."""
+    text = item.sound.explanation if item.confident else item.description
+    if item.problems:
+        text += "\n\nNot a chain because: " + "; ".join(item.problems[:3]) + "."
+    lines = item.lines()
+    return text + ("\n\n" + "\n".join(f"· {line}" for line in lines) if lines else "")
+
+
 class PodWindow(Window):
     TITLE = "POD Go presets"
-    SIZE = "640x600"
+    SIZE = "640x680"
 
     def build(self):
         row = tk.Frame(self.body, bg=self.body["bg"])
@@ -30,15 +44,15 @@ class PodWindow(Window):
         button(row, "Choose a backup…", self.choose).pack(side="left")
         self.where = label(row, size=9, wrap=420)
         self.where.pack(side="left", padx=10)
-        self.list = listbox(self.body, height=22)
-        self.list.pack(fill="both", expand=True, pady=(10, 6))
+        self.list = listbox(self.body, height=12)
+        self.list.pack(fill="x", pady=(10, 6))
         self.list.bind("<<ListboxSelect>>", lambda _: self.describe())
-        self.note = label(self.body, size=9, wrap=600)
-        self.note.pack(fill="x")
         actions = tk.Frame(self.body, bg=self.body["bg"])
-        actions.pack(fill="x", pady=(6, 0))
+        actions.pack(fill="x", pady=(0, 6))
         button(actions, "Put on B", self.put).pack(side="left")
         button(actions, "Ask for this", self.ask).pack(side="left", padx=6)
+        self.note = label(self.body, size=9, wrap=600)
+        self.note.pack(fill="x")
         self.items = []
         path = self.remembered()
         if path and Path(path).is_file():
@@ -64,17 +78,21 @@ class PodWindow(Window):
         from lab.gear import podgo
 
         try:
-            self.items = podgo.import_backup(path)
+            self.items = podgo.import_backup(path, instruments=self.studio.store.instruments())
         except (OSError, ValueError) as error:
-            self.say(str(error))
+            self.items = []
+            self.list.delete(0, "end")
+            self.say(f"{Path(path).name}: {error}")
             return
         self.where.configure(text=Path(path).name)
         self.list.delete(0, "end")
         for item in self.items:
-            self.list.insert("end", f"{item.slot}  {item.name}" + ("" if item.confident else "  · as a request"))
+            mark = "" if item.confident else "  · as a request" if item.pieces else "  · could not be read"
+            self.list.insert("end", f"{item.slot}  {item.name}{mark}")
         chains = sum(item.confident for item in self.items)
-        self.say(f"{len(self.items)} presets: {chains} came across as chains, {len(self.items) - chains} as "
-                 "descriptions to design from.")
+        unread = sum(not item.pieces for item in self.items)
+        self.say(f"{len(self.items)} presets: {chains} came across as chains, {len(self.items) - chains - unread} "
+                 "as descriptions to design from" + (f", {unread} could not be read." if unread else "."))
 
     def chosen(self):
         picked = self.list.curselection()
@@ -82,12 +100,8 @@ class PodWindow(Window):
 
     def describe(self):
         item = self.chosen()
-        if item is None:
-            return
-        text = item.sound.explanation if item.confident else item.description
-        if item.problems:
-            text += "\n\nNot a chain because: " + "; ".join(item.problems[:3])
-        self.note.configure(text=text[:900])
+        if item is not None:
+            self.note.configure(text=account(item)[:2400])
 
     def put(self):
         item = self.chosen()
@@ -96,12 +110,21 @@ class PodWindow(Window):
         if not item.confident:
             self.say(f"{item.name} has no chain of its own here; Ask for this designs one from it.")
             return
-        self.studio.put("b", item.sound)
-        self.say(f"{item.name} is on B.")
+        # The same preset is the same sound each time it is read: one already in History, with whatever was
+        # done to it since, is the one that goes on B.
+        try:
+            sound = self.studio.store.sound(item.sound.id)
+        except (OSError, ValueError):
+            sound = item.sound
+        self.studio.put("b", sound)
+        self.say(f"{item.name} is on B, as a starting point.")
 
     def ask(self):
         item = self.chosen()
         if item is None:
+            return
+        if not item.pieces:
+            self.say(f"{item.name} could not be read, so there is nothing to describe to the designer.")
             return
         self.studio.new_round(item.request)
         self.say(f"Designing from {item.name}. About a minute.")

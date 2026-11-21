@@ -33,7 +33,7 @@ class SongsWindowTest(unittest.TestCase):
         self.export = self.folder / "export.zip"
         with zipfile.ZipFile(self.export, "w") as archive:
             archive.writestr("Streaming_History_Audio_2026.json", json.dumps(ROWS))
-        store = SimpleNamespace(sounds=lambda: [SimpleNamespace(name="Song One lead")])
+        store = SimpleNamespace(sounds=lambda: [SimpleNamespace(name="Song One lead")], songs=lambda: [])
         self.studio = SimpleNamespace(folder=self.folder, store=store, set=lambda **_: None)
         self.desk = SimpleNamespace(root=self.root, studio=self.studio)
 
@@ -50,6 +50,12 @@ class SongsWindowTest(unittest.TestCase):
         self.assertTrue((self.folder / "personal" / "listening.json").exists())
         self.assertTrue((self.folder / "personal" / "listening.md").exists())
         songs.top.destroy()
+
+    def test_the_window_and_the_command_line_rank_an_export_the_same_way(self):
+        summary, ranked = window.songs([self.export], ["Song One lead"])
+        self.assertEqual((ranked[0]["title"], ranked[0]["preset"], ranked[0]["chosen"]), ("Song One", "Song One lead", 9))
+        self.assertEqual(summary["songs"][0]["title"], "Song One")
+        self.assertEqual(window.preset_names(self.studio.store, self.folder), ["Song One lead"])
 
 
 if __name__ == "__main__":

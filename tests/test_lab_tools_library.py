@@ -21,7 +21,8 @@ class FilterTest(unittest.TestCase):
     def test_every_word_must_be_in_the_name_the_setlist_or_the_slot(self):
         rows = [row("Vai for The Love God", "My Presets", 5), row("Clean Strat", "Gigs", 254, "/media/p4/Presets/Gigs"),
                 row("Lead Vai", "Gigs", 9, "/media/p4/Presets/Gigs")]
-        self.assertEqual(library.slot_name(rows[1]["slot"]), "32G")
+        self.assertIn("32G", library.text_of(rows[1]))          # the slot as the unit shows it (`qc.library.place`)
+        self.assertFalse(hasattr(library, "slot_name"))         # the tool's own copy of `place` is gone
         self.assertEqual([found["name"] for found in library.filtered(rows, "vai")], ["Vai for The Love God", "Lead Vai"])
         self.assertEqual([found["name"] for found in library.filtered(rows, "vai gigs")], ["Lead Vai"])
         self.assertEqual([found["name"] for found in library.filtered(rows, "32g")], ["Clean Strat"])
@@ -76,6 +77,28 @@ class OnTheUnitTest(unittest.TestCase):
             engine.close()
             self.assertEqual(unit.position()["position"], 7)
             self.assertEqual(unit.name(), "Wanted after")
+
+    def test_a_preset_the_player_is_editing_is_not_recalled_over(self):
+        # Regression: "Leave it on the unit" recalled the chosen preset whatever the unit held, losing unsaved edits.
+        from lab.qc.engine import Engine
+        from lab.qc.sim import SimAudio, SimUnit
+        from lab.qc.slots import Unsaved, Slots
+        from lab.qc.unit import Unit
+
+        with TemporaryDirectory() as folder:
+            device = SimUnit()
+            device.save_slot(MY_PRESETS, 5, "Being edited", [(PLEXI, {}), (V30, {})])
+            device.save_slot(MY_PRESETS, 7, "Wanted after", [(PLEXI, {})])
+            device.recall(MY_PRESETS, 5)
+            unit = Unit(device, settle=.05, sleep=lambda seconds: None)
+            engine = Engine(unit, Slots(unit, Path(folder)), SimAudio(device))
+            engine.open()
+            device.player_selects(MY_PRESETS, 5)        # the player goes back to it on the unit, and turns a knob
+            device.dirty = True
+            with self.assertRaises(Unsaved):
+                library.leave(engine, {"folder_key": MY_PRESETS, "position": 7, "is_factory": False})
+            self.assertEqual(unit.position()["position"], 5)
+            self.assertTrue(device.dirty)
 
 
 if __name__ == "__main__":

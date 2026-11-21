@@ -156,9 +156,24 @@ def guitar_notes(name):
 
 # ---- What the unit can run ----
 
-CPU = (91., 87.96)       # each of the two processors a pair of rows runs on, found by filling them
+CPU = (91., 87.96)       # each of the two processors a pair of rows runs on, found by filling them (CorOS 4.1.1)
 MEMORY = 85.             # delay memory, one pool for the pair
 PER_CORE = ("cpu", "dm", "pm", "dmda", "pmda")
+
+
+def limits():
+    """What a pair of rows can carry: the processing each of its two processors holds, and the delay memory
+    they share. The costs table's `core` decides when it says (`processors`, a pair; `memory`); otherwise the
+    figures found by filling the unit stand. The unit's own `core.cpu` is not used for this: it reports one
+    figure for both processors, and filling them showed the second holds less."""
+    core = table("costs").get("core", {})
+    found = core.get("processors")
+    if not (isinstance(found, (list, tuple)) and len(found) == 2
+            and all(isinstance(each, (int, float)) and not isinstance(each, bool) and each > 0 for each in found)):
+        found = CPU
+    memory = core.get("memory")
+    return tuple(float(each) for each in found), float(memory) if isinstance(memory, (int, float)) and memory > 0 \
+        else MEMORY
 
 
 def cost(model_id):
@@ -173,17 +188,18 @@ def cost(model_id):
 
 @dataclass(frozen=True)
 class Load:
+    """What `weigh` worked out. `fits` is the app's estimate from the costs table, not the unit's word: the unit
+    decides when the chain is built."""
     fits: bool
-    percent: int
-    memory: int
-    refused: int | None = None
-    unknown: tuple = ()      # models with no known cost, which were not counted
+    refused: int | None = None      # the first model there was no room for
+    unknown: tuple = ()             # models with no known cost, which were not counted
 
 
 def weigh(model_ids):
     """Whether blocks fit one pair of rows: shared out largest first between two processors, as the unit must."""
     core = table("costs").get("core", {})
-    limits = [{**{key: core.get(key, float("inf")) for key in PER_CORE}, "cpu": cpu} for cpu in CPU]
+    processors, pool = limits()
+    caps = [{**{key: core.get(key, float("inf")) for key in PER_CORE}, "cpu": cpu} for cpu in processors]
     used = [dict.fromkeys(PER_CORE, 0.), dict.fromkeys(PER_CORE, 0.)]
     costs = [(model_id, cost(model_id)) for model_id in model_ids if model_id]
     unknown = tuple(model_id for model_id, found in costs if found is None)
@@ -191,17 +207,16 @@ def weigh(model_ids):
     memory = sum(found.get("memory", 0.) for _, found in costs)
     refused = None
     for model_id, found in sorted(costs, key=lambda item: -item[1].get("cpu", 0.)):
-        room = [side for side, limit in sorted(zip(used, limits), key=lambda pair: pair[0]["cpu"])
+        room = [side for side, limit in sorted(zip(used, caps), key=lambda pair: pair[0]["cpu"])
                 if all(side[key] + found.get(key, 0.) <= limit[key] for key in PER_CORE)]
         if not room:
             refused = refused or model_id
             continue
         for key in PER_CORE:
             room[0][key] += found.get(key, 0.)
-    if memory > MEMORY and refused is None:
+    if memory > pool and refused is None:
         refused = max(costs, key=lambda item: item[1].get("memory", 0.))[0]
-    total = sum(found.get("cpu", 0.) for _, found in costs)
-    return Load(refused is None, round(100 * total / sum(CPU)), round(100 * memory / MEMORY), refused, unknown)
+    return Load(refused is None, refused, unknown)
 
 
 @lru_cache(maxsize=1)
@@ -236,23 +251,34 @@ def named_settings(model_id):
 
 # ---- What was measured ----
 
-BREAKUP = ((17., "clean"), (14., "edge of breakup"), (12., "crunch"), (10.5, "overdriven"), (0., "saturated"))
+# The word of the distortion scale a crest factor (peak over average, dB) suggests. An inference: compression
+# lowers the crest factor as clipping does, so the word is a reading of the figure, not a measured distortion.
+CREST_WORDS = ((17., "clean"), (14., "edge of breakup"), (12., "crunch"), (10.5, "overdriven"), (0., "saturated"))
+GAIN_CONTROLS = ("GAIN", "INPUT GAIN", "GAIN 1", "GAIN NORMAL", "DRIVE", "VOLUME", "VOLUME BRIGHT", "VOLUME NORMAL")
 
 
-def drive_curve(model_id):
-    """How distorted an amp measured at three settings of its gain, as "GAIN 2 clean, 5 crunch, 8 saturated"."""
+def crest_word(crest):
+    """The distortion word a crest factor in dB suggests (see `CREST_WORDS`)."""
+    return next((word for floor, word in CREST_WORDS if crest >= floor), CREST_WORDS[-1][1])
+
+
+def crest_by_gain(model_id):
+    """The crest factor an amp's output measured at three settings of its gain, each with the distortion word
+    that figure suggests, as "GAIN 2: 18 dB (suggests clean), 5: 13 dB (suggests crunch), 8: 10 dB (suggests
+    saturated)". None for an amp that was not measured. What was measured is the crest factor; the word is
+    inferred from it."""
     amp = table("controls").get("amps", {}).get(str(model_id))
     info = catalog.model(model_id)
     if not amp or not info:
         return None
-    for name in ("GAIN", "INPUT GAIN", "GAIN 1", "GAIN NORMAL", "DRIVE", "VOLUME", "VOLUME BRIGHT", "VOLUME NORMAL"):
+    for name in GAIN_CONTROLS:
         knob = amp.get("knobs", {}).get(name)
-        if not knob:
+        if not knob or not info.named(name):
             continue
         param = info.named(name)[0]
         step = ((param.high or 10) - (param.low or 0)) / 10
         start, default = amp["default"]["crest"], param.default or 0
-        words = []
+        said = []
         for side in ("low", None, "high"):
             if side is None:
                 moved, crest = 0., start
@@ -261,9 +287,9 @@ def drive_curve(model_id):
                 crest = None if knob[side].get("silent") else start + moved * knob[side]["crest"]
             else:
                 continue
-            word = "silent" if crest is None else next(w for floor, w in BREAKUP if crest >= floor)
-            words.append(f"{default + moved * step:g} {word}")
-        return f"{name} " + ", ".join(words)
+            said.append(f"{default + moved * step:g}: " + ("silent" if crest is None else
+                                                          f"{crest:.0f} dB (suggests {crest_word(crest)})"))
+        return f"{name} " + ", ".join(said)
     return None
 
 

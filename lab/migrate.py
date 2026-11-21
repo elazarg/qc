@@ -27,6 +27,10 @@ What the old app (`tone_lab`) left under `tone_sessions/`, and what becomes of i
 Every new record's id is made from the old one, so running this twice adds
 nothing. Anything that cannot be read is skipped and counted, with the reason.
 Nothing under `tone_sessions/` is changed.
+
+A run that got to its end leaves a note in the data folder (`migrated.json`),
+and `done` reads it: the first start brings the history in, and a start after
+that only if the note is not there, which is when the run failed.
 """
 
 from datetime import datetime, timezone
@@ -38,10 +42,12 @@ import shutil
 
 from lab.sound import catalog
 from lab import knowledge
+from lab.qc.library import SCENES as SCENE_LETTERS
 from lab.sound.chain import Block, Chain, Row, SCENES
 from lab.sound.sounds import Sound, Store
 
 OLD = Path(__file__).resolve().parents[1] / "tone_sessions"
+DONE = "migrated.json"
 MULTI_OUT = 19
 ROLES = ("Gate", "Compressor", "Drive", "Amp", "Cab", "Equalizer", "Modulation", "Delay", "Reverb")
 SETLISTS = "/media/p4/Presets/"
@@ -179,7 +185,7 @@ def _slot_from_label(label):
     if not found:
         return None
     setlist, bank, letter = found.groups()
-    return {"folder_key": SETLISTS + setlist, "position": (int(bank) - 1) * 8 + "ABCDEFGH".index(letter),
+    return {"folder_key": SETLISTS + setlist, "position": (int(bank) - 1) * 8 + SCENE_LETTERS.index(letter),
             "is_factory": False}
 
 
@@ -238,7 +244,7 @@ def apply_round(found, sounds):
         if isinstance(candidate.get("shape"), dict):
             sound.knobs = {key: value for key, value in candidate["shape"].items() if isinstance(value, (int, float))}
         marks = [MARKS.get(str(tag).casefold(), str(tag).casefold()) for tag in candidate.get("user_tags") or []]
-        if marks and hasattr(sound, "marks"):
+        if marks:
             sound.marks = list(dict.fromkeys(marks))
         if candidate.get("review"):
             sound.notes = [{"at": record["created"], "text": str(candidate["review"])}]
@@ -354,7 +360,7 @@ def migrate(folder, old=OLD, *, dry_run=False):
         except Unreadable as error:
             skip(f"draft {path.stem}", str(error))
             continue
-        except (OSError, ValueError, KeyError, TypeError) as error:
+        except (OSError, ValueError, KeyError, TypeError, AttributeError) as error:
             skip(f"draft {path.stem}", f"it could not be read ({type(error).__name__}: {error})")
             continue
         drafts[str(draft["id"])] = sound
@@ -484,7 +490,15 @@ def migrate(folder, old=OLD, *, dry_run=False):
 
     report["left"]["comparison sessions (recordings and measurements, no chain)"] = sum(
         1 for path in old.glob("2*-*") if (path / "session.json").is_file())
+    if not dry_run and not done(folder):
+        folder.mkdir(parents=True, exist_ok=True)
+        _write_json(folder / DONE, {"at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "from": str(old)})
     return report
+
+
+def done(folder):
+    """Whether the earlier app's history has been brought into this data folder: a run got to its end."""
+    return (Path(folder) / DONE).is_file()
 
 
 def _existing(folder):
@@ -515,10 +529,12 @@ def _when(text):
 
 
 def summary(report):
-    """The report in a few plain lines."""
-    lines = [f"{report['sounds']['designed']} designs and {report['sounds']['preset']} presets as sounds, "
-             f"{report['rounds']} rounds, {report['phrases']['known']} recordings with their pickup setting and "
-             f"{report['phrases']['unknown']} without."]
+    """The report in a few plain lines. The first says what was brought in, and is empty when nothing was: there
+    is nothing to tell a player who never had the earlier app, or whose history is already here."""
+    brought = (sum(report["sounds"].values()), report["rounds"], sum(report["phrases"].values()))
+    lines = [f"From the earlier app: {report['sounds']['designed']} designs and {report['sounds']['preset']} presets "
+             f"as sounds, {report['rounds']} rounds, {report['phrases']['known']} recordings with their pickup "
+             f"setting and {report['phrases']['unknown']} without." if any(brought) else ""]
     already = report["already"]
     if any(already.values()):
         lines.append(f"Already there: {already['sounds']} sounds, {already['rounds']} rounds, "
@@ -537,4 +553,5 @@ if __name__ == "__main__":
 
     dry = "--dry-run" in sys.argv
     for line in summary(migrate(knowledge.home(), dry_run=dry)):
-        print(line)
+        if line:
+            print(line)

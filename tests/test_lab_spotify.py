@@ -84,6 +84,33 @@ class Listening(unittest.TestCase):
         with self.assertRaises(ValueError):
             spotify.history([wrong])
 
+    def test_a_play_time_that_is_not_a_number_is_left_out_and_one_written_as_text_is_read(self):
+        # C5: the two readers disagreed; lab.player.listening.plays raised ValueError on "a minute".
+        odd = self.root / "Streaming_History_Audio_odd.json"
+        odd.write_text(json.dumps([extended("A", "Words", "a minute"), extended("A", "Text", "61000"),
+                                   extended("A", "Float", 61000.0), extended("A", "Nothing", None),
+                                   extended("A", "Flag", True), "not an entry"]), encoding="utf-8")
+        self.assertEqual(spotify.history([odd]), [("A", "Text", 61000), ("A", "Float", 61000)])
+
+    def test_an_export_is_read_one_file_at_a_time(self):
+        # C5: every file's text was read before any was parsed: the whole export in memory at once.
+        (self.root / "Streaming_History_Audio_2025_0.json").write_text("{", encoding="utf-8")   # broken, and last
+        reading = spotify.entries([self.root])
+        first = next(reading)                       # the earlier files are already giving entries
+        self.assertEqual(first["master_metadata_album_artist_name"], "Dire Straits")
+        with self.assertRaises(ValueError):
+            list(reading)
+
+    def test_version_marks_are_whole_words(self):
+        folded = {"Black Dog - 2012 Remaster": "black dog", "Time - 2011 Remastered Version": "time",
+                  "Sultans of Swing - Live At Hammersmith": "sultans of swing", "Layla - Acoustic": "layla",
+                  "Layla (Acoustic)": "layla", "Angie - 2009 Mix": "angie", "Money (Mono)": "money"}
+        kept = {"Hey Joe - Deliver Me": "hey joe deliver me", "Little Wing (Olive Branch)": "little wing olive branch",
+                "Song (Demolition)": "song demolition", "Money (That's What I Want)": "money that s what i want",
+                "One - Unmixed": "one unmixed"}
+        for title, key in {**folded, **kept}.items():
+            self.assertEqual(spotify.song_key(title), key, title)
+
 
 if __name__ == "__main__":
     unittest.main()

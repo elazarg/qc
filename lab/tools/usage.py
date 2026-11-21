@@ -1,7 +1,7 @@
 """Usage and feedback: which tools are opened, what the assistant cost each day, and the player's notes.
 
 - **Usage** is a local log of tool windows opened and closed (`ui-usage.jsonl` in the data folder), as the
-  old desk kept for its panels, with `companions` counting what was open together.
+  old desk kept for its panels.
 - **The assistant's ledger** (`ledger.jsonl`, written by `lab.sound.assistant`) is read back day by day: how many
   calls, whose (the player's or the app's own), of which kind, how long they took, how much was sent, how
   they ended, against the daily allowance.
@@ -61,16 +61,6 @@ def opens(folder):
     return Counter(row.get("view") for row in _rows(Path(folder) / LOG) if row.get("event") == "open")
 
 
-def companions(folder):
-    """How often each set of views was open together, by situation, from rows that name what was open."""
-    counts = Counter()
-    for row in _rows(Path(folder) / LOG):
-        if row.get("event") in ("open", "pin") and len(row.get("open", ())) > 1:
-            situation = "reference" if row.get("has_reference") else "live" if row.get("live") else "idle"
-            counts[(situation, tuple(sorted(row["open"])))] += 1
-    return counts
-
-
 # ---- the assistant's ledger ----
 
 def daily(folder, *, days=14, today=None):
@@ -119,17 +109,14 @@ def today_line(folder, today=None):
 
 def situation(studio):
     """What is on the desk, as a note about it should remember it."""
-    state = getattr(studio, "state", None)
-    found = {}
+    state, found = studio.state, {}
     for side in ("a", "b"):
-        sound = studio.sound(side) if state is not None else None
+        sound = studio.sound(side)
         if sound is not None:
             found[side] = {"id": sound.id, "name": sound.name, "digest": sound.chain.digest(),
                            "knobs": dict(sound.knobs)}
-    phrase = getattr(studio, "phrase", None)
-    return {"sounds": found, "phrase": phrase[0] if phrase else None,
-            "round": getattr(state, "round", None), "song": getattr(state, "song", None),
-            "instrument": getattr(state, "instrument", None)}
+    return {"sounds": found, "phrase": studio.phrase[0] if studio.phrase else None,
+            "round": state.round, "song": state.song, "instrument": state.instrument}
 
 
 def save_feedback(folder, text, about=None):
@@ -153,16 +140,6 @@ def feedback_notes(folder):
         except (OSError, ValueError):
             continue
     return found
-
-
-# ---- the unit's share ----
-
-def unit_state(engine, *, stop=None):
-    """What the app keeps on the unit: firmware, whether the round trip is measured, chains in the cache."""
-    from lab.qc.slots import CACHE_SLOTS
-
-    return {"firmware": engine.unit.firmware, "calibrated": engine.offset is not None,
-            "cached": len(engine.slots.index()), "cache_slots": len(CACHE_SLOTS)}
 
 
 # ---- the window ----
@@ -218,7 +195,7 @@ class UsageWindow(Window):
                                      f"{'measured' if state['calibrated'] else 'not measured yet'} · "
                                      f"{state['cached']} of {state['cache_slots']} cache slots hold built chains")
 
-        self.call("lab.tools.usage.unit_state", done=shown, working="Asking the Quad Cortex…")
+        self.call("lab.tools.probe.unit_state", done=shown, working="Asking the Quad Cortex…")
 
     def keep(self):
         try:

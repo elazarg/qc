@@ -14,19 +14,22 @@ A fourth kind was added on 2026-11-19: **measured on the unit**, by replaying on
 
 | What | File |
 | --- | --- |
-| Gear knowledge the app loads: 45 amp families covering all 129 amps, 46 drives, 87 cabs, 135 effects, microphones, 15 recipes, the two guitars | `tone_lab/knowledge/gear.json` |
-| Lookups over it, the tone vocabulary and its remedies | `tone_lab/lore.py` |
-| The catalog as the app reads it, including the cab layout and plugin ownership | `tone_lab/models.py` |
-| The unit's own named settings, read and served | `tone_lab/device_presets.py`, data in `tone_sessions/device-presets.json` |
-| Control roles behind the Shape knobs | `tone_lab/styles.py` (`ROLES`, `KNOBS`) |
-| Silent measurement harness | `tone_lab/probe.py`, `research/measure_controls.py` |
-| What each model costs in processing and delay memory, and whether a chain fits | `tone_lab/budget.py`, data in `tone_lab/knowledge/costs.json` (`python -m tone_lab.budget` rereads it from the unit) |
-| What every amp control was measured to do, and which models invert the signal | `tone_lab/measured.py`, data in `tone_lab/knowledge/controls.json` and `polarity.json` |
+| Gear knowledge the app loads: 45 amp families covering all 129 amps, 46 drives, 87 cabs, 135 effects, microphones, 15 recipes, the two guitars | `lab/tables/gear.json` |
+| Lookups over it | `lab/knowledge.py` (`gear`, `guitar_notes`) |
+| The tone vocabulary and its remedies | `lab/sound/words.py` |
+| The catalog as the app reads it, including the cab layout and plugin ownership | `lab/sound/catalog.py` |
+| The unit's own named settings, read and served | `lab/tools/named.py` (`python -m lab named-settings`), served by `lab/knowledge.py`; data in `device-presets.json` in the data folder |
+| Control roles behind the Shape knobs | `lab/sound/knobs.py` (`ROLES`, `KNOBS`) |
+| Silent measurement | `lab/hearing/listen.py`, `lab/hearing/probe.py`, `lab/hearing/measure.py`; `research/measure_controls.py` |
+| What each model costs in processing and delay memory, and whether a chain fits | `lab/knowledge.py` (`cost`, `weigh`), data in `lab/tables/costs.json` (`python -m lab budget` rereads it from the unit) |
+| What every amp control was measured to do, and which models invert the signal | `lab/knowledge.py`, data in `lab/tables/controls.json` and `polarity.json` |
 | The sweeps behind those tables | `research/measure_amps.py`, `research/analyse_amps.py`, `research/measure_polarity.py`, report in `research/amp-controls-report.md` |
-| What a built draft sounds like, measured before anyone hears it | `tone_lab/hearing.py` (`python -m tone_lab.hearing <draft id>`) |
-| Scenes and a second path in a draft | `tone_lab/preset_design.py` (`layout`, `FORM`), `tone_lab/draft_render.py` (`Chain`, `build_grid`) |
+| What a built sound does to a phrase, measured before anyone hears it | `lab/hearing/measure.py` (`heard`), run by the engine's `hear` |
+| Scenes and a second path in a design | `lab/sound/design.py`, `lab/sound/chain.py` |
 | Raw research with a source per claim | `research/*.json`, `research/qc-internals.md` |
 | Rebuild the knowledge file from the research | `python research/build_knowledge.py` |
+
+The research scripts under `research/` that drive the unit still run on the earlier app's modules (`tone_lab/`).
 
 `gear.json` is generated. Edit the research files or the build script, then rebuild. The build checks every model id, parameter name and setting against the catalog and reports what it drops (currently nothing).
 
@@ -36,7 +39,7 @@ A fourth kind was added on 2026-11-19: **measured on the unit**, by replaying on
 
 The bundled catalog gives a stock cab only its two microphone selectors. Presets archived from the unit show every stock cab stored in the layout of the Default Cabsim: two microphones, each with bypass, selector, level, pan, distance and position, then the block's high-pass, low-pass and output. Five different cabs in 23 archived presets all have this shape, and the harvest read it back for the mono guitar cabs it loaded. The stereo layout is taken from the same catalog and has not been seen in an archived preset.
 
-Consequences, all fixed in `tone_lab/models.py` and its users:
+Consequences, all fixed in the catalog module (`lab/sound/catalog.py`) and its users:
 
 - Tone Lab could not move a cab microphone or a cab filter. Every draft played through the default pair (Dynamic 57 and Ribbon 160) at position 4.0, distance 0, with the cab's filters wide open.
 - The **Low cut** and **Soft top** knobs matched no parameter on a stock cab. They now move one filter per row: the one doing the work (the lowest low-pass or the highest high-pass), whether it sits on the cab or on an equalizer.
@@ -45,7 +48,7 @@ Consequences, all fixed in `tone_lab/models.py` and its users:
 
 ### 2,374 named settings from Neural DSP
 
-The unit holds named settings for each model ("device presets"). The index is one read. The values come back only when a setting is loaded onto a block, so `python -m tone_lab.device_presets` loads each one in the working slot with USB-only routing, reads it back, and restores the preset that was selected. It makes no sound and takes about half an hour. It resumes if interrupted.
+The unit holds named settings for each model ("device presets"). The index is one read. The values come back only when a setting is loaded onto a block, so `python -m lab named-settings` loads each one in the working slot with USB-only routing, reads it back, and restores the preset that was selected. It makes no sound and takes about half an hour. It resumes if interrupted.
 
 It recorded 450 models (amps, drives, cabs, equalizers, compressors, gates, delays, reverbs, modulation, wah, filter, pitch) and 2,374 settings, 1,932 of them named beyond the default. The names are in players' own words, which makes this the manufacturer's statement of what those words mean on each model:
 
@@ -129,7 +132,7 @@ Amp controls, on the US Rectifier at gain 5 into a V30 cab (defaults: Master 3, 
 
 ### What one sound can carry
 
-The unit answers `ModuleStats` with the cost of every model: processor share, four kinds of memory, delay memory and latency. `tone_lab/knowledge/costs.json` holds it for 411 models. What the unit does with those numbers is not documented, so it was found by filling the grid until blocks were refused (2026-11-19, 17 cases):
+The unit answers `ModuleStats` with the cost of every model: processor share, four kinds of memory, delay memory and latency. `lab/tables/costs.json` holds it for 411 models. What the unit does with those numbers is not documented, so it was found by filling the grid until blocks were refused (2026-11-19, 17 cases):
 
 - Rows 1 and 2 of the grid share two processors. A block runs whole on one of them. The two took 91.0% and 88.0% before refusing more.
 - One kind of memory (`pmda`) holds 8,192 per processor. Two amps the size of a Rectifier cannot share a processor, so a third such amp is refused whatever the processor share says.
@@ -202,7 +205,7 @@ What changed:
 
 - Drive at full right now takes every gain control to its top, on a square-law taper so that small turns stay small (`styles._drive_delta`). On this draft it measures 2.7 dB loud to quiet.
 - Drive takes back, at the amp's clean Output, the level the amp's gain was measured to add (`styles._hold_level`). Without it, full right on this draft was 10.5 dB louder, because a clean amp's gain is mostly volume. With it, 3.2 dB.
-- Each amp's card now carries `measured_drive`: how distorted the amp was at three settings of its gain, in words, from the sweep (`measured.drive_curve`). For the Hiwatt: "GAIN 2 clean, 5 clean, 8 clean". For a Rectifier: "GAIN 2 clean, 5 saturated, 8 saturated".
+- Each amp's card carries `crest_by_gain`: the crest factor measured at three settings of its gain, with the word that crest factor suggests marked as an inference (`knowledge.crest_by_gain`), for example "GAIN 2: 20 dB (suggests clean)". Crest factor is a measure of compression, not of distortion; the distortion measured directly is in `research/measurements/distortion-ladder.md`.
 - The designer is told to decide how distorted the sound is and make the chain reach it, to run a fuzz at or near maximum, and to keep a lead bright enough to cut. "Less gain than seems needed" now applies to rhythm parts.
 
 Also measured: the Facial Fuzz's undocumented `PICKUP LEVEL` behaves like the guitar's volume (at 5 the sustain gap opened from 1.8 to 4.9 dB), and its `PICKUP` switch changed almost nothing. With the fuzz at 0 the Hiwatt at Gain 10 and Master 8 did saturate (2.4 dB), driven by the pedal's output.

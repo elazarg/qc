@@ -9,26 +9,23 @@ Carried over from the old Sound check card (`soundcheck_ui`) and its stage previ
 - **The Quad Cortex.** Firmware, whether the USB round trip is measured, the Tone Lab setlist and the cache.
 - **Stage EQ.** The selected sound, played silently, as it stands and with two small output EQ moves for
   the place it will be heard (a full-range speaker or PA, a guitar cabinet, a band mix): a low cut and a
-  gentler top. The three are level-matched and played blind on the computer, as listening tests. Nothing is
+  gentler top. The three are level-matched and played blind on the computer, as listening tests: a blind
+  comparison like any other (`workbench.comparison`), kept with the others under `comparisons/`. Nothing is
   written to the sound or the unit; a move that wins belongs in the output or Global EQ, as the notes say.
 
-The relative levels of sounds, which this card also planned on the old desk, are in the Levels tool.
+The relative levels of a song's parts, which this card also planned on the old desk, are in the Levels tool.
+Every level here is measured the one way the app measures (`hearing.measure`).
 """
 
-from datetime import datetime, timezone
-import json
-import random
 import tkinter as tk
-from uuid import uuid4
 
 import numpy as np
 from scipy import signal
 
 from lab.hearing.audio import RATE, db
-from lab.hearing.measure import match, measure as measure_audio
-from lab.tools.common import (Window, button, gained, heard_chain, label, menu_choice, phrase, play, render, section,
-                     write_pcm16)
-from lab.tools.levels import measure
+from lab.hearing.measure import measure
+from lab.tools.common import Window, button, heard_chain, label, menu_choice, phrase, play, render, section
+from lab.tools.workbench import auditions, comparison
 
 CONTEXTS = {
     "frfr": {"name": "Full-range speaker or PA", "high_pass_hz": 65, "shelf_hz": 4200, "shelf_db": -2.0},
@@ -83,7 +80,7 @@ def stage_variants(wet, context="frfr"):
     if wet.ndim == 1:
         wet = wet[:, None]
     found = measure(wet)
-    if found["lufs"] is None or found["near_rail_samples"]:
+    if found.lufs is None or found.clipped:
         raise ValueError("Start with an audible, unclipped wet sound.")
     spec = CONTEXTS[context]
     cut = signal.butter(2, spec["high_pass_hz"], fs=RATE, btype="highpass", output="sos")
@@ -97,55 +94,45 @@ def stage_variants(wet, context="frfr"):
         ({"name": "Gentler top", "post_eq": [{"type": "high_shelf", "frequency_hz": spec["shelf_hz"],
                                               "gain_db": spec["shelf_db"]}], "post_eq_trim_db": high_trim}, high),
     ]
-    if any(measure(audio)["lufs"] is None for _, audio in variants):
+    if any(measure(audio).lufs is None for _, audio in variants):
         raise ValueError("The filtered versions are too quiet. Use a phrase with guitar across all of it.")
     return variants
 
 
-def level_matched(variants, *, ceiling_db=-3.):
-    """Each variant's audio trimmed to one loudness, with the trims noted on its record."""
-    measured = [measure_audio(audio) for _, audio in variants]
-    trims = match(measured, ceiling_db=ceiling_db)
-    return [({**record, "audition_trim_db": round(trim, 2), "metrics": {"lufs": found.lufs, "rms_dbfs": found.rms_db}},
-             gained(audio, trim)) for (record, audio), found, trim in zip(variants, measured, trims)]
-
-
-def blind(variants, seed=None):
-    """Variants under the letters A, B, C… in a shuffled order: {letter: (record, audio)}."""
-    order = list(range(len(variants)))
-    random.Random(seed).shuffle(order)
-    return {"ABCDEFGH"[place]: variants[index] for place, index in enumerate(order)}
-
-
-def keep_preview(folder, sound_name, context, auditions):
-    """Write a stage preview's level-matched audio and what each letter was, under the data folder."""
-    stamp = datetime.now(timezone.utc)
-    target = folder / "soundcheck" / f"{stamp:%Y%m%d-%H%M%S}-{uuid4().hex[:6]}"
-    target.mkdir(parents=True)
-    record = {"created": stamp.isoformat(timespec="seconds"), "sound": sound_name, "context": context,
-              "context_spec": CONTEXTS[context], "notes": NOTES, "sources": SOURCES, "auditions": {}}
-    for letter, (info, audio) in auditions.items():
-        write_pcm16(target / f"audition-{letter}.wav", audio)
-        record["auditions"][letter] = {**info, "file": f"audition-{letter}.wav"}
-    (target / "preview.json").write_text(json.dumps(record, indent=1), encoding="utf-8")
-    return target
+def stage_comparison(folder, wet, context, *, sound=None, phrase_name=None, seed=None):
+    """The three stage versions of a wet sound as a blind comparison, kept with the others: (folder, record)."""
+    variants = stage_variants(wet, context)
+    return comparison(folder, [record for record, _ in variants], [audio for _, audio in variants], sound=sound,
+                      phrase_name=phrase_name, kind="Stage EQ", seed=seed,
+                      about={"context": context, "context_spec": CONTEXTS[context], "notes": NOTES,
+                             "sources": SOURCES})
 
 
 # ---- the take check (from level_plan.take_report) ----
 
+def mono_fold_down_db(samples):
+    """How much a stereo sound loses when its two channels are added to one, in dB; None for mono or silence."""
+    samples = np.asarray(samples, dtype=np.float64)
+    if samples.ndim != 2 or samples.shape[1] != 2:
+        return None
+    stereo = float(np.sqrt(np.mean(np.square(samples))))
+    mono = float(np.sqrt(np.mean(np.square(samples.mean(axis=1)))))
+    return db(mono / stereo) if stereo > 1e-10 else None
+
+
 def take_report(dry, wet=None):
-    """Levels of a dry take and, if there is one, of its return through a sound."""
-    readings = {"dry": measure(dry)}
+    """Levels of a dry take and, if there is one, of its return through a sound: `hearing.measure` records."""
+    readings = {"dry": measure(dry).to_record()}
     if wet is not None:
-        readings["wet"] = measure(wet)
-    checks = [f"The {kind} signal reached or approached full scale. Lower this gain stage and check again."
-              for kind, found in readings.items() if found["near_rail_samples"]]
+        readings["wet"] = {**measure(wet).to_record(), "mono_fold_down_db": mono_fold_down_db(wet)}
+    checks = [f"The {kind} signal reached full scale. Lower this gain stage and check again."
+              for kind, found in readings.items() if found["clipped"]]
     checks += [f"The {kind} signal is too quiet for a loudness reading. Check the routing."
                for kind, found in readings.items() if found["lufs"] is None]
-    if readings["dry"]["sample_peak_dbfs"] > HEADROOM_DB and not readings["dry"]["near_rail_samples"]:
+    if readings["dry"]["peak_db"] > HEADROOM_DB and not readings["dry"]["clipped"]:
         checks.append(f"The dry peak is within {-HEADROOM_DB:.0f} dB of full scale. A harder attack may clip "
                       "the input; lower the input gain on the unit.")
-    return {**readings, "checks": checks, "headroom_db": round(-readings["dry"]["sample_peak_dbfs"], 1)}
+    return {**readings, "checks": checks, "headroom_db": round(-readings["dry"]["peak_db"], 1)}
 
 
 # ---- operations, run where the unit is held ----
@@ -161,22 +148,6 @@ def check(engine, chain=None, dry=None, seconds=6., *, stop=None):
     return take_report(dry, wet)
 
 
-def unit_check(engine, *, stop=None):
-    """What the app can say about the unit without changing anything."""
-    from lab.qc.slots import CACHE_SLOTS
-
-    found = {"firmware": engine.unit.firmware, "calibrated": engine.offset is not None,
-             "cached": len(engine.slots.index()), "cache_slots": len(CACHE_SLOTS)}
-    try:
-        engine.slots.refresh()
-        found["tone_lab"] = True
-    except RuntimeError as error:
-        found["tone_lab"], found["problem"] = False, str(error)
-    position = engine.unit.position()
-    found["selected"] = {"position": position, "ours": engine.slots.ours(position)}
-    return found
-
-
 def stage_render(engine, chain, dry, *, stop=None):
     return render(engine, chain, dry, tail=.5, stop=stop)
 
@@ -188,7 +159,7 @@ class SoundCheckWindow(Window):
     SIZE = "620x660"
 
     def build(self):
-        self.auditions = {}
+        self.auditions, self.record = {}, None
         take = section(self.body, "Input and output levels",
                        "Play your hardest after pressing Check. The dry input is measured as it reaches the unit, "
                        "then played silently through the selected sound.")
@@ -229,18 +200,18 @@ class SoundCheckWindow(Window):
                 self.say("Record or choose a phrase on the desk first.")
                 return
             dry = taken[1]
-        self.call("lab.tools.soundcheck.check", chain, dry, 6., done=self.show_take,
+        self.call("lab.tools.soundcheck.check", chain, dry, 6., done=self.show_take, renders=True,
                   working="Recording 6 s: play your hardest now…" if record else "Measuring the phrase…")
 
     def show_take(self, report):
         dry = report["dry"]
-        lines = [f"Dry peak {dry['sample_peak_dbfs']:.1f} dBFS, {report['headroom_db']:.1f} dB of headroom, "
-                 f"{dry['near_rail_samples']} samples at full scale"]
+        lines = [f"Dry peak {dry['peak_db']:.1f} dBFS, {report['headroom_db']:.1f} dB of headroom, "
+                 f"{dry['clipped']} samples at full scale"]
         wet = report.get("wet")
         if wet:
             loud = f"{wet['lufs']:.1f} LUFS" if wet["lufs"] is not None else "too quiet to read"
             mono = wet.get("mono_fold_down_db")
-            lines.append(f"Through the sound: {loud}, {wet['true_peak_dbtp_estimate']:.1f} dBTP estimated"
+            lines.append(f"Through the sound: {loud}, true peak {wet['true_peak_db']:.1f} dB"
                          + (f", mono fold-down {mono:+.1f} dB" if mono is not None else ""))
         lines += report["checks"]
         self.take_text.configure(text="\n".join(lines))
@@ -249,10 +220,10 @@ class SoundCheckWindow(Window):
         def shown(found):
             lines = [f"CorOS {found['firmware']} · round trip {'measured' if found['calibrated'] else 'not measured'}"
                      f" · {found['cached']} of {found['cache_slots']} cache slots in use",
-                     "The Tone Lab setlist is there." if found["tone_lab"] else found.get("problem", "")]
+                     "The Tone Lab setlist is there." if found["tone_lab"] else (found["problem"] or "")]
             self.unit_text.configure(text="\n".join(lines))
 
-        self.call("lab.tools.soundcheck.unit_check", done=shown, working="Asking the Quad Cortex…")
+        self.call("lab.tools.probe.unit_state", done=shown, working="Asking the Quad Cortex…")
 
     def stage(self):
         sound = self.selected()
@@ -264,11 +235,11 @@ class SoundCheckWindow(Window):
 
         def rendered(wet):
             try:
-                self.auditions = blind(level_matched(stage_variants(wet, context)))
+                target, self.record = stage_comparison(self.folder, wet, context, sound=sound, phrase_name=taken[0])
             except ValueError as error:
                 self.say(str(error))
                 return
-            keep_preview(self.folder, sound.name, context, self.auditions)
+            self.auditions = auditions(target, self.record)
             for child in self.players.winfo_children():
                 child.destroy()
             for letter in self.auditions:
@@ -279,18 +250,18 @@ class SoundCheckWindow(Window):
                                            "EQ changes, in a blind order.")
 
         self.call("lab.tools.soundcheck.stage_render", heard_chain(sound), taken[1], done=rendered,
-                  working="Playing the phrase silently through the sound…")
+                  working="Playing the phrase silently through the sound…", renders=True)
 
     def play(self, letter):
         try:
-            play(self.auditions[letter][1], self.folder / "previews")
+            play(self.auditions[letter], self.folder / "previews")
             self.say(f"Playing {letter}")
         except (RuntimeError, ImportError) as error:
             self.say(str(error))
 
     def reveal(self):
-        self.stage_text.configure(text="  ·  ".join(f"{letter}: {info['name']}"
-                                                    for letter, (info, _) in self.auditions.items())
+        self.stage_text.configure(text="  ·  ".join(f"{letter}: {row['name']}"
+                                                    for letter, row in self.record["auditions"].items())
                                   + "\n" + NOTES[0])
 
 

@@ -114,14 +114,77 @@ class RemedyOrderTest(unittest.TestCase):
         self.assertIn("Headphones", words.read("more sustain").tip)
 
 
-class BriefTest(unittest.TestCase):
-    def test_the_assistant_is_briefed_on_the_chain_and_the_words(self):
-        found = words.brief([4, 1011, 16005], "it gets muddy and harsh")
-        self.assertEqual([block["model"] for block in found["loaded_gear"]], ["Rodent Drive", "UK C30 TopBoost"])
-        self.assertIn("INVERTED", found["loaded_gear"][1]["controls"]["TONE CUT"])
-        self.assertEqual([remark["word"] for remark in found["remarks"]], ["harsh", "muddy"])
-        self.assertTrue(found["remarks"][0]["players_try_in_order"][0].startswith("less presence"))
-        self.assertEqual(words.brief([16005], "hello"), {})
+class DegreeTest(unittest.TestCase):
+    """How much, before a plain word, says how the sound is; before a comparative, or after "make it", how much
+    is wanted."""
+
+    def test_a_degree_before_a_plain_word_describes_a_fault_when_the_word_can_be_one(self):
+        for text, name, move in (("really dark", "Dark", {"brightness": .45}),
+                                 ("very bright", "Bright", {"brightness": -.45}),
+                                 ("a bit bright", "Bright", {"brightness": -.15}),
+                                 ("so dark", "Dark", {"brightness": .3}),
+                                 ("kind of dark", "Dark", {"brightness": .3}),
+                                 ("it's really harsh", "Harsh", {"presence": -.45}),
+                                 ("very clean", "Clean", {"drive": .45}),
+                                 ("slightly tight", "Tight", {"tightness": -.15})):
+            self.assertEqual(said(text), (name, move), text)
+        # A word with no cure cannot be a fault: it is asked for.
+        self.assertEqual(said("really airy"), ("Airier", {"brightness": .6, "presence": .3}))
+
+    def test_a_degree_before_a_comparative_or_after_make_it_scales_a_wish(self):
+        for text, name, move in (("much darker", "Darker", {"brightness": -.59}),
+                                 ("a bit brighter", "Brighter", {"brightness": .15}),
+                                 ("make it really bright", "Brighter", {"brightness": .45}),
+                                 ("make it very clean", "Cleaner", {"drive": -.45}),
+                                 ("I want it really tight", "Tighter", {"tightness": .45}),
+                                 ("make it a bit dark", "Darker", {"brightness": -.17})):
+            self.assertEqual(said(text), (name, move), text)
+
+
+class TurnedOverTest(unittest.TestCase):
+    def test_every_knob_has_its_words_down_and_up(self):
+        self.assertEqual(set(words.TURNS), set(knobs.KNOBS))
+        self.assertTrue(all(len(pair) == 2 and all(pair) for pair in words.TURNS.values()))
+
+    def test_a_remedy_made_by_turning_another_over_says_what_it_does(self):
+        for text, moves, say in (("too smooth", {"bloom": -.3, "texture": .2}, "less bloom and a rougher top"),
+                                 ("too chunky", {"tightness": -.25, "drive": -.15}, "fuller lows and less gain"),
+                                 ("too dynamic", {"drive": .2}, "more gain"),
+                                 ("more fizzy", {"texture": .4}, "a rougher top"),
+                                 ("too airy", {"brightness": -.4, "presence": -.2}, "a darker top and less presence"),
+                                 ("more noisy", {"gate": -.3}, "a lower gate threshold")):
+            remedy = words.read(text).remedies[0]
+            self.assertEqual((remedy.moves, remedy.say), (moves, say), text)
+        # Whatever the word, a remedy turned over is said in the words of its own moves.
+        for word, entry in words.LEXICON.items():
+            for text, missing in ((f"too {word}", not entry.away), (f"more {word}", not entry.toward)):
+                if missing:
+                    remedy = words.read(text).remedies[0]
+                    self.assertEqual(remedy.say, words.saying(remedy.moves), text)
+                    self.assertNotIn("opposite", remedy.say)
+
+
+class OneTableTest(unittest.TestCase):
+    def test_what_read_reads_direction_leaves_alone(self):
+        forms = ("more {}", "less {}", "too much {}", "not enough {}", "a bit more {}", "way too much {}")
+        for quantity in words.QUANTITIES:
+            for form in forms:
+                text = form.format(quantity)
+                self.assertIsNone(words.read(text), text)             # no word of the lexicon is also a quantity
+                self.assertIsNotNone(words.direction(text), text)
+        for word in words.ALIASES:
+            for form in ("{}", "too {}", "more {}", "less {}", "not {} enough", "too much {}"):
+                text = form.format(word)
+                if words.read(text) is not None:
+                    self.assertIsNone(words.direction(text), text)
+
+    def test_words_the_second_table_alone_knew_are_read_here(self):
+        self.assertEqual(said("narrower"), ("Narrower", {"width": -.3}))
+        self.assertEqual(said("too distorted"), ("Dirty", {"drive": -.3}))
+        self.assertEqual(said("heavier"), ("Fatter", {"body": .3}))     # one reading, the lexicon's
+        self.assertEqual(said("more attack"), ("More bite", {"punch": .3}))
+        self.assertEqual(words.direction("way too much gain"), {"drive": -.6})
+        self.assertEqual(words.direction("more warmth"), {"texture": -.3})
 
 
 if __name__ == "__main__":

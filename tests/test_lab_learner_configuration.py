@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 
 from lab.hearing import audio
-from lab.learner import configuration
+from lab.learner import configuration, profiles
 
 
 def clip(pickup, tone, volume, *, wiring="Series", frequency=110, pick=1):
@@ -29,11 +29,11 @@ class GuitarConfigurationTest(unittest.TestCase):
                     for index, (pickup, wiring, tone, volume) in enumerate(
                         (p, w, t, v) for p in (1, 5) for w in ("Series", "Parallel")
                         for t, v in ((2, 2), (2, 10), (10, 2), (10, 10), (6, 6)))]
-        profile = configuration.calibrate("Charvel", examples)
+        profile = configuration.fit("Charvel", examples)
         held_out = clip(5, 6.8, 7.2, wiring="Parallel", pick=1.04)
         with TemporaryDirectory() as folder:
-            path = configuration.save_profile(Path(folder) / "profile.json", profile)
-            restored = configuration.load_profile(path)
+            path = profiles.save(Path(folder) / "profile.json", profile)
+            restored = profiles.load(path)
         estimate = configuration.estimate(restored, held_out, source_id="held-out")
         self.assertEqual(estimate["pickup"], 5, estimate)
         self.assertEqual(estimate["wiring"], "Parallel", estimate)
@@ -43,28 +43,28 @@ class GuitarConfigurationTest(unittest.TestCase):
             self.assertLessEqual(knob["low"], actual)
             self.assertGreaterEqual(knob["high"], actual)
             self.assertLessEqual(abs(knob["value"] - actual), 1.5)
-        with self.assertRaisesRegex(ValueError, "used for calibration"):
+        with self.assertRaisesRegex(ValueError, "used to teach"):
             configuration.estimate(restored, held_out, source_id="capture-0")
 
     def test_does_not_guess_a_pickup_or_disentangle_controls_moved_together(self):
         examples = [{"pickup": pickup, "tone": setting, "volume": setting, "wav": clip(1, setting, setting)}
                     for pickup in (1, 5) for setting in (2, 6, 10)]
-        profile = configuration.calibrate("Charvel", examples)
+        profile = configuration.fit("Charvel", examples)
         estimate = configuration.estimate(profile, clip(1, 6, 6))
         for key in ("pickup", "tone", "volume"):
             self.assertIsNone(estimate[key], estimate)
-        self.assertEqual(estimate["confidence"], "uncertain")
+        self.assertEqual(estimate["match"], "none")
 
     def test_abstains_on_silence_and_frets_missing_from_training(self):
-        profile = configuration.calibrate("Charvel", [
+        profile = configuration.fit("Charvel", [
             {"pickup": pickup, "tone": 7, "volume": 10, "wav": clip(pickup, 7, 10)} for pickup in (1, 5)])
         for samples in (np.zeros(audio.RATE), clip(1, 7, 10, frequency=246.94)):
             result = configuration.estimate(profile, samples)
             self.assertIsNone(result["pickup"], result)
-            self.assertEqual(result["confidence"], "uncertain")
+            self.assertEqual(result["match"], "none")
 
     def test_does_not_separate_pickup_and_wiring_if_always_changed_together(self):
-        profile = configuration.calibrate("Charvel", [
+        profile = configuration.fit("Charvel", [
             {"pickup": pickup, "wiring": wiring, "tone": 6, "volume": 6,
              "wav": clip(pickup, 6, 6, wiring=wiring)} for pickup, wiring in ((1, "Series"), (5, "Parallel"))])
         result = configuration.estimate(profile, clip(5, 6, 6, wiring="Parallel"))
@@ -72,7 +72,7 @@ class GuitarConfigurationTest(unittest.TestCase):
         self.assertIsNone(result["wiring"], result)
 
     def test_does_not_confuse_different_tone_settings_for_pickup_evidence(self):
-        profile = configuration.calibrate("Charvel", [
+        profile = configuration.fit("Charvel", [
             {"pickup": pickup, "tone": tone, "volume": 6, "wav": clip(1, tone, 6)}
             for pickup, tone in ((1, 2), (5, 10))])
         result = configuration.estimate(profile, clip(1, 10, 6))
@@ -86,7 +86,7 @@ class GuitarConfigurationTest(unittest.TestCase):
             return np.concatenate(notes)
 
         frequencies = (110, 146.83, 164.81, 196)
-        profile = configuration.calibrate("Charvel", [
+        profile = configuration.fit("Charvel", [
             {"pickup": pickup, "tone": 6, "volume": 6, "wiring": wiring,
              "wav": phrase(pickup, wiring, notes)}
             for pickup, wiring, notes in ((1, "Parallel", frequencies), (5, "Parallel", frequencies),
@@ -99,7 +99,7 @@ class GuitarConfigurationTest(unittest.TestCase):
         self.assertEqual(result["nearest"]["wiring"], "Parallel", result)
 
     def test_abstains_when_settings_change_during_the_check(self):
-        profile = configuration.calibrate("Charvel", [
+        profile = configuration.fit("Charvel", [
             {"pickup": pickup, "tone": 6, "volume": 6, "wav": clip(pickup, 6, 6)} for pickup in (1, 5)])
         result = configuration.estimate(profile, np.concatenate([clip(1, 6, 6), clip(5, 6, 6)]))
         self.assertIsNone(result["pickup"], result)
@@ -112,7 +112,7 @@ class GuitarConfigurationTest(unittest.TestCase):
                      "neck_tone": 7, "bridge_tone": 7}
             return {"configuration": {"pickup": pickup, **knobs}, "wav": clip(pickup if pickup == 1 else 5, 7, volume)}
 
-        profile = configuration.calibrate("Les Paul", [row(pickup, volume, other)
+        profile = configuration.fit("Les Paul", [row(pickup, volume, other)
                                           for pickup in (1, 3) for volume, other in ((2, 7), (6, 2), (10, 6))])
         estimate = configuration.estimate(profile, clip(5, 7, 7.2))
         self.assertEqual(estimate["pickup"], 3, estimate)

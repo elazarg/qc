@@ -30,6 +30,10 @@ class PadPanelTest(unittest.TestCase):
         except tk.TclError as error:
             self.skipTest(f"No display: {error}")
         self.root.withdraw()
+        import gc
+
+        self.addCleanup(gc.collect)
+        self.addCleanup(lambda: setattr(self, "root", None))
         self.addCleanup(self.root.destroy)
 
     def panel(self, available, knobs):
@@ -37,7 +41,7 @@ class PadPanelTest(unittest.TestCase):
         sound = SimpleNamespace(knobs=knobs)
         studio = SimpleNamespace(state=SimpleNamespace(side="b"), sound=lambda side: sound,
                                  available=lambda: available, turn=turned.append,
-                                 undo=lambda: None, base=lambda: None)
+                                 undo=lambda: None, base=lambda: None, hearing_base=set())
         desk = Desk.__new__(Desk)
         desk.studio, desk.tray = studio, tk.Frame(self.root, bg=DARK)
         desk.panel_shape()
@@ -93,6 +97,9 @@ class SessionDeskTest(unittest.TestCase):
         (home / "session.json").write_text(json.dumps({"side": "a", "phrase": {"id": "take1", "start": 4800,
                                                                                  "end": 52800},
                                                        "desk": {"panel": "Chain"}}), encoding="utf-8")
+        import gc
+
+        self.addCleanup(gc.collect)             # the window is freed on this thread once the test has let go of it
         root = tk.Tk()
         host = Host(home / "unit", simulated=True, local=True)
         host.ready.result(10)
@@ -128,8 +135,10 @@ class QuietDeskTest(unittest.TestCase):
         self.desk = Desk(self.root, self.studio)
         import gc
 
-        # Tk variables of the windows opened are freed here, on this thread, not later on another one.
+        # The window and its Tk variables are freed here, on this thread, not later on another one: the test lets
+        # go of the desk first, so that the collection that follows finds it.
         self.addCleanup(gc.collect)
+        self.addCleanup(lambda: [setattr(self, name, None) for name in ("desk", "root", "studio")])
         self.addCleanup(self.root.destroy)
         self.addCleanup(self.studio.close)
 

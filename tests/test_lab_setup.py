@@ -118,21 +118,95 @@ class HomeTest(unittest.TestCase):
             found = setup.checks(folder, packages=lambda: setup.finding("packages", True, "ok"),
                                  audio=lambda: setup.finding("audio", False, "Connect it."),
                                  assistant=lambda: setup.finding("assistant", True, "ok"))
-        self.assertEqual([item["check"] for item in found], ["packages", "audio", "assistant", "home"])
+        self.assertEqual([item["check"] for item in found], ["packages", "tables", "audio", "assistant", "home"])
         for item in found:
             self.assertEqual(set(item), {"check", "ok", "say"})
 
+    def test_a_missing_table_is_said_with_how_to_restore_it(self):
+        from lab import knowledge
+
+        self.assertTrue(setup.check_tables()["ok"])
+        with TemporaryDirectory() as folder, patch.object(knowledge, "SHARED", Path(folder)):
+            found = setup.check_tables()
+        self.assertEqual((found["check"], found["ok"]), ("tables", False))
+        self.assertIn("gear.json", found["say"])
+        self.assertIn("git checkout", found["say"])
+
+    def test_the_shortcut_s_package_is_listed_and_checked(self):
+        # Regression: `python -m lab shortcut` needs pywin32, which no list named and no check looked for.
+        self.assertIn(("pywin32", "pythoncom"), setup.requirements())
+        loaded = []
+        setup.check_packages(load=loaded.append)
+        self.assertIn("pythoncom", loaded)
+
 
 class FirstRunTest(unittest.TestCase):
-    def test_needed_until_every_check_has_passed(self):
+    def checking(self, made, ok=False):
+        """`setup.checks` replaced by checks that count how often they are made."""
+        def one(name):
+            def check():
+                made.append(name)
+                return setup.finding(name, ok, f"{name} is missing.")
+            return check
+        real = setup.checks
+        return patch.object(setup, "checks", lambda home, again=False: real(
+            home, again=again, packages=one("packages"), tables=one("tables"), audio=one("audio"),
+            assistant=one("assistant")))
+
+    def test_the_checks_are_made_once_and_their_outcome_recorded(self):
+        # Regression: every start repeated the checks (seconds, before the window) until all of them passed.
+        from lab import migrate
+
+        with TemporaryDirectory() as folder, patch.object(migrate, "OLD", Path(folder) / "none"), \
+                patch.object(migrate.migrate, "__defaults__", (Path(folder) / "none",)):
+            home, made = Path(folder) / "home", []
+            with self.checking(made):
+                self.assertTrue(setup.first_run_needed(home))
+                said = setup.first_run(home)
+                self.assertIn("audio is missing.", said)
+                self.assertEqual(made, ["packages", "tables", "audio", "assistant"])
+                self.assertFalse(setup.first_run_needed(home))          # although a check failed
+                self.assertEqual(setup.first_run(home), "")
+                self.assertEqual(len(made), 4)
+                self.assertEqual([item["check"] for item in setup.checks(home)][:2], ["packages", "tables"])
+                self.assertEqual(len(made), 4)                          # what was recorded, not checked again
+                setup.checks(home, again=True)                          # as `doctor` asks
+                self.assertEqual(len(made), 8)
+            noted = json.loads((home / setup.MARKER).read_text(encoding="utf-8"))
+            self.assertEqual((noted["passed"], noted["findings"][0]["check"]), (False, "packages"))
+
+    def test_nothing_is_said_about_an_earlier_app_there_never_was(self):
+        # Regression: a first start with no earlier history said "0 designs and 0 presets as sounds, 0 rounds…".
+        from lab import migrate
+
+        with TemporaryDirectory() as folder, patch.object(migrate, "OLD", Path(folder) / "none"), \
+                patch.object(migrate.migrate, "__defaults__", (Path(folder) / "none",)):
+            with self.checking([], ok=True):
+                self.assertEqual(setup.first_run(Path(folder) / "home"), "")
+            self.assertEqual(migrate.summary(migrate.migrate(Path(folder) / "other"))[0], "")
+
+    def test_bringing_the_history_in_is_tried_again_after_it_failed_and_the_checks_are_not(self):
+        # Regression: a failure was never retried once the checks had passed; and until they had, both were.
+        from lab import migrate
+
         with TemporaryDirectory() as folder:
-            self.assertTrue(setup.first_run_needed(folder))
-            self.assertFalse(setup.record(folder, [setup.finding("audio", False, "Connect it.")]))
-            self.assertTrue(setup.first_run_needed(folder))
-            self.assertTrue(setup.record(folder, [setup.finding("audio", True, "Connected.")]))
-            self.assertFalse(setup.first_run_needed(folder))
-            noted = json.loads((Path(folder) / setup.MARKER).read_text(encoding="utf-8"))
-            self.assertEqual(noted["findings"][0]["check"], "audio")
+            home, made, runs = Path(folder) / "home", [], []
+            real = migrate.migrate
+
+            def failing(home_, *args, **options):
+                runs.append(home_)
+                if len(runs) == 1:
+                    raise OSError("the disk was busy")
+                return real(home_, Path(folder) / "none")
+
+            with self.checking(made, ok=True), patch.object(migrate, "migrate", failing):
+                self.assertIn("tried again at the next start", setup.first_run(home))
+                self.assertTrue(setup.first_run_needed(home))
+                self.assertEqual(setup.first_run(home), "")
+                self.assertEqual((len(runs), len(made)), (2, 4))
+                self.assertFalse(setup.first_run_needed(home))
+                setup.first_run(home)
+                self.assertEqual(len(runs), 2)
 
     def test_a_damaged_note_means_a_first_run(self):
         with TemporaryDirectory() as folder:
@@ -197,7 +271,7 @@ class MoveTest(unittest.TestCase):
 
 
 class LauncherTest(unittest.TestCase):
-    """desktop_launcher/start.pyw opens the old desk unless told to open the new one."""
+    """desktop_launcher/start.pyw opens the new desk unless told to open the earlier one."""
 
     def setUp(self):
         import runpy
@@ -243,7 +317,8 @@ class LauncherTest(unittest.TestCase):
 
         main = self.launcher["main"]
         opened = Mock()
-        with patch.dict(main.__globals__, {"write_log": Mock(return_value=None), "open_new_desk": opened}), \
+        with patch.dict(main.__globals__, {"write_log": Mock(return_value=None), "open_new_desk": opened,
+                                           "take_identity": Mock()}), \
                 patch("sys.path", list(__import__("sys").path)):
             self.assertEqual(main(["--new", "--simulated"]), 0)
         opened.assert_called_once_with(["--new", "--simulated"])

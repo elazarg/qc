@@ -6,8 +6,15 @@ learner's live listening (`live.run`, the default) or gesture listening
 
 `run` is called on a thread of the desk's side. It starts
 `python -m lab.learner.worker <config.json>`, sends it the window's commands
-(a new profile, a request to keep a clip, stop) as JSON lines, and passes the
-events it prints back to `report` until it finishes.
+(a new profile, a request to keep a clip, arming gestures again, stop) as JSON
+lines, and passes the events it prints back to `report` until it finishes.
+
+The settings say everything the process needs: which USB channel is the dry
+guitar (the desk asked the engine; the process never opens the unit), where
+the learner keeps its data, and where faults are written.
+
+Recording a take is the one thing that opens the audio driver inside the
+desk's own process (`lab.learner.takes`, on the seat's thread).
 """
 
 import faulthandler
@@ -28,7 +35,7 @@ from lab.learner.folders import LOG
 START_TIMEOUT = 18.0
 HEARTBEAT_TIMEOUT = 6.0
 STOP_TIMEOUT = 6.0
-COMMANDS = ("learner-profile", "learner-snapshot")
+COMMANDS = ("learner-profile", "learner-snapshot", "guitar-arm")
 
 
 def worker_command():
@@ -42,7 +49,8 @@ def run(config, stop, commands, report):
     """Listen live with `config` until `stop` is set. Returns what the worker reports when it finishes."""
     with TemporaryDirectory(prefix="tone-learner-") as folder:
         path = Path(folder) / "session.json"
-        path.write_text(json.dumps(config, ensure_ascii=True), encoding="utf-8")
+        settings = {**config, "folder": str(folders.root()), "log": folders.log_path()}
+        path.write_text(json.dumps(settings, ensure_ascii=True), encoding="utf-8")
         return supervise(worker_command() + [str(path)], stop, commands, report)
 
 
@@ -162,6 +170,14 @@ def main(arguments):
     if len(arguments) != 1:
         emit({"event": "error", "text": "Give the live listening settings."})
         return 2
+    try:
+        config = json.loads(Path(arguments[0]).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        emit({"event": "error", "text": f"The live listening settings could not be read: {error}"})
+        return 2
+    if config.get("folder"):
+        folders.use(config["folder"])
+    folders.log_to(config.get("log"))
     log = folders.crash_log()
     log.parent.mkdir(parents=True, exist_ok=True)
     with log.open("a", encoding="utf-8") as crash_log:
@@ -177,7 +193,6 @@ def main(arguments):
                     faulthandler.dump_traceback_later(4.5, file=crash_log)
                 emit(event)
 
-            config = json.loads(Path(arguments[0]).read_text(encoding="utf-8"))
             if config.get("mode") == "gestures":
                 from lab.learner import gestures
 

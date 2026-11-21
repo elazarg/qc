@@ -6,12 +6,17 @@ missing, what to do about it. Nothing here touches the Quad Cortex beyond
 asking Windows which audio devices exist; no stream is opened.
 
 - `packages`: every package in requirements.txt imports.
+- `tables`: the tables of gear knowledge that ship with the app are there.
 - `audio`: the audio driver lists the Quad Cortex.
 - `assistant`: the `codex` program is found, and signed in.
 - `home`: the data folder can be written.
 
-`first_run_needed(home)` says whether these have not yet all passed on this
-computer; `record(home, findings)` notes that they have.
+The checks run once for a data folder, at the first start (`first_run`), and
+what they found is recorded there; `python -m lab doctor` runs them again
+whenever asked. A start does not repeat them: they take seconds, and a unit
+that is switched off says so itself when the desk opens. The first run also
+brings the earlier app's history in (`migrate`); if that fails it is tried
+again at the next start, and the checks are not.
 
 `move_old_home` copies what an earlier version kept inside the program
 folder into the data folder in the user's profile, once, and leaves a note
@@ -33,6 +38,8 @@ REQUIREMENTS = REPO / "requirements.txt"
 MARKER = "setup.json"
 MOVED_NOTE = "MOVED.txt"
 DEVICE_NAMES = ("quad cortex", "neuraldsp usb audio", "neural dsp")
+# The module that shows a package is installed, where it is not the package's own name.
+IMPORT_NAMES = {"pywin32": "pythoncom"}
 INSTALL_CODEX = ("Install Codex: either the Codex app from the Microsoft Store, or in a terminal "
                  "`npm install -g @openai/codex` (needs Node.js). Then run `codex login` once and sign in "
                  "with your ChatGPT account.")
@@ -57,7 +64,7 @@ def requirements(path=REQUIREMENTS):
             continue
         name = re.split(r"[<>=!~;@\s\[]", line, maxsplit=1)[0].strip()
         if name:
-            found.append((name, name.replace("-", "_").lower()))
+            found.append((name, IMPORT_NAMES.get(name.lower(), name.replace("-", "_").lower())))
     return found
 
 
@@ -84,6 +91,20 @@ def _import(module):
     if module == "sounddevice":
         os.environ.setdefault("SD_ENABLE_ASIO", "1")    # must be set before the first import, or ASIO is not listed
     importlib.import_module(module)
+
+
+# ---- The tables that ship with the app ----
+
+def check_tables():
+    """The tables of gear knowledge are in the program folder and can be read. Without one nothing is designed."""
+    from lab import knowledge
+
+    missing = knowledge.missing()
+    if missing:
+        return finding("tables", False, f"The app's tables are missing or cannot be read: {', '.join(missing)} in "
+                                        f"{knowledge.SHARED}. Restore them from the repository "
+                                        "(`git checkout -- lab/tables`).")
+    return finding("tables", True, f"The app's {len(knowledge.SHIPPED)} tables of gear knowledge are in place.")
 
 
 # ---- Audio ----
@@ -166,22 +187,63 @@ def check_home(home):
 
 # ---- All of them ----
 
-def checks(home, *, packages=None, audio=None, assistant=None):
-    """Every check, in the order a player would fix them. The keyword arguments replace a check (for tests)."""
-    return [(packages or check_packages)(), (audio or check_audio)(), (assistant or check_codex)(), check_home(home)]
+def checks(home, *, again=False, packages=None, tables=None, audio=None, assistant=None):
+    """What the checks find, in the order a player would fix them.
+
+    They are made once for a data folder: when their outcome is recorded there, that is what is returned,
+    unless `again` asks for them to be made now (as `doctor` does). The other keyword arguments replace a
+    check (for tests).
+    """
+    if not again:
+        found = recorded(home)
+        if found is not None:
+            return found
+    return [(packages or check_packages)(), (tables or check_tables)(), (audio or check_audio)(),
+            (assistant or check_codex)(), check_home(home)]
 
 
-def first_run_needed(home):
-    """Whether the checks have not yet all passed on this computer for this data folder."""
+def recorded(home):
+    """The findings recorded for this data folder, or None when the checks have not been made for it."""
     try:
         record_ = json.loads((Path(home) / MARKER).read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return True
-    return not (isinstance(record_, dict) and record_.get("passed"))
+        return None
+    found = record_.get("findings") if isinstance(record_, dict) else None
+    return found if isinstance(found, list) else None
+
+
+def first_run_needed(home):
+    """Whether something of the first run is still to do for this data folder: the checks have never been made,
+    or the earlier app's history has not been brought in (it is tried again until it has)."""
+    from lab import migrate
+
+    return recorded(home) is None or not migrate.done(home)
+
+
+def first_run(home):
+    """What the first start does, once: check what the app needs and record it, and bring the earlier app's
+    history in. Returns what to say about it, "" when there is nothing to say.
+
+    A later start does only what is still to do: nothing, or bringing the history in again if that failed.
+    """
+    from lab import migrate
+
+    said = []
+    if recorded(home) is None:
+        findings = checks(home, again=True)
+        record(home, findings)
+        said += [item["say"] for item in findings if not item["ok"]]
+    if not migrate.done(home):
+        try:
+            said.append(migrate.summary(migrate.migrate(home))[0])
+        except Exception as error:  # noqa: BLE001  whatever went wrong, the app opens; it is tried again
+            said.append(f"The earlier app's history could not be brought in ({error}). It is tried again at the "
+                        "next start.")
+    return " ".join(text for text in said if text)
 
 
 def record(home, findings):
-    """Note the outcome of the checks. The first run is over once every check has passed."""
+    """Note the outcome of the checks for this data folder. Returns whether every one passed."""
     passed = all(item["ok"] for item in findings)
     path = Path(home) / MARKER
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -65,7 +65,6 @@ class UsageAndFeedbackTest(unittest.TestCase):
             usage.record(folder, "close", "Levels")
             usage.record(folder, "open", "Library", open=["Library", "Levels"], live=True)
             self.assertEqual(usage.opens(folder), {"Levels": 2, "Library": 1})
-            self.assertEqual(usage.companions(folder), {("live", ("Levels", "Library")): 1})
 
     def test_a_note_is_kept_with_what_was_on_the_desk(self):
         a, b = Sound("Clean", chain(PLEXI, V30), {"kind": "designed"}), Sound("Lead", chain(PLEXI), {})
@@ -87,12 +86,17 @@ class OnTheUnitTest(unittest.TestCase):
         with TemporaryDirectory() as folder:
             unit = host(folder)
             try:
-                state = unit.call("lab.tools.usage.unit_state").result(10)
+                state = unit.call("lab.tools.probe.unit_state").result(10)
             finally:
                 unit.close()
         self.assertEqual(state["firmware"], "4.1.1")
         self.assertEqual(state["cached"], 0)
         self.assertEqual(state["cache_slots"], 32)
+        # The one answer about the unit, for this window, the sound check and `doctor --unit`.
+        self.assertEqual((state["tone_lab"], state["problem"], state["calibrated"]), (True, None, False))
+        self.assertEqual(state["preset"], "Brit 2203")
+        self.assertIsInstance(state["dry_channel"], int)
+        self.assertFalse(hasattr(usage, "unit_state"))
 
 
 if __name__ == "__main__":

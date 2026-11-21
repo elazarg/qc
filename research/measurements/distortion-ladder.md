@@ -90,3 +90,44 @@ lead), which is the research's texture axis (docs/TONE_RESEARCH.md, findings 2 a
 
 Attack times on the same ladder were unreliable on driven sounds (a sustaining amp reaches its peak late, so the
 10-90 % rise reads long: 168 ms on the Duo); they are shown but not yet used for words.
+
+## How to read these tables after 21 November 2026
+
+The tables above were measured with the first layout of the test signal: the firm tone, then the softer tone
+0.2 s later, then two notes a third apart (196 and 247 Hz). `lab/hearing/probe.py` now plays the softer tone first,
+holds the firm tone 3.6 s, adds a 740 Hz tone, and plays the two notes a fourth apart (196 and 262 Hz). Nothing
+here has been measured again on the unit yet. What that means for each column:
+
+- **distortion** and the texture table: the same 196 Hz tone at the same level, analysed over the same 0.3 to
+  0.9 s of it. For the chains above (none has an echo) the figures should come out the same; this is to be
+  confirmed on the unit, not assumed.
+- **soft**: the same tone and window, but the softer tone is now played *before* the firm one. Behind a delay or
+  reverb the old order put the firm tone's repeats, harmonics and all, inside the softer tone (on synthetic
+  signals a clipper reading −34 dB alone read −23 dB behind a delay). None of the driven chains above has one, so
+  their figures should hold; an amp whose state takes longer than 0.5 s to recover from a firm tone (sag, a slow
+  compressor) may now read a little differently. To be measured again.
+- **IMD**: not comparable with new figures. The two notes are another interval, chosen so that none of the four
+  products falls on a multiple of 50 Hz (with a third, f2 − f1 was 50.9 Hz: mains hum would have been counted).
+  The −50.5 dB of *Digital Delay alone* was very likely not intermodulation: a repeat arriving while the two
+  notes sound steps their level, and on synthetic signals a clean 503 ms repeat read −45 to −58 dB. The new
+  layout measures the two notes only after the last repeat found from the click has arrived, or reports that it
+  cannot. The whole column needs measuring again.
+- **other** (decay, echo, wobble): *Room alone, decay 0.23 s* is the first layout's `decay_s`, three times the
+  fall from −5 to −25 dB of the click **with its direct sound counted in**, which reads short when the reverb is
+  quieter than the direct sound (a quarter of the true time at 20 dB under). The new `decay_rt60_s` is the decay
+  of what comes after the first 40 ms only, and `late_energy_db` says how much of that there is; the room's
+  figure needs measuring again. The wobble figures were read over half a second with a curve taken off, which
+  hid anything slower than about 3 Hz; they are now read over 3 s.
+
+New figures the ladder does not have yet, and which no word uses until it does: `cleans_up_db` (distortion minus
+soft: what follows the non-linear stage, tone stack and cab, cancels in it), `distortion_740hz_db` (a drive that
+cuts lows before it clips, as the Green 808 does, distorts a high note far more than the 196 Hz one: its −29.9 dB
+above is likely an under-reading of how distorted it sounds), and `late_energy_db`, from which the tail word now
+comes with provisional thresholds (−9, −18 and −30 dB).
+
+The borders of the distortion words are unchanged. Two cautions belong beside them: the figures are of harmonics
+as they leave the chain, so a tone stack or cab that lifts the 196 Hz tone against its harmonics lowers them (on
+a synthetic clipper, 8 dB more at 196 Hz after it lowered "distortion" by 8 dB and left `cleans_up_db` where it
+was); and the border between overdriven and saturated (−20.5 dB on the softer tone) lies inside the plateau the
+driven chains share, so the Plexi at 10 (−18.7), the Duo (−21.9) and the Solo 100 (−21.7) are told apart by one
+to three dB.

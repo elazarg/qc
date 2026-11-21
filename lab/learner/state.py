@@ -1,24 +1,31 @@
-"""Estimate a guitar control's labeled state from calibrated mono DI excerpts."""
+"""Tell one guitar control's setting from mono dry audio, after being taught examples of each setting.
+
+`fit(guitar, control, examples)` makes a profile from labelled dry excerpts recorded with the other controls
+held fixed. `estimate(profile, dry)` names the taught setting a clip is closest to, or none, with a closeness
+between 0 and 1 (a heuristic distance to what was taught, not a probability of being right). `track` does that
+window by window, at the cadence live listening uses (`WINDOW_SECONDS`, `HOP_SECONDS`), so a rehearsal on a
+recorded take sees what listening live would.
+
+What is read for each control: for pickup and tone, the shape of the harmonics of each note; for volume,
+the level of the dry signal, which picking strength and input gain change as much as the knob does.
+"""
 
 from collections import Counter, defaultdict
-import json
 import math
 import os
-from pathlib import Path
-from uuid import uuid4
 
 import numpy as np
 from scipy import signal
 
 from lab.hearing import audio
+from lab.learner.profiles import CONTROLS, HARMONICS, SCHEMA
 
-CONTROLS = ("pickup", "tone", "volume")
 MIN_SECONDS = .24
-SCHEMA = 1
+WINDOW_SECONDS = .48        # what one estimate is made from, live and in a rehearsal
+HOP_SECONDS = .14           # how often an estimate is made
 PITCH_RATE = audio.RATE // 4
 FRAME = round(.12 * audio.RATE)
 HOP = FRAME // 2
-HARMONICS = 12
 MIN_RMS = 10 ** (-70 / 20)
 WINDOW = signal.windows.hann(FRAME, sym=False)
 FFT_SIZE = 8192
@@ -100,7 +107,7 @@ def _distance(value, center, scale):
     return np.sqrt(np.mean(((value - center) / scale) ** 2, axis=-1))
 
 
-def calibrate(guitar, control, examples):
+def fit(guitar, control, examples):
     """Build one profile from labeled DI windows, recorded with other controls held fixed.
 
     Each example has label and wav keys (or an in-memory 48 kHz dry array in place
@@ -114,7 +121,7 @@ def calibrate(guitar, control, examples):
     for example in examples:
         label = example["label"].strip()
         if not label:
-            raise ValueError("Give every calibration example a state label.")
+            raise ValueError("Name the setting of every example.")
         label = labels.setdefault(label.casefold(), label)
         clip = _samples(example["wav"], example.get("start"), example.get("end"))
         if len(clip) < round(MIN_SECONDS * audio.RATE):
@@ -146,96 +153,56 @@ def calibrate(guitar, control, examples):
     return {"schema": SCHEMA, "guitar": guitar, "control": control, "labels": state_labels, "notes": notes}
 
 
-def _validate(profile):
-    try:
-        labels = profile["labels"]
-        notes = profile["notes"]
-        control = profile["control"]
-        if (profile["schema"] != SCHEMA or not isinstance(profile["guitar"], str) or not profile["guitar"].strip()
-                or control not in CONTROLS or not isinstance(labels, list) or len(labels) < 2
-                or any(not isinstance(name, str) or not name.strip() for name in labels)
-                or len(set(name.casefold() for name in labels)) != len(labels) or not isinstance(notes, dict)
-                or not notes):
-            raise ValueError
-        width = 1 if control == "volume" else HARMONICS
-        for note, record in notes.items():
-            shapes = {"centers": (len(labels), width), "scale": (width,), "radii": (len(labels),)}
-            if not isinstance(note, str) or not note.isdigit() or not 32 <= int(note) <= 95:
-                raise ValueError
-            for key, shape in shapes.items():
-                values = np.asarray(record[key], dtype=float)
-                if (values.shape != shape or not np.isfinite(values).all()
-                        or (key != "centers" and np.min(values) <= 0)):
-                    raise ValueError
-    except (AttributeError, KeyError, TypeError, ValueError) as error:
-        raise ValueError("The guitar-state calibration file is invalid or has an unsupported format.") from error
-    return profile
-
-
-def save_profile(path, profile):
-    path = Path(path)
-    _validate(profile)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
-    temporary.write_text(json.dumps(profile, indent=2, ensure_ascii=False, allow_nan=False) + "\n", encoding="utf-8")
-    temporary.replace(path)
-    return path
-
-
-def load_profile(path):
-    return _validate(json.loads(Path(path).read_text(encoding="utf-8")))
-
-
 def _estimate(profile, observations):
     labels = profile["labels"]
     votes = Counter()
-    confidence = defaultdict(list)
+    closeness = defaultdict(list)
     notes_used = set()
     matched = 0
     for note, value in observations:
-        calibration = profile["notes"].get(str(note))
-        if calibration is None:
+        taught = profile["notes"].get(str(note))
+        if taught is None:
             continue
         matched += 1
-        distances = _distance(value, np.asarray(calibration["centers"]), np.asarray(calibration["scale"]))
+        distances = _distance(value, np.asarray(taught["centers"]), np.asarray(taught["scale"]))
         closest, runner_up = np.argsort(distances)[:2]
         best, second = distances[closest], distances[runner_up]
         margin = (second - best) / max(.5, second)
-        radius = calibration["radii"][closest]
+        radius = taught["radii"][closest]
         if best > radius or margin < .25:
             continue
         label = labels[closest]
         votes[label] += 1
-        confidence[label].append(.7 * margin + .3 * max(0.0, 1 - best / radius))
+        closeness[label].append(.7 * margin + .3 * max(0.0, 1 - best / radius))
         notes_used.add(note)
-    result = {"label": None, "confidence": 0.0, "votes": {label: votes[label] for label in labels},
+    result = {"label": None, "closeness": 0.0, "votes": {label: votes[label] for label in labels},
               "notes_used": sorted(notes_used)}
     if not observations:
         return {**result, "reason": "No stable single note detected."}
     if not matched:
-        return {**result, "reason": "No detected note was in the calibration."}
+        return {**result, "reason": "No detected note is one that was taught."}
     if matched < math.ceil(len(observations) / 2):
-        return {**result, "reason": "Most of the detected notes were outside the calibration."}
+        return {**result, "reason": "Most of the detected notes are not ones that were taught."}
     accepted = sum(votes.values())
     if accepted < max(2, math.ceil(matched / 2)):
-        return {**result, "reason": "Not enough frames separated the calibrated states."}
+        return {**result, "reason": "Not enough frames separated the taught settings."}
     winner, count = votes.most_common(1)[0]
     share = count / accepted
     if share < .67:
-        return {**result, "reason": "The clip contains mixed or ambiguous states."}
-    score = float(np.median(confidence[winner])) * share
-    return {**result, "label": winner, "confidence": round(score, 3), "reason": "Matches the calibrated examples."}
+        return {**result, "reason": "The clip contains mixed or ambiguous settings."}
+    score = float(np.median(closeness[winner])) * share
+    return {**result, "label": winner, "closeness": round(score, 3), "reason": "Matches the taught examples."}
 
 
 def estimate(profile, dry, *, start=None, end=None):
-    """Estimate a single state; confidence is a heuristic, not a probability."""
+    """The taught setting the clip is closest to, with how close (0 to 1: a heuristic, not a probability)."""
     clip = _samples(dry, start, end)
     if len(clip) < round(MIN_SECONDS * audio.RATE):
         raise ValueError(f"Use at least {MIN_SECONDS:.2f} seconds of dry guitar.")
     return _estimate(profile, _observations(clip, profile["control"]))
 
 
-def track(profile, dry, *, window=.35, hop=.12):
+def track(profile, dry, *, window=WINDOW_SECONDS, hop=HOP_SECONDS):
     """Return window-end times and estimates, including abstentions during silence."""
     if (not math.isfinite(window) or not math.isfinite(hop) or window < MIN_SECONDS
             or not .02 <= hop <= window):

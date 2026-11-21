@@ -23,7 +23,9 @@ Each block's match is one of:
 - "same": the Quad Cortex model is based on the same gear;
 - "family": the same maker and model line, another version or channel;
 - "kind": no Quad Cortex model of that gear, or a Line 6 original; a block of
-  the same kind stands in (a tape delay for a tape delay, a plate for a plate);
+  the same kind stands in (a tape delay for a tape delay, a plate for a plate,
+  an overdrive for an overdrive; for a cab, the stock cab the research pairs
+  with the preset's amp);
 - "omitted": a block with no sound of its own here (volume pedal, FX loop, looper);
 - "none": nothing on the Quad Cortex will do.
 
@@ -31,10 +33,19 @@ A preset gives a chain when every amp matches as "same" or "family", nothing
 that is ever switched on is "none", and the chain fits the unit. Every preset
 also gives a description of the original in words, which is the request for
 the designer when there is no chain.
+
+A chain made this way is a starting point, and says so block by block
+(`Imported.lines`): what each block became and why, which of its values were
+set from the POD Go's, and that every other value is the Quad Cortex's own.
+
+A backup that cannot be read says which folder of it and why; a preset in a
+shape this reader does not know is listed with that as its problem, and the
+others come across.
 """
 
 from dataclasses import dataclass, field
 from functools import lru_cache
+from hashlib import sha256
 import json
 from pathlib import Path
 import re
@@ -44,10 +55,9 @@ import zlib
 from lab.sound import catalog
 from lab import knowledge
 from lab.sound.chain import Block, Chain, Row, SCENES
-from lab.sound.sounds import Sound
+from lab.sound.sounds import Sound, settings
 
 RESEARCH = Path(__file__).resolve().parents[2] / "research" / "podgo-models.json"
-DEVICE_LIST = "https://neuraldsp.com/device-list"
 INPUT, MULTI_OUT, SCENE_NAME = 1, 19, 12
 SNAPSHOT_CONTROLLER = 11          # the controller number that assigns a value to snapshots
 SNAPSHOTS = 4
@@ -90,7 +100,11 @@ KIND = {
                                                           ("", 18001)),
     "eq": (("graphic", 4002), ("cut", 4003), ("", 4001)), "gate": (("", 16003),),
     "boost": (("", 23),), "fuzz": (("big muff", 15), ("muff", 15), ("", 22)),
+    # An overdrive the Quad Cortex has no model of: a bass drive for a bass drive, the Bluesbreaker-type pedal for
+    # its descendants, a distortion for a distortion, and otherwise the plain overdrive most rigs have.
+    "drive": (("bass", 3001), ("darkglass", 3000), ("of tone", 9), ("distortion", 10), ("", 5)),
 }
+RELATION_WORDS = {"same": "same gear", "family": "same family", "kind": "same kind"}
 OMITTED = {"utility", "volume", "looper", "acoustic", "synth"}
 GENERIC = set("""amp amplifier head combo channel ch normal nrm bright brt brilliant jumped jump vibrato vib clean lead
 crunch rhythm drive overdrive od the of with and model version mod modded custom series pedal speaker speakers drivers
@@ -113,6 +127,10 @@ OVERRIDES = {
     "HD2_AmpBritTremJump": (1080, "family", "the JTM-50 is the first Marshall 50 W model 1987, which Brit Plexi 50 is"),
     "HD2_Chorus70sChorusStereo": (7025, "family", "the BOSS CE-2W has a CE-1 mode"),
     "HD2_MM4AnalogChorus": (7025, "family", "the BOSS CE-2W has a CE-1 mode"),
+    "HD2_AmpGermanUbersonic": (1131, "same", "Line 6's Ubersonic is the Überschall's high-gain channel, which is "
+                                             "Bogna Uber Lead"),
+    "HD2_AmpGermanMahadeva": (1117, "family", "the Quad Cortex has the Shiva's clean channel alone, and Line 6 does "
+                                              "not say which channel it modelled"),
 }
 MAKERS = {"mesa/boogie": "mesa", "mesa boogie": "mesa", "boogie": "mesa", "pro co": "proco", "pro-co": "proco",
           "electro-harmonix": "ehx", "electro harmonix": "ehx", "gallien-krueger": "gk", "gallien krueger": "gk",
@@ -132,13 +150,28 @@ def research():
     return json.loads(RESEARCH.read_text(encoding="utf-8"))
 
 
+def _ids(model_id):
+    """A Line 6 id and its twin: most effects exist as a mono and a stereo model under two ids, and the tables
+    here list one of the two."""
+    model_id = str(model_id)
+    yield model_id
+    for mine, other in (("Mono", "Stereo"), ("Stereo", "Mono")):
+        if model_id.endswith(mine):
+            yield model_id[:-len(mine)] + other
+
+
 def model_info(model_id):
     """What Line 6 says about one of its models: name, category, based_on, maker, certainty, sources, note."""
-    found = research()["models"].get(model_id)
-    if found:
-        return found
+    for known in _ids(model_id):
+        found = research()["models"].get(known)
+        if found:
+            return found
     return {"name": model_id, "category": None, "based_on": None, "maker": None, "certainty": "unknown",
             "sources": [], "note": "not in research/podgo-models.json"}
+
+
+def _override(model_id):
+    return next((OVERRIDES[known] for known in _ids(model_id) if known in OVERRIDES), None)
 
 
 # ---- Reading a backup ------------------------------------------------------------------------------------
@@ -151,8 +184,34 @@ class Preset:
     tone: dict
 
 
+def _folder(tag, payload, compressed, expanded):
+    """One setlist folder of a backup as (name, [Preset])."""
+    if compressed:
+        inflater = zlib.decompressobj()
+        payload = inflater.decompress(payload, expanded + 1)
+        if not inflater.eof:
+            raise ValueError("its compressed data is incomplete")
+    if len(payload) != expanded:
+        raise ValueError("its size is not the one the backup states")
+    folder = json.loads(payload)
+    name = str(folder["meta"]["name"])
+    presets = []
+    for i, item in enumerate(folder["data"]["presets"]):
+        if not item:
+            continue                                # an empty slot
+        slot = f"{i // 4 + 1:02}{'ABCD'[i % 4]}"
+        meta = item.get("meta") if isinstance(item, dict) else None
+        title = str(meta.get("name") or "").strip() if isinstance(meta, dict) else ""
+        # A preset in a shape this reader does not know is kept, and said to be unreadable when it is translated.
+        presets.append(Preset(name, slot, title or f"Preset {slot}", item.get("tone") if isinstance(item, dict) else None))
+    return name, presets
+
+
 def read_backup(path):
-    """The setlists in a POD Go backup, as {"setlists": {name: [Preset]}, "irs": [entry tags]}."""
+    """The setlists in a POD Go backup, as {"setlists": {name: [Preset]}, "irs": [entry tags]}.
+
+    A file that is not a backup, or a folder of it that cannot be read, is a `ValueError` that says which and why.
+    """
     raw = Path(path).read_bytes()
     if len(raw) < 48 or raw[:8] != b"AF6L\x01\0\0\0":
         raise ValueError("Choose a POD Go .pgb backup.")
@@ -168,18 +227,12 @@ def read_backup(path):
             irs.append(tag)
         if not re.fullmatch(r"SL\d\d", tag):       # SL00, SL01: the setlists ("SLNM" holds their names)
             continue
-        payload = raw[start:start + size]
-        if compressed:
-            inflater = zlib.decompressobj()
-            payload = inflater.decompress(payload, expanded + 1)
-            if not inflater.eof:
-                raise ValueError(f"Incomplete compressed POD Go folder {tag}.")
-        if len(payload) != expanded:
-            raise ValueError(f"Wrong POD Go folder size for {tag}.")
-        folder = json.loads(payload)
-        name = folder["meta"]["name"]
-        setlists[name] = [Preset(name, f"{i // 4 + 1:02}{'ABCD'[i % 4]}", item["meta"]["name"].strip(), item["tone"])
-                          for i, item in enumerate(folder["data"]["presets"]) if item]
+        try:
+            name, presets = _folder(tag, raw[start:start + size], compressed, expanded)
+        except (zlib.error, ValueError, KeyError, TypeError, AttributeError) as error:
+            raise ValueError(f"The folder {tag} of the POD Go backup could not be read: "
+                             f"{type(error).__name__}: {error}.") from error
+        setlists[name] = presets
     if not setlists:
         raise ValueError("No POD Go setlists found in that archive.")
     return {"setlists": setlists, "irs": irs}
@@ -253,7 +306,7 @@ def find_qc(info, *, bass=False):
     maker = _tokens(info.get("maker") or based_on.split()[0])
     wanted = _tokens(based_on) - GENERIC - maker
     channels = _channel(based_on)
-    best = None
+    best, rivals = None, []
     for model_id, section, name, real in _qc_models():
         if section not in sections or not real:
             continue
@@ -269,16 +322,22 @@ def find_qc(info, *, bass=False):
         # A model name ("jcm800") says more than a word ("twin"), which says more than a bare number ("50").
         weight = sum(3 if re.search(r"\d", w) and re.search(r"[a-z]", w) else 1 if w.isdigit() else 2 for w in shared)
         score = (weight, channel, section.startswith("Bass") == bass, -len(theirs - wanted), -model_id)
+        rivals.append((weight, name))
         if best is None or score > best[0]:
             best = (score, model_id, shared, real, name)
     if best is None:
         return None
-    _, model_id, shared, real, name = best
+    score, model_id, shared, real, name = best
     numbers = {word for word in wanted if re.search(r"\d", word)}
     relation = "same" if wanted <= shared or (numbers and numbers <= shared) else "family"
+    why = f"{based_on} -> {real}"
     if relation == "same" and channels and _channel(name) and not channels & _channel(name):
         relation = "family"                     # the same amp, another channel
-    return model_id, relation, f"{based_on} -> {real}"
+    elif (relation == "same" and category in ("amp", "preamp") and not channels
+          and any(weight == score[0] and _channel(other) != _channel(name) for weight, other in rivals)):
+        # The Quad Cortex has this gear's channels as separate models and Line 6 does not say which it modelled.
+        relation, why = "family", why + f"; Line 6 names no channel, and {name} is one of several"
+    return model_id, relation, why
 
 
 def _find_cab(info, sections, bass):
@@ -456,6 +515,8 @@ class Piece:
     qc: int | None = None
     relation: str = "none"
     why: str = ""
+    dropped: bool = False       # matched, but left out of the chain: a row holds eight blocks
+    carried: dict = field(default_factory=dict)   # the Quad Cortex settings set from the POD Go's values
 
     @property
     def ever_on(self):
@@ -532,6 +593,27 @@ class Imported:
         """The text to hand the designer: the description, as a request for a starting point."""
         return self.description
 
+    def lines(self):
+        """What became of each block of the original, one line each: its counterpart, how close a match that is
+        and why, and, when there is a chain, which of its settings were set from the POD Go's values."""
+        out = []
+        for piece in self.pieces:
+            if piece.dropped:
+                out.append(f"{piece.name}: left out, as a row holds eight blocks")
+            elif piece.qc and piece.relation in RELATION_WORDS:
+                text = f"{piece.name} → {catalog.model(piece.qc).name} ({RELATION_WORDS[piece.relation]}): {piece.why}"
+                if self.sound is not None:
+                    text += (". Set from the POD Go: " + ", ".join(f"{name} {value}" for name, value in
+                                                                   piece.carried.items())
+                             + "; the rest is the Quad Cortex's own" if piece.carried
+                             else ". Every value is the Quad Cortex's own")
+                out.append(text)
+            elif piece.relation == "omitted":
+                out.append(f"{piece.name}: left out ({piece.why})")
+            else:
+                out.append(f"{piece.name}: nothing stands in ({piece.why})")
+        return out
+
 
 def _snapshots(tone):
     """The indices of the snapshots in use (at least the first)."""
@@ -586,23 +668,51 @@ def _pair_cab(amp_id):
     return None
 
 
-def _instrument(preset, found):
-    name = preset.name.casefold()
-    if name.startswith(("bass", "bas:", "bas ")) or " bass" in name or any(
-            catalog.model(p.qc) and catalog.model(p.qc).category.startswith("Bass") for p in found if p.qc):
-        return "Bass"
-    if re.match(r"lp\b", name):
-        return "Les Paul"
-    if re.match(r"ch\b", name):
-        return "Charvel"
-    return None
+def _first_word(name):
+    found = re.match(r"[^\W\d_]+", (name or "").casefold())
+    return found.group() if found else ""
 
 
-def translate(preset):
+def for_bass(name):
+    """Whether a preset's name says it is for bass: "bass" as a word of it, or "bas" as its first word."""
+    return _first_word(name) == "bas" or bool(re.search(r"\bbass\b", (name or "").casefold()))
+
+
+def _instrument(preset, found, instruments=()):
+    """The player's instrument a preset was made for, or None.
+
+    `instruments` are the player's own ({"name", "kind"}, as the app keeps them). A preset for bass (its name
+    says so, or it uses a bass amp or cab) is for the one of the bass kind. Otherwise it is for the one
+    instrument its name opens with: the whole name, its initials or its first letters, as players prefix their
+    presets ("LP Crunch" for a Les Paul, "Strat clean" for a Stratocaster). Without instruments, only "Bass".
+    """
+    names = [(str(item["name"]), item.get("kind")) for item in instruments if item.get("name")]
+    if for_bass(preset.name) or any(
+            catalog.model(p.qc) and catalog.model(p.qc).category.startswith(("Bass", "Cabsim Bass"))
+            for p in found if p.qc):
+        return next((name for name, kind in names if kind == "bass"), "Bass")
+    first = _first_word(preset.name)
+    if len(first) < 2:
+        return None
+    matches = []
+    for name, _ in names:
+        words = name.casefold().split()
+        if first in (name.casefold(), "".join(word[0] for word in words)) or words[0].startswith(first):
+            matches.append(name)
+    return matches[0] if len(matches) == 1 else None
+
+
+def sound_id(preset, chain):
+    """The id of the sound a preset becomes: the same every time the same preset gives the same chain, so that
+    reading the backup again does not make another sound of it."""
+    return sha256(f"POD Go {preset.setlist} {preset.slot} {preset.name} {chain.digest()}".encode("utf-8")).hexdigest()[:12]
+
+
+def translate(preset, instruments=()):
     """One POD Go preset as an `Imported`."""
     found = pieces(preset)
     problems = []
-    bass = preset.name.casefold().startswith(("bass", "bas"))
+    bass = for_bass(preset.name)
     for piece in found:
         info = model_info(piece.model)
         info = {**info, "category": piece.category}
@@ -613,7 +723,7 @@ def translate(preset):
         if piece.category == "ir":
             piece.relation, piece.why = "kind", "an impulse response from the POD Go; a stock cab stands in"
             continue
-        match = OVERRIDES.get(piece.model) or find_qc(info, bass=bass)
+        match = _override(piece.model) or find_qc(info, bass=bass)
         if match:
             piece.qc, piece.relation, piece.why = match
             continue
@@ -640,6 +750,14 @@ def translate(preset):
                 piece.relation, piece.why = "none", "an impulse response, and no stock cab the research pairs with the amp"
             else:
                 piece.relation, piece.why = "none", "an impulse response with no matched amp to pair a stock cab with"
+        elif piece.category == "cab" and piece.qc is None:
+            # A cab the Quad Cortex has nothing like takes the stock cab the research pairs with the amp, as an
+            # impulse response does.
+            cab = _pair_cab(amps[0].qc) if amps else None
+            if cab:
+                piece.qc, piece.relation = cab, "kind"
+                piece.why = (f"no Quad Cortex cab like the {piece.based_on or piece.name}; {catalog.model(cab).name} "
+                             f"is the cab the research pairs with {catalog.model(amps[0].qc).name}")
 
     for piece in found:
         if piece.category in ("amp", "preamp") and piece.relation not in ("same", "family"):
@@ -656,10 +774,10 @@ def translate(preset):
         problems += more
     sound = None
     if chain is not None and not problems:
-        instrument = _instrument(preset, found)
-        sound = Sound(name=preset.name[:24] or "POD Go preset", chain=chain,
+        instrument = _instrument(preset, found, instruments)
+        sound = Sound(name=preset.name[:24] or "POD Go preset", chain=chain, id=sound_id(preset, chain),
                       origin={"kind": "imported", "from": "POD Go", "slot": preset.slot, "name": preset.name},
-                      explanation=_explain(found)[:600], tags=[t for t in ("POD Go", instrument) if t])
+                      explanation=_explain(found)[:900], tags=[t for t in ("POD Go", instrument) if t])
     return Imported(preset.setlist, preset.slot, preset.name, found, description, sound, problems)
 
 
@@ -678,10 +796,12 @@ def build(preset, found):
         idle = next((p for p in kept if not p.ever_on), None)
         drop = idle or next((p for p in reversed(kept) if p.category == "eq"), kept[-1])
         kept.remove(drop)
+        drop.dropped = True
         drop.why += "; left out, as a row holds eight blocks"
     cells = []
     for piece in kept:
         block = carry(Block(piece.qc), model_info(piece.model) | {"category": piece.category}, piece.params)
+        piece.carried = {**settings(block, every=True), **settings(block)}       # the block began with nothing stated: these came across
         if labels and len(set(piece.on)) > 1:
             block = Block(block.model, block.params, _scene_values([not flag for flag in piece.on]))
         elif not piece.ever_on:
@@ -700,12 +820,14 @@ def build(preset, found):
 
 
 def _explain(found):
-    lines = []
-    for piece in found:
-        if piece.relation in ("same", "family", "kind") and piece.qc:
-            word = {"same": "same gear", "family": "same family", "kind": "same kind"}[piece.relation]
-            lines.append(f"{piece.name} -> {catalog.model(piece.qc).name} ({word})")
-    return "From the POD Go: " + "; ".join(lines) + "."
+    """What the chain was made from, block by block, and what was left out of it."""
+    lines = [f"{piece.name} -> {catalog.model(piece.qc).name} ({RELATION_WORDS[piece.relation]})"
+             for piece in found if piece.relation in RELATION_WORDS and piece.qc and not piece.dropped]
+    text = "A starting point from the POD Go: " + "; ".join(lines) + "."
+    left = [piece.name for piece in found if piece.dropped]
+    if left:
+        text += " Left out, as a row holds eight blocks: " + ", ".join(left) + "."
+    return text + " Values are the POD Go's where the controls correspond, and the Quad Cortex's own elsewhere."
 
 
 def describe(preset, found=None):
@@ -724,9 +846,23 @@ def describe(preset, found=None):
     return text
 
 
-def import_backup(path, setlist="User"):
-    """Every preset in one setlist of a backup, as `Imported`, in slot order."""
+def import_backup(path, setlist="User", instruments=()):
+    """Every preset in one setlist of a backup, as `Imported`, in slot order. `instruments` are the player's
+    own, for saying which one a preset was made for (see `_instrument`).
+
+    A preset that cannot be translated (a shape of preset this reader does not know) is listed with that as
+    its problem, and the others come across.
+    """
     lists = read_backup(path)["setlists"]
     if setlist not in lists:
         raise ValueError(f"The backup has no setlist {setlist!r}; it has {', '.join(lists)}.")
-    return [translate(preset) for preset in lists[setlist]]
+    found = []
+    for preset in lists[setlist]:
+        try:
+            found.append(translate(preset, instruments))
+        except Exception as error:  # noqa: BLE001  whatever shape the preset has, the others are still read
+            found.append(Imported(preset.setlist, preset.slot, preset.name, [],
+                                  f'My POD Go preset "{preset.name}" ({preset.setlist} {preset.slot}).', None,
+                                  [f"{preset.setlist} {preset.slot} \"{preset.name}\" could not be read "
+                                   f"({type(error).__name__}: {error})"]))
+    return found

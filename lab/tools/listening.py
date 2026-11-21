@@ -12,6 +12,9 @@ and shown, and the designer uses it as a background for open requests.
 Everything this window works out is personal: it is kept in the data
 folder's `personal` folder, never in the project. The export's path is
 remembered there too.
+
+`songs` is the one ranking of an export's songs; `python -m lab history`
+prints it.
 """
 
 import json
@@ -35,6 +38,23 @@ def saved_analysis(folder):
         return json.loads((personal(folder) / "listening.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
+
+
+def preset_names(store, folder):
+    """The names a song may already have a sound under: the player's sounds and songs, and the presets on the unit."""
+    from lab.qc.library import cached
+
+    names = {sound.name for sound in store.sounds()} | {song["name"] for song in store.songs() if song.get("name")}
+    return sorted(names | {entry["name"] for entry in cached(folder) or []})
+
+
+def songs(paths, names=(), *, limit=40):
+    """(summary, songs) of an export: the songs chosen and come back to most, each marked with the preset or
+    sound of the player's it already has (`names`), as the window lists them."""
+    from lab.player import listening
+
+    summary = listening.summarize(listening.plays(paths), limit=limit)
+    return summary, listening.with_presets(summary["songs"], names)
 
 
 class ListeningWindow(Window):
@@ -80,25 +100,13 @@ class ListeningWindow(Window):
             (personal(self.folder) / REMEMBERED).write_text(json.dumps({"paths": list(paths)}), encoding="utf-8")
             self.load(list(paths))
 
-    def preset_names(self):
-        names = {sound.name for sound in self.studio.store.sounds()}
-        try:
-            from lab.qc.library import cached
-
-            names |= {entry["name"] for entry in cached(self.folder) or []}
-        except ImportError:
-            pass
-        return sorted(names)
-
     def load(self, paths):
-        from lab.player import listening
-
         try:
-            summary = listening.summarize(listening.plays(paths))
+            summary, ranked = songs(paths, preset_names(self.studio.store, self.folder))
         except (OSError, ValueError) as error:
             self.say(str(error))
             return
-        record = {"summary": {**summary, "songs": listening.with_presets(summary["songs"], self.preset_names())},
+        record = {"summary": {**summary, "songs": ranked},
                   "guitar_context": (saved_analysis(self.folder) or {}).get("guitar_context")}
         self.save(record)
         self.show(record)
@@ -167,7 +175,8 @@ class ListeningWindow(Window):
         song = self.chosen()
         if song is not None:
             self.studio.set(song=f"{song['artist']} - {song['title']}")
-            self.say(f"Working on {song['artist']} – {song['title']}. Its parts collect in the desk's Song panel.")
+            self.say(f"Working on {song['artist']} – {song['title']}. Sounds you keep or save for it become its "
+                     "parts; History lists them.")
 
     def make(self):
         song = self.chosen()

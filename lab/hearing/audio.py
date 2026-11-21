@@ -30,10 +30,14 @@ class Cancelled(RuntimeError):
 
 
 def read_wave(path):
+    """A WAV file as float32 samples at RATE, one column per channel: 8-bit (unsigned, centred on 128), 16-, 24-
+    and 32-bit PCM and float files, at any sample rate (resampled)."""
     rate, samples = wavfile.read(path)
     if samples.ndim == 1:
         samples = samples[:, None]
-    if np.issubdtype(samples.dtype, np.signedinteger):
+    if samples.dtype == np.uint8:
+        samples = (samples.astype(np.float32) - 128.) / 128.
+    elif np.issubdtype(samples.dtype, np.signedinteger):
         samples = samples.astype(np.float32) / float(-np.iinfo(samples.dtype).min)
     else:
         samples = samples.astype(np.float32)
@@ -47,13 +51,20 @@ def read_wave(path):
 
 def write_wave(path, samples):
     path = Path(path)
-    part = path.with_suffix(".part")
-    wavfile.write(part, RATE, np.asarray(samples, dtype=np.float32))
+    part = path.with_name(path.name + ".part")      # beside the file, and never another file's part
+    with part.open("wb") as file:
+        wavfile.write(file, RATE, np.asarray(samples, dtype=np.float32))
     part.replace(path)
 
 
 def db(amplitude):
+    """An amplitude as dB (20 log10), never below -200."""
     return 20 * math.log10(max(float(amplitude), 1e-10))
+
+
+def power_db(ratio, floor=1e-7):
+    """A ratio of powers as dB (10 log10), never below the floor (-70 dB unless another is given)."""
+    return 10 * math.log10(max(float(ratio), floor))
 
 
 class Audio:
@@ -158,44 +169,44 @@ def click(seconds=.5):
 
 
 def onset(returned, sent_at=RATE // 10):
-    """The delay in samples between a click sent at `sent_at` and its arrival in `returned`."""
-    mono = np.abs(np.asarray(returned, dtype=np.float64)).max(axis=1)
-    peak = float(mono.max())
+    """The delay in samples between a click sent at `sent_at` and its arrival in `returned`.
+
+    Nothing can come back before it was sent, so what is in `returned` before `sent_at` is the noise the click
+    must stand out of: a click less than four times the largest of it is refused, never guessed at."""
+    mono = np.abs(np.asarray(returned, dtype=np.float64).reshape(len(returned), -1)).max(axis=1)
+    peak = float(mono[sent_at:].max()) if len(mono) > sent_at else 0.
     if peak < 1e-4:
         raise RuntimeError("Nothing came back. Check that the chain passes USB 5/6 through.")
-    return int(np.argmax(mono > .2 * peak)) - sent_at
+    noise = float(mono[:sent_at].max()) if sent_at else 0.
+    if peak < 4 * noise:
+        raise RuntimeError("The click did not stand out of the noise that came back, so the round trip was not "
+                           "measured.")
+    return int(np.argmax(mono[sent_at:] > max(.2 * peak, 2 * noise)))
 
 
 class Loop:
-    """A phrase played round and round into USB 5, with the processed return's peak noted.
-
-    `muted` silences what is sent without losing the place in the phrase, so
-    that switching between sounds does not restart it. The audio itself runs
-    on the driver's own thread; `start` and `stop` may be called from any.
-    """
+    """A phrase played round and round into USB 5. The audio itself runs on the driver's own thread; `start` and
+    `stop` may be called from any."""
 
     def __init__(self, audio, dry):
         if dry.ndim != 2 or dry.shape[1] != 1 or not .001 <= float(np.max(np.abs(dry))) < .999:
             raise ValueError("Loop a mono phrase that is neither silent nor clipped.")
         self.audio = audio
         riff = np.pad(dry[:, 0].astype(np.float32), (0, RATE // 2))
-        fade = np.linspace(0, 1, RATE // 100, dtype=np.float32)
-        riff[:len(fade)] *= fade
-        riff[len(dry) - len(fade):len(dry)] *= fade[::-1]
-        self.riff, self.cursor, self.muted, self.peak, self.stream = riff, 0, False, 0., None
+        fade = np.linspace(0, 1, min(RATE // 100, len(dry) // 2), dtype=np.float32)   # 10 ms, or half a short phrase
+        if len(fade):
+            riff[:len(fade)] *= fade
+            riff[len(dry) - len(fade):len(dry)] *= fade[::-1]
+        self.riff, self.cursor, self.stream = riff, 0, None
 
     def _process(self, indata, outdata, frames, timing, status):
         outdata.fill(0)
-        if not self.muted:
-            written = 0
-            while written < frames:
-                count = min(frames - written, len(self.riff) - self.cursor)
-                outdata[written:written + count, 0] = self.riff[self.cursor:self.cursor + count]
-                self.cursor = (self.cursor + count) % len(self.riff)
-                written += count
-            self.peak = max(self.peak, float(np.max(np.abs(indata))) if len(indata) else 0.)
-        else:
-            self.cursor = (self.cursor + frames) % len(self.riff)
+        written = 0
+        while written < frames:
+            count = min(frames - written, len(self.riff) - self.cursor)
+            outdata[written:written + count, 0] = self.riff[self.cursor:self.cursor + count]
+            self.cursor = (self.cursor + count) % len(self.riff)
+            written += count
 
     def start(self):
         sd = getattr(self.audio, "sd", None)

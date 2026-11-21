@@ -24,7 +24,7 @@ from qc_mcp import leveling
 
 from lab.sound import catalog
 from lab.sound.chain import INTERNAL, Chain, Row, routed
-from lab.hearing.listen import calibrate, calibration, listen
+from lab.hearing.listen import RoundTripChanged, calibrate, calibration, listen
 from lab.qc.rig import Rig
 from lab.qc.unit import CEILING_DB, same_slot
 
@@ -355,7 +355,16 @@ class Engine:
         self.shown = None               # the unit is borrowed: A and B must be made ready again, also after a failure
         if self.offset is None:
             self.measure_round_trip()
-        return listen(self.rig, self.audio, chain, dry, self.offset, stop=stop, scene=scene)
+        return self._listen(chain, dry, stop, scene)
+
+    def _listen(self, chain, dry, stop, scene):
+        """Listen once; when the test click says the USB round trip is no longer what was measured (another buffer
+        size, another driver), measure it again and listen once more."""
+        try:
+            return listen(self.rig, self.audio, chain, dry, self.offset, stop=stop, scene=scene)
+        except RoundTripChanged:
+            self.measure_round_trip()
+            return listen(self.rig, self.audio, chain, dry, self.offset, stop=stop, scene=scene)
 
     def hear_shaped(self, chain, knobs, dry, scene=0, *, stop=None):
         """What `chain` with its Shape knobs at `knobs` does to the phrase, measured silently, as `hear` does.
@@ -370,7 +379,7 @@ class Engine:
             self.measure_round_trip()
         slot, held = self.rig.ready(chain, stop=stop)
         shaped = with_knobs(held, knobs) if knobs else held      # as the desk turns them: every scene moved
-        return listen(self.rig, self.audio, shaped, dry, self.offset, stop=stop, scene=scene)
+        return self._listen(shaped, dry, stop, scene)
 
     def read(self, slot):
         """The chain and name of a preset saved on the unit."""
