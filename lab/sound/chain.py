@@ -388,12 +388,12 @@ def plan_structure(current, wanted, *, sounding=(), fresh=False):
     return ops
 
 
-def plan_values(current, wanted):
+def plan_values(current, wanted, *, resting_scene=None):
     """The writes of values, assuming every wanted block is already in place.
 
     Values that differ by scene come last, grouped by scene, each group
-    preceded by a scene switch, and the first scene is selected again at the
-    end. A value held by scene on either side is written scene by scene: a
+    preceded by a scene switch. A build ends on A; live edits end in the scene
+    being played. A value held by scene on either side is written scene by scene: a
     plain write to a value the unit holds by scene lands on the selected
     scene only.
     """
@@ -436,13 +436,19 @@ def plan_values(current, wanted):
     ops = shared + assign + plan_performance(current, wanted)
     labels = [Op("label", (scene, label)) for scene, (old, label) in enumerate(zip(current.labels, wanted.labels))
               if old != label]
-    for scene in range(SCENES):
+    order = list(range(SCENES))
+    if resting_scene is not None:
+        order.remove(resting_scene)
+        order.append(resting_scene)
+    last = None
+    for scene in order:
         group = per_scene[scene] + [op for op in labels if op.args[0] == scene]
         if group:
             ops.append(Op("scene", (scene,)))
             ops.extend(group)
-    if any(op.kind == "scene" for op in ops):
-        ops.append(Op("scene", (0,)))
+            last = scene
+    if last is not None and (resting_scene is None or last != resting_scene):
+        ops.append(Op("scene", (0 if resting_scene is None else resting_scene,)))
     return ops
 
 

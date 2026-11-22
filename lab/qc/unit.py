@@ -229,13 +229,14 @@ class Unit:
             self.guard()
             self.execute(op)
 
-    def apply(self, wanted, *, stop=None, sounding=(), fresh=False, current=None):
+    def apply(self, wanted, *, stop=None, sounding=(), fresh=False, current=None, preserve_scene=False):
         """Make the unit hold `wanted`, and return what it holds afterwards.
 
         `sounding` are rows that may stay connected while their blocks change.
         `fresh` adds every block anew, so that values the chain leaves unset are
         the unit's own and not what the slot held before. `current` is what the
         unit holds when the caller has just read it, to save reading it again.
+        `preserve_scene` keeps the selected scene when writing scene values live.
         """
         wanted = bounded(wanted)
         current = self.read() if current is None else current
@@ -258,10 +259,14 @@ class Unit:
                     raise Refused(f"The Quad Cortex has no processing left for {missing[0]}. "
                                   "Remove a block or choose a lighter one.") from None
                 raise
+        resting_scene = None
         for attempt in range(2):
-            ops = plan_values(current, wanted)
+            ops = plan_values(current, wanted, resting_scene=resting_scene)
             if not ops:
                 break
+            if preserve_scene and resting_scene is None and any(op.kind == "scene" for op in ops):
+                resting_scene = self.scene()
+                ops = plan_values(current, wanted, resting_scene=resting_scene)
             self.run(ops, stop)
             try:
                 # The values are waited for as the blocks are. One the unit has not shown by then is written

@@ -320,7 +320,8 @@ class Engine:
                 continue
             block = replace(block, bypass=value) if index is None else block.set(index, value)
             changed = changed.with_block(row, column, block)
-        self.unit.apply(changed)
+        # A scene-assigned knob writes several scenes. Keep the one actually playing on the unit.
+        self.unit.apply(changed, current=held, preserve_scene=True)
         self.knobs[side] = {key: value for key, value in wanted.items() if key in {
             (row + first, column, index) for (row, column, index) in targets}}
         return knobs.moves(chain, values)

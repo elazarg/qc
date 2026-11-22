@@ -224,6 +224,23 @@ class EngineTest(unittest.TestCase):
         self.assertGreater(held[0], .35)
         self.assertGreater(held[2], .8)
 
+    def test_live_distortion_keeps_the_lead_scene_and_its_pedal_on(self):
+        rodent = 4
+        pedal = Block(rodent, bypass=(True, False) + (True,) * 6).set(0, (.3, .52) + (.3,) * 6)
+        lead = Chain((Row((pedal, Block(PLEXI), Block(V30)), inlet=1, outlet=MULTI_OUT),), ("Clean", "Lead"))
+        self.engine.show(sound(PLEXI, V30), lead)
+        self.engine.scene(1)
+        self.engine.play("b", "guitar")
+        self.engine.turn("b", {"drive": .4})
+        held = self.unit.read().block(2, 0)
+        self.assertGreater(held.display(0, 1), 5.2)
+        self.assertEqual(self.unit.scene(), 1)
+        self.assertFalse(held.bypass[self.unit.scene()])
+        self.assertTrue(held.bypass[0])
+        self.device.set_scene(2)
+        self.engine.turn("b", {"drive": .8})
+        self.assertEqual(self.unit.scene(), 2)
+
 
 # ---- Faults the reviews of 2026-11-20 found (docs/CODEBASE_REVIEW.md), each reproduced as it was found ----
 
