@@ -133,6 +133,7 @@ def build():
     york = cab_research.get("york_mes_212_v30", {})
     words = load("vocabulary.json")
     recipes = [{"target": recipe["target"], "aliases": recipe.get("aliases", []),
+                **({"sources": recipe["verified_sources"]} if "verified_sources" in recipe else {}),
                 "documented_gear": short(recipe.get("documented_gear"), 420),
                 "chain": [{key: short(block.get(key), 150) for key in ("block", "choice", "settings", "why")
                            if block.get(key)} for block in recipe.get("chain", [])],

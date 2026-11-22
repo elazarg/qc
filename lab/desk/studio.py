@@ -121,6 +121,8 @@ class Studio:
         self.showing = None               # the making-ready of A and B in flight
         self.shows = self.plays = 0       # counted, so that only the newest one's outcome is acted on
         self.level_sent = {}              # side -> the level and peak limit last asked of the unit
+        self.prepared_audition = None     # temporary chains and their clean level compensation
+        self.refused_audition = None
         self.unit_scene = 0               # the scene last asked of the unit
         self.hearing_base = set()         # sides heard without their Shape knobs for now
         self.audio_held_by = None         # who holds the audio input outside the engine: a key of HOLDERS
@@ -498,7 +500,22 @@ class Studio:
         self._set(**{side: sound.id, "side": side, "revision": self.state.revision + 1, **changes})
         self._show()
 
-    def _show(self):
+    def _audition(self, a, b):
+        from lab.tools.levels import audition_gain, saved_settings
+
+        reference = self.media_reference
+        settings = saved_settings(self.listening)
+        scene = self.state.scene
+        audition = []
+        for sound in (a, b):
+            chain, boost = (sound.chain if sound else None), 0.
+            if sound and reference and settings["match"]:
+                chain, boost = audition_gain(chain, self.ear.level_evidence(sound), reference["lufs"], scene,
+                                             settings["loudness_db"])
+            audition.append((chain, boost, scene if sound and sound.chain.scenes_in_use() > 1 else None))
+        return tuple(audition)
+
+    def _show(self, *, native=False):
         a, b = self.sound("a"), self.sound("b")
         if a is None and b is None:
             return
@@ -512,12 +529,17 @@ class Studio:
         if scene and not any(sound.chain.scenes_in_use() > scene for sound in (a, b) if sound):
             scene = 0
         self.begin(key, "Getting A and B ready on the Quad Cortex…", shown=None, scene=scene)
+        planned = self._audition(a, b) if not native else tuple(
+            (sound.chain if sound else None, 0., None) for sound in (a, b))
+        if planned == self.refused_audition:
+            planned = tuple((sound.chain if sound else None, 0., None) for sound in (a, b))
 
         def shown(how):
             if self.showing == key:
                 self.showing = None
             if self.state.revision != revision:
                 return
+            self.prepared_audition = planned
             self._set(shown=how)
             if self.state.scene != self.unit_scene:
                 self.unit_scene = self.state.scene
@@ -530,10 +552,14 @@ class Studio:
                 self.showing = None
             if self.state.revision != revision or getattr(error, "kind", "") == "Stopped":
                 return
+            if any(boost for _, boost, _ in planned):
+                self.refused_audition = planned
+                self._show(native=True)
+                return
             # Nothing is ready, so nothing plays: the desk must not say it does.
             self._set(mode=None, status=str(error))
 
-        self.later(self.host.call("show", a.chain if a else None, b.chain if b else None), shown, failed, doing=key)
+        self.later(self.host.call("show", *(chain for chain, _, _ in planned)), shown, failed, doing=key)
 
     def play(self, mode, side=None):
         side = side or self.state.side
@@ -560,6 +586,13 @@ class Studio:
         if mode == "phrase" and self.phrase is None:
             self.say("Record or choose a phrase first.")
             return
+        if self.state.mode is None:
+            planned = self._audition(self.sound("a"), self.sound("b"))
+            if (planned != self.prepared_audition and planned != self.refused_audition
+                    and any(boost for pair in (planned, self.prepared_audition or ()) for _, boost, _ in pair)):
+                self._set(mode=mode, side=side)
+                self._show()
+                return
         phrase = self.phrase[1] if mode == "phrase" else None
         if interrupted:
             # Stopping the listen dropped what waited behind it, so the scene is asked for again (the knobs and
@@ -580,7 +613,8 @@ class Studio:
                 self.store.save(sound)
             if sound.knobs:
                 self.later(self.host.call("turn", side, sound.knobs), lambda moves: None)
-            self.say(f"{side.upper()} · {mode}" if self.state.blind else f"{side.upper()} · {sound.name} · {mode}")
+            self.say(f"{side.upper()} · {mode}" if self.state.blind else
+                     f"{side.upper()} · {sound.name} · {mode}{self._level_gap(side, sound)}")
 
         def failed(error):
             # Nothing plays: the desk must not go on saying it does. A play that Stop dropped, or that a newer
@@ -597,7 +631,6 @@ class Studio:
         different brightness better than a plain level does (docs/TONE_RESEARCH.md, 13); by RMS level only when one of
         the two was measured before loudness was recorded. A level the unit already has is not sent again."""
         from lab.qc.engine import PREVIEW_DB
-        from lab.qc.unit import CEILING_DB
 
         sounds = {side: self.sound(side) for side in ("a", "b")}
         heard = {side: self.ear.level_evidence(sound) for side, sound in sounds.items() if sound}
@@ -609,10 +642,11 @@ class Studio:
         limits = {side: -3. - record["true_peak_db"] for side, record in heard.items()
                   if record.get("true_peak_db") is not None}
         if self.media_reference is not None:
+            limits = {side: limit - (2. if heard[side].get("short") else 0.) for side, limit in limits.items()}
             measured = {side: record["loudness_lufs"] for side, record in heard.items()
                         if record.get("loudness_lufs") is not None and side in limits and not record.get("clipped")}
             target = self.media_reference["lufs"]
-            wanted = {side: min(target - measured[side], CEILING_DB, limits[side]) if side in measured else PREVIEW_DB
+            wanted = {side: min(target - measured[side], limits[side]) if side in measured else 0.
                       for side, sound in sounds.items() if sound is not None}
         elif len(levels) < 2:
             # Nothing fair to match by: both play at the preview level, and no earlier trim stays on either.
@@ -622,10 +656,36 @@ class Studio:
                            min((levels[side] + limit for side, limit in limits.items()), default=float("inf")))
             wanted = {side: baseline - level for side, level in levels.items()}
         for side, level in wanted.items():
-            request = round(level, 3), limits.get(side)
+            boost = self.prepared_boost(side)
+            level -= boost
+            limit = limits.get(side)
+            if limit is not None:
+                limit -= boost
+            request = round(level, 3), limit
             if self.level_sent.get(side) != request:
                 self.level_sent[side] = request
                 self.later(self.host.call("level", side, level, peak_limit=request[1]), lambda result: None)
+
+    def prepared_boost(self, side):
+        if self.prepared_audition is not None:
+            _, extra, scene = self.prepared_audition[side == "b"]
+            if scene is None or scene == self.state.scene:
+                return extra
+        return 0.
+
+    def _level_gap(self, side, sound):
+        from lab.tools.levels import lane_headroom, saved_settings
+
+        reference, evidence = self.media_reference, self.ear.level_evidence(sound)
+        settings = saved_settings(self.listening)
+        if not reference or not settings["match"] or settings["muted"] or not evidence or any(
+                evidence.get(key) is None for key in ("loudness_lufs", "true_peak_db")):
+            return ""
+        boost = self.prepared_boost(side)
+        peak_room = -3. - evidence["true_peak_db"] - (2. if evidence.get("short") else 0.)
+        maximum = evidence["loudness_lufs"] + min(peak_room, boost + lane_headroom(sound.chain, self.state.scene))
+        gap = reference["lufs"] + settings["loudness_db"] - maximum
+        return f" · about {gap:.0f} dB below music target" if gap >= 3. else ""
 
     def scene(self, scene):
         """Hear another scene of the sounds on show."""
@@ -917,9 +977,8 @@ class Studio:
         except ValueError as error:
             self.say(str(error))
             return
-        name = f"{sound.name[:19]} {'IR' if asset.kind == 'ir' else 'Cap'}"
-        copy = Sound(name, chain, {"kind": "revised", "from": sound.id, "request": what}, parent=sound.id,
-                     explanation=f"{sound.explanation} {what}".strip(), knobs=dict(sound.knobs))
+        copy = Sound(sound.name, chain, {**sound.origin, "kind": "revised", "from": sound.id, "request": what},
+                     parent=sound.id, explanation=sound.explanation, sources=list(sound.sources), knobs=dict(sound.knobs))
         self.put("b", copy)
         self.say(what + " Undo takes it back.")
 
@@ -1028,9 +1087,9 @@ class Studio:
             return
         knob_values = dict(sound.knobs if knob_values is None else knob_values)
         name = (name or sound.name)[:24]
+        chain, level_note = self._saved_level(sound, knob_values)
         self.stop()
         self.begin("save", f"Saving {name} to the Tone Lab setlist…")
-        chain = sound.chain
 
         def saved(result):
             slot, _ = result
@@ -1039,10 +1098,34 @@ class Studio:
             self.store.save(fresh)
             self.marks.into_song(fresh)
             self.marks.learn()
-            self._set(shown=None, status=f"Saved · Tone Lab {slot['position'] + 1} · {name}")
+            self._set(shown=None, status=f"Saved · Tone Lab {slot['position'] + 1} · {name}{level_note}")
             self._show()
 
         self.later(self.host.call("save", chain, name, knob_values or None), saved, doing="save")
+
+    def _saved_level(self, sound, knob_values):
+        from lab.tools.levels import fitted_chain, saved_settings
+
+        reference = self.media_reference
+        if reference is None:
+            return sound.chain, ""
+        settings = saved_settings(self.listening)
+        evidence = self.ear.level_evidence(sound) if knob_values == sound.knobs else None
+        if not settings["match"] or not evidence or evidence.get("clipped") or any(
+                evidence.get(key) is None for key in ("true_peak_db", "loudness_lufs")):
+            return sound.chain, " · preset level kept"
+        target = reference["lufs"] + settings["loudness_db"]
+        limit = -3. - evidence["true_peak_db"] - (2. if evidence.get("short") else 0.)
+        trim = min(target - evidence["loudness_lufs"], limit)
+        scene = self.state.scene if sound.chain.scenes_in_use() > 1 else None
+        try:
+            chain, applied = fitted_chain(sound.chain, trim, scene)
+        except ValueError:
+            return sound.chain, " · no room for clean level trim"
+        gap = target - evidence["loudness_lufs"] - applied
+        if gap >= 1.:
+            return chain, f" · about {gap:.0f} dB below music target"
+        return chain, " · level matched"
 
     def measure_round_trip(self):
         """Measure the delay of the USB round trip, which every silent listen is lined up by."""

@@ -242,6 +242,19 @@ class PlayerIRTest(unittest.TestCase):
         self.addCleanup(folder.cleanup)
         self.folder = Path(folder.name)
 
+    def test_new_song_uses_the_preferred_ir_with_a_documented_alternative(self):
+        favorite = Asset("ir", "CIR_ba5e", "ML Sound Lab's BEST IR IN THE WORLD", "user")
+        lead = answer("Felder", [block(PLEXI, 0), block(V30, 1)])
+        alternative = {**answer("Alternate", [block(RECTIFIER, 0), block(V30, 1)]), "cab_reason": "Specific mic blend"}
+        script = Scripted(reply(lead, alternative))
+        _, rounds = design.round_of_three(Assistant(self.folder, run=script), "Hotel California solo", CHARVEL,
+                                          assets_known=[favorite])
+        self.assertIn('"preferred_guitar_ir"', script.asked[0][0])
+        self.assertIn("narrow-panel Fender Tweed Deluxe", script.asked[0][0])
+        found = rounds[0][0].chain.block(0, 1)
+        self.assertEqual((found.get(1), found.get(9)), (favorite.key, favorite.key))
+        self.assertFalse(assets.references(rounds[1][0].chain.block(0, 1)))
+
     def test_a_new_design_can_use_the_second_processor_pair(self):
         draft = answer("Four-row mix", [block(PLEXI, 0), block(V30, 1)])
         draft["rows"].extend([

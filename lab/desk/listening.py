@@ -50,6 +50,7 @@ class Listening:
         self.away = False                 # the player chose a preset of their own on the unit: it is left alone
         self.borrowed = False             # something used the unit: A and B are made ready again afterwards
         self.settled = None               # what was on show when nothing was left to hear or prepare
+        self.quick_levels = {}            # sound id -> short measurement or failure, for its exact setting
 
     # ---- what the studio tells it ----
 
@@ -105,12 +106,15 @@ class Listening:
         return shaped if shaped.get("knobs") == sound.knobs and made_on == self.playing_as(sound) else None
 
     def level_evidence(self, sound):
-        """A full listen, or the independent peak and loudness measured by Fit selected."""
-        fitted = sound.origin.get("music_fit")
-        if (isinstance(fitted, dict) and fitted.get("knobs") == sound.knobs
-                and self.made_on(fitted) == self.playing_as(sound)):
-            return self.evidence(sound) or fitted
-        return self.evidence(sound)
+        """Use full measurement when present, otherwise a short audition or verified saved trim."""
+        full = self.evidence(sound)
+        if full is not None and full.get("true_peak_db") is not None:
+            return full
+        for record in (self.quick_levels.get(sound.id), sound.origin.get("music_fit")):
+            if (isinstance(record, dict) and record.get("knobs") == sound.knobs
+                    and self.made_on(record) == self.playing_as(sound) and "failed" not in record):
+                return record
+        return full
 
     def unheard(self, sound):
         """Why `sound` could not be listened to as it plays now, or None when it could or has not been tried."""
@@ -165,6 +169,14 @@ class Listening:
             self.free_since = now
         if self.away or now < self.listen_after:
             return
+        if studio.media_reference is not None and now - self.free_since >= min(self.idle_seconds, .25):
+            sound = self.needs_level()
+            if sound is not None:
+                if self.looked:
+                    self.measure_level(sound)
+                else:
+                    self.look_first()
+                return
         if self.shaping is not None and now - self.shaping[2] >= self.settle_seconds:
             if not self.looked:
                 self.look_first()
@@ -205,6 +217,51 @@ class Listening:
             self.turned_away(getattr(error, "kind", ""), error, wait=60)
 
         studio.later(studio.host.call("inputs"), found, failed)
+
+    def needs_level(self):
+        studio = self.studio
+        side = studio.state.side
+        for key in (side, "a" if side == "b" else "b"):
+            sound = studio.sound(key)
+            if sound is None:
+                continue
+            evidence = self.level_evidence(sound)
+            if evidence and evidence.get("true_peak_db") is not None:
+                continue
+            tried = self.quick_levels.get(sound.id)
+            if tried and self.made_on(tried) == self.playing_as(sound) and tried["knobs"] == sound.knobs:
+                continue
+            return sound
+        return None
+
+    def measure_level(self, sound):
+        """Get audition level from one pass. The player can interrupt it by pressing Play."""
+        studio = self.studio
+        phrase_key, digest, scene = self.playing_as(sound)
+        record = {"phrase": phrase_key, "digest": digest, "scene": scene, "knobs": dict(sound.knobs), "short": True}
+        self.hearing, self.borrowed = sound.id, True
+        studio.begin("level measurement", "Checking audition level…")
+
+        def received(result):
+            self.hearing = None
+            self.quick_levels[sound.id] = {**record, **result}
+            studio._set()
+            if not studio.state.mode and not result.get("failed"):
+                planned = studio._audition(studio.sound("a"), studio.sound("b"))
+                if (planned != studio.prepared_audition and planned != studio.refused_audition
+                        and any(boost for _, boost, _ in planned)):
+                    studio._show()
+
+        def failed(error):
+            self.hearing = None
+            kind = getattr(error, "kind", "")
+            if kind not in NOT_THE_SOUND:
+                received({"failed": True})
+            elif kind != "Stopped":
+                self.turned_away(kind, error)
+
+        studio.later(studio.host.call("lab.tools.levels.audition_reading", sound.chain, sound.knobs, studio.phrase[1], scene),
+                     received, failed, doing="level measurement")
 
     def turned_away(self, kind, error, wait=15):
         """The unit was not the app's to listen with. After the player chose another preset there, nothing is

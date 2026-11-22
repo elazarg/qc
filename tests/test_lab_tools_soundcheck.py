@@ -82,6 +82,8 @@ class StageCheckTest(unittest.TestCase):
         quiet = soundcheck.take_report(phrase(level=.05))
         self.assertEqual(quiet["checks"], [])
         self.assertGreater(quiet["headroom_db"], 20)
+        self.assertTrue(any("try +6 dB" in check for check in
+                            soundcheck.take_report(phrase(level=.05), input_calibration=True)["checks"]))
 
     def test_the_take_is_measured_the_one_way_the_app_measures(self):
         dry = phrase(level=.2)

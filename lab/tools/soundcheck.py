@@ -126,7 +126,7 @@ def mono_fold_down_db(samples):
     return db(mono / stereo) if stereo > 1e-10 else None
 
 
-def take_report(dry, wet=None):
+def take_report(dry, wet=None, *, input_calibration=False):
     """Levels of a dry take and, if there is one, of its return through a sound: `hearing.measure` records."""
     readings = {"dry": measure(dry).to_record()}
     if wet is not None:
@@ -139,6 +139,11 @@ def take_report(dry, wet=None):
         cut = round(readings["dry"]["peak_db"] + 12.)
         checks.append(f"Try reducing the Quad Cortex input gain by about {cut} dB, then play your hardest again. "
                       "That leaves about 12 dB of headroom on this take.")
+    dry_peak = readings["dry"]["peak_db"]
+    if input_calibration and -45. < dry_peak < -18. and readings["dry"]["lufs"] is not None:
+        lift = min(6, round(-12. - dry_peak))
+        checks.append(f"If this was your hardest playing, try +{lift} dB in Quad Cortex I/O Settings for this "
+                      "input, then repeat with the louder guitar. This changes how hard presets drive their amps.")
     if wet is not None and readings["wet"]["true_peak_db"] > -3.:
         checks.append("The USB return is within 3 dB of full scale. Lower clean output level after the drive and "
                       "check it again.")
@@ -153,13 +158,14 @@ def take_report(dry, wet=None):
 
 def check(engine, chain=None, dry=None, seconds=6., scene=None, *, stop=None):
     """Record the dry input for `seconds` (or take `dry`), and play it silently through `chain`, if one."""
-    if dry is None:
+    live = dry is None
+    if live:
         dry = engine.record(seconds, stop=stop)[:, :1]
     dry = np.asarray(dry, dtype=np.float32)
     if len(dry) < RATE // 2:
         raise RuntimeError("Nothing was recorded.")
     wet = render(engine, chain, dry, scene=scene, tail=.5, stop=stop) if chain is not None else None
-    return take_report(dry, wet)
+    return take_report(dry, wet, input_calibration=live)
 
 
 def stage_render(engine, chain, dry, scene=None, *, stop=None):

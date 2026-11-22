@@ -91,6 +91,45 @@ class ToolsTest(DeskCase):
         self.pump()
         self.assertAlmostEqual(self.look()["levels"]["b"], 0., delta=.25)
 
+    def test_music_reference_plays_unmeasured_at_native_level_then_matches_with_clean_gain(self):
+        original = Sound("Quiet lead", chain(gain_db=-15.), {"kind": "preset"})
+        self.put("b", original)
+        taken = self.studio.phrase[1]
+        reading = self.studio.host.call("lab.tools.levels.measure_sounds", {"lead": original.chain}, taken).result(20)
+        target = round(reading["lead"]["lufs"] + 13., 1)
+        self.studio.set_media_reference({"lufs": target, "endpoint": "Test music"})
+        self.studio.play("phrase")
+        self.pump()
+        self.assertEqual(self.look()["levels"]["b"], 0.)
+        self.studio.stop()
+        self.pump()
+        self.studio.ear.measure_level(self.studio.sound("b"))
+        self.pump()
+        self.studio.play("phrase")
+        self.pump()
+        preview, boost, _ = self.studio.prepared_audition[1]
+        self.assertNotEqual(preview, original.chain)
+        self.assertGreater(boost, 5.)
+        self.assertAlmostEqual(self.look()["levels"]["b"] + boost, 13., delta=1.)
+        self.assertEqual(self.studio.sound("b").chain, original.chain)
+        self.studio.save()
+        self.pump()
+        saved = self.studio.sound("b").saved
+        stored, _ = self.studio.host.call("read", saved["slot"]).result(10)
+        after = self.studio.host.call("lab.tools.levels.measure_sounds", {"lead": stored}, taken).result(10)
+        self.assertAlmostEqual(after["lead"]["lufs"], target, delta=1.)
+
+    def test_swapping_cab_irs_preserves_the_sound_name(self):
+        from lab.qc.assets import Asset
+
+        self.put("b", Sound("Named lead", chain(PLEXI, V30), {"kind": "designed"}))
+        for key in ("CIR_1ab", "CIR_2ab"):
+            self.studio.use_asset(Asset("ir", key, "Test IR"))
+            self.pump()
+        sound = self.studio.sound("b")
+        self.assertEqual(sound.name, "Named lead")
+        self.assertEqual((sound.chain.block(0, 1).get(1), sound.chain.block(0, 1).get(9)), ("CIR_2ab", "CIR_2ab"))
+
     def test_the_learner_records_one_idle_reference_for_multiple_presets(self):
         from lab.learner import idle
 

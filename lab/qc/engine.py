@@ -331,7 +331,12 @@ class Engine:
         self.asked[side] = db
         self.peak_limits[side] = peak_limit
         played = self.listening(db) if self.listening else db
-        ceiling = CEILING_DB if peak_limit is None else min(CEILING_DB, peak_limit)
+        base = self.bases.get(side)
+        loudest = max((self._own_db(side, r) for r, row in enumerate(base.rows) if row.outlet not in INTERNAL),
+                      default=0.) if base else 0.
+        ceiling = CEILING_DB - round(loudest, 4)
+        if peak_limit is not None:
+            ceiling = min(ceiling, peak_limit)
         before, self.levels[side] = self.levels[side], max(-40., min(ceiling, played))
         # A level that is already the one played is not written again: the desk matches levels at every play.
         if self.mode is not None and side == self.active and abs(self.levels[side] - before) > .05:

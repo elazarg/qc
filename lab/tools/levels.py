@@ -33,7 +33,7 @@ from lab.hearing.measure import measure
 from lab.sound.chain import Block, COLUMNS, INTERNAL, SCENES
 from lab.desk.theme import INK, PAPER
 from lab.qc.unit import CEILING_DB
-from lab.tools.common import (Chips, Tool, button, caption, heard_chain, label, listbox, phrase, render_many,
+from lab.tools.common import (Chips, Tool, button, caption, disclosure, heard_chain, label, listbox, phrase, render_many,
                               room, section, sized)
 
 FLOOR_DB = -40.
@@ -86,12 +86,12 @@ def reading(settings):
     return f"{offset:+d} dB from matched" if offset else "Matched level"
 
 
-def side_level(asked_db, settings):
+def side_level(asked_db, settings, ceiling=CEILING_DB):
     """What a side plays at, given what the desk asked for it and the listening settings."""
     if settings["muted"]:
         return FLOOR_DB
     if settings["match"]:
-        return max(FLOOR_DB, min(CEILING_DB, asked_db + settings["loudness_db"]))
+        return max(FLOOR_DB, min(ceiling, asked_db + settings["loudness_db"]))
     from lab.qc.engine import PREVIEW_DB
 
     return max(FLOOR_DB, min(CEILING_DB, PREVIEW_DB + settings["master_db"]))
@@ -153,7 +153,7 @@ def output_rows(chain):
     return [r for r, row in enumerate(chain.rows) if (row.blocks or row.split) and row.outlet not in INTERNAL]
 
 
-def with_trim(chain, trim_db, *, scene=None):
+def with_trim(chain, trim_db, *, scene=None, measured=False):
     """The chain with `trim_db` more on a clean Gain block at the end of each row that leaves the preset.
 
     An existing Gain block at the end of the row takes the trim; otherwise one is added after the last block.
@@ -161,7 +161,10 @@ def with_trim(chain, trim_db, *, scene=None):
     """
     gain = catalog.model(catalog.GAIN_BLOCK)
     low = gain.params[0].low
-    applied = None
+    high = gain.params[0].high if measured else CEILING_DB
+    applied = trim_db
+    blocks = []
+    affected = range(SCENES) if scene is None else (scene,)
     rows = output_rows(chain)
     rows = rows or [r for r, row in enumerate(chain.rows) if row.blocks][:1]
     if not rows:
@@ -179,18 +182,68 @@ def with_trim(chain, trim_db, *, scene=None):
                 raise ValueError(f"Row {r + 1} has no free place at its end for a level trim.")
             block = Block(catalog.GAIN_BLOCK)
         before = [block.display(0, index) or 0. for index in range(SCENES)]
-        affected = range(SCENES) if scene is None else (scene,)
-        after = list(before)
         for index in affected:
-            after[index] = max(low, min(CEILING_DB, before[index] + trim_db))
-            change = after[index] - before[index]
-            applied = change if applied is None else min(applied, change, key=abs)
+            available = max(0., high - before[index]) if trim_db > 0 else min(0., low - before[index])
+            applied = min(applied, available, key=abs)
+        blocks.append((r, where, block, before))
+    if abs(applied) < .001:
+        return chain, 0.
+    for r, where, block, before in blocks:
+        after = [value + applied if index in affected else value for index, value in enumerate(before)]
         levels = tuple(catalog.to_norm(catalog.GAIN_BLOCK, 0, value) for value in after)
         chain = chain.with_block(r, where, block.set(0, levels[0] if len(set(levels)) == 1 else levels))
     return chain, round(applied, 2)
 
 
 # ---- operations, run where the unit is held ----
+
+def audition_reading(engine, chain, knobs, dry, scene, *, stop=None):
+    """One short, representative return to set audition level before the long tone analysis."""
+    import numpy as np
+
+    from lab.hearing.audio import RATE
+    from lab.tools.common import render, with_knobs
+
+    frame = RATE // 10
+    audio = np.asarray(dry, dtype=np.float32).reshape(-1, 1)
+    frames = len(audio) // frame
+    if frames > 20:
+        energy = np.mean(audio[:frames * frame].reshape(frames, frame) ** 2, axis=1)
+        first = int(np.argmax(np.convolve(energy, np.ones(20), mode="valid"))) * frame
+        audio = audio[first:first + 20 * frame]
+    result = measure(render(engine, with_knobs(chain, knobs), audio, scene=scene, tail=.4, stop=stop))
+    return {"loudness_lufs": result.lufs, "true_peak_db": result.true_peak_db, "level_db": result.rms_db,
+            "clipped": result.clipped}
+
+
+def lane_headroom(chain, scene):
+    """Common headroom of active terminal lane faders. The unit still enforces its own ceiling."""
+    from lab.sound.chain import in_scene
+
+    levels = [leveling.db_of(in_scene(dict(chain.rows[r].output).get(catalog.LANE_VOLUME,
+                                                                  leveling.norm_of(0.)), scene))
+              for r in output_rows(chain)]
+    return CEILING_DB - max(levels, default=0.)
+
+
+def audition_gain(chain, evidence, target, scene, offset=0.):
+    """Bookend a measured sound with enough clean gain that the lane fader can reach the safe target."""
+    if not output_rows(chain) or not evidence or evidence.get("clipped") or evidence.get("loudness_lufs") is None \
+            or evidence.get("true_peak_db") is None:
+        return chain, 0.
+    limit = -3. - evidence["true_peak_db"]
+    if evidence.get("short"):
+        limit -= 2.
+    requested = min(target + offset - evidence["loudness_lufs"], limit)
+    extra = requested - lane_headroom(chain, scene)
+    if extra < .2:
+        return chain, 0.
+    try:
+        result, applied = with_trim(chain, extra, scene=scene if chain.scenes_in_use() > 1 else None, measured=True)
+    except ValueError:
+        return chain, 0.
+    return result, applied if applied > 0 else 0.
+
 
 def measure_sounds(engine, chains, dry, scenes=None, *, stop=None):
     """{name: `hearing.measure` record} for {name: chain}, each the phrase played silently through it on the unit."""
@@ -235,20 +288,26 @@ def fit_music(engine, chain, knobs, dry, scene, target, *, stop=None):
     if before.lufs is None or before.clipped:
         raise ValueError("The guitar return is silent or at full scale. Check its level before matching music.")
     trim = min(target - before.lufs, -3. - before.true_peak_db)
-    fitted, applied = with_output_trim(chain, trim) if scene is None else (chain, 0.)
-    if abs(trim - applied) >= .2:
-        try:
-            fitted, extra = with_trim(fitted, trim - applied, scene=scene)
-        except ValueError:
-            if not applied:
-                raise
-        else:
-            applied += extra
+    fitted, applied = fitted_chain(chain, trim, scene)
     after = read(fitted) if applied else before
     if after.lufs is None or after.clipped or after.true_peak_db > -2.8 or abs(after.lufs - before.lufs - applied) > 1.:
         raise ValueError("The new preset level did not verify. Check the output and try another phrase.")
     evidence = {"loudness_lufs": after.lufs, "true_peak_db": after.true_peak_db, "level_db": after.rms_db}
     return fitted, round(after.lufs - before.lufs, 1), round(after.lufs - target, 1), evidence
+
+
+def fitted_chain(chain, trim, scene):
+    """Write a measured output trim without changing amp drive or other scenes."""
+    fitted, applied = with_output_trim(chain, trim) if scene is None else (chain, 0.)
+    if abs(trim - applied) >= .2:
+        try:
+            fitted, extra = with_trim(fitted, trim - applied, scene=scene, measured=True)
+        except ValueError:
+            if not applied:
+                raise
+        else:
+            applied += extra
+    return fitted, applied
 
 
 def install(engine, settings, *, stop=None):
@@ -258,7 +317,7 @@ def install(engine, settings, *, stop=None):
     floor and the ceiling.
     """
     settings = saved_settings(settings)
-    engine.listen_at(lambda asked_db: side_level(asked_db, settings))
+    engine.listen_at(lambda asked_db: side_level(asked_db, settings, ceiling=float("inf")))
     return {side: engine.levels[side] for side in ("a", "b")}
 
 
@@ -278,15 +337,18 @@ class LevelsTool(Tool):
         self.targets_measured = {}
         backing = section(self.body, "Play with music",
                           "Play a representative section from Spotify or YouTube through Quad Cortex Out 1/2 at "
-                          "your usual volume. Measure it once. Fit selected uses the current guitar phrase and scene, "
-                          "including any matched listening offset, and puts a verified copy here for Save to QC.")
+                          "your usual app volume and measure it once. The shared Quad Cortex master knob can stay "
+                          "where you listen. A short reamp automatically sets audition level when the desk is idle.")
         row = tk.Frame(backing, bg=backing["bg"])
         row.pack(fill="x")
         button(row, "Measure music", self.measure_music).pack(side="left")
-        button(row, "Fit selected", self.fit_selected).pack(side="left", padx=4)
+        button(row, "Spotify Normal", self.standard_music, quiet=True).pack(side="left", padx=4)
         self.clear_music = button(row, "Clear", self.forget_music, quiet=True)
         self.music_note = label(backing, size=9, wrap=320)
         self.music_note.pack(fill="x", pady=(4, 0))
+        verify = disclosure(backing, "Verify a preset level", note="Reamp and verify the saved level if you want an "
+                            "independent check before saving.")
+        button(verify, "Verify and prepare copy", self.fit_selected, quiet=True).pack(anchor="w")
         listen = section(self.body, "Listening level",
                          f"Both sides together, from {FLOOR_DB:+.0f} dB up to {CEILING_DB:+.0f} dB, the app's ceiling. "
                          "Matched keeps A and B equally loud, as the desk matches them, and moves both; Manual sets "
@@ -370,7 +432,8 @@ class LevelsTool(Tool):
         self.mute.configure(text="Unmute" if settings["muted"] else "Mute")
         self.manual.configure(text="Matched" if not match else "Manual")
         reference = self.studio.media_reference
-        self.music_note.configure(text=f"Music reference {reference['lufs']:.1f} LUFS" if reference else
+        self.music_note.configure(text=(f"Music reference {reference['lufs']:.1f} LUFS" if reference["endpoint"]
+                                        != media.SPOTIFY_NORMAL["endpoint"] else "Spotify Normal · −14 LUFS target") if reference else
                                   "Play a song through Quad Cortex Out 1/2.")
         if reference:
             self.clear_music.pack(side="left")
@@ -399,6 +462,11 @@ class LevelsTool(Tool):
     def forget_music(self):
         if not self.busy:
             self.studio.set_media_reference(None)
+            self.sync()
+
+    def standard_music(self):
+        if not self.busy:
+            self.studio.set_media_reference(media.SPOTIFY_NORMAL)
             self.sync()
 
     def fit_selected(self):

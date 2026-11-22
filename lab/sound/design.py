@@ -322,7 +322,7 @@ def design_schema():
                     scene_settings={"type": "array", "items": _fields(scene=whole, name=text, value=number)},
                     off_in_scenes={"type": "array", "items": whole}, off=flag)
     row = _fields(row=whole, split_at=whole, join_at=whole, blocks={"type": "array", "items": block})
-    return _fields(name=text, target=text, explanation=text, differs=text,
+    return _fields(name=text, target=text, explanation=text, differs=text, cab_reason=text,
                    guitar_setup=_fields(pickup=whole, wiring=text,
                                         knobs={"type": "array", "items": _fields(name=text, value=number)}),
                    scenes={"type": "array", "items": text},
@@ -640,6 +640,8 @@ def _ir_block(spec, asset, count, kept=None):
     block, problems = _block({**spec, "model_id": loader}, count, kept, names=_ir_controls(), label=asset.name)
     binding = assets.block_for(asset, stereo=loader == assets.IR_STEREO)
     for index, value in binding.params:
+        if kept is not None and index not in (assets.IR_PATH, assets.IR_NAME):
+            continue  # a revision preserves the other side of an existing stereo blend
         block = block.set(index, value)
     return block, problems
 
@@ -740,6 +742,7 @@ def facts(text, instrument, *, chain=None, earlier=None, models=(), irs=None, gu
     layout = LAYOUTS[layouts[0]] if layouts else None
     recipe = _recipe(text) if chain is None else None
     irs = irs or {}
+    preferred = assets.preferred_ir(irs.values())
     return {"request": text,
             "instrument": {key: instrument.get(key) for key in ("name", "kind", "about")} if instrument else None,
             **({"guitar_controls": {"pickup_positions": dict(enumerate(layout["pickups"], 1)),
@@ -749,6 +752,8 @@ def facts(text, instrument, *, chain=None, earlier=None, models=(), irs=None, gu
             **({"guitar_profile": guitar} if guitar else {}),
             **({"player_listening": listening} if listening else {}),
             **({"community_recipe": recipe} if recipe else {}),
+            **({"preferred_guitar_ir": next(key for key, asset in irs.items() if asset == preferred)}
+               if preferred and chain is None and (instrument or {}).get("kind", "electric") == "electric" else {}),
             **({"current_chain": as_form(chain, irs)} if chain is not None else {}),
             **({"earlier": earlier} if earlier else {}),
             **({"soundcheck": engineering} if engineering else {}),
@@ -896,6 +901,11 @@ def round_of_three(assistant, text, instrument, *, earlier=None, by="player", ca
             if wrong:
                 problems += [f"Design {number}: {problem}" for problem in wrong]
                 continue
+            preferred = assets.preferred_ir(irs.values()) if kind == "electric" else None
+            if preferred and not str(item.get("cab_reason") or "").strip() and any(
+                    block.info and block.info.is_stock_cab for _, _, block in chain.blocks) and not any(
+                    assets.references(block, irs.values()) for _, _, block in chain.blocks if assets.is_cab(block)):
+                chain, _ = assets.with_ir(chain, preferred, keep_cab=True)
             if chain.digest() in seen:
                 problems.append(f"Design {number} is the same chain as an earlier one.")
                 continue

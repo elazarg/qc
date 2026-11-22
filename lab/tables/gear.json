@@ -10934,6 +10934,47 @@
  },
  "recipes": [
   {
+   "target": "Eagles Hotel California",
+   "aliases": [
+    "Hotel California solo",
+    "Hotel California 12-string intro",
+    "Don Felder and Joe Walsh"
+   ],
+   "sources": [
+    {
+     "title": "Don Felder on the guitar gear behind classic Eagles albums",
+     "url": "https://www.guitarworld.com/features/don-felder-eagles-dear-guitar-2013"
+    },
+    {
+     "title": "Joe Walsh discusses his career and gear",
+     "url": "https://www.guitarworld.com/features/interview-joe-walsh-discusses-his-career-gear-and-new-album-analog-man"
+    }
+   ],
+   "documented_gear": "Don Felder described a 1959 Les Paul into a cranked narrow-panel Fender Tweed Deluxe for his electric part. Joe Walsh recalled using a Telecaster. Felder's separately recorded 12-string introduces the song. The outro alternates two players, then has both playing harmonies.",
+   "chain": [
+    {
+     "block": "Felder lead",
+     "choice": "5E3 Tweed Deluxe type",
+     "settings": "Amp breakup at full guitar volume, warm mids, audible pick, slight room",
+     "why": "Use a Les Paul humbucker or the Charvel in series for Felder's fuller voice."
+    },
+    {
+     "block": "Walsh reply",
+     "choice": "Brighter lower-gain amp voice",
+     "settings": "Bridge pickup, treble cut only if harsh, less saturation",
+     "why": "Use a Tele-like Charvel split or parallel setting when available. Treat the amp model as an approximation."
+    },
+    {
+     "block": "Intro, when requested",
+     "choice": "Clean 12-string approximation",
+     "settings": "Blend an octave-up voice conservatively on the electric guitar",
+     "why": "Keep the opening arpeggio separate from the driven outro. A duet needs two lines rather than a permanent harmonizer."
+    }
+   ],
+   "guitar": "",
+   "playing": ""
+  },
+  {
    "target": "jazz clean",
    "aliases": [
     "archtop-ish clean",

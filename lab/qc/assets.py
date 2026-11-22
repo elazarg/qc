@@ -47,6 +47,7 @@ IR_ROOT, CAPTURE_ROOT = "local_ir_root", "local_nc_root"
 IR_STEREO = catalog.IR_LOADER_STEREO
 IR_MODELS = (catalog.IR_LOADER, IR_STEREO)
 IR_PATH, IR_NAME = 2, 22
+IR_RIGHT_PATH, IR_RIGHT_NAME = 10, 23
 CAPTURE_FILE = 5
 CAPTURE_VERSIONS = {1: catalog.CAPTURE_MODELS[0], 2: catalog.CAPTURE_MODELS[1]}
 CAPTURE_MODELS_SET = frozenset(catalog.CAPTURE_MODELS)
@@ -166,8 +167,23 @@ def block_for(asset, *, stereo=False, version=None):
     """The block that loads an asset: an IR loader holding the IR, or the capture block of its version."""
     found = _check(asset, version)
     if asset.kind == "ir":
-        return Block(IR_STEREO if stereo else catalog.IR_LOADER, ((IR_PATH, asset.key), (IR_NAME, asset.name)))
+        return _load_ir(Block(IR_STEREO if stereo else catalog.IR_LOADER), asset)
     return Block(CAPTURE_VERSIONS[found], ((CAPTURE_FILE, asset.key + asset.name),))
+
+
+def _load_ir(block, asset):
+    block = block.set(IR_PATH, asset.key).set(IR_NAME, asset.name)
+    if block.model == IR_STEREO:
+        block = block.set(IR_RIGHT_PATH, asset.key).set(IR_RIGHT_NAME, asset.name).set(0, 0.).set(8, 0.)
+    return block
+
+
+def preferred_ir(known):
+    """The user's requested ML Sound Lab starting point, only when actually installed."""
+    found = [asset for asset in known if asset.kind == "ir" and asset.source == "user"
+             and "ml sound lab" in asset.name.casefold() and IR_KEY.fullmatch(asset.key)]
+    return min(found, key=lambda asset: ("best ir in the world" not in asset.name.casefold(), asset.name.casefold()),
+               default=None)
 
 
 def bound(block, known=()):
@@ -204,7 +220,14 @@ def references(block, known=()):
                         "ir", key, name if isinstance(name, str) else "")
         return list(found.values())
     asset = bound(block, known)
-    return [asset] if asset else []
+    found = [asset] if asset else []
+    if block.model == IR_STEREO:
+        key = block.get(IR_RIGHT_PATH)
+        if isinstance(key, str) and IR_KEY.fullmatch(key) and not any(
+                item.key.casefold() == key.casefold() for item in found):
+            found.append(next((item for item in known if item.key.casefold() == key.casefold()),
+                              Asset("ir", key, block.get(IR_RIGHT_NAME) or "")))
+    return found
 
 
 # ---- Putting one into a sound ----
@@ -222,7 +245,7 @@ def is_amp(block):
 def with_ir(chain, asset, *, keep_cab=False):
     """Put the IR in each cab path and describe the change.
 
-    With `keep_cab`, a stock cab keeps its controls and uses its first mic slot.
+    With `keep_cab`, a stock cab keeps its controls and uses both mic slots.
     An existing IR Loader keeps its settings. Other cabs are replaced by an IR Loader.
     """
     if asset.kind != "ir":
@@ -235,11 +258,15 @@ def with_ir(chain, asset, *, keep_cab=False):
     native = []
     for r, column, block in cabs:
         if keep_cab and block.model in IR_MODELS:
-            chain = chain.with_block(r, column, block.set(IR_PATH, asset.key).set(IR_NAME, asset.name))
+            chain = chain.with_block(r, column, _load_ir(block, asset))
             native.append(block.name)
             continue
         if keep_cab and block.info and block.info.is_stock_cab:
-            chain = chain.with_block(r, column, block.set(catalog.CAB_IR_SLOTS[0][0], asset.key))
+            for selector, _ in catalog.CAB_IR_SLOTS:
+                block = block.set(selector, asset.key)
+                if block.info.category in STEREO_CABS:
+                    block = block.set(selector - 1, 0.)
+            chain = chain.with_block(r, column, block)
             native.append(block.name)
             continue
         stereo = block.model == IR_STEREO or block.info.category in STEREO_CABS

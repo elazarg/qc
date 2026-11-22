@@ -119,14 +119,14 @@ class BlockTest(unittest.TestCase):
 
 
 class SubstituteTest(unittest.TestCase):
-    def test_putting_an_ir_in_a_stock_cab_keeps_the_other_mic_and_filter(self):
+    def test_putting_an_ir_in_a_stock_cab_sets_both_slots_and_keeps_the_filter(self):
         original = one_path(PLEXI, V30)
         cab = original.block(0, 1).set(9, "Ribbon 160").set(16, .35)
         changed, _ = assets.with_ir(original.with_block(0, 1, cab), IR, keep_cab=True)
         attached = changed.block(0, 1)
         self.assertEqual(attached.model, V30)
         self.assertEqual(attached.get(1), IR.key)
-        self.assertEqual(attached.get(9), cab.get(9))
+        self.assertEqual(attached.get(9), IR.key)
         self.assertEqual(attached.get(16), cab.get(16))
         self.assertEqual(assets.references(attached, [IR]), [IR])
 
@@ -147,6 +147,7 @@ class SubstituteTest(unittest.TestCase):
         changed, said = assets.with_ir(chain, IR)
         self.assertEqual([(r, c, b.model) for r, c, b in changed.blocks if assets.bound(b)],
                          [(0, 1, catalog.IR_LOADER), (1, 1, assets.IR_STEREO)])
+        self.assertEqual(changed.block(1, 1).get(assets.IR_RIGHT_PATH), IR.key)
         self.assertEqual(changed.rows[0].split, (0, 3))
         self.assertIn("both cabs", said)
 

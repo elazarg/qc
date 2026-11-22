@@ -6,6 +6,8 @@ import os
 from lab.hearing.audio import RATE
 from lab.hearing.measure import measure
 
+SPOTIFY_NORMAL = {"lufs": -14., "endpoint": "Spotify Normal"}
+
 
 def reference(value):
     """Read a saved calibration, if it still has a usable target and endpoint name."""
