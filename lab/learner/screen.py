@@ -6,11 +6,10 @@
     screen.follow()                              # the instrument on the desk has changed
     screen.say(text)                             # its own line at the bottom, for what the desk's status line says
 
-One screen with two views, chosen in place at its top: the Guitar Learner (`lab.learner.window`), for a guitar
+One screen with views chosen in place at its top: the Guitar Learner (`lab.learner.window`), for a guitar
 whose controls it has a photograph and a layout of, and Teach a control (`lab.learner.teach`), with the gesture
-mapping, for any instrument. For an instrument the learner has no layout for, only Teach a control is offered,
-and the screen says so in a few words. Both views work on the instrument chosen on the desk and follow it when
-it changes. Each is made the first time it is shown and kept, so the screen comes back as it was left.
+mapping, for any instrument. Idle reference is available for guitars with a defined control layout. Each view
+follows the instrument chosen on the desk, and is made the first time it is shown.
 
 Leaving the screen, or changing the view, ends a recording or a live listening of the view that is left;
 gesture listening goes on, so that the guitar can be played on the desk.
@@ -20,21 +19,21 @@ import tkinter as tk
 
 from lab.desk.theme import DARK, DIM, FONT, INK, PAPER, SOFT, SUBTLE, TILE
 
-LEARNER, TEACH = "Guitar Learner", "Teach a control"
+LEARNER, TEACH, IDLE = "Guitar Learner", "Teach a control", "Idle reference"
 
 
 class LearningScreen:
     def __init__(self, seat, parent):
         self.seat = seat
         self.frame = tk.Frame(parent, bg=PAPER)
-        self.learner = self.teaching = None     # the two views, each made when it is first shown
+        self.learner = self.teaching = self.idle_reference = None
         self.view = None                        # the one on show
         self.wanted = LEARNER                   # the one the player chose last; shown when the instrument has it
         self.on = False
         head = tk.Frame(self.frame, bg=PAPER)
         head.pack(fill="x", pady=(0, 10))
         self.tabs = {}
-        for title in (LEARNER, TEACH):
+        for title in (LEARNER, TEACH, IDLE):
             tab = tk.Label(head, text=title, font=(FONT, 11), padx=12, pady=5, cursor="hand2")
             tab.bind("<ButtonRelease-1>", lambda _, title=title: self.choose(title))
             self.tabs[title] = tab
@@ -56,15 +55,17 @@ class LearningScreen:
 
     def hidden(self):
         self.on = False
-        for view in (self.learner, self.teaching):
+        for view in (self.learner, self.teaching, self.idle_reference):
             if view is not None:
                 view.hidden()
 
     def offered(self):
         """The views there are for the instrument chosen on the desk."""
+        from lab.learner.dataset import layouts_for
         from lab.learner.window import offered_for
 
-        return (LEARNER, TEACH) if offered_for(self.seat.guitar) else (TEACH,)
+        return (*((LEARNER,) if offered_for(self.seat.guitar) else ()), TEACH,
+                *((IDLE,) if layouts_for(self.seat.guitar) else ()))
 
     def follow(self):
         """Show what there is for the instrument chosen on the desk: called when the screen is put on and when the
@@ -74,7 +75,7 @@ class LearningScreen:
             part.pack_forget()
         for title in offered:
             self.tabs[title].pack(side="left", padx=(0, 4))
-        if LEARNER not in offered:
+        if LEARNER not in offered and self.wanted != IDLE:
             self.why.configure(text=f"The Guitar Learner has no picture of the {self.seat.guitar}'s controls.")
             self.why.pack(side="left")
         self.show(self.wanted if self.wanted in offered else TEACH)
@@ -86,7 +87,7 @@ class LearningScreen:
             self.show(title)
 
     def show(self, title):
-        current = self.learner if self.view == LEARNER else self.teaching if self.view == TEACH else None
+        current = {LEARNER: self.learner, TEACH: self.teaching, IDLE: self.idle_reference}.get(self.view)
         if title != self.view and current is not None:
             current.frame.pack_forget()
             if current.header is not None:
@@ -99,12 +100,18 @@ class LearningScreen:
 
                 self.learner = GuitarLearner(self.seat, self.stage, self.beside)
             view = self.learner
-        else:
+        elif title == TEACH:
             if self.teaching is None:
                 from lab.learner.teach import Teaching
 
                 self.teaching = Teaching(self.seat, self.stage, self.beside)
             view = self.teaching
+        else:
+            if self.idle_reference is None:
+                from lab.learner.idle_view import IdleReference
+
+                self.idle_reference = IdleReference(self.seat, self.stage, self.board_setup)
+            view = self.idle_reference
         if not view.frame.winfo_manager():
             view.frame.pack(fill="both", expand=True)
             if view.header is not None:
@@ -114,6 +121,14 @@ class LearningScreen:
             chosen = name == title
             tab.configure(bg=TILE if chosen else DARK, fg=INK if chosen else SOFT,
                           font=(FONT, 11, "bold" if chosen else "normal"))
+
+    def board_setup(self, guitar):
+        learner = self.learner
+        if learner is not None and learner.guitar == guitar and learner.layout:
+            from lab.learner.idle import setup
+
+            return setup(guitar, learner.layout, learner.board.values)
+        return None
 
     def say(self, text, working=""):
         """The line at the bottom: what the desk is working on, if anything, then what its status line says."""

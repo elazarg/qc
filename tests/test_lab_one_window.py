@@ -376,11 +376,11 @@ class LearningScreenTest(DeskCase):
         desk = self.desk
         screen = self.learn()
         self.assertEqual((screen.view, screen.learner.guitar), ("Guitar Learner", "Charvel"))
-        self.assertEqual([tab.winfo_ismapped() for tab in screen.tabs.values()], [True, True])
+        self.assertEqual([tab.winfo_ismapped() for tab in screen.tabs.values()], [True, True, True])
         desk.choose_instrument("Acoustic")                          # changed while the screen is on
         self.settle_learning()
         self.assertEqual(screen.view, "Teach a control")
-        self.assertEqual([tab.winfo_ismapped() for tab in screen.tabs.values()], [False, True])
+        self.assertEqual([tab.winfo_ismapped() for tab in screen.tabs.values()], [False, True, False])
         self.assertFalse(screen.learner.frame.winfo_ismapped())
         self.assertEqual(screen.why.cget("text"), "The Guitar Learner has no picture of the Acoustic's controls.")
         self.assertTrue(screen.why.winfo_ismapped())

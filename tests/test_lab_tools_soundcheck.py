@@ -10,7 +10,6 @@ import json
 from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
-from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -96,11 +95,10 @@ class StageCheckTest(unittest.TestCase):
 
 class IdleCheckTest(unittest.TestCase):
     def test_the_gate_is_kept_only_when_it_lowers_idle_noise_and_leaves_soft_playing(self):
-        idle = phrase(seconds=3., level=.002)
+        idle = phrase(seconds=2.5, level=.002)
         dry = phrase(seconds=2., level=.2)
-        engine = SimpleNamespace(record=lambda *args, **options: idle)
         tone = chain(PLEXI, V30)
-        input_end = len(idle) + 3 * RATE // 2
+        input_end = len(idle) + 2 * RATE
 
         def rendered(engine, chain, probe, **options):
             wet = np.pad(probe * 4., ((0, RATE), (0, 0)))
@@ -112,17 +110,16 @@ class IdleCheckTest(unittest.TestCase):
 
         with patch.object(soundcheck, "render", rendered):
             cut_notes = False
-            found = soundcheck.idle_check(engine, tone, {}, dry, 0)
+            found = soundcheck.idle_check(None, tone, {}, idle, dry, 0)
             self.assertEqual(found["reduction_db"], 20.)
             self.assertEqual(found["chain"].block(0, 1), tone.block(0, 0))
             cut_notes = True
-            self.assertIsNone(soundcheck.idle_check(engine, tone, {}, dry, 0)["chain"])
+            self.assertIsNone(soundcheck.idle_check(None, tone, {}, idle, dry, 0)["chain"])
 
     def test_a_guitar_gate_is_not_offered_for_noise_present_with_zero_input(self):
         idle = phrase(seconds=3., level=.001)
-        engine = SimpleNamespace(record=lambda *args, **options: idle)
         with patch.object(soundcheck, "render", side_effect=lambda engine, chain, dry, **options: np.full_like(dry, .01)):
-            found = soundcheck.idle_check(engine, chain(PLEXI, V30), {}, phrase(), 0)
+            found = soundcheck.idle_check(None, chain(PLEXI, V30), {}, idle, None, 0)
         self.assertIsNone(found["chain"])
         self.assertIn("silent input", found["note"])
 

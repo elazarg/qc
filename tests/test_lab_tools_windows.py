@@ -91,6 +91,26 @@ class ToolsTest(DeskCase):
         self.pump()
         self.assertAlmostEqual(self.look()["levels"]["b"], 0., delta=.25)
 
+    def test_the_learner_records_one_idle_reference_for_multiple_presets(self):
+        from lab.learner import idle
+
+        tool = self.tool("soundcheck")
+        tool.open_idle_reference()
+        screen = self.desk.learning
+        self.assertEqual(screen.view, "Idle reference")
+        screen.idle_reference.record()
+        self.pump()
+        setup = idle.selected(self.home, "Charvel")
+        self.assertIsNotNone(setup)
+        self.desk.leave_learning()
+        for level in (-9., 0.):
+            self.put("b", Sound("Example", chain(gain_db=level), {"kind": "designed"}))
+            tool.check_idle()
+            self.pump()
+            self.assertIn("recorded reference", tool.idle_text.cget("text"))
+            self.assertIn("With silent input", tool.idle_text.cget("text"))
+        self.assertEqual(len(list((self.home / "learner" / "idle").rglob("*.wav"))), 1)
+
     def test_a_listening_level_stays_on_when_the_tool_is_left_and_the_desk_offers_the_way_back(self):
         self.put("a", Sound("Quiet", chain(gain_db=-9.), {"kind": "designed"}))
         self.put("b", Sound("Loud", chain(gain_db=0.), {"kind": "designed"}))

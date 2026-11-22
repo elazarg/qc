@@ -25,6 +25,8 @@ from scipy import signal
 
 from lab.hearing.audio import RATE, db
 from lab.hearing.measure import measure
+from lab.learner import idle as guitar_idle
+from lab.learner.dataset import suggested_setup
 from lab.sound.chain import Block, INTERNAL, SCENES
 from lab.tools.common import (Chips, Tool, button, caption, disclosure, flow, heard_chain, phrase, play, render,
                               said, section)
@@ -184,15 +186,15 @@ def _input_gate(chain, threshold, scene):
     return chain.with_row(r, replace(row, cells=(gate, *row.cells[:empty], *row.cells[empty + 1:])))
 
 
-def idle_check(engine, chain, knobs, phrase_dry, scene, *, stop=None):
+def idle_check(engine, chain, knobs, idle_dry, phrase_dry, scene, *, stop=None):
     """Compare real muted strings with a zero input, then verify any gate against a soft replay."""
     from lab.tools.common import with_knobs
 
-    idle = np.asarray(engine.record(3., stop=stop)[RATE // 2:, :1], dtype=np.float32)
+    idle = np.asarray(idle_dry, dtype=np.float32)
     if len(idle) < RATE:
-        raise ValueError("Too little input was captured. Mute the strings and try again.")
+        raise ValueError("The idle reference is too short. Record another one in Guitar Learner.")
     quiet = np.zeros((2 * RATE, 1), dtype=np.float32)
-    playing = np.asarray(phrase_dry, dtype=np.float32).reshape(-1, 1) * .25
+    playing = quiet[:0] if phrase_dry is None else np.asarray(phrase_dry, dtype=np.float32).reshape(-1, 1) * .25
     probe = np.concatenate((quiet, idle, playing))
     where = len(quiet) + len(idle)
 
@@ -207,6 +209,9 @@ def idle_check(engine, chain, knobs, phrase_dry, scene, *, stop=None):
     if idle_db <= zero_db + 6.:
         result["note"] = ("Noise remains with a silent input. Check the amp or effects and the monitoring path."
                           if zero_db > -85. else "The USB return was quiet. If you still hear noise, check monitoring.")
+        return result
+    if not len(playing):
+        result["note"] = "Choose a guitar phrase to verify a gate."
         return result
     threshold = max(-90., min(-20., db(float(np.quantile(np.abs(idle), .999))) + 6.))
     candidate = _input_gate(chain, threshold, scene)
@@ -244,10 +249,12 @@ class SoundCheckTool(Tool):
         self.take_text = said(take, pady=(6, 0))
 
         idle = disclosure(self.body, "Noise while idle",
-                          note="Keep guitar volume and pickup where you play them. Mute the strings for three seconds. "
-                               "The check compares that signal with digital silence and tests any gate on a soft "
-                               "version of your selected phrase.")
-        button(idle, "Check with strings muted", self.check_idle, quiet=True).pack(anchor="w")
+                          note="Checks the preset with the selected Guitar Learner idle reference and digital silence. "
+                               "A phrase is only needed to verify a gate.")
+        row = tk.Frame(idle, bg=idle["bg"])
+        row.pack(fill="x")
+        button(row, "Check preset", self.check_idle, quiet=True).pack(side="left")
+        button(row, "Guitar Learner", self.open_idle_reference, quiet=True).pack(side="left", padx=4)
         self.idle_text = said(idle, pady=(6, 0))
         self.keep_idle = button(idle, "Use quieter copy", self.use_idle, quiet=True)
         self.idle_candidate = None
@@ -306,17 +313,39 @@ class SoundCheckTool(Tool):
             return
         studio = self.studio
         sound, taken = self.selected(), phrase(studio)
-        if sound is None or taken is None:
-            self.say("Choose a sound and a guitar phrase first.")
+        if sound is None:
+            self.say("Choose a sound first.")
             return
-        signature = (studio.state.instrument, studio.state.side, studio.state.scene, sound.id, sound.knobs,
-                     studio.phrase_key())
+        signature = self.idle_signature()
         self.idle_candidate = None
         self.keep_idle.pack_forget()
-        self.idle_text.configure(text="Mute the strings. Keep the guitar volume up.")
+        self.idle_text.configure(text="Finding the guitar's idle reference…")
+        self.pending += 1
 
-        def checked(found):
-            result = (f"Dry {found['dry_db']:.0f} dBFS RMS · Wet {found['idle_db']:.0f} · "
+        def lookup():
+            item = guitar_idle.for_sound(studio.folder, signature[0], sound)
+            return item, guitar_idle.reference(studio.folder, item) if item else None
+
+        def found(lookup_result):
+            self.pending -= 1
+            if signature != self.idle_signature():
+                self.idle_text.configure(text="The selected sound or guitar changed. Check again.")
+                return
+            item, source = lookup_result
+            label = suggested_setup(item, signature[0]) if item else signature[0]
+            if source is None:
+                self.idle_text.configure(text=f"{label}\nNo idle reference. Open Guitar Learner to record once.")
+                return
+            self.idle_text.configure(text=f"{label} · {source[1]}")
+            self.call("lab.tools.soundcheck.idle_check", sound.chain, sound.knobs, source[0],
+                      taken[1] if taken else None, studio.state.scene, done=lambda report: checked(report, label, source[1]),
+                      renders=True, working="Measuring idle noise through the preset…")
+
+        def checked(found, label, source):
+            if signature != self.idle_signature():
+                self.idle_text.configure(text="The selected sound or guitar changed. Check again.")
+                return
+            result = (f"{label} · {source}\nDry {found['dry_db']:.0f} dBFS RMS · Wet {found['idle_db']:.0f} · "
                       f"With silent input {found['zero_db']:.0f}")
             if found["chain"] is not None:
                 self.idle_candidate = signature, found["chain"]
@@ -326,8 +355,23 @@ class SoundCheckTool(Tool):
                 result += "\n" + found["note"]
             self.idle_text.configure(text=result)
 
-        self.call("lab.tools.soundcheck.idle_check", sound.chain, sound.knobs, taken[1], studio.state.scene,
-                  done=checked, renders=True, working="Measuring idle noise and checking soft notes…")
+        def failed(error):
+            self.pending -= 1
+            self.idle_text.configure(text=str(error))
+
+        studio.later(studio.reading.submit(lookup), found, failed)
+
+    def idle_signature(self):
+        studio, sound = self.studio, self.selected()
+        if sound is not None:
+            return (studio.state.instrument, studio.state.side, studio.state.scene, sound.id, sound.knobs,
+                    studio.phrase_key(), guitar_idle.selected(studio.folder, studio.state.instrument))
+        return None
+
+    def open_idle_reference(self):
+        from lab.learner.screen import IDLE
+
+        self.desk.learn(IDLE)
 
     def use_idle(self):
         from lab.sound.sounds import Sound
@@ -336,8 +380,7 @@ class SoundCheckTool(Tool):
         if self.idle_candidate is None or sound is None:
             return
         signature, chain = self.idle_candidate
-        if signature != (studio.state.instrument, studio.state.side, studio.state.scene, sound.id, sound.knobs,
-                         studio.phrase_key()):
+        if signature != self.idle_signature():
             self.say("Your guitar, sound, scene or phrase changed. Run the idle check again.")
             return
         copy = Sound(sound.name, chain, {**sound.origin, "kind": "revised", "from": sound.id,

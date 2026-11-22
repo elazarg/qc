@@ -171,10 +171,10 @@ def _role(role):
     return role
 
 
-def dataset_folder(instrument, layout):
+def dataset_folder(instrument, layout, *, root=None):
     _, key = _instrument(instrument)
     _layout(layout)
-    return folders.learner() / folders.slug(key) / layout
+    return (root if root is not None else folders.learner()) / folders.slug(key) / layout
 
 
 def _check_instrument(instrument, source):
@@ -275,9 +275,9 @@ def live_recordings():
     return folders.live_recordings()
 
 
-def label_history(instrument, layout):
+def label_history(instrument, layout, *, root=None):
     """Read active and retired labels, including their configuration edits."""
-    folder = dataset_folder(instrument, layout)
+    folder = dataset_folder(instrument, layout, root=root)
     result = []
     for path in folder.glob("*/record.json"):
         if not re.fullmatch("[0-9a-f]{32}", path.parent.name):
@@ -309,11 +309,11 @@ def _exposure(rows):
     return {row["source_id"] for row in examples}, {row["excerpt_id"] for row in examples}
 
 
-def records(instrument, layout, *, role=None):
+def records(instrument, layout, *, role=None, root=None):
     """Return active labels. A test query returns only score-eligible checks."""
     if role is not None:
         _role(role)
-    return _active_records(label_history(instrument, layout), role)
+    return _active_records(label_history(instrument, layout, root=root), role)
 
 
 def _active_records(rows, role):
