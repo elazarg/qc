@@ -156,8 +156,8 @@ def player_irs(text, chain=None, known=None):
         except OSError:
             known = []
     known = [asset for asset in known if asset.kind == "ir" and asset.source == "user" and asset.name]
-    chosen = [found for found in (assets.bound(block, known) for _, _, block in (chain.blocks if chain else ()))
-              if found is not None and found.kind == "ir"]
+    chosen = [found for _, _, block in (chain.blocks if chain else ()) for found in assets.references(block, known)
+              if found.kind == "ir" and found.name]
     said, lowered = _tokens(text), (text or "").casefold()
     asks = bool(said & {"ir", "irs", "impulse"})
     scored = []
@@ -665,7 +665,7 @@ def _block(spec, count, kept=None, *, names=None, label=None):
                     else in_scene(held, scene) for scene in range(SCENES)]
             values[index] = each[0] if all(value == each[0] for value in each) else tuple(each)
     bypass = _switching(spec, count, kept, label, problems)
-    return Block(model_id, tuple(values.items()), bypass), problems
+    return replace(kept or Block(model_id), params=values, bypass=bypass), problems
 
 
 # ---- Asking ----

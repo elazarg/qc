@@ -190,6 +190,23 @@ def bound(block, known=()):
     return None
 
 
+def references(block, known=()):
+    """Assets used by a block, including both stock-cab microphone slots across scenes."""
+    if block.info and block.info.is_stock_cab:
+        by_key = {asset.key.casefold(): asset for asset in known}
+        found = {}
+        for index, label in catalog.CAB_IR_SLOTS:
+            for scene in range(8):
+                key = block.get(index, scene)
+                if isinstance(key, str) and IR_KEY.fullmatch(key):
+                    name = block.get(label, scene)
+                    found[key.casefold()] = by_key.get(key.casefold()) or Asset(
+                        "ir", key, name if isinstance(name, str) else "")
+        return list(found.values())
+    asset = bound(block, known)
+    return [asset] if asset else []
+
+
 # ---- Putting one into a sound ----
 
 def is_cab(block):
@@ -202,9 +219,12 @@ def is_amp(block):
     return bool(info) and (info.category.endswith("Amplifier") or block.model in CAPTURE_MODELS_SET)
 
 
-def with_ir(chain, asset):
-    """The chain with each cab (on both paths when each has one) replaced by an IR loader holding `asset`,
-    in the same place. Returns (chain, what changed in words). Raises ValueError with the reason when it cannot."""
+def with_ir(chain, asset, *, keep_cab=False):
+    """Put the IR in each cab path and describe the change.
+
+    With `keep_cab`, a stock cab keeps its controls and uses its first mic slot.
+    An existing IR Loader keeps its settings. Other cabs are replaced by an IR Loader.
+    """
     if asset.kind != "ir":
         raise ValueError("Choose an IR to put in place of the cab.")
     _check(asset)
@@ -212,11 +232,24 @@ def with_ir(chain, asset):
     if not cabs:
         raise ValueError("This sound has no cab to replace. A capture that includes its cab needs no IR.")
     replaced = []
+    native = []
     for r, column, block in cabs:
+        if keep_cab and block.model in IR_MODELS:
+            chain = chain.with_block(r, column, block.set(IR_PATH, asset.key).set(IR_NAME, asset.name))
+            native.append(block.name)
+            continue
+        if keep_cab and block.info and block.info.is_stock_cab:
+            chain = chain.with_block(r, column, block.set(catalog.CAB_IR_SLOTS[0][0], asset.key))
+            native.append(block.name)
+            continue
         stereo = block.model == IR_STEREO or block.info.category in STEREO_CABS
         chain = chain.with_block(r, column, replace(block_for(asset, stereo=stereo), bypass=block.bypass))
         replaced.append(block.name if block.model not in IR_MODELS else (bound(block) or asset).name or block.name)
-    if len(replaced) == 1:
+    if native:
+        said = f"Put the IR {asset.name} in " + " and ".join(native) + "."
+        if replaced:
+            said += " Replaced " + " and ".join(replaced) + " with an IR Loader."
+    elif len(replaced) == 1:
         said = f"Replaced the cab ({replaced[0]}) with the IR {asset.name}."
     else:
         said = f"Replaced both cabs ({' and '.join(replaced)}) with the IR {asset.name}."

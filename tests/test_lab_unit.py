@@ -54,6 +54,16 @@ class Player(SimUnit):
 
 
 class ChainTest(unittest.TestCase):
+    def test_scene_assignments_survive_even_when_every_scene_has_the_same_value(self):
+        unit = fast(SimUnit())
+        unit.device.recall(**BUILD)
+        block = Block(PLEXI, ((0, (.5,) * 8),), (False,) * 8)
+        wanted = Chain((Row((block,), inlet=1, outlet=19),))
+        held = unit.apply(wanted)
+        self.assertEqual(held.block(0, 0).get(0, 7), .5)
+        self.assertEqual(held.block(0, 0).values[0], (.5,) * 8)
+        self.assertEqual(held.block(0, 0).bypass, (False,) * 8)
+
     def test_a_chain_read_from_the_unit_is_the_chain_that_was_put_there(self):
         unit = fast(SimUnit())
         unit.device.recall(**BUILD)

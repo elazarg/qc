@@ -45,6 +45,10 @@ def blank(name=""):
             lane.models.add()
         point = lane.split_control_points.add()
         point.split = point.mix = -1
+        splitter = lane.splitter.add()
+        splitter.hash = 10002
+        for value in (.5, 0., 0.):
+            splitter.params.add().param_values.add().float_value = value
         mixer = lane.mixer.add()
         mixer.hash = catalog.MIXER
         for index, param in enumerate(catalog.model(catalog.MIXER).params):
@@ -188,6 +192,10 @@ class SimUnit:
         cell.sceneMode = False
         for flag in cell.sceneBypass:
             flag.bypass = False
+        keep = [item for item in self.working.stomp_mode_assignments
+                if (item.row, item.column) != (row, column)]
+        del self.working.stomp_mode_assignments[:]
+        self.working.stomp_mode_assignments.extend(keep)
 
     def _targets(self, parameter):
         return [parameter.param_values[self.scene]] if parameter.scene_mode else list(parameter.param_values)
@@ -221,6 +229,30 @@ class SimUnit:
             self.working.bypass[row].colBypass[column].sceneMode = True
         else:
             cell.params[index].scene_mode = True
+
+    def assign_expression(self, row, column, param_index, expression, expr_min=0., expr_max=1.):
+        self._write("expression", row, column, param_index, expression, expr_min, expr_max)
+        p = self.working.chains[row].models[column].params[param_index]
+        p.expression, p.expression_min, p.expression_max = expression, expr_min, expr_max
+
+    def assign_stomp(self, row, column, stomp_index, kind="primary", momentary=None, settle_s=0.):
+        self._write("stomp", row, column, stomp_index, kind)
+        self.working.stomp_mode_assignments.add(row=row, column=column, stomp_index=stomp_index,
+                                                type=int(kind == "secondary"))
+        self.working.stomp_is_momentary[stomp_index] = bool(momentary)
+
+    def unassign_stomp(self, row, column, stomp_index, settle_s=0.):
+        self._write("unstomp", row, column, stomp_index)
+        assignments = self.working.stomp_mode_assignments
+        keep = [item for item in assignments
+                if (item.row, item.column, item.stomp_index) != (row, column, stomp_index)]
+        del assignments[:]
+        assignments.extend(keep)
+        self.working.stomp_is_momentary[stomp_index] = False
+
+    def set_stomp_momentary(self, switch, enabled):
+        self._write("momentary", switch, enabled)
+        self.working.stomp_is_momentary[switch] = enabled
 
     def set_block_bypass(self, row, column, bypassed=True, scenes=None, **_):
         self._write("bypass", row, column, bypassed)

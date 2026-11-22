@@ -882,7 +882,7 @@ class Studio:
         self.later(self.host.call("lab.qc.library.directory", folder=str(self.folder)), read, doing="directory")
 
     def use_asset(self, asset, *, has_cab=None, version=None):
-        """A copy of the sound on B with one of the player's IRs in place of its cab, or a capture in place of
+        """A copy of the sound on B with one of the player's IRs in its cab, or a capture in place of
         its amp (and cab, when the capture has one)."""
         from lab.qc import assets
 
@@ -892,7 +892,7 @@ class Studio:
             return
         try:
             if asset.kind == "ir":
-                chain, what = assets.with_ir(sound.chain, asset)
+                chain, what = assets.with_ir(sound.chain, asset, keep_cab=True)
             else:
                 chain, what = assets.with_capture(sound.chain, asset, has_cab=has_cab, version=version)
         except ValueError as error:

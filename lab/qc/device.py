@@ -101,6 +101,15 @@ class Device:
             finally:
                 self._qc._pending.clear()
 
+    def set_stomp_momentary(self, switch, enabled):
+        """Set the switch-wide flag after its block assignments have been installed."""
+        from qc_mcp import protocol
+
+        message = protocol.message_class("Grid")(action=protocol.ACTION["UPDATE"],
+                                                 request_id=self._qc.next_request_id())
+        message.preset.stomp_is_momentary[switch] = enabled
+        self._qc.send("Grid", message)
+
 @contextmanager
 def connect(*, write=False, exclusive=False, opener=_library, editor=editor_running):
     """The unit, open, as the object `unit.Unit` drives. Closed when the block ends.

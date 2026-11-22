@@ -73,8 +73,7 @@ def dependencies(chain):
     """Locate IR Loader and Neural Capture references by the identifiers in the preset."""
     references = []
     for row, column, block in chain.blocks:
-        bound = assets.bound(block)
-        if bound is not None:
+        for bound in assets.references(block):
             references.append({"row": row, "column": column, **bound.to_record()})
     return references
 

@@ -84,6 +84,22 @@ class EngineTest(unittest.TestCase):
         routes = [index for index, (call, _) in enumerate(self.device.log) if call == "route"]
         self.assertLess(max(lanes), max(routes))
 
+    def test_performance_assignments_and_the_splitter_survive_audition_and_save(self):
+        amp = Block(PLEXI, expression=((1, 1, .2, .8),), stomp=((3, "primary", True),))
+        chain = Chain((Row((amp, Block(V30)), inlet=1, outlet=MULTI_OUT, split=(0, 3),
+                           splitter=((1, .66),)),))
+        self.assertEqual(self.engine.show(chain, sound(HIWATT)), "recall")
+        self.engine.play("a", "guitar")
+        held = self.unit.read()
+        self.assertEqual(held.block(0, 0).expression, amp.expression)
+        self.assertEqual(held.block(0, 0).stomp, amp.stomp)
+        self.assertAlmostEqual(dict(held.rows[0].splitter)[1], .66)
+        slot, saved = self.engine.save(Chain.from_record(held.to_record()), "Performance copy")
+        actual, _ = self.engine.read(slot)
+        self.assertEqual(actual.block(0, 0).expression, amp.expression)
+        self.assertEqual(actual.block(0, 0).stomp, amp.stomp)
+        self.assertEqual(actual.rows[0].splitter, saved.rows[0].splitter)
+
     def test_a_pair_is_built_once(self):
         a, b = sound(PLEXI, V30), sound(HIWATT, GREENBACK)
         self.engine.show(a, b)

@@ -9,8 +9,8 @@ A on rows 1 and 2, B on rows 3 and 4. Each pair of rows has its own two
 processors, so two sounds that each fit alone always fit together, and
 switching between them is moving the input from one row to the other, about
 20 ms, where recalling another preset takes seconds. The pair is built once
-and kept in the cache, like any chain. A sound that needs more than two rows,
-such as a large saved preset, is compared by recalling its own slot instead.
+and kept in the cache, like any chain. A sound that needs more than two rows
+or has an expression or stomp assignment is compared by recalling its own slot.
 
 Every change follows the unit's rules (see `unit.py`): the output level and
 mute of a row are set before its input is connected, nothing is written to a
@@ -109,7 +109,7 @@ class Engine:
         self.knobs = {"a": {}, "b": {}}
         self.on_unit = None
         both = [chain for chain in (a, b) if chain is not None]
-        if all(fits_two_rows(chain) for chain in both):
+        if all(fits_two_rows(chain) and not chain.performance_controls for chain in both):
             combined = pair(a or Chain(), b or Chain())
             slot, held = self.rig.ready(combined, stop=stop)
             self.shown = ("pair", slot, held)

@@ -53,6 +53,7 @@ import unittest  # noqa: E402
 from qc_mcp import directory as library_directory, preset as wire, protocol  # noqa: E402
 from qc_mcp.transport import QCError, QuadCortex  # noqa: E402
 
+from lab.qc.device import Device  # noqa: E402
 from lab.qc.rig import Rig  # noqa: E402
 from lab.qc.sim import MY_PRESETS, SimUnit  # noqa: E402
 from lab.qc.slots import BUILD, Slots  # noqa: E402
@@ -87,15 +88,20 @@ def named(function):
             any(p.kind is p.VAR_KEYWORD for p in parameters))
 
 
+def real_call(name):
+    """The concrete implementation of the device interface used by Unit."""
+    return getattr(Device, name, None) or getattr(QuadCortex, name, None)
+
+
 class ParityTest(unittest.TestCase):
     def test_every_call_the_simulated_unit_answers_is_one_the_library_has_with_the_same_arguments(self):
         simulated = calls_of(SimUnit)
         self.assertGreater(len(simulated), 20)
         for name, function in simulated.items():
             with self.subTest(call=name):
-                self.assertTrue(callable(getattr(QuadCortex, name, None)), "the library has no such call")
+                self.assertTrue(callable(real_call(name)), "the device interface has no such call")
                 ours, takes_more = named(function)
-                theirs, _ = named(getattr(QuadCortex, name))
+                theirs, _ = named(real_call(name))
                 self.assertLessEqual(len(ours), len(theirs))
                 for mine, real in zip(ours, theirs):
                     self.assertIn(real.name, (mine.name, OTHER_NAME.get(mine.name)))
@@ -132,9 +138,9 @@ class ParityTest(unittest.TestCase):
         self.assertGreater(len(calls), 25)
         self.assertGreater(len({call for _, _, call, _, _ in calls}), 12)
         for where, line, call, by_place, by_name in calls:
-            for kind in (QuadCortex, SimUnit):
-                with self.subTest(call=f"{where}:{line} {call}", on=kind.__name__):
-                    signature = inspect.signature(getattr(kind, call))
+            for implementation in (real_call(call), getattr(SimUnit, call)):
+                with self.subTest(call=f"{where}:{line} {call}", on=implementation.__qualname__):
+                    signature = inspect.signature(implementation)
                     signature.bind(None, *[None] * by_place, **dict.fromkeys(by_name))
 
 

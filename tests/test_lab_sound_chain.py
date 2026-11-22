@@ -38,7 +38,7 @@ class SceneValuesTest(unittest.TestCase):
         after = unit.apply(flat)                    # raised Mismatch: the plain write reached one scene only
         self.assertEqual(differences(after, flat), [])
         self.assertEqual([round(after.block(0, 0).display(GAIN, scene), 2) for scene in range(8)], [5.] * 8)
-        self.assertIs(after.block(0, 2).bypass, False)
+        self.assertEqual(after.block(0, 2).bypass, (False,) * 8)
 
     def test_the_plan_writes_each_scene_that_differs_and_only_those(self):
         current = by_scene()

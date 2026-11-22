@@ -119,6 +119,17 @@ class BlockTest(unittest.TestCase):
 
 
 class SubstituteTest(unittest.TestCase):
+    def test_putting_an_ir_in_a_stock_cab_keeps_the_other_mic_and_filter(self):
+        original = one_path(PLEXI, V30)
+        cab = original.block(0, 1).set(9, "Ribbon 160").set(16, .35)
+        changed, _ = assets.with_ir(original.with_block(0, 1, cab), IR, keep_cab=True)
+        attached = changed.block(0, 1)
+        self.assertEqual(attached.model, V30)
+        self.assertEqual(attached.get(1), IR.key)
+        self.assertEqual(attached.get(9), cab.get(9))
+        self.assertEqual(attached.get(16), cab.get(16))
+        self.assertEqual(assets.references(attached, [IR]), [IR])
+
     def test_an_ir_takes_the_cabs_place_and_switching(self):
         chain = Chain((Row((Block(PLEXI), Block(V30, bypass=(False, True) + (False,) * 6), Block(DELAY)),
                            inlet=1, outlet=19),))

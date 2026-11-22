@@ -196,6 +196,14 @@ class Unit:
                 device.set_param(row, column, index, value)
         elif kind == "assign":
             device.assign_param_to_scenes(*args)
+        elif kind == "expression":
+            device.assign_expression(*args)
+        elif kind == "stomp":
+            device.assign_stomp(*args, settle_s=0)
+        elif kind == "unstomp":
+            device.unassign_stomp(*args, settle_s=0)
+        elif kind == "momentary":
+            device.set_stomp_momentary(*args)
         elif kind == "bypass":
             row, column, flag = args
             device.set_block_bypass(row, column, bool(flag))

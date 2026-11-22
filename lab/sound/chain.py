@@ -69,6 +69,7 @@ def same(a, b):
 # loader's IR NAME parameters only label the IR its IR PATH holds.
 KEYED = {(model, 5): 64 for model in catalog.CAPTURE_MODELS}
 LABELS = {(model, index) for model in (catalog.IR_LOADER, catalog.IR_LOADER_STEREO) for index in (22, 23)}
+CAB_LABELS = {label for _, label in catalog.CAB_IR_SLOTS}
 
 
 def agrees(model, index, have, want):
@@ -89,14 +90,18 @@ class Block:
     model: int
     params: tuple = ()         # ((index, value), ...) sorted by index
     bypass: object = False     # a bool, or eight when it differs by scene
+    expression: tuple = ()     # (parameter index, pedal, normalized minimum, normalized maximum)
+    stomp: tuple = ()          # (switch index, "primary" or "secondary", momentary)
 
     def __post_init__(self):
         object.__setattr__(self, "params", tuple(sorted((int(i), _value(v)) for i, v in dict(self.params).items())))
         if isinstance(self.bypass, (list, tuple)):
-            flags = tuple(bool(flag) for flag in self.bypass)
-            object.__setattr__(self, "bypass", flags[0] if len(set(flags)) == 1 else flags)
+            object.__setattr__(self, "bypass", tuple(bool(flag) for flag in self.bypass))
         else:
             object.__setattr__(self, "bypass", bool(self.bypass))
+        object.__setattr__(self, "expression", tuple(sorted((int(i), int(pedal), round(low, 6), round(high, 6))
+                                                           for i, pedal, low, high in self.expression)))
+        object.__setattr__(self, "stomp", tuple(sorted(tuple(item) for item in self.stomp)))
 
     @property
     def values(self):
@@ -134,6 +139,7 @@ class Row:
     split: tuple | None = None      # (split column, mix column)
     mixer: tuple = ()               # ((index, value), ...) of the mixer joining the split
     output: tuple = ()              # ((index, value), ...) of the row's output control
+    splitter: tuple = ()            # ((index, value), ...) of the splitter before the parallel paths
 
     def __post_init__(self):
         cells = tuple(self.cells) + (None,) * (COLUMNS - len(self.cells))
@@ -141,6 +147,7 @@ class Row:
         object.__setattr__(self, "split", tuple(self.split) if self.split else None)
         object.__setattr__(self, "mixer", tuple(sorted((int(i), _value(v)) for i, v in dict(self.mixer).items())))
         object.__setattr__(self, "output", tuple(sorted((int(i), _value(v)) for i, v in dict(self.output).items())))
+        object.__setattr__(self, "splitter", tuple(sorted((int(i), _value(v)) for i, v in dict(self.splitter).items())))
 
     @property
     def blocks(self):
@@ -188,6 +195,10 @@ class Chain:
         return [(r, column, block) for r, row in enumerate(self.rows) for column, block in row.blocks]
 
     @property
+    def performance_controls(self):
+        return any(block.stomp or block.expression for _, _, block in self.blocks)
+
+    @property
     def scenes(self):
         """How many scenes the chain names, or 0 when it is one sound."""
         named = [index for index, label in enumerate(self.labels) if label]
@@ -220,9 +231,10 @@ class Chain:
         """
         return {"rows": [{"cells": [None if found is None else
                                     {"model": found.model, "params": [[i, v] for i, v in found.params],
-                                     "bypass": found.bypass}
+                                     "bypass": found.bypass, **_controls(found)}
                                     for found in row.cells],
-                          "split": row.split, "mixer": [[i, v] for i, v in row.mixer] if row.split else []}
+                          "split": row.split, "mixer": [[i, v] for i, v in row.mixer] if row.split else [],
+                          **({"splitter": row.splitter} if row.split and row.splitter else {})}
                          for row in self.rows]}
 
     def digest(self):
@@ -246,10 +258,12 @@ class Chain:
         return {"labels": list(self.labels), "rows": [
             {"inlet": row.inlet, "outlet": row.outlet, "split": list(row.split) if row.split else None,
              "mixer": [[i, v] for i, v in row.mixer], "output": [[i, v] for i, v in row.output],
+             **({"splitter": [list(item) for item in row.splitter]} if row.splitter else {}),
              "cells": [None if block is None else
                        {"model": block.model, "params": [[i, list(v) if isinstance(v, tuple) else v]
                                                          for i, v in block.params],
-                        "bypass": list(block.bypass) if isinstance(block.bypass, tuple) else block.bypass}
+                        "bypass": list(block.bypass) if isinstance(block.bypass, tuple) else block.bypass,
+                        **_controls(block)}
                        for block in row.cells]}
             for row in self.rows]}
 
@@ -258,14 +272,20 @@ class Chain:
         rows = []
         for row in record["rows"]:
             cells = tuple(None if cell is None else Block(cell["model"], tuple((i, v) for i, v in cell["params"]),
-                                                          cell.get("bypass", False))
+                                                          cell.get("bypass", False), cell.get("expression", ()),
+                                                          cell.get("stomp", ()))
                           for cell in row["cells"])
             rows.append(Row(cells, row.get("inlet", 0), row.get("outlet", 0), row.get("split"),
-                            tuple(map(tuple, row.get("mixer", []))), tuple(map(tuple, row.get("output", [])))))
+                            row.get("mixer", ()), row.get("output", ()), row.get("splitter", ())))
         return cls(tuple(rows), tuple(record.get("labels", ())))
 
 
 # ---- Reading what the unit holds -------------------------------------------------------------------------
+
+def _controls(block):
+    return {name: [list(item) for item in getattr(block, name)]
+            for name in ("expression", "stomp") if getattr(block, name)}
+
 
 def _stored(param_value):
     kind = param_value.WhichOneof("value")
@@ -292,6 +312,12 @@ def _params(message):
 
 def from_preset(preset):
     """The chain in a preset as the unit returns it (a BinaryPreset message)."""
+    stomp = {}
+    for assignment in preset.stomp_mode_assignments:
+        index = int(assignment.stomp_index)
+        kind = "secondary" if getattr(assignment, "type", 0) == 1 else "primary"
+        stomp.setdefault((assignment.row, assignment.column), []).append(
+            (index, kind, bool(preset.stomp_is_momentary.get(index, False))))
     rows = []
     for r, lane in enumerate(list(preset.chains)[:ROWS]):
         cells = []
@@ -308,12 +334,17 @@ def from_preset(preset):
                     flags = tuple(scenes[:SCENES])
                 elif scenes:
                     flags = scenes[0]
-            cells.append(Block(int(held.hash), tuple(_params(held).items()), flags))
+            expression = tuple((i, int(param.expression), round(param.expression_min, 6),
+                                round(param.expression_max, 6))
+                               for i, param in enumerate(held.params) if param.expression)
+            cells.append(Block(int(held.hash), tuple(_params(held).items()), flags,
+                               expression, stomp.get((r, column), ())))
         points = [(point.split, point.mix) for point in lane.split_control_points if (point.split, point.mix) != (-1, -1)]
         mixer = tuple(_params(lane.mixer[0]).items()) if points and len(lane.mixer) else ()
+        splitter = tuple(_params(lane.splitter[0]).items()) if points and len(lane.splitter) else ()
         output = tuple(_params(lane.output_control[0]).items()) if len(lane.output_control) else ()
         rows.append(Row(tuple(cells), int(lane.in_portid), int(lane.out_portid), points[0] if points else None,
-                        mixer, output))
+                        mixer, output, splitter))
     return Chain(tuple(rows), tuple(preset.scene_labels))
 
 
@@ -373,11 +404,14 @@ def plan_values(current, wanted):
                 continue
             have = a.values if a is not None and a.model == b.model else {}
             for index, value in b.params:
+                if index in CAB_LABELS and b.info and b.info.is_stock_cab:
+                    continue     # the unit assigns the display name when the selector is bound
                 before = have.get(index)
-                if before is not None and agrees(b.model, index, before, value):
+                needs_assignment = isinstance(value, tuple) and not isinstance(before, tuple)
+                if before is not None and not needs_assignment and agrees(b.model, index, before, value):
                     continue
                 if isinstance(value, tuple) or isinstance(before, tuple):
-                    if isinstance(value, tuple) and not isinstance(before, tuple):
+                    if needs_assignment:
                         assign.append(Op("assign", (r, column, index)))
                     for scene in range(SCENES):
                         if before is None or not same(in_scene(before, scene), in_scene(value, scene)):
@@ -394,11 +428,12 @@ def plan_values(current, wanted):
             elif before != b.bypass:
                 shared.append(Op("bypass", (r, column, b.bypass)))
         if want.split:
-            have = dict(now.mixer)
-            for index, value in want.mixer:
-                if index not in have or not same(have[index], value):
-                    shared.append(Op("lane", (r, "mixer", index, value)))
-    ops = shared + assign
+            for field in ("splitter", "mixer"):
+                have = dict(getattr(now, field))
+                for index, value in getattr(want, field):
+                    if index not in have or not same(have[index], value):
+                        shared.append(Op("lane", (r, field, index, value)))
+    ops = shared + assign + plan_performance(current, wanted)
     labels = [Op("label", (scene, label)) for scene, (old, label) in enumerate(zip(current.labels, wanted.labels))
               if old != label]
     for scene in range(SCENES):
@@ -408,6 +443,38 @@ def plan_values(current, wanted):
             ops.extend(group)
     if any(op.kind == "scene" for op in ops):
         ops.append(Op("scene", (0,)))
+    return ops
+
+
+def plan_performance(current, wanted):
+    """Keep assignments on individually stored sounds and reconcile the switch-wide latch flags."""
+    ops = []
+    before_switches, after_switches = {}, {}
+    touched = set()
+    for row, column, block in wanted.blocks:
+        before = current.block(row, column)
+        if before is None or before.model != block.model:
+            before = Block(block.model)
+        have = {index: (pedal, low, high) for index, pedal, low, high in before.expression}
+        want = {index: (pedal, low, high) for index, pedal, low, high in block.expression}
+        for index in sorted(have.keys() | want.keys()):
+            if have.get(index) != want.get(index):
+                ops.append(Op("expression", (row, column, index, *want.get(index, (0, 0., 1.)))))
+        old = {(switch, kind) for switch, kind, _ in before.stomp}
+        new = {(switch, kind) for switch, kind, _ in block.stomp}
+        # DELETE identifies an assignment by switch and cell. Reinstall any other role at that cell.
+        removed = {switch for switch, _ in old - new}
+        for switch in sorted(removed):
+            ops.append(Op("unstomp", (row, column, switch)))
+        for switch, kind in sorted({entry for entry in new if entry not in old or entry[0] in removed}):
+            ops.append(Op("stomp", (row, column, switch, kind)))
+            touched.add(switch)
+        touched.update(removed)
+        before_switches.update((switch, flag) for switch, _, flag in before.stomp)
+        after_switches.update((switch, flag) for switch, _, flag in block.stomp)
+    for switch, flag in sorted(after_switches.items()):
+        if flag != before_switches.get(switch, False) or (flag and switch in touched):
+            ops.append(Op("momentary", (switch, flag)))
     return ops
 
 
@@ -448,17 +515,23 @@ def differences(current, wanted):
                 continue
             have = a.values
             for index, value in b.params:
+                if index in CAB_LABELS and b.info and b.info.is_stock_cab:
+                    continue
                 if (b.model, index) in LABELS and isinstance(have.get(index), str):
                     continue        # the unit may name the IR its own way; the IR PATH says which it is
-                if index not in have or not agrees(b.model, index, have[index], value):
+                if (index not in have or (isinstance(value, tuple) and not isinstance(have[index], tuple))
+                        or not agrees(b.model, index, have[index], value)):
                     found.append(f"{where} {b.name} parameter {index} is {have.get(index)}, wanted {value}")
-            if a.bypass != b.bypass:
+            if (isinstance(b.bypass, tuple) and not isinstance(a.bypass, tuple)) or not same(a.bypass, b.bypass):
                 found.append(f"{where} {b.name} bypass is {a.bypass}, wanted {b.bypass}")
+            if a.expression != b.expression or a.stomp != b.stomp:
+                found.append(f"{where} {b.name} has different performance assignments")
         if want.split:
-            have = dict(now.mixer)
-            for index, value in want.mixer:
-                if index not in have or not same(have[index], value):
-                    found.append(f"row {r + 1} mixer parameter {index} is {have.get(index)}, wanted {value}")
+            for field in ("splitter", "mixer"):
+                have = dict(getattr(now, field))
+                for index, value in getattr(want, field):
+                    if index not in have or not same(have[index], value):
+                        found.append(f"row {r + 1} {field} parameter {index} is {have.get(index)}, wanted {value}")
         have = dict(now.output)
         for index, value in want.output:
             if index not in have or not same(have[index], value):

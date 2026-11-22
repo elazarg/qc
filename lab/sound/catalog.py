@@ -23,6 +23,7 @@ from qc_mcp import catalog as _catalog
 CAB_LAYOUTS = {"Cabsim Guitar (M)": 12000, "Cabsim Bass (M)": 12000,
                "Cabsim Guitar (ST)": 32000, "Cabsim Bass (ST)": 32000}
 MIC_SELECTOR = "ir selector"
+CAB_IR_SLOTS = ((1, 19), (9, 20))   # (selector, derived display name) for each stock-cab mic
 
 # Blocks and lane controls the app itself relies on.
 GAIN_BLOCK = 16005      # a clean level trim, used as the app's own output control

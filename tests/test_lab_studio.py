@@ -329,7 +329,9 @@ class StudioTest(StudioCase):
         settle(self.studio)
         with_ir = self.studio.sound("b")
         self.assertEqual(with_ir.parent, before.id)
-        self.assertIn(29001, [block.model for _, _, block in with_ir.chain.blocks])
+        cab = with_ir.chain.block(0, 1)
+        self.assertEqual(cab.model, GREENBACK)
+        self.assertEqual(cab.get(1), irs[0].key)
         self.assertEqual(self.studio.state.shown, "pair")      # built and held on the unit
         self.studio.use_asset(captures[0], has_cab=True, version=captures[0].capture_version or 2)
         settle(self.studio)
