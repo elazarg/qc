@@ -15,12 +15,11 @@ import numpy as np
 
 import support  # noqa: E402
 from lab.hearing import audio
-from lab.learner import calibration, dataset, folders, gestures, inputs, state, taught, teach
+from lab.learner import dataset, folders, gestures, inputs, state, taught, teach
 
 from test_lab_learner_gestures import note
 from test_lab_learner_seat import seat_for, settle
 from test_lab_learner_takes import four_inputs
-from support import hosting
 
 
 def phrase(kind, *, level=.08):
@@ -148,31 +147,27 @@ class TeachWindowTest(unittest.TestCase):
             self.skipTest(f"No display: {error}")
         self.root.withdraw()
         self.seat = seat_for(self, self.root)
-        hosting(self.seat.desk, self.root)
-        self.window = teach.open(self.seat)
+        self.window = teach.Teaching(self.seat, self.root)     # as the learning screen makes it, in the window
+        self.window.frame.pack(fill="both", expand=True)
         self.panel = self.window.panel
 
     def tearDown(self):
         gestures.stop()
-        teach._shown.clear()
         self.window.worker.shutdown(wait=True)
         self.root.destroy()
         self.window = self.panel = self.root = None
         support.free_now()
 
-    def test_it_is_named_for_what_it_does_and_the_earlier_name_still_opens_it(self):
+    def test_it_is_named_for_what_it_does_and_is_in_the_desks_window(self):
         self.assertEqual(self.window.TITLE, "Teach a control")
         self.assertEqual(self.window.frame.winfo_toplevel(), self.root)     # in the desk's window, not one of its own
-        self.assertIs(self.seat.desk.hosted, self.window)
-        self.assertIs(calibration.open, teach.open)
-        self.assertIs(calibration.open(self.seat), self.window)
         self.assertEqual(self.panel.instrument.get(), "Charvel")
         self.assertEqual(self.panel.example_label.get(), "Neck")
         self.assertEqual(tuple(self.panel.setting_chips.chips)[:2], ("Neck", "Bridge"))
 
-    def test_the_instrument_and_the_setting_are_chosen_from_chips_or_typed_in_place(self):
-        # In place of the two drop-downs that also took typing: the choices as chips, and a line for a new one.
-        self.assertIn("Charvel", self.panel.instrument_chips.chips)
+    def test_the_setting_is_chosen_from_chips_or_typed_in_place_and_the_instrument_is_the_desks(self):
+        # In place of the drop-down that also took typing: the choices as chips, and a line for a new one.
+        self.assertFalse(hasattr(self.panel, "instrument_chips") or hasattr(self.panel, "instrument_entry"))
         self.root.update()
         self.panel.setting_chips.chips["Bridge"].event_generate("<ButtonRelease-1>")
         self.root.update()
@@ -180,12 +175,25 @@ class TeachWindowTest(unittest.TestCase):
         self.panel.setting_entry.delete(0, "end")
         self.panel.setting_entry.insert(0, "Neck, tone rolled off")         # a setting of the player's own
         self.assertEqual(self.panel.example_label.get(), "Neck, tone rolled off")
-        self.panel.new_instrument.set("A friend's Tele")
-        self.panel.name_instrument()
+        self.seat.studio.state.instrument = "A friend's Tele"       # one the app knows nothing of
+        self.window.shown()
         self.assertEqual(self.panel.instrument.get(), "A friend's Tele")
-        self.assertIn("A friend's Tele", self.panel.instrument_chips.chips)
-        self.assertEqual(self.panel.new_instrument.get(), "")
         self.assertEqual(tuple(self.panel.setting_chips.chips)[:3], taught.SETTINGS["pickup"][:3])
+
+    def test_what_is_worth_knowing_once_is_behind_a_hint_and_follows_the_control(self):
+        from lab.desk.hints import Hint
+
+        said = [child.cget("text") for child in walk(self.window.frame) if child.winfo_class() == "Label"]
+        self.assertFalse(any("Repeat the same three" in text or "Keep both knobs" in text for text in said))
+        self.assertIsInstance(self.panel.control_help, Hint)
+        self.assertIn("Move the selector.", self.panel.control_help.words)
+        self.assertIn("Repeat the same three sustained single notes", self.panel.control_help.words)
+        self.panel.choose_control("tone")
+        self.assertIn("Turn the tone knob.", self.panel.control_help.words)
+        # Nothing can be mapped before two settings are learned, and one line says so.
+        self.root.update()
+        self.assertTrue(self.panel.unmapped.winfo_ismapped())
+        self.assertFalse(self.panel.mapping_choices.winfo_ismapped())
 
     def test_a_wav_to_label_or_to_check_is_chosen_in_place(self):
         # In place of the two file dialogs: the WAVs found where recordings are kept, or a path typed in.
@@ -215,23 +223,22 @@ class TeachWindowTest(unittest.TestCase):
             "notes": {"45": {"centers": [[0.] * 12, [1.] * 12], "scale": [2.] * 12, "radii": [1., 1.]}}})
         self.panel.loaded_selection = None
         self.panel.load_selection()
+        self.root.update()
+        self.assertTrue(self.panel.mapping_choices.winfo_ismapped() and not self.panel.unmapped.winfo_ismapped())
         self.assertEqual(tuple(self.panel.home_chips.chips), ("Neck", "Bridge"))
         self.assertEqual(tuple(self.panel.excursion_chips.chips), ("Neck", "Bridge"))
         self.assertEqual((self.panel.home.get(), self.panel.excursion.get()), ("Neck", "Bridge"))
 
-    def test_going_back_to_the_desk_ends_a_recording_and_leaves_gesture_listening_on(self):
+    def test_leaving_the_screen_ends_a_recording_and_leaves_gesture_listening_on(self):
         from threading import Event
 
         stop = Event()
         self.panel.recording = {"stop": stop}
         self.panel.live_running = True
-        self.seat.desk.back()
+        self.window.hidden()
         self.assertTrue(stop.is_set())
         self.assertTrue(self.panel.live_running)        # the guitar can be played on the desk while it listens
-        self.assertFalse(self.window.showing())
         self.panel.recording, self.panel.live_running = None, False
-        self.assertIs(teach.open(self.seat), self.window)       # the same one, as it was left
-        self.assertTrue(self.window.showing())
 
     def record(self, played):
         """Press Record, let the stand-in driver deliver `played`, press Stop, and wait for the take to be used."""
@@ -298,12 +305,27 @@ class TeachWindowTest(unittest.TestCase):
         self.assertFalse(self.panel.live_running)
         self.assertFalse(self.panel.observe.get())
 
-    def test_the_instrument_follows_the_desk_when_the_teaching_is_shown(self):
-        self.seat.desk.back()
+    def test_the_instrument_follows_the_desk_unless_something_is_under_way(self):
         self.seat.studio.state.instrument = "Les Paul"
-        self.window.show()
+        self.window.shown()                             # as when the screen puts it on show, or the instrument changes
         self.assertEqual(self.panel.instrument.get(), "Les Paul")
         self.assertEqual(tuple(self.panel.setting_chips.chips)[:3], ("Neck", "Bridge", "Both"))
+        self.panel.working = True                       # a fit or a check is running
+        self.seat.studio.state.instrument = "Charvel"
+        self.window.shown()
+        self.assertEqual(self.panel.instrument.get(), "Les Paul")
+        self.assertEqual(self.panel.status.get(), "Still on the Les Paul: finish what is running first.")
+        self.panel.working = False
+        self.window.shown()                             # asked again when it is over: it follows
+        self.assertEqual(self.panel.instrument.get(), "Charvel")
+
+
+def walk(widget):
+    found = []
+    for child in widget.winfo_children():
+        found.append(child)
+        found += walk(child)
+    return found
 
 
 def tearDownModule():

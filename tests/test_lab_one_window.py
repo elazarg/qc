@@ -1,11 +1,13 @@
 """One window: no dialogs, no pop-up windows or menus, no keyboard shortcuts, nothing opened outside it.
 
 Two kinds of check. The code of the app is read: nothing in `lab/` may name a second window, a dialog, a menu,
-a drop-down or the browser, and a key may be bound only where this file says so, with the reason. And the
-things that used to have windows of their own (every side tool, the Guitar Learner, the teaching of a control)
-are opened on the real desk, kept off the screen: each is shown in the desk's own window in the place of the
-side panel, fits it across at the size the desk opens with and at its smallest, leaves both tiles on the
-screen, and goes back to the panel it was opened from.
+a drop-down or the browser; a key may be bound only where this file says so, with the reason; and so may the
+mouse be watched over the whole window, or the pointer resting on something. And the things that used to have
+windows of their own are opened on the real desk, kept off the screen. Every side tool is shown in the desk's
+own window in the place of the side panel, fits it across at the size the desk opens with and at its smallest,
+leaves both tiles on the screen, and goes back to the panel it was opened from. The Guitar Learner and Teach a
+control are the two views of the learning screen, which takes the place of everything below the top row and
+gives the desk back as it was.
 
 What the reading cannot see is a caption that advertises a key, and what the measuring cannot see is how any
 of it looks.
@@ -20,13 +22,14 @@ import json
 from pathlib import Path
 import re
 from threading import Event
+import tkinter as tk
 import unittest
 
 from lab.qc.sim import FACTORY
 from lab.sound.sounds import Sound
 from lab.tools.menu import TOOLS
 
-from support import DELAY, PLEXI, V30, DeskCase, chain
+from support import DEFAULT_SIZE, DELAY, PLEXI, SMALLEST_SIZE, V30, DeskCase, chain, inside, wide_children
 
 LAB = Path(__file__).resolve().parents[1] / "lab"
 
@@ -56,7 +59,19 @@ KEYS = {
     "tools/common.py": [("<Return>", 1, "Return in the line a file's path is typed into checks and takes that path")],
     "tools/search.py": [("<Return>", 1, "Return in the line the words are typed into finds by them")],
     "tools/workbench.py": [("<Return>", 1, "Return in the line a request or values are typed into renders them")],
-    "learner/teach.py": [("<Return>", 1, "Return in the line a new guitar's name is typed into takes that name")],
+}
+# The mouse watched over the whole window (bound on the window itself, not on the thing clicked), by file: the
+# event and why. Anything else that wants a click is bound on what is clicked.
+WINDOW_WIDE = {
+    "desk/chooser.py": [("<ButtonPress-1>", "a press anywhere but on the instrument chooser or in its list puts "
+                                            "the list away")],
+    "desk/hints.py": [("<ButtonPress-1>", "a press anywhere takes away the words a click on a ? left on show")],
+    "desk/window.py": [("<Destroy>", "the desk's clock is stopped when the window goes")],
+}
+# The pointer resting on something (<Enter> and <Leave>), by file, and what it does: it never does more than show.
+HOVER = {
+    "desk/chooser.py": "the row of the instrument list under the pointer is lit",
+    "desk/hints.py": "a ? shows its words, and a drawn symbol its name, while the pointer rests on it",
 }
 
 
@@ -75,10 +90,11 @@ def name_of(node):
 
 @lru_cache(maxsize=None)
 def read(path):
-    """What a file of the app names and binds: (forbidden names with their lines, Tk roots made, events bound).
+    """What a file of the app names and binds: (forbidden names with their lines, Tk roots made, events bound,
+    the events among them that are bound on the window itself: on something called `top` or `root`).
     Each file is read once for all the tests here."""
     tree = ast.parse(path.read_text(encoding="utf-8"))
-    named, roots, bound = [], 0, []
+    named, roots, bound, wide = [], 0, [], []
     for node in ast.walk(tree):
         if isinstance(node, (ast.Import, ast.ImportFrom)):
             for alias in node.names:
@@ -95,11 +111,13 @@ def read(path):
                 event = node.args[1] if called == "bind_class" and len(node.args) > 1 else node.args[0]
                 if isinstance(event, ast.Constant) and isinstance(event.value, str):
                     bound.append((event.value, node.lineno))
+                    if isinstance(node.func, ast.Attribute) and name_of(node.func.value) in ("top", "root"):
+                        wide.append((event.value, node.lineno))
                 elif isinstance(event, ast.JoinedStr):
                     bound.append(("an event put together when it runs", node.lineno))
                 elif not isinstance(event, ast.Tuple):          # a tuple is a socket's address, not an event
                     bound.append(("an event that cannot be read here", node.lineno))
-    return named, roots, bound
+    return named, roots, bound, wide
 
 
 class NothingOpensOutsideTheWindowTest(unittest.TestCase):
@@ -129,6 +147,19 @@ class NothingOpensOutsideTheWindowTest(unittest.TestCase):
                 self.assertIn(event, ("<Return>", "<KeyRelease>"))      # never a shortcut: only an entry's own keys
                 self.assertGreater(len(why), 20)
 
+    def test_the_mouse_is_watched_over_the_whole_window_only_where_it_is_listed_here_with_the_reason(self):
+        found = {name: sorted(event for event, _ in read(path)[3]) for name, path in self.files() if read(path)[3]}
+        self.assertEqual(found, {name: sorted(event for event, _ in rows) for name, rows in WINDOW_WIDE.items()})
+        for rows in WINDOW_WIDE.values():
+            for event, why in rows:
+                self.assertTrue(NOT_A_KEY.match(event) and len(why) > 20, event)
+
+    def test_the_pointer_resting_on_something_does_something_only_where_it_is_listed_here(self):
+        found = {name for name, path in self.files()
+                 if any(event in ("<Enter>", "<Leave>") for event, _ in read(path)[2])}
+        self.assertEqual(found, set(HOVER))
+        self.assertTrue(all(len(why) > 20 for why in HOVER.values()))
+
     def test_every_double_click_has_a_button_on_show_that_does_the_same(self):
         found = {}
         for name, path in self.files():
@@ -149,50 +180,47 @@ class NothingOpensOutsideTheWindowTest(unittest.TestCase):
                               "top = tk.Toplevel()\nmenu = tk.Menu(top)\nroot = tk.Tk()\n"
                               "top.bind('<Escape>', print)\ntop.bind('<Button-1>', print)\n"
                               "top.bind(f'<{key}>', print)\ndoor.bind(('127.0.0.1', 1))\n", encoding="utf-8")
-            named, roots, bound = read(sample)
+            named, roots, bound, wide = read(sample)
+        self.assertEqual([event for event, _ in wide], ["<Escape>", "<Button-1>"])       # both bound on `top`
         self.assertEqual({word for word, _ in named}, {"filedialog", "webbrowser", "Toplevel", "Menu"})
         self.assertEqual(roots, 1)
         self.assertEqual([event for event, _ in bound if not NOT_A_KEY.match(event)],
                          ["<Escape>", "an event put together when it runs"])
 
 
+def all_widgets(widget):
+    found = []
+    for child in widget.winfo_children():
+        found.append(child)
+        found += all_widgets(child)
+    return found
+
+
+def open_every_part(widget):
+    """Open every part shown on request (`lab.tools.common.disclosure`: a frame with a `show`) inside a widget."""
+    for part in all_widgets(widget):
+        if isinstance(part, tk.Frame) and callable(getattr(part, "show", None)):
+            part.show(True)
+
+
+def pushed_out(widget, window):
+    """What is on show inside `widget` and does not lie wholly inside the window, as (class, text)."""
+    found = []
+    for part in all_widgets(widget):
+        if part.winfo_class() in ("Button", "Label", "Listbox", "Entry", "Canvas", "Checkbutton") \
+                and part.winfo_ismapped() and not inside(part, window):
+            found.append((part.winfo_class(), str(part.cget("text"))[:30] if part.winfo_class() != "Canvas"
+                          and part.winfo_class() != "Listbox" and part.winfo_class() != "Entry" else ""))
+    return found
+
+
 class HostedTest(DeskCase):
-    """Each thing that had a window of its own, in the desk's."""
+    """Each side tool, which had a window of its own, in the desk's."""
 
     def setUp(self):
         super().setUp()
         self.put("a", Sound("Clean", chain(gain_db=0.), {"kind": "designed"}))
         self.put("b", Sound("Plexi", chain(PLEXI, V30, DELAY), {"kind": "designed"}))
-
-    def learner(self):
-        from lab.learner import folders
-
-        self.addCleanup(folders.log_to, None)       # the seat points the learner's folders and log at this desk
-        self.addCleanup(folders.use, None)
-        self.desk.toggle("Guitar")
-        self.desk.open_learner()
-        seat = self.desk.seat
-        self.addCleanup(seat.worker.shutdown, wait=True)
-        self.addCleanup(self.desk.learner.worker.shutdown, wait=True)
-        for _ in range(200):
-            self.studio.poll()
-            seat.tick()
-            self.root.update()
-            if self.desk.learner.job is None and not self.desk.learner.queued:
-                break
-        return self.desk.learner
-
-    def teaching(self):
-        from lab.learner import folders
-
-        self.addCleanup(folders.log_to, None)
-        self.addCleanup(folders.use, None)
-        self.desk.toggle("Guitar")
-        self.desk.open_teach()
-        self.addCleanup(self.desk.seat.worker.shutdown, wait=True)
-        self.addCleanup(self.desk.teaching.worker.shutdown, wait=True)
-        self.root.update()
-        return self.desk.teaching
 
     def test_every_tool_is_shown_in_the_desks_window_fits_and_goes_back_to_the_more_panel(self):
         self.desk.toggle("More")
@@ -256,63 +284,194 @@ class HostedTest(DeskCase):
         self.pump()
         self.assertEqual(len(bench.auditions), 3)       # and its result is there when the tool is opened again
 
-    def test_the_guitar_learner_is_shown_in_the_desks_window_and_going_back_ends_a_recording(self):
-        learner = self.learner()
-        self.assert_fits(learner, "Guitar Learner")
-        self.assertEqual(self.desk.tiles["a"][0].winfo_toplevel(), learner.frame.winfo_toplevel())
-        learner.toggle_dataset()
-        learner.toggle_guide()
-        self.assert_fits(learner, "Guitar Learner")     # with the dataset and the guide on show too
-        learner.toggle_dataset()
-        learner.toggle_takes()
-        self.assert_fits(learner, "Guitar Learner")     # and with the takes and WAVs to choose from
-        learner.stop, learner.live_stop = Event(), Event()      # as while a take is recorded, or it listens live
-        stop, live = learner.stop, learner.live_stop
-        self.desk.back()
-        self.assertTrue(stop.is_set() and live.is_set())
-        self.assertIsNone(self.desk.hosted)
-        self.assertEqual((self.desk.panel, self.desk.tray.winfo_manager()), ("Guitar", "grid"))
-        learner.stop = learner.live_stop = None
-        self.desk.open_learner()
-        self.assertIs(self.desk.hosted, learner)        # the same one, as it was left
-        self.assertTrue(learner.guide_open)
-
-    def test_the_teaching_of_a_control_is_shown_in_the_desks_window_and_going_back_ends_a_recording(self):
-        teaching = self.teaching()
-        self.assert_fits(teaching, "Teach a control")
-        panel = teaching.panel
-        for content in (child for child in self.all_widgets(teaching.frame) if hasattr(child, "show")):
-            content.show(True)                          # every part shown on request, open
-        self.assert_fits(teaching, "Teach a control")
-        panel.recording = {"kind": "example", "setting": "Neck", "guitar": "Charvel", "stop": Event(),
-                           "ready": Event(), "started": True, "said": None}
-        stop = panel.recording["stop"]
-        self.desk.back()
-        self.assertTrue(stop.is_set())
-        self.assertEqual((self.desk.panel, self.desk.tray.winfo_manager()), ("Guitar", "grid"))
-        panel.recording = None
-        self.desk.open_teach()
-        self.assertIs(self.desk.hosted, teaching)
-
-    def all_widgets(self, widget):
-        found = []
-        for child in widget.winfo_children():
-            found.append(child)
-            found += self.all_widgets(child)
-        return found
-
     def test_every_part_shown_on_request_still_fits_across(self):
         for title, name in TOOLS:
             with self.subTest(tool=title):
                 tool = self.tool(name)
-                for content in (child for child in self.all_widgets(tool.frame) if hasattr(child, "show")):
-                    content.show(True)
+                open_every_part(tool.frame)
                 self.assert_fits(tool, title)
 
     def test_the_way_the_app_was_left_comes_back_as_the_panel_a_tool_was_opened_from(self):
         self.desk.toggle("More")
         self.tool("usage")
         self.assertEqual(self.studio.desk_session.get("panel"), "More")
+
+
+class LearningScreenTest(DeskCase):
+    """Learning the guitar is a screen of its own: the Guitar Learner and Teach a control, in the place of
+    everything below the top row."""
+
+    def setUp(self):
+        super().setUp()
+        self.put("a", Sound("Clean", chain(gain_db=0.), {"kind": "designed"}))
+        self.put("b", Sound("Plexi", chain(PLEXI, V30, DELAY), {"kind": "designed"}))
+
+    def test_it_takes_the_place_of_everything_below_the_top_row_and_the_panel_names_go(self):
+        desk = self.desk
+        desk.toggle("Shape")
+        screen = self.learn()
+        for size in (DEFAULT_SIZE, SMALLEST_SIZE):
+            self.resize(size)
+            self.assertTrue(desk.learning_on)
+            for gone in (desk.body, desk.names, desk.tiles["a"][0], desk.tray, desk.request, desk.line):
+                self.assertFalse(gone.winfo_ismapped(), (size, gone))
+            for stays in (desk.learn_symbol, desk.chooser):         # the top row: the symbol and the instrument
+                self.assertTrue(stays.winfo_ismapped(), size)
+            top = desk.chooser.master
+            self.assertEqual(screen.frame.winfo_toplevel(), self.root)
+            self.assertEqual(screen.frame.winfo_width(), top.winfo_width())             # the window's whole width
+            self.assertGreaterEqual(screen.frame.winfo_rooty(), top.winfo_rooty() + top.winfo_height())
+            self.assertTrue(inside(screen.frame, self.root), size)
+            self.assertGreater(screen.frame.winfo_height(), size[1] - 110, size)        # and down to its bottom
+        self.resize(DEFAULT_SIZE)
+        self.assertEqual([child.winfo_class() for child in self.root.winfo_children()], ["Frame"])   # still one page
+        # What the desk's status line says is said on the screen's own line.
+        self.studio.say("Something the desk says.")
+        self.assertEqual(screen.line.cget("text"), "Something the desk says.")
+        self.assertEqual(desk.working.cget("text"), "")
+
+    def test_the_desk_comes_back_exactly_as_it_was(self):
+        desk = self.desk
+        desk.toggle("More")
+        tool = self.tool("usage")
+        self.studio.play("phrase", "b")
+        self.pump()
+        screen = self.learn()
+        self.assertEqual(self.studio.state.mode, "phrase")          # what plays goes on behind the screen
+        desk.learn_symbol.event_generate("<ButtonRelease-1>")       # pressed again
+        self.root.update()
+        self.assertFalse(desk.learning_on)
+        self.assertFalse(screen.frame.winfo_ismapped())
+        self.assertIs(desk.hosted, tool)
+        self.assertEqual((desk.panel, self.studio.state.mode, self.studio.state.side), ("More", "phrase", "b"))
+        for back in (desk.body, desk.names, desk.side, tool.frame, desk.tiles["a"][0], desk.tiles["b"][0], desk.request):
+            self.assertTrue(back.winfo_ismapped(), back)
+        desk.back()
+        self.assertEqual(desk.tray.winfo_manager(), "grid")
+        desk.toggle_learning()
+        self.assertIs(desk.learning, screen)                        # the same screen, as it was left
+        self.assertEqual(screen.view, "Guitar Learner")
+
+    def test_the_symbol_is_lit_while_learning_and_says_what_a_press_does(self):
+        from lab.desk.theme import ACCENT, RULE
+
+        desk, symbol = self.desk, self.desk.learn_symbol
+
+        def said():
+            symbol.event_generate("<Enter>")
+            self.root.update()
+            words = [child.cget("text") for child in self.root.winfo_children() if child.winfo_class() == "Label"]
+            symbol.event_generate("<Leave>")
+            self.root.update()
+            return words
+
+        self.assertEqual((symbol.cget("highlightbackground"), said()), (RULE, ["Learn the guitar"]))
+        self.learn()
+        self.assertEqual((symbol.cget("highlightbackground"), said()), (ACCENT, ["Back to the desk"]))
+        self.assertEqual([child.winfo_class() for child in self.root.winfo_children()], ["Frame"])   # the name is gone
+        desk.toggle_learning()
+        self.assertEqual(symbol.cget("highlightbackground"), RULE)
+
+    def test_it_follows_the_instrument_and_offers_teach_a_control_alone_for_one_with_no_layout(self):
+        desk = self.desk
+        screen = self.learn()
+        self.assertEqual((screen.view, screen.learner.guitar), ("Guitar Learner", "Charvel"))
+        self.assertEqual([tab.winfo_ismapped() for tab in screen.tabs.values()], [True, True])
+        desk.choose_instrument("Acoustic")                          # changed while the screen is on
+        self.settle_learning()
+        self.assertEqual(screen.view, "Teach a control")
+        self.assertEqual([tab.winfo_ismapped() for tab in screen.tabs.values()], [False, True])
+        self.assertFalse(screen.learner.frame.winfo_ismapped())
+        self.assertEqual(screen.why.cget("text"), "The Guitar Learner has no picture of the Acoustic's controls.")
+        self.assertTrue(screen.why.winfo_ismapped())
+        self.assertEqual(screen.teaching.panel.instrument.get(), "Acoustic")
+        screen.choose("Guitar Learner")                             # not offered: nothing happens
+        self.assertEqual(screen.view, "Teach a control")
+        desk.choose_instrument("Charvel")
+        self.settle_learning()
+        self.assertEqual(screen.view, "Guitar Learner")             # the view chosen before is back with the guitar
+        self.assertFalse(screen.why.winfo_ismapped())
+        self.assertLess(screen.tabs["Guitar Learner"].winfo_rootx(), screen.tabs["Teach a control"].winfo_rootx())
+        screen.tabs["Teach a control"].event_generate("<ButtonRelease-1>")
+        self.root.update()
+        self.assertEqual((screen.view, screen.teaching.panel.instrument.get()), ("Teach a control", "Charvel"))
+        self.assertFalse(screen.learner.frame.winfo_ismapped())
+
+    def test_opened_on_an_instrument_with_no_layout_it_shows_teach_a_control_and_says_why(self):
+        self.desk.choose_instrument("Bass")
+        screen = self.learn()
+        self.assertEqual((screen.view, screen.learner), ("Teach a control", None))
+        self.assertIn("no picture of the Bass's controls", screen.why.cget("text"))
+        self.assertEqual(screen.teaching.panel.instrument.get(), "Bass")
+        self.assertEqual(self.desk.chooser.name.cget("text"), "Bass")
+
+    def test_nothing_is_wider_than_the_screen_or_pushed_out_of_the_window_at_either_size(self):
+        screen = self.learn()
+        learner = screen.learner
+
+        def fits(what, scrolls=False):
+            for size in (DEFAULT_SIZE, SMALLEST_SIZE):
+                self.resize(size)
+                across = screen.frame.winfo_width()
+                self.assertEqual(across, size[0] - 40, (what, size))
+                self.assertEqual(wide_children(screen.frame, across), [], (what, size))
+                self.assertTrue(inside(screen.frame, self.root), (what, size))
+                if not scrolls:
+                    self.assertEqual(pushed_out(screen.frame, self.root), [], (what, size))
+            self.resize(DEFAULT_SIZE)
+
+        fits("the Guitar Learner")
+        # Every control of the guitar is on the photograph as it is shown, also in the smallest window.
+        self.resize(SMALLEST_SIZE)
+        art = learner.board.art
+        self.assertEqual(set(learner.board.hotspots), {"volume", "tone", "pickup", "wiring"})
+        for key, (x, y) in learner.board.hotspots.items():
+            self.assertTrue(15 < x < art.winfo_width() - 15 and 15 < y < art.winfo_height() - 15, key)
+        self.resize(DEFAULT_SIZE)
+        learner.toggle_takes()
+        self.root.update()
+        self.assertTrue(learner.chooser.winfo_ismapped() and not learner.board.winfo_ismapped())
+        fits("its takes and WAVs")
+        learner.toggle_takes()
+        learner.toggle_dataset()
+        fits("its dataset")
+        learner.toggle_dataset()
+        self.root.update()
+        self.assertTrue(learner.board.winfo_ismapped())
+        screen.choose("Teach a control")
+        self.root.update()
+        fits("Teach a control")
+        open_every_part(screen.teaching.frame)          # with every part shown on request open, it scrolls
+        fits("Teach a control with every part open", scrolls=True)
+        self.assertTrue(inside(screen.teaching.scroller, self.root))
+
+    def test_leaving_the_screen_or_the_view_ends_a_recording_and_a_live_listening(self):
+        desk = self.desk
+        screen = self.learn()
+        learner = screen.learner
+        learner.stop, learner.live_stop = Event(), Event()      # as while a take is recorded, or it listens live
+        stop, live = learner.stop, learner.live_stop
+        desk.toggle_learning()
+        self.assertTrue(stop.is_set() and live.is_set())
+        learner.stop = learner.live_stop = None
+        self.learn("Teach a control")
+        panel = screen.teaching.panel
+        learner.stop = Event()
+        panel.recording = {"kind": "example", "setting": "Neck", "guitar": "Charvel", "stop": Event(),
+                           "ready": Event(), "started": True, "said": None}
+        panel.live_running = True
+        stop = panel.recording["stop"]
+        desk.toggle_learning()
+        self.assertTrue(stop.is_set() and learner.stop.is_set())
+        self.assertTrue(panel.live_running)             # gesture listening goes on: the guitar is played on the desk
+        panel.recording, panel.live_running, learner.stop = None, False, None
+        self.learn()
+        learner.stop = Event()
+        stop = learner.stop
+        screen.choose("Guitar Learner")
+        screen.choose("Teach a control")                # the other view: the one that is left ends its recording
+        self.assertTrue(stop.is_set())
+        learner.stop = None
 
 
 class DeskPanelsTest(DeskCase):

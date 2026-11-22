@@ -29,7 +29,7 @@ A fourth kind was added on 2026-11-19: **measured on the unit**, by replaying on
 | Raw research with a source per claim | `research/*.json`, `research/qc-internals.md` |
 | Rebuild the knowledge file from the research | `python research/build_knowledge.py` |
 
-The research scripts under `research/` that drive the unit still run on the earlier app's modules (`tone_lab/`).
+The research scripts under `research/` that drive the unit run on the app's own engine (`lab/tools/sweeps.py`); each takes `--simulated`.
 
 `gear.json` is generated. Edit the research files or the build script, then rebuild. The build checks every model id, parameter name and setting against the catalog and reports what it drops (currently nothing).
 

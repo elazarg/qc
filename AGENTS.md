@@ -46,8 +46,9 @@ fed with files that hold the player's presets (keep them in the data folder or `
 - **Never reach the real unit, the audio driver or the Codex CLI from a test.** Use `lab.qc.sim` (`SimUnit`,
   `SimAudio`), `Host(folder, simulated=True, local=True)` and `Assistant(folder, run=...)`. Every command-line
   call in a test passes `--simulated`.
-- **Never put a window on the screen from a test.** A test that creates Tk imports `hidden_tk` first. No
-  screenshots: the player may be at the computer.
+- **Never put a window on the screen from a test.** A test that creates Tk imports `hidden_tk` first. To look
+  at what you built, take a picture of the hidden window: `tests/picture.py` (`picture.save(root, path)`)
+  writes a PNG without showing anything. Look at every screen you change, at 1100x680 and at 980x620.
 - **Never read or write the player's data from a test.** Everything goes in a temporary folder; `TONE_LAB_HOME`
   points the app's data folder at it.
 - **Do not drive the real unit from an agent session unless the player asked for it in that session.** A job
@@ -55,8 +56,15 @@ fed with files that hold the player's presets (keep them in the data folder or `
 
 ## Rules of the design
 
-- **One window.** No dialogs, no pop-up windows or menus, no keyboard shortcuts. A feature opens as a panel of
-  the desk, and the desk stays sparse: what is rarely needed is disclosed on request, in place.
+- **One window.** No dialogs, no pop-up windows, no keyboard shortcuts. A feature opens as a panel of the desk,
+  and the desk stays sparse: what is rarely needed is disclosed on request, in place. A list that drops down
+  (the instrument chooser) and the words of a hint are frames placed over the window's own content, never a
+  window or a `tk.Menu`. Learning the guitar is the one thing that takes the whole screen below the top row.
+- **Few words on the screen.** A sentence that explains how something works, and does not change with what
+  is happening, is left out when the control's name says it, and otherwise goes behind a `hint`
+  (`lab/desk/hints.py`). Names, values, results and the status line stay in the open.
+- **The instrument is global.** It is chosen in the top row and everything follows it at once; nothing keeps
+  an instrument of its own.
 - **Name what is measured.** A measurement is named for the quantity it measures. A conclusion drawn from it
   (such as "overdriven") is an inference and is labelled as one. Prefer a direct test signal to a proxy.
   The same holds for controls: a Shape knob is a quality that is heard, never one device control.

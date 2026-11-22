@@ -279,3 +279,15 @@ Every section above was acted on. Each bug was reproduced on the simulated unit 
 6. One real request to the assistant: the way its process is run and stopped changed.
 7. The taskbar button.
 8. A look at every hosted tool, the Guitar Learner (its photograph is now cropped) and Teach a control: their layouts were checked by measurement only.
+
+## After the owner used it (November 22, 2026)
+
+His remarks, and what was done:
+
+- **The instrument is global and visible.** A chooser at the left of the top row shows the instrument's picture and name and lists the others beneath it, inside the window (`lab/desk/chooser.py`, `lab/desk/pictures.py`). The whole app follows a change at once, the phrase included when one was recorded on that instrument. The chips in More are gone. (The app had been left on "Acoustic", chosen once in More, with nothing on the screen saying so.)
+- **Learning the guitar is a screen of its own.** A symbol at the far left puts the learning screen in the place of everything below the top row and brings the desk back as it was (`lab/learner/screen.py`). It holds the Guitar Learner at the window's whole width and Teach a control; they are no longer in the Guitar panel.
+- **Few words.** Explanations are behind a "?" (`lab/desk/hints.py`) or gone, in every panel, tool and learner view.
+- **`tone_lab/` is removed**, with its 37 test files and the launcher's `--old`. The tag `with-tone_lab` is the last commit that has it. The four research scripts that drove the unit through it now use the app's engine (`lab/tools/sweeps.py`); `analyse_amps.py` still reproduces `lab/tables/controls.json` and the report byte for byte. They have not been run on the real unit since the port.
+- **Looking is possible now.** `tests/picture.py` writes a picture of a hidden window, and every screen changed here was looked at in one, at 1100x680 and at 980x620.
+
+Still open from the list above: the session on the unit (now including one trial run of `research/measure_amps.py` on two amps before the sweeps are trusted), the decision on the check before every write, and `lab/migrate.py` once the history is confirmed complete. There is no screen yet for adding an instrument; `instruments.json` in the data folder holds the list.

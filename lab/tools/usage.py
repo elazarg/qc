@@ -19,7 +19,7 @@ import tkinter as tk
 from uuid import uuid4
 
 from lab.desk.theme import FONT, INK, PAPER, SOFT, SUBTLE
-from lab.tools.common import WIDTH, Tool, button, disclosure, label, listbox, section
+from lab.tools.common import WIDTH, Tool, button, disclosure, label, listbox, room, said, section, sized
 
 LOG = "ui-usage.jsonl"
 
@@ -162,32 +162,35 @@ class UsageTool(Tool):
     TITLE = "Usage and feedback"
 
     def build(self):
-        self.rows = []
-        calls = section(self.body, "The assistant", "Calls by day, from the ledger every call is written to. "
-                                                    "Choose a day for the rest.")
-        self.today = label(calls, size=10, bold=True, wrap=WIDTH)
+        self.rows, self.kept = [], []
+        calls = section(self.body, "The assistant", "Calls to the assistant by day, yours and the app's own, "
+                                                    "from the ledger every call is written to. Choose a day for "
+                                                    "what they were.")
+        self.today = label(calls, size=9, wrap=WIDTH)
         self.today.pack(fill="x")
-        self.days = listbox(calls, height=6)
+        self.days_part = room(calls)        # the days, once there is one
+        self.days = listbox(self.days_part, height=6)
         self.days.pack(fill="x", pady=(6, 0))
         self.days.bind("<<ListboxSelect>>", lambda _: self.describe_day())
-        self.day = label(calls, size=9, color=SUBTLE, wrap=WIDTH)
-        self.day.pack(fill="x", pady=(4, 0))
+        self.day = said(calls, color=SUBTLE)
 
         notes = section(self.body, "Feedback", "A note about what is on A and B now. It is kept with them.")
         self.note = tk.Text(notes, height=3, width=20, bg=PAPER, fg=INK, insertbackground=INK, relief="flat",
                             font=(FONT, 10), wrap="word")
         self.note.pack(fill="x")
         button(notes, "Keep this note", self.keep).pack(anchor="w", pady=(6, 0))
-        self.notes = listbox(notes, height=4)
+        self.notes_part = room(notes)       # the notes kept, once there is one
+        self.notes = listbox(self.notes_part, height=4)
         self.notes.pack(fill="x", pady=(6, 0))
+        self.notes.bind("<<ListboxSelect>>", lambda _: self.describe_note())
+        self.said_of = said(self.notes_part, color=SUBTLE)      # the note chosen, whole, and what it was about
 
-        views = disclosure(self.body, "Tools opened, and what is kept on the unit")
+        views = disclosure(self.body, "Tools opened, and the unit")
         self.views = label(views, size=9, color=SOFT, wrap=WIDTH)
         self.views.pack(fill="x")
         button(views, "What the app keeps on the Quad Cortex", self.check_unit, quiet=True).pack(anchor="w",
                                                                                                 pady=(6, 0))
-        self.unit = label(views, size=9, color=SUBTLE, wrap=WIDTH)
-        self.unit.pack(fill="x", pady=(4, 0))
+        self.unit = said(views, color=SUBTLE)
         self.refresh()
 
     def shown(self):
@@ -199,19 +202,31 @@ class UsageTool(Tool):
         if picked:
             self.day.configure(text=day_detail(self.rows[picked[0]]))
 
+    def describe_note(self):
+        picked = self.notes.curselection()
+        if picked:
+            note = self.kept[picked[0]]
+            sounds = " / ".join(item["name"] for item in note.get("sounds", {}).values())
+            self.said_of.configure(text=note["text"] + (f"  ·  {sounds}" if sounds else ""))
+
     def refresh(self):
         self.today.configure(text=today_line(self.folder))
         self.days.delete(0, "end")
         self.rows = daily(self.folder)
+        self.days_part.show(bool(self.rows))
         for row in self.rows:
             self.days.insert("end", day_line(row))
+        sized(self.days, 6)
         counted = opens(self.folder)
         self.views.configure(text=" · ".join(f"{view} {count}" for view, count in counted.most_common(12))
                              or "No tool has been opened yet.")
         self.notes.delete(0, "end")
-        for note in feedback_notes(self.folder)[:30]:
-            sounds = " / ".join(item["name"] for item in note.get("sounds", {}).values())
-            self.notes.insert("end", f"{note['at'][:16]}  {note['text'][:70]}" + (f"  ·  {sounds}" if sounds else ""))
+        self.kept = feedback_notes(self.folder)[:30]
+        self.notes_part.show(bool(self.kept))
+        self.said_of.configure(text="")
+        for note in self.kept:
+            self.notes.insert("end", f"{note['at'][5:16].replace('T', ' ')}  {note['text']}")
+        sized(self.notes, 4)
 
     def check_unit(self):
         def shown(state):

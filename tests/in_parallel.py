@@ -24,7 +24,8 @@ SAME_DOOR = ("test_lab_desk_window", "test_lab_cli", "test_lab_launcher", "test_
 # Roughly how long each of the long modules takes, in seconds; the others count by their size.
 LONG = {"test_lab_studio_flow": 14, "test_lab_one_window": 13, "test_lab_tools_windows": 11, "test_lab_desk_window": 11,
         "test_lab_studio": 8, "test_lab_probe": 6, "test_lab_learner_gestures": 6, "test_lab_measure": 5,
-        "test_lab_learner_teach": 4, "test_lab_learner_window": 4, "test_isolation": 3, "test_lab_cli": 3}
+        "test_lab_learner_teach": 4, "test_lab_learner_window": 4, "test_isolation": 3, "test_lab_cli": 3,
+        "test_lab_tools_sweeps": 6}
 
 
 def shares(count):

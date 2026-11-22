@@ -1,4 +1,4 @@
-"""The launcher's Python side (desktop_launcher/start.pyw) and the shortcut's taskbar repair, without the earlier app.
+"""The launcher's Python side (desktop_launcher/start.pyw) and the shortcut's taskbar repair.
 
 Nothing here opens a desk, shows a message box or touches the real data folder: the desk, the box and the
 folder are stand-ins."""
@@ -42,7 +42,7 @@ class StartTest(unittest.TestCase):
     def test_the_process_that_owns_the_window_takes_tone_lab_s_taskbar_identity(self):
         # Regression: only the launcher had it, and the launcher is gone seconds after it starts this process.
         opened = Mock()
-        self.assertEqual(self.run_main(["--simulated"], open_new_desk=opened), 0)
+        self.assertEqual(self.run_main(["--simulated"], open_desk=opened), 0)
         self.identity.assert_called_once_with(cli.APP_ID)
         self.assertEqual(self.launcher["APP_ID"], cli.APP_ID)
         opened.assert_called_once_with(["--simulated"])
@@ -54,7 +54,7 @@ class StartTest(unittest.TestCase):
         self.assertFalse(self.home.exists())            # finding the log's place creates nothing
         self.home.mkdir()
         self.assertEqual(self.launcher["log_files"](os.environ)[0], self.home / "startup.log")
-        self.assertEqual(self.run_main([], open_new_desk=Mock()), 0)
+        self.assertEqual(self.run_main([], open_desk=Mock()), 0)
         log = (self.home / "startup.log").read_text(encoding="utf-8")
         self.assertIn("Opening Tone Lab", log)
         self.assertIn("Launch finished", log)
@@ -76,29 +76,34 @@ class StartTest(unittest.TestCase):
         def broken(arguments):
             raise ValueError("Initialization failed")
 
-        self.assertEqual(self.run_main([], open_new_desk=broken), 2)
+        self.assertEqual(self.run_main([], open_desk=broken), 2)
         self.assertIn("ValueError: Initialization failed", (self.home / "startup.log").read_text(encoding="utf-8"))
         message = self.box.call_args.args[1]
         self.assertIn("Initialization failed", message)
         self.assertIn(str(self.home / "startup.log"), message)
 
-    def test_old_without_the_earlier_app_says_so_and_how_to_go_on(self):
-        with TemporaryDirectory() as program:               # a program folder the earlier app has been removed from
-            self.assertEqual(self.run_main(["--old"], ROOT=Path(program)), 2)
+    def test_asking_for_the_earlier_app_says_it_is_gone_and_how_to_go_on(self):
+        self.assertEqual(self.run_main(["--old"]), 2)
         message = self.box.call_args.args[1]
-        self.assertIn("The earlier app is no longer in the program folder", message)
+        self.assertIn("no longer part of Tone Lab", message)
         self.assertIn("without --old", message)
 
-    def test_nothing_but_old_needs_the_earlier_app(self):
-        """The new desk's start, the command line, first run and migration import nothing of `tone_lab`."""
-        source = START.read_text(encoding="utf-8")
-        self.assertEqual(source.count("from tone_lab"), 1)          # in `open_old_desk` alone
-        mine = [setup.REPO / "lab" / name for name in ("cli.py", "setup.py", "migrate.py")]
-        for path in [*mine, *(setup.REPO / "lab" / "tools").glob("*.py"), *(setup.REPO / "lab" / "gear").glob("*.py")]:
-            text = path.read_text(encoding="utf-8")
-            self.assertNotIn("import tone_lab", text, path.name)
-            self.assertNotIn("from tone_lab", text, path.name)
-            self.assertNotIn('"tone_sessions" / "recordings"', text, path.name)    # the earlier app's takes
+    def test_a_shortcut_made_while_there_were_two_desks_still_opens_the_desk(self):
+        from unittest.mock import patch as replace
+
+        opened = Mock()
+        with replace.dict(sys.modules, {"lab.desk.window": Mock(main=opened)}):
+            self.assertEqual(self.run_main(["--new", "--simulated"]), 0)
+        opened.assert_called_once_with(["--simulated"])
+
+    def test_nothing_needs_the_earlier_app(self):
+        """No part of the program imports `tone_lab`, and there is no such folder to import."""
+        self.assertFalse((setup.REPO / "tone_lab").exists())
+        sources = [START, *(setup.REPO / "lab").rglob("*.py"), *(setup.REPO / "research").glob("*.py")]
+        needing = [path.name for path in sources
+                   if any(sign in path.read_text(encoding="utf-8")
+                          for sign in ("import tone_lab", "from tone_lab", '"tone_sessions" / "recordings"'))]
+        self.assertEqual(needing, [])
 
 
 @unittest.skipUnless(sys.platform == "win32", "Windows desktop integration")

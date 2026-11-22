@@ -380,7 +380,7 @@ def measured_lines(record):
     """What listening measured, one line each, named for what was measured, with the word it gives. Reads
     records of every age: a value that was not measured, or could not be, is left out or said to be so."""
     if not record or "probe" not in record:
-        return ["Not measured with the current tests yet; that happens by itself while the unit is free."]
+        return ["Not measured with the current tests yet."]
     probe, lines = record["probe"] or {}, []
     current = probe.get("version", 1) >= 2        # the test signal's second layout (lab.hearing.probe)
     if _number(probe.get("distortion_db")) and _number(probe.get("distortion_soft_db")):

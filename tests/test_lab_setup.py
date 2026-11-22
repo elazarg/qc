@@ -272,59 +272,5 @@ class MoveTest(unittest.TestCase):
         self.assertFalse((self.old / setup.MOVED_NOTE).exists())
 
 
-class LauncherTest(unittest.TestCase):
-    """desktop_launcher/start.pyw opens the new desk unless told to open the earlier one."""
-
-    def setUp(self):
-        import runpy
-
-        self.launcher = runpy.run_path(str(setup.REPO / "desktop_launcher" / "start.pyw"))
-        self.temporary = TemporaryDirectory()
-        self.environ = {"LOCALAPPDATA": self.temporary.name}
-
-    def tearDown(self):
-        self.temporary.cleanup()
-
-    def choose(self, arguments=(), **environ):
-        return self.launcher["chosen_desk"](list(arguments), {**self.environ, **environ})
-
-    def test_the_new_desk_by_default(self):
-        self.assertEqual(self.choose(), "new")
-
-    def test_the_command_line_wins(self):
-        self.assertEqual(self.choose(["--new"], TONE_LAB_DESK="old"), "new")
-        self.assertEqual(self.choose(["--old"], TONE_LAB_DESK="new"), "old")
-
-    def test_then_the_environment(self):
-        self.assertEqual(self.choose(TONE_LAB_DESK="NEW"), "new")
-        self.assertEqual(self.choose(TONE_LAB_DESK="something else"), "new")
-
-    def test_then_the_setting_in_the_data_folder(self):
-        folder = Path(self.temporary.name) / "Tone Lab"
-        folder.mkdir()
-        (folder / "launcher.json").write_text('{"desk": "old"}', encoding="utf-8")
-        self.assertEqual(self.choose(), "old")
-        (folder / "launcher.json").write_text("{ broken", encoding="utf-8")
-        self.assertEqual(self.choose(), "new")
-
-    def test_the_setting_follows_tone_lab_home(self):
-        chosen = Path(self.temporary.name) / "chosen"
-        chosen.mkdir()
-        (chosen / "launcher.json").write_text('{"desk": "old"}', encoding="utf-8")
-        self.assertEqual(self.choose(TONE_LAB_HOME=str(chosen)), "old")
-        self.assertFalse((Path(self.temporary.name) / "Tone Lab").exists())   # finding it creates nothing
-
-    def test_the_new_desk_gets_the_other_arguments(self):
-        from unittest.mock import Mock
-
-        main = self.launcher["main"]
-        opened = Mock()
-        with patch.dict(main.__globals__, {"write_log": Mock(return_value=None), "open_new_desk": opened,
-                                           "take_identity": Mock()}), \
-                patch("sys.path", list(__import__("sys").path)):
-            self.assertEqual(main(["--new", "--simulated"]), 0)
-        opened.assert_called_once_with(["--new", "--simulated"])
-
-
 if __name__ == "__main__":
     unittest.main()

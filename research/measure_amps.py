@@ -1,62 +1,90 @@
 """Measure what every control of every guitar amp does, on the unit, with no sound in the room.
 
-Run from the repository root: python research/measure_amps.py [low] [inert] [model ids]
+Run from the repository root:
+    .venv\\Scripts\\python.exe research\\measure_amps.py [low] [inert] [model ids] [--limit N]
+                                                       [--phrase WAV] [--instrument NAME] [--out FOLDER]
+                                                       [--simulated]
+
+WITHOUT --simulated THIS DRIVES THE REAL QUAD CORTEX. Run it with the desk closed (the desk holds the unit, and
+the run is refused while it is open) and with the preset on the unit saved. Nothing is heard in the room: the
+phrase is replayed through the app's build slot over USB. The preset that was selected is given back at the
+end. Ctrl+C stops at the next safe point, and so does choosing another preset on the unit.
+
 One amp at a time takes the first cell of a fixed chain (amp, 412 V30 cab,
 level trim). Each knob is measured three points below and three above its
 default, and each switch in its other positions. Results go to
-research/measurements/amps/<id>.json, one file per amp, so a stopped run
-resumes where it left off. Selecting another preset on the unit stops it.
+research/measurements/amps/<id>.json (or under --out), one file per amp, so a
+stopped run resumes where it left off: an amp whose file was measured on the
+unit's firmware is not measured again, and --limit ends a run after so many
+amps. A file from before they said their firmware counts as measured on the
+firmware of the table the app ships.
 
-The loudest stretch of a take is mostly upper strings, which says little about
-bass controls. `low` repeats the bass and low-end controls on the stretch with
-the most energy below 200 Hz, into research/measurements/amps-low/.
+The phrase is the loudest 3.5 s of the newest phrase recorded on the desk that
+is long enough (see measure_controls.py). The loudest stretch of a take is
+mostly upper strings, which says little about bass controls. `low` repeats the
+bass and low-end controls on the stretch with the most energy below 200 Hz,
+into research/measurements/amps-low/.
 
 Amps named by id are measured again even when a result exists. `inert` names
 the amps that were found to pass the signal through untouched, which is what
 the unit does with a plugin it holds no licence for: run it after buying one,
 then run analyse_amps.py.
+
+With --simulated the simulated unit is driven instead, to try the mechanics.
+Its numbers mean nothing, so --out must name a scratch folder for them.
 """
 
 import json
 from pathlib import Path
 import sys
 
-import numpy as np
 from scipy import signal
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tone_lab import audio, device_presets, measured, models, preset_design, probe, session, styles  # noqa: E402
-from measure_controls import phrase  # noqa: E402
+import catalog_rows as models  # noqa: E402
+from measure_controls import (OUT, ask, checked, loudest, mono, no_phrase, options, phrase, takes, told,  # noqa: E402
+                              trimmed, unit, write_whole)
 
-OUT = Path(__file__).resolve().parent / "measurements" / "amps"
-CAB, GAIN_BLOCK = 12001, 16005
+from lab import cli, knowledge  # noqa: E402
+from lab.hearing.audio import RATE  # noqa: E402
+from lab.hearing.measure import CENTRES  # noqa: E402
+from lab.sound.chain import Block  # noqa: E402
+from lab.sound.design import EVERYDAY  # noqa: E402
+from lab.sound.knobs import AMP, ROLES  # noqa: E402
+
+STAND_IN, CAB = 1018, 12001     # the amp the chain is built with, and the cab every amp is heard through
+SECONDS = 3.5
 SKIP = {"OUTPUT", "MUTE TRIG"}
 STEP = .3  # of the control's range, either side of its default
-LOW_END = {*styles.ROLES[styles.AMP, "bass"], *styles.ROLES[styles.AMP, "thump"]}
+LOW_END = {*ROLES[AMP, "bass"], *ROLES[AMP, "thump"]}
 
 
-def low_phrase(seconds=3.5):
-    """The Charvel stretch with the most energy below 200 Hz, as mono dry audio."""
-    length = round(seconds * audio.RATE)
-    lows = signal.butter(4, 200, "low", fs=audio.RATE, output="sos")
+def low_phrase(folder, seconds=SECONDS, *, wav=None, instrument=None):
+    """The stretch with the most energy below 200 Hz among the takes, as (its name, mono dry audio)."""
+    length = round(seconds * RATE)
+    lows = signal.butter(4, 200, "low", fs=RATE, output="sos")
+
+    def cut(dry):
+        start, energy = loudest(signal.sosfilt(lows, dry[:, 0].astype("float64")), length)
+        return energy, dry[start:start + length].copy()
+
+    if wav is not None:
+        dry = mono(wav)
+        return Path(wav).name, cut(dry)[1] if len(dry) > length else dry
     best = None
-    for take in sorted((session.SESSIONS / "recordings").glob("clip-*")):
+    for info, path in takes(folder, instrument):
         try:
-            if json.loads((take / "clip.json").read_text(encoding="utf-8")).get("guitar") != "Charvel":
-                continue
-            dry = audio.read_wave(take / "dry.wav")
-        except (OSError, ValueError, KeyError):
+            dry = mono(path)
+        except (OSError, ValueError):
             continue
         if len(dry) <= length:
             continue
-        energy = np.concatenate(([0.], np.cumsum(np.square(signal.sosfilt(lows, dry[:, 0].astype(np.float64))))))
-        window = energy[length:] - energy[:-length]
-        start = int(np.argmax(window))
-        if best is None or window[start] > best[0]:
-            best = (window[start], take.name, dry[start:start + length].copy())
+        energy, part = cut(dry)
+        if best is None or energy > best[0]:
+            best = (energy, info["id"], part)
     if best is None:
-        raise RuntimeError("No Charvel take of that length was found.")
+        raise no_phrase(seconds, folder, instrument)
     return best[1], best[2]
 
 
@@ -85,39 +113,84 @@ def conditions(model_id, only=None):
 
 
 def order():
-    locked = device_presets.unavailable()
+    locked = models.unavailable()
     amps = [model["id"] for model in models.all_models()
-            if model["category"] == "Guitar Amplifier" and model["id"] not in locked]
-    everyday = [model_id for model_id in preset_design.MODELS["Amp"] if model_id in amps]
+            if model["category"] == AMP and model["id"] not in locked]
+    everyday = [model_id for model_id in EVERYDAY if model_id in amps]
     return everyday + [model_id for model_id in amps if model_id not in everyday]
 
 
-def main(chosen, low=False):
-    out = OUT.with_name("amps-low") if low else OUT
-    out.mkdir(parents=True, exist_ok=True)
-    take, dry = low_phrase() if low else phrase(3.5)
+def shipped(key, default=None):
+    """A field of the table of amp controls the app ships, or `default` without that table."""
+    try:
+        return knowledge.table("controls").get(key, default)
+    except knowledge.MissingTable:
+        return default
+
+
+def measured_on(path, earlier):
+    """The firmware an amp's result file was measured on (`earlier` for a file from before they said), None
+    when there is no such file. A file that cannot be read is left as it is: ValueError says so."""
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8")).get("firmware") or earlier
+    except (OSError, ValueError, AttributeError):
+        raise ValueError(f"{path} cannot be read. Move it away to measure that amp again.") from None
+
+
+def main(argv=None):
+    parser = options("What every control of every guitar amp does, measured silently, one file per amp.")
+    parser.add_argument("words", nargs="*", metavar="low|inert|ID",
+                        help="low: the bass controls on a low-string stretch; inert: the amps found to do nothing, "
+                             "again; ids: these amps, again")
+    parser.add_argument("--limit", type=int, metavar="N", help="measure at most N amps in this run")
+    args = checked(parser.parse_intermixed_args(argv))      # words and options in any order
+    unknown = [word for word in args.words if word not in ("low", "inert") and not word.isdigit()]
+    if unknown:
+        raise ValueError(f"{unknown[0]!r} is not low, inert or a model id.")
+    low, inert = "low" in args.words, set(shipped("inert", ()))
+    chosen = [int(word) for word in args.words if word.isdigit()] + (sorted(inert) if "inert" in args.words else [])
+    strangers = [model_id for model_id in chosen if not models.lookup(model_id)]
+    if strangers:
+        raise ValueError(f"The catalog has no model {strangers[0]}.")
+    out = (args.out or OUT) / ("amps-low" if low else "amps")
+    folder = cli.data_folder(args.simulated)
+    take, dry = (low_phrase(folder, wav=args.phrase, instrument=args.instrument) if low
+                 else phrase(SECONDS, folder, wav=args.phrase, instrument=args.instrument))
     only = LOW_END if low else None
-    # The full pass keeps measuring amps that did nothing, in case the unit gains a licence. The low pass skips them.
-    wanted = [model_id for model_id in (chosen or order()) if (chosen or not (out / f"{model_id}.json").exists())
-              and len(conditions(model_id, only)) > 1 and not (low and model_id in measured.inert())]
-    print(f"{len(wanted)} amps to measure on {take}", flush=True)
+    with unit(args.simulated) as (host, firmware):
+        # The full pass keeps measuring amps that did nothing, in case the unit gains a licence. The low pass
+        # skips them.
+        wanted = [model_id for model_id in (chosen or order())
+                  if (chosen or measured_on(out / f"{model_id}.json", shipped("firmware")) != firmware)
+                  and len(conditions(model_id, only)) > 1 and not (low and model_id in inert)]
+        todo = wanted if args.limit is None else wanted[:max(args.limit, 0)]
+        print(f"Amps to measure on {take}: {len(todo)}" + (f", and {len(wanted) - len(todo)} more after this run"
+                                                           if len(todo) < len(wanted) else ""), flush=True)
 
-    def done(model_id, rows):
-        info = models.lookup(model_id)
-        result = {"id": model_id, "name": info["name"], "take": take, "seconds": len(dry) / audio.RATE,
-                  "bands_hz": list(probe.CENTRES), "cab": models.lookup(CAB)["name"],
-                  "conditions": rows, "refused": rows is None}
-        (out / f"{model_id}.json").write_text(json.dumps(result, indent=1) + "\n", encoding="utf-8")
-        if rows is None:
-            print(f"{info['name']}: the unit would not load it", flush=True)
+        def done(event):
+            rows = event["rows"]
+            result = {"id": event["model"], "name": event["name"], "take": take, "seconds": len(dry) / RATE,
+                      "firmware": event["firmware"], "bands_hz": list(CENTRES), "cab": models.lookup(CAB)["name"],
+                      "conditions": rows, "refused": rows is None, "skipped": event["skipped"]}
+            write_whole(out / f"{event['model']}.json", json.dumps(result, indent=1) + "\n")
+            if rows is None:
+                print(f"{event['name']}: the unit would not load it", flush=True)
+            else:
+                print(f"{event['name']}: {len(rows)} conditions, {sum(row['seconds'] for row in rows):.0f} s"
+                      + (f"; the unit did not take {', '.join(event['skipped'])}" if event["skipped"] else ""),
+                      flush=True)
 
-    chain = [(1018, []), (CAB, []), (GAIN_BLOCK, [(0, -12.)])]
-    probe.sweep_models(0, [(model_id, conditions(model_id, only)) for model_id in wanted], chain, dry, done,
-                       report=lambda line: print(line, flush=True))
-    print("finished", flush=True)
+        found = {"left": 0, "stopped": False}
+        if todo:
+            found = ask(host, "lab.tools.sweeps.sweep_models", trimmed(Block(STAND_IN), Block(CAB)), (0, 0),
+                        [(model_id, conditions(model_id, only)) for model_id in todo], dry, each=done)
+    left = found["left"] + len(wanted) - len(todo)
+    print(f"stopped; amps left: {left}. Run it again to go on" if found["stopped"] else
+          f"finished this run; amps left: {left}. Run it again to go on" if left else "finished", flush=True)
+    return 1 if found["stopped"] else 0
 
 
 if __name__ == "__main__":
-    words = sys.argv[1:]
-    main([int(value) for value in words if value.isdigit()] + (sorted(measured.inert()) if "inert" in words else []),
-         low="low" in words)
+    sys.exit(told(main))

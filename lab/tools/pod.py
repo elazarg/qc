@@ -21,19 +21,20 @@ import json
 from pathlib import Path
 import tkinter as tk
 
+from lab.desk.hints import hint
 from lab.desk.theme import SUBTLE
-from lab.tools.common import WIDTH, FileChoice, Tool, button, disclosure, label, listbox, usual_folders
+from lab.tools.common import FileChoice, Tool, button, disclosure, listbox, room, said, sized, usual_folders
 
 REMEMBERED = "podgo.json"
 
 
 def account(item):
-    """What a preset became, in words: the summary, why there is no chain if there is none, and each block."""
+    """What a preset became, in words, as (the summary, and why there is no chain if there is none; each block
+    and why, one to a line)."""
     text = item.sound.explanation if item.confident else item.description
     if item.problems:
         text += "\n\nNot a chain because: " + "; ".join(item.problems[:3]) + "."
-    lines = item.lines()
-    return text + ("\n\n" + "\n".join(f"· {line}" for line in lines) if lines else "")
+    return text, "\n".join(f"· {line}" for line in item.lines())
 
 
 class PodTool(Tool):
@@ -41,24 +42,30 @@ class PodTool(Tool):
 
     def build(self):
         self.items = []
-        self.where = label(self.body, size=9, wrap=WIDTH)
-        self.where.pack(fill="x")
-        self.list = listbox(self.body, height=9)
+        self.where = said(self.body, color=SUBTLE, pady=0)
+        # The presets of the backup read, and what is done with one: there once a backup was read.
+        self.presets = room(self.body)
+        self.list = listbox(self.presets, height=9)
         self.list.pack(fill="x", pady=(4, 6))
         self.list.bind("<<ListboxSelect>>", lambda _: self.describe())
-        actions = tk.Frame(self.body, bg=self.body["bg"])
+        actions = tk.Frame(self.presets, bg=self.body["bg"])
         actions.pack(fill="x", pady=(0, 6))
         button(actions, "Put on B", self.put).pack(side="left")
         button(actions, "Ask for this", self.ask).pack(side="left", padx=6)
+        hint(actions, "Put on B: the preset as a chain of the Quad Cortex's own models, where it came across as "
+                      "one. Ask for this: the assistant designs three sounds from what the preset "
+                      "is.").pack(side="left")
+        # What the preset chosen became: in a few words in the open, and block by block on request.
+        self.summary = said(self.presets, pady=(0, 4))
+        self.blocks = room(self.presets)
+        self.note = said(disclosure(self.blocks, "Block by block"), color=SUBTLE, pady=0)
         # The backup is chosen once; choosing another is shown on request.
-        self.backup = disclosure(self.body, "The POD Go backup")
-        label(self.backup, "A .pgb backup: POD Go Edit, Backup. Usually under Documents, Line 6, POD Go, Backups.",
-              size=9, color=SUBTLE, wrap=WIDTH).pack(fill="x")
+        self.backup = disclosure(self.body, "The POD Go backup",
+                                 note="A .pgb backup, made in POD Go Edit with Backup. Usually under Documents, "
+                                      "Line 6, POD Go, Backups.")
         self.files = FileChoice(self.backup, folders=lambda: usual_folders("pod", self.folder), patterns=("*.pgb",),
                                 choose=self.choose, action="Read this backup")
         self.files.pack(fill="x")
-        self.note = label(self.body, size=9, wrap=WIDTH)
-        self.note.pack(fill="x", pady=(6, 0))
         path = self.remembered()
         if path and Path(path).is_file():
             self.load(path)
@@ -86,18 +93,22 @@ class PodTool(Tool):
         except (OSError, ValueError) as error:
             self.items = []
             self.list.delete(0, "end")
+            self.presets.show(False)
             self.backup.show(True)
             self.say(f"{Path(path).name}: {error}")
             return False
         self.where.configure(text=Path(path).name)
+        self.presets.show(True)
         self.list.delete(0, "end")
         for item in self.items:
             mark = "" if item.confident else "  · as a request" if item.pieces else "  · could not be read"
             self.list.insert("end", f"{item.slot}  {item.name}{mark}")
+        sized(self.list, 9)
+        self.describe()
         chains = sum(item.confident for item in self.items)
         unread = sum(not item.pieces for item in self.items)
-        self.say(f"{len(self.items)} presets: {chains} came across as chains, {len(self.items) - chains - unread} "
-                 "as descriptions to design from" + (f", {unread} could not be read." if unread else "."))
+        self.say(f"{len(self.items)} presets: {chains} as chains, {len(self.items) - chains - unread} "
+                 "as requests" + (f", {unread} could not be read." if unread else "."))
         return True
 
     def chosen(self):
@@ -108,8 +119,10 @@ class PodTool(Tool):
 
     def describe(self):
         picked = self.list.curselection()
-        if picked:
-            self.note.configure(text=account(self.items[picked[0]])[:2400])
+        summary, blocks = account(self.items[picked[0]]) if picked else ("", "")
+        self.summary.configure(text=summary[:900])
+        self.note.configure(text=blocks[:2400])
+        self.blocks.show(bool(blocks))
 
     def put(self):
         item = self.chosen()

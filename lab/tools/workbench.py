@@ -1,9 +1,7 @@
 """The comparison workbench: several versions of one sound, rendered with the phrase, heard blind.
 
-Carried over from the old first workbench (`python -m tone_lab ui`: reamp scenes, compare WAVs, sweep a
-parameter, blind A/B/C audition, keep a preference) and the style renders of `iterate` (a request rendered
-at two strengths next to the original). On the new core each version is a chain made from the selected
-sound, played silently through the unit with the desk's phrase:
+Each version is a chain made from the selected sound, played silently through the unit with the desk's
+phrase:
 
 - **Scenes**: each scene the sound names (up to six).
 - **Strengths**: a request such as "darker" or "more jazz" as Shape knob moves, at 40 % and 85 %, next to the
@@ -35,12 +33,22 @@ from lab.hearing.audio import read_wave
 from lab.hearing.measure import match, measure
 from lab.sound.sounds import Sound
 from lab.desk.theme import FONT, INK, SUBTLE, TILE
-from lab.tools.common import (SCENE_LETTERS, WIDTH, Chips, FileChoice, Tool, button, disclosure, flow, gained,
-                              heard_chain, label, listbox, phrase, play, section, silence, usual_folders,
-                              with_knobs, write_pcm16)
+from lab.tools.common import (SCENE_LETTERS, Chips, FileChoice, Tool, button, caption, disclosure, flow, gained,
+                              heard_chain, label, listbox, phrase, play, room, said, section, silence, sized,
+                              usual_folders, with_knobs, write_pcm16)
 
 STRENGTHS = (.4, .85)
 KINDS = ("Scenes", "Strengths", "Sweep", "WAV files")
+# What each kind compares, said behind the "?" beside the heading; and how the versions are made and heard.
+KIND_NOTES = {
+    "Scenes": "Each scene the selected sound names, up to six.",
+    "Strengths": "A request in words, such as darker, more jazz or less delay, at 40 % and 85 % next to the sound as "
+                 "it is.",
+    "Sweep": "One control of the selected sound at each of the values typed: choose the control in the list, then "
+             "type two values or more.",
+    "WAV files": "Two or more recordings from elsewhere: click each in the list, or paste a path. No unit needed.",
+}
+HOW_RENDERED = "They are rendered silently with the desk's phrase, then level-matched and shuffled."
 
 
 # ---- versions of a sound ----
@@ -245,14 +253,14 @@ class WorkbenchTool(Tool):
         self.target = self.record = self.last = None
         self.auditions = {}
         self.control_rows = []          # the controls listed for a sweep: (label, row, column, index)
-        make = section(self.body, "Versions of the selected sound",
-                       "Rendered silently with the desk's phrase, then level-matched and shuffled.")
+        make = section(self.body, "Versions of the selected sound", "Versions.")
+        self.help = make.hint           # what the kind chosen compares, behind the "?": `kind_changed` says it
         self.kind = tk.StringVar(master=self.frame, value=KINDS[0])
-        Chips(make, self.kind, KINDS, command=self.kind_changed).pack(fill="x")
-        self.help = label(make, size=9, color=SUBTLE, wrap=WIDTH)
-        self.help.pack(fill="x", pady=(4, 4))
+        Chips(make, self.kind, KINDS, command=self.kind_changed).pack(fill="x", pady=(0, 4))
         # What a kind needs is shown for that kind alone: the words or values, the control, the recordings.
         self.typed = tk.Frame(make, bg=make["bg"])
+        self.asked = label(self.typed, size=9, color=SUBTLE)        # the name of what is typed
+        self.asked.pack(fill="x")
         self.argument = tk.Entry(self.typed, font=(FONT, 10), relief="flat", bg=TILE, fg=INK, insertbackground=INK)
         self.argument.pack(fill="x", ipady=4)
         self.argument.bind("<Return>", lambda _: self.render())
@@ -262,13 +270,14 @@ class WorkbenchTool(Tool):
         self.render_button = button(make, "Render", self.render)
 
         # The audition is shown once there is a comparison to hear.
-        self.hear = section(self.body, "Blind audition")
+        self.hear = section(self.body, "Blind audition",
+                            "The versions at one loudness, in an order that is not the one they were made in. Play "
+                            "them, keep the one you prefer, then ask which was which.")
         self.players = tk.Frame(self.hear, bg=self.hear["bg"])
         self.players.pack(fill="x")
-        self.about = label(self.hear, size=9, wrap=WIDTH)
-        self.about.pack(fill="x", pady=(6, 0))
-        label(self.hear, "A remark on the one last played, or on the comparison:", size=9,
-              color=SUBTLE).pack(fill="x", pady=(6, 0))
+        self.about = said(self.hear, pady=(6, 0))
+        caption(self.hear, "Remark", "Kept with the version last played (Keep last played), or with the comparison "
+                                     "as a whole (Note on this comparison).").pack(fill="x", pady=(6, 0))
         self.remark = tk.Entry(self.hear, font=(FONT, 10), relief="flat", bg=TILE, fg=INK, insertbackground=INK)
         self.remark.pack(fill="x", ipady=4)
         row = tk.Frame(self.hear, bg=self.hear["bg"])
@@ -282,9 +291,11 @@ class WorkbenchTool(Tool):
         self.hear.pack_forget()
 
         earlier_ones = disclosure(self.body, "Earlier comparisons")
-        self.earlier = listbox(earlier_ones, height=5)
+        self.none_earlier = said(earlier_ones, color=SUBTLE, pady=0)
+        self.earlier_part = room(earlier_ones)
+        self.earlier = listbox(self.earlier_part, height=5)
         self.earlier.pack(fill="x")
-        button(earlier_ones, "Open", self.open_earlier, quiet=True).pack(anchor="w", pady=(4, 0))
+        button(self.earlier_part, "Open", self.open_earlier, quiet=True).pack(anchor="w", pady=(4, 0))
         self.earlier.bind("<Double-Button-1>", lambda _: self.open_earlier())     # the same as Open
         self.kind_changed()
         self.list_earlier()
@@ -294,24 +305,19 @@ class WorkbenchTool(Tool):
         for part in (self.typed, self.control_list, self.files, self.render_button):
             part.pack_forget()
         self.argument.delete(0, "end")
+        self.help.say(f"{KIND_NOTES[kind]} {HOW_RENDERED if kind != 'WAV files' else ''}".strip())
         if kind == "Strengths":
-            self.help.configure(text="A request in words, such as darker, more jazz or less delay. It is rendered at "
-                                     "40 % and 85 % next to the sound as it is.")
+            self.asked.configure(text="A request, such as darker")
             self.typed.pack(fill="x")
         elif kind == "Sweep":
-            self.help.configure(text="Choose a control of the selected sound, then type the values to compare, such "
-                                     "as 3 5 7.")
+            self.asked.configure(text="Values of the control chosen, such as 3 5 7")
             self.list_controls()
             self.control_list.pack(fill="x", pady=(0, 4))
             self.typed.pack(fill="x")
         elif kind == "WAV files":
-            self.help.configure(text="Two or more recordings from elsewhere: click each in the list, or paste a "
-                                     "path. No unit needed.")
             self.files.look()
             self.files.pack(fill="x")
             return
-        else:
-            self.help.configure(text="Each scene the sound names, up to six.")
         self.render_button.pack(anchor="w", pady=(6, 0))
 
     def shown(self):
@@ -325,6 +331,7 @@ class WorkbenchTool(Tool):
         self.control_list.delete(0, "end")
         for name, *_ in self.control_rows:
             self.control_list.insert("end", name)
+        sized(self.control_list, 5)
 
     def versions(self, sound):
         kind, text = self.kind.get(), self.argument.get().strip()
@@ -456,12 +463,16 @@ class WorkbenchTool(Tool):
 
     def list_earlier(self):
         self.found = earlier(self.folder)       # the rows of the list, one for one
+        self.earlier_part.show(bool(self.found))
+        self.none_earlier.configure(text="" if self.found else "None yet.")
         self.earlier.delete(0, "end")
         for _, record in self.found:
             chosen = record.get("choice")
-            self.earlier.insert("end", f"{str(record.get('created', ''))[:16]}  {record.get('kind', '')}"
+            self.earlier.insert("end", f"{str(record.get('created', ''))[:16].replace('T', ' ')}  "
+                                       f"{record.get('kind', '')}"
                                        + (f" · {record['sound']['name']}" if record.get("sound") else "")
                                        + (f" · kept {chosen['name']}" if chosen else ""))
+        sized(self.earlier, 5)
 
     def open_earlier(self):
         chosen = self.earlier.curselection()

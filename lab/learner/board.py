@@ -1,9 +1,9 @@
 """The guitar's controls for labelling dry recordings: a photograph of the Charvel with its controls marked,
 two dials, the pickup blade and the mini-toggle.
 
-It is drawn for the width of the desk's side panel, where the Guitar Learner is shown, in the desk's colours
-and type (`lab.desk.theme`). The photograph is the part of the catalog picture that holds the controls, at
-its own scale, so the marks on it are as large as they were.
+It is the left part of the learning screen, in the desk's colours and type (`lab.desk.theme`). The photograph
+is shown at its own size; in a window too small for all of it, its top and its right (the upper horn, the
+neck) are what is left out, never the controls.
 
 Everything is set with the mouse: a dial is dragged or scrolled over, a mark on the photograph is dragged
 (a knob) or clicked (the blade, the toggle), and the blade and the toggle have buttons of their own. Nothing is
@@ -29,7 +29,6 @@ DIM = theme.DIM
 ACCENT = theme.ACCENT
 ACTIVE_INK = theme.ACCENT_INK
 ALERT = theme.SOFT
-WIDTH = 380         # what fits across the desk's side panel (`lab.tools.common.WIDTH`)
 LAYOUTS_SHOWN = ("dk24_hh_toggle", "dk24_blade")
 LAYOUT_LABELS = ("Blade + toggle", "Blade only")
 # Each layout's photograph, and where its controls are on it (in the whole picture's pixels).
@@ -39,9 +38,7 @@ PHOTO = {
     "dk24_blade": ("charvel-dk24-blade.png", {"volume": (184, 262), "tone": (132, 318),
                                              "pickup": (212, 280)}),
 }
-# The part of the picture shown: the body's lower half, with the pickups and every control (left, top, right,
-# bottom).
-SHOWN = (0, 100, WIDTH, 356)
+SMALLEST = (430, 250)       # the least of the photograph that is asked for (across, down): every control is in it
 
 
 def word(parent, title=None, *, variable=None, size=10, color=INK, bold=False, wrap=0):
@@ -128,40 +125,53 @@ class Dial(tk.Canvas):
 
 class GuitarBoard(tk.Frame):
     def __init__(self, parent, on_layout, changed):
-        super().__init__(parent, background=PANEL)
+        super().__init__(parent, background=PANEL, padx=14, pady=10)
         self.on_layout, self.changed = on_layout, changed
         self.layout = None
         self.values = defaults(LAYOUTS_SHOWN[0])
         self.photo_drag = None
         self.hotspots = {}
-        self.images = {layout: self.part_shown(filename) for layout, (filename, _) in PHOTO.items()}
+        self.images = {layout: tk.PhotoImage(master=self, file=str(Path(__file__).with_name("assets") / filename))
+                       for layout, (filename, _) in PHOTO.items()}
         head = tk.Frame(self, background=PANEL)
         head.pack(fill="x")
-        word(head, "Charvel DK24", size=9, bold=True).pack(side="left")
+        word(head, "Charvel DK24", size=11, bold=True).pack(side="left")
         self.layout_buttons = []
         for key, label in reversed(tuple(zip(LAYOUTS_SHOWN, LAYOUT_LABELS))):
             btn = button(head, label, lambda picked=key: self.on_layout(picked), compact=True)
             btn.pack(side="right", padx=(4, 0))
             self.layout_buttons.append((key, btn))
-        left, top, right, bottom = SHOWN
-        self.art = tk.Canvas(self, background=PANEL, highlightthickness=0, width=right - left, height=bottom - top,
+        # The controls are placed first, from the bottom, so that the photograph has the room that is left.
+        dock = tk.Frame(self, background=PANEL)
+        dock.pack(side="bottom", fill="x", pady=(2, 0))
+        self.art = tk.Canvas(self, background=PANEL, highlightthickness=0, width=SMALLEST[0], height=SMALLEST[1],
                              borderwidth=0)
-        self.art.pack(pady=(6, 1))
+        self.art.pack(fill="both", expand=True, pady=(6, 1))
         self.art.bind("<Configure>", lambda _: self.draw_photo())
         self.art.bind("<Motion>", lambda event: self.art.configure(cursor="hand2" if self.point_at(event) else ""))
         self.art.bind("<ButtonPress-1>", self.press_photo)
         self.art.bind("<B1-Motion>", self.drag_photo)
         self.art.bind("<ButtonRelease-1>", lambda _: self.end_photo())
 
-        dock = tk.Frame(self, background=PANEL)
-        dock.pack(fill="x", pady=(2, 0))
         self.dials = {}
         for key in ("volume", "tone"):
             dial = Dial(dock, key, lambda value, name=key: self.set_knob(name, value))
             dial.pack(side="left", padx=(0, 6))
             self.dials[key] = dial
-        beside = tk.Frame(dock, background=PANEL)        # right of the knobs: the mini-toggle, and the knobs to 10
-        beside.pack(side="left", anchor="n", fill="y", padx=(8, 0))
+        pickup = tk.Frame(dock, background=PANEL)
+        pickup.pack(side="left", anchor="n", padx=(10, 0))
+        word(pickup, "PICKUP BLADE", size=9, bold=True).pack(anchor="w", pady=(5, 2))
+        self.pickup_name = tk.StringVar(master=self)
+        word(pickup, variable=self.pickup_name, color=MUTED, size=9).pack(anchor="w")
+        blade = tk.Frame(pickup, background=BG, padx=3, pady=3)
+        blade.pack(anchor="w", pady=(6, 0))
+        self.positions = []
+        for n in range(1, 6):
+            switch = button(blade, str(n), lambda index=n: self.set("pickup", index), compact=True)
+            switch.pack(side="left", padx=2)
+            self.positions.append(switch)
+        beside = tk.Frame(dock, background=PANEL)        # right of the blade: the mini-toggle, and the knobs to 10
+        beside.pack(side="left", anchor="n", fill="y", padx=(16, 0))
         self.full_button = button(beside, "Knobs to 10", self.knobs_full, compact=True)
         self.full_button.pack(side="bottom", anchor="w", pady=(0, 6))
         self.toggle = tk.Frame(beside, background=PANEL)
@@ -171,27 +181,7 @@ class GuitarBoard(tk.Frame):
             switch = button(self.toggle, title, lambda value=wiring: self.set("wiring", value), compact=True)
             switch.pack(fill="x", pady=1)
             self.toggle_buttons.append((wiring, switch))
-        pickup = tk.Frame(self, background=PANEL)
-        pickup.pack(fill="x", pady=(0, 4))
-        word(pickup, "PICKUP BLADE", size=9, bold=True).pack(side="left")
-        blade = tk.Frame(pickup, background=BG, padx=3, pady=3)
-        blade.pack(side="left", padx=8)
-        self.positions = []
-        for n in range(1, 6):
-            switch = button(blade, str(n), lambda index=n: self.set("pickup", index), compact=True)
-            switch.pack(side="left", padx=2)
-            self.positions.append(switch)
-        self.pickup_name = tk.StringVar(master=self)
-        word(pickup, variable=self.pickup_name, color=MUTED, size=9).pack(side="left")
         self.refresh()
-
-    def part_shown(self, filename):
-        """The part of a layout's photograph that holds the controls (`SHOWN`), as an image of its own."""
-        whole = tk.PhotoImage(master=self, file=str(Path(__file__).with_name("assets") / filename))
-        left, top, right, bottom = SHOWN
-        part = tk.PhotoImage(master=self)
-        self.tk.call(part, "copy", whole, "-from", left, top, min(right, whole.width()), min(bottom, whole.height()))
-        return part
 
     def show(self, layout, values=None):
         self.layout = layout
@@ -247,13 +237,14 @@ class GuitarBoard(tk.Frame):
             return
         layout = self.layout or LAYOUTS_SHOWN[0]
         photo = self.images[layout]
-        left, top = SHOWN[:2]
+        # In the middle when there is room for all of it. Across a narrower place its left stays (the neck is
+        # what goes); down a shorter one its bottom stays (the controls are there, the upper horn goes).
         x = max(0, (canvas.winfo_width() - photo.width()) / 2)
-        y = max(0, (canvas.winfo_height() - photo.height()) / 2)
+        y = (canvas.winfo_height() - photo.height()) / (2 if canvas.winfo_height() >= photo.height() else 1)
         canvas.create_image(x, y, anchor="nw", image=photo)
         canvas.create_text(canvas.winfo_width()-7, canvas.winfo_height()-6, anchor="se",
                            text="Charvel catalog reference", fill=DIM, font=(FONT, 8))
-        self.hotspots = {key: (x + px - left, y + py - top) for key, (px, py) in PHOTO[layout][1].items()}
+        self.hotspots = {key: (x + px, y + py) for key, (px, py) in PHOTO[layout][1].items()}
         for key, (a, b) in self.hotspots.items():
             radius = 13 if key in self.dials else 11
             canvas.create_oval(a-radius, b-radius, a+radius, b+radius, outline=ACCENT, width=1)

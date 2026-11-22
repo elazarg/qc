@@ -8,6 +8,12 @@ Nothing here opens a window, a dialog or a menu, and nothing is bound to a key: 
 row of chips (`Chips`), a file is chosen from a list in place (`FileChoice`), and what is rarely needed is
 shown on request, in place (`disclosure`).
 
+A tool shows what is done with it, not a paragraph about it. In the open: the names of its controls, what was
+measured or found, its status line, and one short prompt where there is nothing yet. What is worth knowing once
+(how something works, what a control is for) is a "?" beside the heading or the control (`section`'s and
+`disclosure`'s note, `caption`), which says it while the pointer rests on it (`lab.desk.hints`). A line or a
+part that has nothing to show takes no room (`said`, `room`).
+
 `render` is the operation most tools need: the phrase played through a chain
 on the unit and returned over USB, with nothing routed to the unit's outputs.
 It builds the chain once and keeps it in the cache like any other, so a sound
@@ -31,6 +37,7 @@ from lab.sound.chain import routed
 from lab.qc.library import SCENES as SCENE_LETTERS   # "ABCDEFGH": the one place the scene letters are spelled
 from lab.qc.rig import USB
 from lab.qc.unit import Stopped
+from lab.desk.hints import hint
 from lab.desk.theme import ACCENT, DIM, FONT, INK, PAPER, RULE, SOFT, SUBTLE, TILE, WHITE
 
 
@@ -170,13 +177,76 @@ def button(parent, text, action, *, quiet=False):
 
 
 def section(parent, title, note=""):
-    """A part of a tool: a title, a quiet note under it, and what is packed into it."""
+    """A part of a tool: a title, and what is packed into it. `note` (how it works, what it is for) is behind a
+    "?" beside the title, `part.hint`, and takes no room of its own."""
     part = tk.Frame(parent, bg=parent["bg"])
     part.pack(fill="x", pady=(0, 10))
-    label(part, title, size=10, bold=True).pack(fill="x")
+    head = tk.Frame(part, bg=part["bg"])
+    head.pack(fill="x", pady=(0, 3))
+    label(head, title, size=10, bold=True).pack(side="left")
+    part.hint = hint(head, note) if note else None
     if note:
-        label(part, note, size=9, color=SUBTLE, wrap=WIDTH).pack(fill="x", pady=(2, 4))
+        part.hint.pack(side="left")
     return part
+
+
+def caption(parent, text, note=""):
+    """The name of a control, small and quiet, with a "?" beside it (`row.hint`) when there is something worth
+    knowing once about it. The caller places the row."""
+    row = tk.Frame(parent, bg=parent["bg"])
+    label(row, text, size=9, color=SUBTLE).pack(side="left")
+    row.hint = hint(row, note) if note else None
+    if note:
+        row.hint.pack(side="left")
+    return row
+
+
+def room(parent):
+    """A frame for a part that is there only sometimes (a list once it has rows, the buttons that act on it):
+    `part.show(wanted)` shows and hides it. It keeps its place among what is packed around it, and takes no room
+    while hidden."""
+    holder = tk.Frame(parent, bg=parent["bg"], height=1)
+    holder.pack(fill="x")
+    part = tk.Frame(holder, bg=parent["bg"])
+
+    def show(wanted=True):
+        if wanted and not part.winfo_manager():
+            part.pack(fill="x")
+        elif not wanted and part.winfo_manager():
+            part.pack_forget()
+            holder.configure(height=1)      # an emptied frame keeps its size until it is given one
+    part.show = show
+    return part
+
+
+class Said(tk.Label):
+    """A line for what is said only sometimes (a result, a remark, a reason): it takes no room while it has
+    nothing to say, and keeps its place among what is packed around it. It is placed when it is made."""
+
+    def __init__(self, parent, text="", *, size=9, color=INK, bold=False, wrap=WIDTH, pady=(4, 0)):
+        self.holder = tk.Frame(parent, bg=parent["bg"], height=1)
+        self.holder.pack(fill="x")
+        super().__init__(self.holder, bg=parent["bg"], fg=color, font=(FONT, size, "bold" if bold else "normal"),
+                         justify="left", anchor="w", wraplength=wrap)
+        self.pady = pady
+        self.configure(text=text)
+
+    def configure(self, cnf=None, **options):
+        found = super().configure(cnf, **options)
+        if "text" in options or (isinstance(cnf, dict) and "text" in cnf):
+            if self.cget("text") and not self.winfo_manager():
+                self.pack(fill="x", pady=self.pady)
+            elif not self.cget("text") and self.winfo_manager():
+                self.pack_forget()
+                self.holder.configure(height=1)
+        return found
+
+    config = configure
+
+
+def said(parent, text="", **options):
+    """A `Said` line in `parent`: see there."""
+    return Said(parent, text, **options)
 
 
 def flow(parent, widgets, *, width=WIDTH, gap=4, unit=6):
@@ -202,6 +272,11 @@ def listbox(parent, height=10):
     return tk.Listbox(parent, bg=PAPER, fg=INK, selectbackground=TILE, selectforeground=INK, relief="flat",
                       highlightthickness=1, highlightbackground=RULE, highlightcolor=RULE, font=(FONT, 9),
                       height=height, activestyle="none", exportselection=False)
+
+
+def sized(box, most):
+    """Make a list as tall as what it holds, up to `most` rows: a list of three is not shown with room for ten."""
+    box.configure(height=max(1, min(most, box.size())))
 
 
 class Chips(tk.Frame):
@@ -249,25 +324,32 @@ class Chips(tk.Frame):
 
 def scrolled(parent):
     """A frame that scrolls up and down inside `parent` when what it holds is taller: (the canvas to place, the
-    frame to build into). The bar is there only while there is something to scroll to; the wheel scrolls it
-    (`wheel`, once the frame is built)."""
-    from tkinter import ttk
-
+    frame to build into). The bar is there only while there is something to scroll to: a thin one in the desk's
+    own colours, dragged or clicked to move. The wheel scrolls too (`wheel`, once the frame is built)."""
     canvas = tk.Canvas(parent, bg=parent["bg"], highlightthickness=0, borderwidth=0)
-    style = ttk.Style(parent)
-    style.configure("ToneLab.Vertical.TScrollbar", background=RULE, troughcolor=parent["bg"], bordercolor=parent["bg"],
-                    darkcolor=RULE, lightcolor=RULE, arrowcolor=SUBTLE, arrowsize=11)
-    bar = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview, style="ToneLab.Vertical.TScrollbar")
+    bar = tk.Frame(parent, bg=parent["bg"], width=6)
+    thumb = tk.Frame(bar, bg=RULE)
     inner = tk.Frame(canvas, bg=parent["bg"])
     held = canvas.create_window((0, 0), anchor="nw", window=inner)
 
     def show(first, last):
-        bar.set(first, last)
-        if float(first) <= 0 and float(last) >= 1:
+        first, last = float(first), float(last)
+        if first <= 0 and last >= 1:
             bar.pack_forget()
-        elif not bar.winfo_manager():
+            return
+        if not bar.winfo_manager():
             bar.pack(side="right", fill="y", before=canvas)
+        thumb.place(relx=0, rely=first, relwidth=1, relheight=max(last - first, .06))
 
+    def move(event):
+        """Bring the part of the page under the pointer to the middle of what is shown."""
+        first, last = canvas.yview()
+        at = event.y + (thumb.winfo_y() if event.widget is thumb else 0)
+        canvas.yview_moveto(at / max(1, bar.winfo_height()) - (last - first) / 2)
+
+    for part in (bar, thumb):
+        part.bind("<Button-1>", move)
+        part.bind("<B1-Motion>", move)
     canvas.configure(yscrollcommand=show)
     inner.bind("<Configure>", lambda _: canvas.configure(scrollregion=canvas.bbox("all")))
     canvas.bind("<Configure>", lambda event: canvas.itemconfigure(held, width=event.width))
@@ -360,21 +442,25 @@ class FileChoice(tk.Frame):
                  width=WIDTH):
         super().__init__(parent, bg=parent["bg"])
         self.folders, self.patterns, self.choose, self.several = folders, tuple(patterns), choose, several
-        self.found = []
-        self.list = listbox(self, height=height)
+        self.found, self.most = [], height
+        # The files found, and the button that uses the one chosen: there while there is one to choose.
+        self.listed = room(self)
+        self.list = listbox(self.listed, height=height)
         if several:
             self.list.configure(selectmode="multiple")
-        self.list.pack(fill="x")
+        self.list.pack(fill="x", pady=(0, 4))
         row = tk.Frame(self, bg=self["bg"])
-        row.pack(fill="x", pady=(4, 0))
-        button(row, action, self.use).pack(side="left")
-        button(row, "Look again", self.look, quiet=True).pack(side="left", padx=4)
-        label(self, "Or its path:", size=9, color=SUBTLE).pack(fill="x", pady=(4, 0))
+        row.pack(fill="x")
+        self.action = button(row, action, self.use)
+        self.again = button(row, "Look again", self.look, quiet=True)
+        self.again.pack(side="left", padx=(0, 4))
+        self.where = hint(row, "")         # where it looked: said on request, not in the open
+        self.where.pack(side="left")
+        caption(self, "Or its path", "Type or paste the file's path, then press Return.").pack(fill="x", pady=(4, 0))
         self.path = tk.Entry(self, font=(FONT, 9), bg=TILE, fg=INK, relief="flat", insertbackground=INK)
         self.path.pack(fill="x", ipady=3)
         self.path.bind("<Return>", lambda _: self.typed())
-        self.said = label(self, size=9, color=SUBTLE, wrap=width)
-        self.said.pack(fill="x")
+        self.said = said(self, color=SUBTLE, wrap=width, pady=(2, 0))
         self.list.bind("<Double-Button-1>", lambda _: self.use())     # the same as the button beside it
         self.look()
 
@@ -384,8 +470,14 @@ class FileChoice(tk.Frame):
         self.list.delete(0, "end")
         for path in self.found:
             self.list.insert("end", f"{path.name}  ·  {path.parent.name}")
-        self.said.configure(text="" if self.found else "None found in " + ", ".join(str(folder) for folder in folders)
-                            + ". Paste the path of one below.")
+        sized(self.list, self.most)
+        self.listed.show(bool(self.found))
+        if self.found:
+            self.action.pack(side="left", padx=(0, 4), before=self.again)
+        else:
+            self.action.pack_forget()
+        self.where.say("Looked in, and one folder down:\n" + "\n".join(str(folder) for folder in folders))
+        self.said.configure(text="" if self.found else "None found. Paste the path of one.")
 
     def use(self):
         picked = [self.found[index] for index in self.list.curselection()]
@@ -405,20 +497,26 @@ class FileChoice(tk.Frame):
         self.choose([path] if self.several else path)
 
 
-def disclosure(parent, title, *, opened=False):
-    """A part shown on request, in place: a line to click, and the frame it shows and hides."""
+def disclosure(parent, title, *, opened=False, note=""):
+    """A part shown on request, in place: a line to click, and the frame it shows and hides. `note` (what the
+    part is for) is behind a "?" beside the line, `content.hint`."""
     content = tk.Frame(parent, bg=parent["bg"])
-    control = tk.Label(parent, bg=parent["bg"], fg=ACCENT, font=(FONT, 9), cursor="hand2", anchor="w")
+    line = tk.Frame(parent, bg=parent["bg"])
+    control = tk.Label(line, bg=parent["bg"], fg=ACCENT, font=(FONT, 9), cursor="hand2", anchor="w")
+    control.pack(side="left")
+    content.hint = hint(line, note) if note else None
+    if note:
+        content.hint.pack(side="left")
 
     def show(wanted):
         if wanted:
-            content.pack(fill="x", pady=(4, 6), after=control)
+            content.pack(fill="x", pady=(4, 6), after=line)
         else:
             content.pack_forget()
         control.configure(text=f"{title} {'▴' if wanted else '▾'}")
 
     control.bind("<ButtonRelease-1>", lambda _: show(not content.winfo_manager()))
-    control.pack(fill="x", pady=(2, 0))
+    line.pack(fill="x", pady=(2, 0))
     show(opened)
     content.show = show
     return content

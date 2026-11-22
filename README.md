@@ -2,11 +2,17 @@
 
 Tone Lab helps you make and improve presets for a Neural DSP Quad Cortex by playing and talking: two sounds side by side, your guitar or a recorded phrase through either, and one line to ask in. Designs come from an assistant that knows the unit's models and how players set them; the app builds them on the unit, listens to them silently, and puts them in front of you.
 
-Start it with **Tone Lab.exe**, **Start Tone Lab.cmd**, or `.\.venv\Scripts\python.exe -m lab`. The earlier app is still here: `Tone Lab.exe --old`, or `{"desk": "old"}` in `launcher.json` in the data folder to make it the default again. `python -m lab --simulated` runs it with a simulated unit and no hardware. Opening it again brings the open window forward.
+Start it with **Tone Lab.exe**, **Start Tone Lab.cmd**, or `.\.venv\Scripts\python.exe -m lab`. `python -m lab --simulated` runs it with a simulated unit and no hardware. Opening it again brings the open window forward.
 
 ## The desk
 
-Everything happens in the one window: no other windows, no dialogs, no pop-up menus, no keyboard shortcuts. (One exception: if the app cannot start, a message box says why, because there is no window yet to say it in.)
+Everything happens in the one window: no other windows, no dialogs, no keyboard shortcuts. A list that drops down and the words of a **?** are drawn inside the window. (One exception: if the app cannot start, a message box says why, because there is no window yet to say it in.)
+
+**The top row** is there on every screen. At its left, the instrument you are playing: a tile with its picture and name. Click it and choose another from the list beneath; the whole app follows at once (the Guitar and Phrase panels, what the designer is told, gestures, and the phrase, when one was recorded on that instrument). Left of it, the learning symbol.
+
+**Learning the guitar** is a screen of its own: the learning symbol puts it in the place of everything below the top row, and brings the desk back as it was when pressed again. It has two views. The **Guitar Learner** (for a guitar it has a photograph of: the Charvel) records or opens a dry clip, shows what it makes of it, and tags it with the controls set on the photograph. **Teach a control** (any instrument) teaches two settings of one control, checks a fresh take, and maps a return gesture to a Shape knob.
+
+The desk shows what is done with a thing, not a paragraph about it: what is worth knowing once is behind a **?** beside it, shown while the pointer rests there, or after a click until the next.
 
 - **A** and **B** are two sounds; click one to hear it. **Guitar** and **Phrase** choose what feeds the selected one; press it again to stop. Switching between A and B moves only the input. **Copy B to A** and **Compare blind** sit beside them: blind hides the names and may swap A and B; **Show which was which** tells. **Undo** appears beside them once there is something to take back.
 - **Ask** in the line at the bottom. A remark in players' words (“a bit tighter”, “muddy when I palm mute”, “fizzy”) moves the Shape knobs at once, with the remedy players usually try first that this chain can perform; say it again for the next remedy, and when the last one has been tried the line says so and nothing is sent to the assistant for it. A request that reads as a change to the sound on B (“more sustain from the fuzz, without more mud”, “make it heavier”) revises a copy of it and keeps everything the request does not change. Anything else (a sound, an artist, a song, “make …”) starts a round. The exact name of one of your presets brings it in. **Cancel** beside the working line drops a request in flight.
@@ -26,12 +32,12 @@ Panels open beside the tiles:
 - **Phrase**: the phrases recorded, recording a new one with its pickup setting and, to compare settings, what was played, and the loop's edges to drag.
 - **Sounds**: your presets on the unit, with a filter by words or by slot as the unit shows it; **Work on this** puts one on A as saved and a copy on B; **More with this preset** keeps it as a reference for Tone search, in the scene chosen, or leaves it selected on the unit. And your IRs and Neural Captures: an IR goes into B's cab, a capture in place of B's amp, or amp and cab. The designer also uses an IR of yours when a request names it.
 - **History**: songs, what your choices say, and every sound, newest first.
-- **Guitar**: the **Guitar Learner** (for an instrument it has a layout for) and **Teach a control**, which open in the panel's place with **‹ Back** to return; **Gestures on**, which listens for 20 s, and 20 s more after each gesture, and shows the seconds left; what each pickup setting of your instrument puts out, compared only on takes marked as the same gesture; and recording.
-- **More**: the side tools, each shown in the panel's place with **‹ Back**: **Levels**, **Tone search**, **Tone field**, **Comparison workbench**, **Versions and the unit**, **Setup and sound check**, **Usage and feedback**, **POD Go presets**, **Songs you listen to**; the instrument; measuring the USB round trip.
+- **Guitar**: **Gestures on**, which listens for 20 s, and 20 s more after each gesture, and shows the seconds left; what each pickup setting of your instrument puts out, compared only on takes marked as the same gesture; and recording a phrase with its pickup setting.
+- **More**: the side tools, each shown in the panel's place with **‹ Back**: **Levels**, **Tone search**, **Tone field**, **Comparison workbench**, **Versions and the unit**, **Setup and sound check**, **Usage and feedback**, **POD Go presets**, **Songs you listen to**; and measuring the USB round trip.
 
 A file (a WAV, a POD Go backup, a Spotify export) is chosen in place: from the list of those found where such files are kept (the data folder's `imports`, Downloads, Music, POD Go Edit's Backups), or by pasting its path and pressing Enter; a path that cannot be used says why.
 
-While the Guitar Learner records or listens it has the audio input: Guitar and Phrase say so instead of starting. Beside gesture listening the guitar still plays, and Phrase stops the listening first. While the Levels tool's offset or mute is on, a line under A and B says so, with **Back to the desk's own level**.
+While the learning screen records or listens it has the audio input: Guitar and Phrase say so instead of starting. Beside gesture listening the guitar still plays, and Phrase stops the listening first. While the Levels tool's offset or mute is on, a line under A and B says so, with **Back to the desk's own level**.
 
 A fault is said on the line and written with its trace to `errors.log` in the data folder; stopping, cancelling and a unit busy with your own edits are said and not logged.
 
@@ -45,7 +51,7 @@ Only models found to work on this unit are offered: plugins you do not own (Goji
 
 ## Your data
 
-Sounds, rounds, songs, phrases, the Guitar Learner's recordings and labels (`learner`), the assistant's ledger, the unit's directory and its named settings (`device-presets.json`), and the start-up log live in `%LOCALAPPDATA%\Tone Lab` (`TONE_LAB_HOME` overrides it). The first start checks what the app needs, once (`python -m lab doctor` repeats the checks), and brings in the earlier app's history; `python -m lab migrate` does that again and adds only what is new. What the earlier app kept in `tone_sessions` in the program folder (the Guitar Learner's data, the named settings) is copied to the data folder the first time it is needed; the originals are left as they were.
+Sounds, rounds, songs, phrases, the Guitar Learner's recordings and labels (`learner`), the assistant's ledger, the unit's directory and its named settings (`device-presets.json`), and the start-up log live in `%LOCALAPPDATA%\Tone Lab` (`TONE_LAB_HOME` overrides it). The first start checks what the app needs, once (`python -m lab doctor` repeats the checks), and brings in the history an earlier version of the app left in `tone_sessions` in the program folder; `python -m lab migrate` does that again and adds only what is new. The Guitar Learner's data and the named settings kept there are copied to the data folder the first time they are needed; the originals are left as they were.
 
 ## The assistant
 
@@ -56,7 +62,7 @@ Designs and revisions are made by the Codex CLI (`codex login` once). Every call
 ```powershell
 $lab = '.\.venv\Scripts\python.exe'
 & $lab -m lab doctor            # what the app needs, and whether it is there
-& $lab -m lab migrate --dry-run # what would be brought in from the earlier app
+& $lab -m lab migrate --dry-run # what would be brought in from an earlier version's history
 & $lab -m lab directory         # the presets on the unit
 & $lab -m lab time-switch       # how long switching between A and B takes on the unit
 & $lab -m lab pod "$env:USERPROFILE\Documents\Line 6\POD Go\Backups\<backup>.pgb"
@@ -77,7 +83,7 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m lab shortcut
 ```
 
-The tests use a simulated unit and a temporary data folder; they cannot reach the unit, the audio driver, the assistant or your data. Close Cortex Control and any audio program holding the driver before starting the app. The earlier app (`tone_lab/`, `python -m tone_lab`) is still here, reachable with `--old`. See [what Tone Lab knows about tone](docs/TONE_KNOWLEDGE.md), [what tone research says](docs/TONE_RESEARCH.md), [the Guitar Learner's design](docs/GUITAR_LEARNER_DESIGN.md), and the reviews of the code ([the desk and the unit layer](docs/CODEBASE_REVIEW.md), [everything else](docs/WHOLE_CODEBASE_REVIEW.md)). [AGENTS.md](AGENTS.md) holds the rules for working on it.
+The tests use a simulated unit and a temporary data folder; they cannot reach the unit, the audio driver, the assistant or your data. Close Cortex Control and any audio program holding the driver before starting the app. The earlier app, `tone_lab/`, was removed on 2026-11-22; the tag `with-tone_lab` is the last commit that has it. See [what Tone Lab knows about tone](docs/TONE_KNOWLEDGE.md), [what tone research says](docs/TONE_RESEARCH.md), [the Guitar Learner's design](docs/GUITAR_LEARNER_DESIGN.md), and the reviews of the code ([the desk and the unit layer](docs/CODEBASE_REVIEW.md), [everything else](docs/WHOLE_CODEBASE_REVIEW.md)). [AGENTS.md](AGENTS.md) holds the rules for working on it.
 
 ## Personal data
 

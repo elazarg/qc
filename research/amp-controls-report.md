@@ -26,7 +26,7 @@ Positive means the control moves its band the way its role says. A Shape knob mo
 
 ## Controls that go against their role
 
-`styles.ROLES` says which way each control should move its band. These moved it the other way by at least 0.1 dB per point.
+`lab.sound.knobs.ROLES` says which way each control should move its band. These moved it the other way by at least 0.1 dB per point.
 
 - **US SPR Vibrato Mid** (mid), above its default: -0.18 dB per point in its own band. Raising it gives level +0.73, 200–800 Hz -0.4, 3–6 kHz +0.5.
 - **CA 1Star Drive 50W Normal Mid** (mid), below its default: -0.11 dB per point in its own band. Raising it gives level +0.44, 3–6 kHz +0.3, above 6 kHz +0.8.

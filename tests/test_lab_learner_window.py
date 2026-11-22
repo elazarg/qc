@@ -16,13 +16,12 @@ import numpy as np
 
 import support  # noqa: E402
 from lab.hearing import audio
-from lab.learner import dataset as data, folders, gestures, inputs, worker
+from lab.learner import dataset as data, folders, gestures, inputs, window as learner_window, worker
 from lab.learner.window import GuitarLearner, offered_for
 
 from test_lab_learner_gestures import note
 from test_lab_learner_seat import seat_for, settle
 from test_lab_learner_takes import four_inputs
-from support import hosting
 
 PACKAGE = Path(__file__).resolve().parents[1] / "lab" / "learner"
 
@@ -41,7 +40,7 @@ class StandaloneTest(unittest.TestCase):
             self.assertTrue((PACKAGE / "assets" / filename).is_file(), filename)
 
     def test_everything_is_followed_on_the_desks_one_clock(self):
-        for name in ("window.py", "teach.py", "gestures.py"):
+        for name in ("window.py", "teach.py", "gestures.py", "screen.py", "board.py"):
             source = (PACKAGE / name).read_text(encoding="utf-8")
             self.assertNotIn(".after(", source, name)
 
@@ -59,13 +58,12 @@ class WindowTest(unittest.TestCase):
             self.skipTest(f"No display: {error}")
         self.root.withdraw()
         self.seat = seat_for(self, self.root)
-        hosting(self.seat.desk, self.root)
         self.learner = None
 
     def tearDown(self):
         gestures.stop()
         if self.learner is not None:
-            self.learner.hide()
+            self.learner.hidden()
             settle(self.seat, lambda: self.seat.job is None and self.learner.job is None, root=self.root, seconds=5)
         self.root.destroy()
         # Free the window's Tk variables here, on the main thread: if a later test's worker thread happens to run
@@ -74,7 +72,8 @@ class WindowTest(unittest.TestCase):
         support.free_now()
 
     def opened(self):
-        self.learner = GuitarLearner(self.seat)
+        self.learner = GuitarLearner(self.seat, self.root)     # as the learning screen makes it, in the window
+        self.learner.frame.pack(fill="both", expand=True)
         self.settle()
         return self.learner
 
@@ -148,27 +147,37 @@ class WindowTest(unittest.TestCase):
         # Before: every take was stamped "Charvel" and taught into its dataset, whatever the desk had chosen.
         self.seat.studio.state.instrument = "Les Paul"
         learner = self.opened()
-        learner.show()
-        self.assertFalse(learner.showing())
-        self.assertIsNone(self.seat.desk.hosted)
-        self.assertIn("no control layout for the Les Paul", self.seat.studio.statuses[-1])
+        self.assertFalse(learner.use_guitar(self.seat.guitar))      # the learning screen then shows its other view
         self.assertIsNone(learner.guitar)
         self.seat.studio.state.instrument = "Charvel"
-        learner.show()
+        learner.shown()                                             # as when the screen puts it on show
         self.settle()
-        self.assertTrue(learner.showing())
-        self.assertEqual(learner.frame.winfo_manager(), "pack")
         self.assertEqual((learner.guitar, learner.layout), ("Charvel", "dk24_hh_toggle"))
+        # While something runs it stays on the guitar it has, and says so.
+        learner.stop = Event()
+        with patch.object(learner_window, "offered_for", lambda guitar: ["dk24_blade"]):     # another it has a layout for
+            self.assertTrue(learner.use_guitar("Another guitar"))
+        self.assertEqual((learner.guitar, learner.status.get()),
+                         ("Charvel", "Still on the Charvel: finish what is running first."))
+        learner.stop = None
 
-    def test_going_back_to_the_desk_ends_a_recording_and_a_live_listening(self):
+    def test_leaving_the_screen_ends_a_recording_and_a_live_listening(self):
         learner = self.opened()
-        learner.show()
         learner.stop, learner.live_stop = Event(), Event()
         stop, live = learner.stop, learner.live_stop
-        self.seat.desk.back()
+        learner.hidden()
         self.assertTrue(stop.is_set() and live.is_set())
-        self.assertFalse(learner.showing())
         learner.stop = learner.live_stop = None
+
+    def test_what_it_keeps_at_the_top_goes_beside_the_views_names_when_there_is_such_a_place(self):
+        learner = self.opened()
+        self.assertEqual(learner.header.master, learner.frame)      # by itself: at its own top
+        beside = tk.Frame(self.root)
+        other = GuitarLearner(self.seat, self.root, beside)
+        self.assertTrue(settle(self.seat, lambda: other.job is None and not other.queued, root=self.root))
+        self.assertEqual((other.header.master, other.header.winfo_manager()), (beside, ""))    # the screen places it
+        self.assertEqual(other.dataset_button.master, other.header)
+        other.worker.shutdown(wait=True)
 
     def test_the_knobs_and_the_switches_are_set_with_the_mouse_alone(self):
         # Before: a double click put a knob back, and the arrow keys turned it.

@@ -22,11 +22,10 @@ import tkinter as tk
 import numpy as np
 from scipy import signal
 
-from lab.desk.theme import SUBTLE
 from lab.hearing.audio import RATE, db
 from lab.hearing.measure import measure
-from lab.tools.common import (WIDTH, Chips, Tool, button, disclosure, flow, heard_chain, label, phrase, play, render,
-                              section)
+from lab.tools.common import (Chips, Tool, button, caption, disclosure, flow, heard_chain, phrase, play, render,
+                              said, section)
 from lab.tools.workbench import auditions, comparison
 
 CONTEXTS = {
@@ -162,32 +161,32 @@ class SoundCheckTool(Tool):
     def build(self):
         self.auditions, self.record = {}, None
         take = section(self.body, "Input and output levels",
-                       "Play your hardest after pressing Check. The dry input is measured as it reaches the unit, "
-                       "then played silently through the selected sound.")
+                       "Check: play now records six seconds: play your hardest. The dry input is measured as it "
+                       "reaches the unit, then played silently through the selected sound. Check the phrase does "
+                       "the same with the desk's phrase.")
         row = tk.Frame(take, bg=take["bg"])
         row.pack(fill="x")
         button(row, "Check: play now", lambda: self.check(record=True)).pack(side="left")
         button(row, "Check the phrase", lambda: self.check(record=False), quiet=True).pack(side="left", padx=6)
-        self.take_text = label(take, size=9, wrap=WIDTH)
-        self.take_text.pack(fill="x", pady=(6, 0))
+        self.take_text = said(take, pady=(6, 0))
 
         # The two rarer checks are shown on request.
-        unit = disclosure(self.body, "The Quad Cortex")
+        unit = disclosure(self.body, "The Quad Cortex",
+                          note="Its firmware, whether the USB round trip was measured, and how much of the Tone Lab "
+                               "setlist's cache is in use.")
         button(unit, "Check the Quad Cortex", self.unit_check, quiet=True).pack(anchor="w")
-        self.unit_text = label(unit, size=9, wrap=WIDTH)
-        self.unit_text.pack(fill="x", pady=(6, 0))
+        self.unit_text = said(unit, pady=(6, 0))
 
-        stage = disclosure(self.body, "Stage EQ")
-        label(stage, "The selected sound as it is and with two small EQ moves, level-matched and in a blind order. "
-                     "Judge them at rehearsal level. It will be heard through:", size=9, color=SUBTLE,
-              wrap=WIDTH).pack(fill="x")
+        stage = disclosure(self.body, "Stage EQ",
+                           note="The selected sound as it is and with two small EQ moves for what it will be heard "
+                                "through, level-matched and in a blind order. " + NOTES[0])
+        caption(stage, "Heard through").pack(fill="x")
         self.context = tk.StringVar(master=self.frame, value=next(iter(CHOICES)))
         Chips(stage, self.context, tuple(CHOICES)).pack(fill="x", pady=(2, 4))
         button(stage, "Make the three", self.stage).pack(anchor="w")
         self.players = tk.Frame(stage, bg=stage["bg"])
         self.players.pack(fill="x", pady=(6, 0))
-        self.stage_text = label(stage, size=9, wrap=WIDTH)
-        self.stage_text.pack(fill="x", pady=(6, 0))
+        self.stage_text = said(stage, pady=(6, 0))
         self.unit_part, self.stage_part = unit, stage
 
     def selected(self):
@@ -248,8 +247,7 @@ class SoundCheckTool(Tool):
             flow(self.players, [button(self.players, f"Play {letter}", lambda letter=letter: self.play(letter))
                                 for letter in self.auditions]
                  + [button(self.players, "Which was which?", self.reveal, quiet=True)])
-            self.stage_text.configure(text=f"{CONTEXTS[context]['name']} · {sound.name}: as it is and two small "
-                                           "EQ changes, in a blind order.")
+            self.stage_text.configure(text=f"{CONTEXTS[context]['name']} · {sound.name}")
 
         self.call("lab.tools.soundcheck.stage_render", heard_chain(sound), taken[1], done=rendered,
                   working="Playing the phrase silently through the sound…", renders=True)
@@ -263,8 +261,7 @@ class SoundCheckTool(Tool):
 
     def reveal(self):
         self.stage_text.configure(text="  ·  ".join(f"{letter}: {row['name']}"
-                                                    for letter, row in self.record["auditions"].items())
-                                  + "\n" + NOTES[0])
+                                                    for letter, row in self.record["auditions"].items()))
 
 
 def open(desk):  # noqa: A001

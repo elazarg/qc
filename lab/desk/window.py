@@ -7,10 +7,17 @@ does.
 
 Everything happens in this one window: no dialogs, no pop-up windows or
 menus, no keyboard shortcuts. Choices are buttons, names are typed in place,
-and the panels say what they hold. The side tools, the Guitar Learner and the
-teaching of a control are shown in the place of the side panel, one at a time
-(`Desk.show`), with "‹ Back" to return to the panel they were opened from.
-Each is made once and kept, so it comes back as it was left.
+and what is worth knowing once is behind a "?" (`lab.desk.hints`). The side
+tools are shown in the place of the side panel, one at a time (`Desk.show`),
+with "‹ Back" to return to the panel they were opened from. Each is made once
+and kept, so it comes back as it was left.
+
+The top row is there on every screen. At its left: the learning symbol, which
+puts the learning screen (`lab.learner.screen`: the Guitar Learner and Teach a
+control) in the place of everything below the row and brings the desk back as
+it was; and the instrument chooser (`lab.desk.chooser`), which says which
+instrument is played and changes it for the whole app at once. At its right,
+while the desk is on show, the names of the panels.
 
 What is drawn again, and when: the tiles and the lines on every change of
 state; the round's chips, the scene chips and the open panel only when what
@@ -28,6 +35,9 @@ from lab.sound import knobs as knob_table
 from lab.hearing.audio import read_wave
 from lab.knowledge import REPO, home
 from lab.hearing.measure import summary
+from lab.desk.chooser import InstrumentChooser
+from lab.desk.hints import hint, named
+from lab.desk.pictures import learning_symbol
 from lab.desk.studio import RATE, Studio
 from lab.learner.seat import LearnerSeat  # noqa: F401  (the desk makes one; tests import it from here)
 from lab.desk.theme import ACCENT, DARK, DIM, FONT, INK, LIVE, PAPER, RULE, SIDE, SOFT, SUBTLE, TILE, mix
@@ -99,7 +109,10 @@ class Desk:
         """`door` is the socket `claim_door` bound, on which a second launch knocks; None for a desk without one
         (a simulated unit, a test)."""
         self.root, self.studio = root, studio
-        self.panel = self.learner = None
+        self.panel = None
+        self.learning = None            # the learning screen, once the learning symbol was pressed
+        self.learning_on = False        # whether it is on show, in the place of everything below the top row
+        self.instrument_shown = None    # the instrument the desk last drew for
         self.panel_key = None           # what the open panel was drawn from; it is redrawn only when that changes
         self.strip_key = self.scene_key = None      # the same for the round's chips and the scene chips
         self.dragging = False           # something in the panel is being dragged: the panel is left as it is
@@ -111,8 +124,7 @@ class Desk:
         self.record_gesture = None      # what is played in it, when it is one of the gestures settings are compared on
         self.gestures_shown = None      # what the Guitar panel last showed of gesture listening
         self.tools = {}                 # the side tools made so far, by title (`lab.tools.common.Tool.open`)
-        self.hosted = None              # the tool, the learner or the teaching on show in the side panel's place
-        self.teaching = None            # the teaching of a control, once it was opened
+        self.hosted = None              # the tool on show in the side panel's place
         self.sounds_query = ""          # what the Sounds panel's presets are filtered by
         self.preset_more = False        # whether the Sounds panel shows what else can be done with a preset
         self.reference_scene = "Default scene"      # the scene a preset is captured in as a reference
@@ -167,22 +179,37 @@ class Desk:
     # ---- building ----
 
     def build(self):
-        page = tk.Frame(self.root, bg=PAPER, padx=20, pady=16)
+        page = self.page = tk.Frame(self.root, bg=PAPER, padx=20, pady=16)
         page.pack(fill="both", expand=True)
         top = tk.Frame(page, bg=PAPER)
         top.pack(fill="x")
-        self.dot = tk.Canvas(top, width=12, height=12, bg=PAPER, highlightthickness=0)
-        self.dot.pack(side="left")
-        self.dot_mark = self.dot.create_oval(2, 2, 10, 10, fill=DIM, width=0)
+        # The learning symbol: pressed, the learning screen takes the place of everything below this row; pressed
+        # again, the desk is back as it was. It is lit while the learning screen is on.
+        self.symbols = {on: learning_symbol(self.root, 30, 25, paper=TILE if on else PAPER, ink=ACCENT if on else SOFT)
+                        for on in (False, True)}
+        self.learn_symbol = tk.Label(top, image=self.symbols[False], bg=PAPER, cursor="hand2", width=40, height=34,
+                                     borderwidth=0, highlightthickness=1, highlightbackground=RULE)
+        self.learn_symbol.pack(side="left", padx=(0, 8))
+        self.learn_symbol.bind("<ButtonRelease-1>", lambda _: self.toggle_learning())
+        named(self.learn_symbol, lambda: "Back to the desk" if self.learning_on else "Learn the guitar")
+        self.chooser = InstrumentChooser(top, instruments=self.studio.store.instruments,
+                                         current=lambda: self.studio.state.instrument, choose=self.choose_instrument)
+        self.chooser.pack(side="left")
+        # Where a suggestion of the instrument would be shown ("Are you using the Les Paul?", with a click to
+        # take it): beside the chooser. Nothing guesses yet, so the frame holds nothing.
+        self.suggestion = tk.Frame(top, bg=PAPER)
+        self.suggestion.pack(side="left", padx=(8, 0))
         self.working = label(top, color=SOFT)
         self.working.pack(side="left", padx=8)
         self.cancel_link = link(top, "Cancel", lambda: self.studio.cancel(), color=ACCENT)
+        self.names = tk.Frame(top, bg=PAPER)        # the panels' names: not shown while the learning screen is on
+        self.names.pack(side="right")
         for name in PANELS[::-1]:
-            opener = tk.Label(top, text=name, bg=PAPER, fg=SUBTLE, font=(FONT, 10), cursor="hand2", padx=8)
+            opener = tk.Label(self.names, text=name, bg=PAPER, fg=SUBTLE, font=(FONT, 10), cursor="hand2", padx=8)
             opener.pack(side="right")
             opener.bind("<ButtonRelease-1>", lambda _, name=name: self.toggle(name))
 
-        body = tk.Frame(page, bg=PAPER)
+        body = self.body = tk.Frame(page, bg=PAPER)
         body.pack(fill="both", expand=True, pady=(12, 0))
         body.columnconfigure(0, weight=1)
         body.rowconfigure(0, weight=1)
@@ -191,8 +218,8 @@ class Desk:
         self.tray = tk.Frame(body, bg=DARK, width=430, padx=12, pady=10)
         self.tray.grid_propagate(False)
         self.tray.pack_propagate(False)        # one width for every panel
-        # Where a tool, the Guitar Learner or the teaching of a control is shown: the tray's place and size. Its
-        # frames are not the tray's children, which are destroyed whenever a panel is drawn again.
+        # Where a side tool is shown: the tray's place and size. Its frames are not the tray's children, which
+        # are destroyed whenever a panel is drawn again.
         self.side = tk.Frame(body, bg=DARK, width=430, padx=12, pady=10)
         self.side.grid_propagate(False)
         self.side.pack_propagate(False)
@@ -228,6 +255,10 @@ class Desk:
             badge.pack(side="bottom", fill="x")
             for widget in (tile, badge, name, caption, air):
                 widget.bind("<ButtonRelease-1>", lambda _, side=side: self.studio.select(side))
+            # A name or a caption longer than the tile is wide goes on to the next line, however wide the tile is.
+            tile.bind("<Configure>", lambda event, name=name, caption=caption: (
+                name.configure(wraplength=max(100, event.width - 40)),
+                caption.configure(wraplength=max(100, event.width - 40))))
             self.tiles[side] = (tile, name, caption, air, marks)
 
         # Shown while the Levels tool's offset or mute is on: nothing else on the desk would say so.
@@ -246,6 +277,9 @@ class Desk:
 
         row = tk.Frame(main, bg=PAPER)
         row.pack(fill="x", pady=(12, 0))
+        # Placed in the order of what must stay when the row is narrow (a panel open in the smallest window):
+        # saving first, the phrase's name last, which is then cut short.
+        button(row, "Save to QC", self.save).pack(side="right", padx=(8, 0))
         self.guitar = button(row, "Guitar", lambda: self.toggle_play("guitar"))
         self.guitar.pack(side="left")
         self.loop = button(row, "Phrase", lambda: self.toggle_play("phrase"))
@@ -256,10 +290,10 @@ class Desk:
         self.blind_link.pack(side="left")
         # Shown once there is something to take back.
         self.undo_link = link(row, "Undo", lambda: self.studio.undo())
-        self.phrase_link = tk.Label(row, text="No phrase", bg=PAPER, fg=SUBTLE, font=(FONT, 9), cursor="hand2")
-        self.phrase_link.pack(side="right")
+        self.phrase_link = tk.Label(row, text="No phrase", bg=PAPER, fg=SUBTLE, font=(FONT, 9), cursor="hand2",
+                                    anchor="e")
+        self.phrase_link.pack(side="right", padx=(8, 0))
         self.phrase_link.bind("<ButtonRelease-1>", lambda _: self.toggle("Phrase"))
-        button(row, "Save to QC", self.save).pack(side="right", padx=8)
         # Naming a save, in place: shown when Save to QC is pressed.
         self.save_row = tk.Frame(main, bg=PAPER)
         label(self.save_row, "Save as", size=9, color=SOFT).pack(side="left")
@@ -297,13 +331,18 @@ class Desk:
     def paint(self):
         studio, state = self.studio, self.studio.state
         sounds = {side: studio.sound(side) for side in ("a", "b")}
-        self.working.configure(text=state.working)
+        if state.instrument != self.instrument_shown:
+            self.instrument_changed()
+        # While the learning screen is on, what the desk is working on and its status line are said on that
+        # screen's own line; the top row has the symbol and the instrument alone.
+        self.working.configure(text="" if self.learning_on else state.working)
+        if self.learning_on:
+            self.learning.say(state.status, state.working)
         # Cancel is there for as long as a request is with the assistant, whatever else the working line says.
-        if studio.cancellable():
+        if studio.cancellable() and not self.learning_on:
             self.cancel_link.pack(side="left")
         else:
             self.cancel_link.pack_forget()
-        self.dot.itemconfigure(self.dot_mark, fill=LIVE if state.mode else (ACCENT if state.working else DIM))
         for side in ("a", "b"):
             tile, name, caption, air, marks = self.tiles[side]
             sound = sounds[side]
@@ -341,15 +380,17 @@ class Desk:
         elif self.level_row.winfo_manager():
             self.level_row.pack_forget()
         if studio.history and not self.undo_link.winfo_manager():
-            self.undo_link.pack(side="left")
+            self.undo_link.pack(side="left", before=self.phrase_link)
         elif not studio.history and self.undo_link.winfo_manager():
             self.undo_link.pack_forget()
         phrase_id = studio.phrase[0] if studio.phrase else None
-        if phrase_id != self.phrase_shown:
-            self.phrase_shown = phrase_id
+        if (phrase_id, state.instrument) != self.phrase_shown:
+            self.phrase_shown = (phrase_id, state.instrument)
             item = next((item for item in studio.recorded_phrases() if item["id"] == phrase_id), None)
-            self.phrase_link.configure(text=f"Phrase · {item.get('instrument', '')} · {item.get('setting', '')}"
-                                       if item else ("Phrase" if phrase_id else "No phrase"))
+            # The instrument is at the top left; the phrase names its own only when it is another one.
+            parts = [item.get("instrument") if item and item.get("instrument") != state.instrument else None,
+                     item.get("setting") if item else None]
+            self.phrase_link.configure(text=" · ".join(["Phrase", *filter(None, parts)]) if phrase_id else "No phrase")
         self.draw_strip(sounds["b"])
         self.draw_scenes()
         if self.panel and self.hosted is None and not self.dragging and self.drawn_from(sounds) != self.panel_key:
@@ -457,8 +498,86 @@ class Desk:
         """A frame for something to be shown in the side panel's place (`show`). It is kept until the desk closes."""
         return tk.Frame(self.side, bg=DARK)
 
+    # ---- the instrument, and learning it ----
+
+    def choose_instrument(self, name):
+        """The instrument picked in the chooser: for the whole app, at once. The phrase follows it when a phrase
+        was recorded on that instrument; when none was, the line says whose phrase is still in use."""
+        studio = self.studio
+        studio.set(instrument=name)
+        recorded = studio.recorded_phrases()
+        current = next((item for item in recorded if studio.phrase and item["id"] == studio.phrase[0]), None)
+        on_it = [item for item in recorded if item.get("instrument") == name]
+        if on_it and (current is None or current.get("instrument") != name):
+            self.choose_recorded(on_it[0])
+            setting = on_it[0].get("setting")
+            studio.say(f"Now on the {name}. The phrase is the last one recorded on it" + (f" ({setting})." if setting else "."))
+        elif current is not None and current.get("instrument") not in (None, name):
+            studio.say(f"Now on the {name}. No phrase is recorded on it yet: the phrase is still the "
+                       f"{current['instrument']}'s.")
+        else:
+            studio.say(f"Now on the {name}.")
+
+    def instrument_changed(self):
+        """The instrument is another one than the desk last drew for (chosen in the chooser, or put back from the
+        last session): everything that showed or used the one before follows."""
+        import sys as modules
+
+        before, self.instrument_shown = self.instrument_shown, self.studio.state.instrument
+        self.chooser.refresh()
+        self.record_setting = None          # a pickup setting of the instrument before
+        if before is None:
+            return                          # the desk is opening: nothing was on show for another instrument
+        gestures = modules.modules.get("lab.learner.gestures")      # nothing to stop if it was never used
+        if gestures is not None and gestures.running():
+            gestures.stop()
+            self.studio.say(f"Gestures off: they were listening to the {before}.")
+        if self.learning_on:
+            self.learning.follow()
+
+    def toggle_learning(self):
+        """The learning symbol was pressed."""
+        if self.learning_on:
+            self.leave_learning()
+        else:
+            self.learn()
+
+    def learn(self, view=None):
+        """Put the learning screen in the place of everything below the top row (at `view`, when one is named).
+        The desk itself is left as it is, out of sight: the open panel, a tool on show, what plays."""
+        if self.learning is None:
+            from lab.learner.screen import LearningScreen
+
+            self.learning = LearningScreen(self.learner_seat(), self.page)
+        if view is not None:
+            self.learning.wanted = view
+        if self.learning_on:
+            self.learning.follow()
+            return self.learning
+        self.chooser.close()
+        self.body.pack_forget()
+        self.names.pack_forget()
+        self.learning.frame.pack(fill="both", expand=True, pady=(12, 0))
+        self.learning_on = True
+        self.learn_symbol.configure(image=self.symbols[True], bg=TILE, highlightbackground=ACCENT)
+        self.learning.shown()
+        self.draw()
+        return self.learning
+
+    def leave_learning(self):
+        """Bring the desk back, as it was. A recording or a live listening of the learning screen is ended."""
+        self.learning.hidden()
+        self.learning.frame.pack_forget()
+        self.learning_on = False
+        self.learn_symbol.configure(image=self.symbols[False], bg=PAPER, highlightbackground=RULE)
+        self.names.pack(side="right")
+        self.body.pack(fill="both", expand=True, pady=(12, 0))
+        self.draw()
+
+    # ---- what is shown in the side panel's place ----
+
     def show(self, thing):
-        """Show a tool, the Guitar Learner or the teaching of a control in the place of the side panel.
+        """Show a side tool in the place of the side panel.
 
         `thing` has a `frame` (from `host_frame`), a `TITLE`, and `shown()` and `hidden()`, called as it comes
         and goes. One at a time: what was there is hidden and kept as it was."""
@@ -683,9 +802,11 @@ class Desk:
 
         for line in self.studio.difference():
             label(self.tray, line, size=10, wrap=400).pack(fill="x", pady=2)
-        button(self.tray, "Measure A and B now", self.measure_difference).pack(anchor="w", pady=(10, 4))
-        label(self.tray, "Plays the phrase silently through both, as they are set now, and says how B differs from "
-                         "A whatever their levels.", size=9, color=SUBTLE, wrap=400).pack(fill="x")
+        row = tk.Frame(self.tray, bg=DARK)
+        row.pack(fill="x", pady=(10, 4))
+        button(row, "Measure A and B now", self.measure_difference).pack(side="left")
+        hint(row, "Plays the phrase silently through both, as they are set now, and says how B differs from A "
+                  "whatever their levels.").pack(side="left")
         found = self.contrast
         if found and found["key"] == self.contrast_key():
             for line in field.contrast_lines(found):
@@ -728,7 +849,7 @@ class Desk:
         for item in studio.recorded_phrases()[:8]:
             chosen = item["id"] == current
             row = tk.Label(self.tray, text=f"{item.get('instrument', '')} · {item.get('setting', '')} · "
-                                           f"{str(item.get('recorded', ''))[5:16]}",
+                                           f"{str(item.get('recorded', ''))[5:16].replace('T', ' ')}",
                            bg=TILE if chosen else DARK, fg=INK if chosen else SOFT, font=(FONT, 9), anchor="w",
                            padx=6, pady=2, cursor="hand2")
             row.pack(fill="x")
@@ -748,15 +869,18 @@ class Desk:
             canvas.create_line(x, height / 2 - value * height / 2, x, height / 2 + value * height / 2, fill=SOFT)
         shade = canvas.create_rectangle(0, 0, 0, height, fill=ACCENT, stipple="gray25", width=0)
         seconds = len(audio) / RATE
-        note = label(self.tray, size=9, color=SUBTLE)
-        note.pack(fill="x", pady=(4, 0))
+        under = tk.Frame(self.tray, bg=DARK)
+        under.pack(fill="x", pady=(4, 0))
+        note = label(under, size=9, color=SUBTLE)
+        note.pack(side="left")
+        hint(under, "Drag either edge of the shaded part to change what loops. The recording itself is never "
+                    "changed.").pack(side="left")
         edges = {"now": (start, end)}
 
         def draw():
             first, last = edges["now"]
             canvas.coords(shade, first / len(audio) * width, 0, last / len(audio) * width, height)
-            note.configure(text=f"Loop {first / RATE:.1f}–{last / RATE:.1f} s of {seconds:.1f} s. "
-                                "Drag either edge; the recording itself is never changed.")
+            note.configure(text=f"Loop {first / RATE:.1f}–{last / RATE:.1f} s of {seconds:.1f} s")
 
         def drag(event):
             self.dragging = True
@@ -838,8 +962,6 @@ class Desk:
                                                    self.fill_panel()))
         if not self.preset_more:
             return
-        label(foot, "Use as reference plays the phrase silently through it, in the scene chosen, and keeps what "
-                    "came back for Tone search to match against.", size=9, color=SUBTLE, wrap=400).pack(fill="x")
         scenes = tk.Frame(foot, bg=DARK)
         scenes.pack(fill="x", pady=(2, 2))
         for index, scene in enumerate(("Default scene", *SCENE_LETTERS)):
@@ -852,9 +974,10 @@ class Desk:
         actions = tk.Frame(foot, bg=DARK)
         actions.pack(fill="x", pady=(2, 0))
         button(actions, "Use as reference", lambda: self.reference_preset(chosen())).pack(side="left")
-        button(actions, "Leave it on the unit", lambda: self.leave_preset(chosen())).pack(side="left", padx=6)
-        label(foot, "Leave it on the unit selects it, and it stays selected when the app closes.", size=9,
-              color=SUBTLE, wrap=400).pack(fill="x", pady=(2, 0))
+        hint(actions, "Plays the phrase silently through the preset, in the scene chosen above, and keeps what came "
+                      "back for Tone search to match against.").pack(side="left")
+        button(actions, "Leave it on the unit", lambda: self.leave_preset(chosen())).pack(side="left", padx=(6, 0))
+        hint(actions, "Selects the preset on the unit. It stays selected when the app closes.").pack(side="left")
 
     def reference_preset(self, row):
         """Play the phrase silently through a saved preset and keep the return as a reference for Tone search."""
@@ -1071,8 +1194,9 @@ class Desk:
         instrument = self.studio.store.instrument(self.studio.state.instrument) or {}
         settings = [f"{position} · {wiring}".rstrip(" ·") for position in instrument.get("settings") or ["Pickup"]
                     for wiring in (instrument.get("wiring") or [""])]
-        label(self.tray, f"Record a phrase on the {self.studio.state.instrument}, played on:", size=9,
-              color=SUBTLE).pack(fill="x", pady=(10, 2))
+        label(self.tray, f"Record a phrase on the {self.studio.state.instrument}", size=10, bold=True).pack(
+            fill="x", pady=(12, 0))
+        label(self.tray, "Pickup setting", size=9, color=SUBTLE).pack(fill="x", pady=(4, 2))
         from lab.tools.common import flow
 
         grid = tk.Frame(self.tray, bg=DARK)
@@ -1090,8 +1214,11 @@ class Desk:
         # only on takes marked as the same gesture (`lab.hearing.profile`). Choosing one is optional.
         from lab.hearing.profile import GESTURES
 
-        label(self.tray, "To compare pickup settings, play the same thing on each and say which:", size=9,
-              color=SUBTLE, wrap=400).pack(fill="x", pady=(6, 2))
+        played = tk.Frame(self.tray, bg=DARK)
+        played.pack(fill="x", pady=(6, 2))
+        label(played, "What is played", size=9, color=SUBTLE).pack(side="left")
+        hint(played, "Pickup settings are compared only on takes of the same thing. To compare them, play the same "
+                     "thing on each setting and mark it here; otherwise leave it.").pack(side="left")
         for gesture in GESTURES:
             chosen = gesture == self.record_gesture
             chip = tk.Label(self.tray, text=gesture, bg=TILE if chosen else DARK, fg=INK if chosen else SOFT,
@@ -1114,27 +1241,20 @@ class Desk:
         self.studio.use_phrase(item["id"], whole, start, end)
 
     def panel_guitar(self):
-        """The Guitar Learner and teaching a control (each shown in this panel's place), gesture listening, what
-        the instrument puts out, and recording a take."""
-        from lab.learner import gestures, offered_for
+        """Gesture listening, what the instrument puts out, and recording a take. (Learning the guitar is a screen
+        of its own, behind the learning symbol at the top left.)"""
+        from lab.learner import gestures
 
         instrument = self.studio.state.instrument
-        offered = bool(offered_for(instrument))
         row = tk.Frame(self.tray, bg=DARK)
-        row.pack(fill="x", pady=(0, 4))
-        if offered:
-            button(row, "Guitar Learner", self.open_learner).pack(side="left", padx=(0, 6))
-        button(row, "Teach a control", self.open_teach).pack(side="left", padx=(0, 6))
+        row.pack(fill="x", pady=(0, 8))
         state = gestures.state()
         self.gestures_shown = _gestures_shown(state)
         button(row, f"Gestures off · armed {state['seconds_left']:.0f} s" if state["armed"]
                else "Gestures off" if state["running"] else "Gestures on", self.toggle_gestures).pack(side="left")
-        if not offered:
-            label(self.tray, f"The Guitar Learner has no layout of the {instrument}'s controls, so it is not "
-                             "offered for it.", size=9, color=SUBTLE, wrap=400).pack(fill="x")
-        label(self.tray, f"Gestures on for {gestures.ARM_SECONDS:.0f} s, and {gestures.ARM_SECONDS:.0f} s more "
-                         "after each gesture: a return gesture taught on a guitar control turns its Shape knob on "
-                         "the sound on show.", size=9, color=SUBTLE, wrap=400).pack(fill="x", pady=(0, 8))
+        hint(row, f"A return gesture taught on a guitar control (Teach a control, on the learning screen) turns its "
+                  f"Shape knob on the sound on show. Gestures stay on for {gestures.ARM_SECONDS:.0f} s, and "
+                  f"{gestures.ARM_SECONDS:.0f} s more after each gesture.").pack(side="left")
         label(self.tray, f"What the {instrument} puts out", size=10, bold=True).pack(fill="x")
         # Worked out away from the window (reading the takes takes a second or more); the panel is drawn again
         # when it arrives.
@@ -1143,37 +1263,23 @@ class Desk:
         self.recording_controls()
 
     def panel_more(self):
-        """The side tools, the instrument, and measuring the USB round trip."""
+        """The side tools, and measuring the USB round trip."""
         from lab.tools.menu import TOOLS, opener
 
-        label(self.tray, "Tools", size=9, color=SUBTLE).pack(fill="x")
         grid = tk.Frame(self.tray, bg=DARK)
         grid.pack(fill="x", pady=(2, 10))
+        grid.columnconfigure((0, 1), weight=1, uniform="tools")
         for index, (title, name) in enumerate(TOOLS):
-            chip = tk.Label(grid, text=title, bg=TILE, fg=INK, font=(FONT, 9), padx=8, pady=4, cursor="hand2")
+            chip = tk.Label(grid, text=title, bg=TILE, fg=INK, font=(FONT, 9), padx=8, pady=4, cursor="hand2",
+                            anchor="w")
             chip.grid(row=index // 2, column=index % 2, sticky="we", padx=(0, 4), pady=2)
             chip.bind("<ButtonRelease-1>", lambda _, name=name: opener(name)(self))
-        label(self.tray, "Instrument", size=9, color=SUBTLE).pack(fill="x")
-        row = tk.Frame(self.tray, bg=DARK)
-        row.pack(fill="x", pady=(2, 10))
-        for item in self.studio.store.instruments():
-            chosen = item["name"] == self.studio.state.instrument
-            chip = tk.Label(row, text=item["name"], bg=TILE if chosen else DARK, fg=INK if chosen else SOFT,
-                            font=(FONT, 9), padx=8, pady=3, cursor="hand2")
-            chip.pack(side="left", padx=(0, 4))
-            chip.bind("<ButtonRelease-1>", lambda _, name=item["name"]: self.studio.set(instrument=name))
         button(self.tray, "Measure the USB round trip", self.studio.measure_round_trip).pack(anchor="w")
 
     def learner_seat(self):
         """The Guitar Learner's seat at this desk, made when something of the learner is first opened. With a
         simulated unit it opens no audio driver: there is no unit behind the real one."""
         return self.seat or LearnerSeat(self, real_audio=not self.studio.host.simulated)
-
-    def open_teach(self):
-        """Teaching one control's settings, in the side panel's place."""
-        from lab.learner import teach
-
-        self.teaching = teach.open(self.learner_seat())
 
     def toggle_gestures(self):
         from lab.learner import gestures
@@ -1209,14 +1315,6 @@ class Desk:
             self.studio.say("Back at the desk's own level.")
         else:
             self.studio.clear_listening()
-
-    def open_learner(self):
-        """The Guitar Learner, in the side panel's place, seated on this desk."""
-        from lab.learner import GuitarLearner
-
-        if self.learner is None:
-            self.learner = GuitarLearner(self.learner_seat())
-        self.learner.show()
 
     def failed(self, kind, error, trace):
         """A fault in a click: logged with its trace, and said on the line."""

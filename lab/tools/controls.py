@@ -17,7 +17,7 @@ import tkinter as tk
 from lab.sound import knobs
 from lab.sound.sounds import describe
 from lab.desk.theme import SUBTLE
-from lab.tools.common import WIDTH, Tool, button, disclosure, label, section, stated
+from lab.tools.common import WIDTH, Tool, button, disclosure, label, said, section, stated
 
 
 def lineage(store, sound):
@@ -87,7 +87,9 @@ class ControlsTool(Tool):
 
     def build(self):
         self.drawn = None               # what the tool was last drawn from
-        versions = section(self.body, "Versions")
+        versions = section(self.body, "Versions", "The sounds the selected one was made from and the ones made "
+                                                  "from it, oldest first. Older and Newer put that version on the "
+                                                  "selected side.")
         self.name = label(versions, size=10, bold=True, wrap=WIDTH)
         self.name.pack(fill="x")
         row = tk.Frame(versions, bg=versions["bg"])
@@ -96,19 +98,16 @@ class ControlsTool(Tool):
         self.older.pack(side="left")
         self.newer = button(row, "Newer", lambda: self.step(1), quiet=True)
         self.newer.pack(side="left", padx=4)
-        self.version = label(versions, size=9, wrap=WIDTH)
-        self.version.pack(fill="x", pady=(6, 0))
+        self.version = said(versions, pady=(6, 0))
         self.why = disclosure(versions, "Why it was made this way")
-        self.why_text = label(self.why, size=9, color=SUBTLE, wrap=WIDTH)
-        self.why_text.pack(fill="x")
-        self.moves = disclosure(self.body, "What each knob moves here")
-        self.moves_text = label(self.moves, size=9, color=SUBTLE, wrap=WIDTH)
-        self.moves_text.pack(fill="x")
+        self.why_text = said(self.why, color=SUBTLE, pady=0)
+        self.moves = disclosure(versions, "What each knob moves here")
+        self.moves_text = said(self.moves, color=SUBTLE, pady=0)
 
-        unit = section(self.body, "What the Quad Cortex holds")
-        button(unit, "Read it back", self.read_back, quiet=True).pack(anchor="w", pady=(4, 0))
-        self.held = label(unit, size=9, wrap=WIDTH)
-        self.held.pack(fill="x", pady=(4, 0))
+        unit = section(self.body, "What the Quad Cortex holds",
+                       "The chain on the unit now, read back from it: what plays, whatever the desk shows.")
+        button(unit, "Read it back", self.read_back, quiet=True).pack(anchor="w")
+        self.held = said(unit, pady=(4, 0))
         self.listener = lambda state: self.after(0, self.refresh) if self.showing() else None
         self.studio.listeners.append(self.listener)
         self.refresh()

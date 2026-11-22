@@ -71,7 +71,7 @@ class DispatchTest(Home):
     def test_every_command_parses(self):
         parser = cli.parser()
         for line in (["doctor", "--unit"], ["migrate", "--dry-run"], ["pod", "x.pgb", "--user-slot", "02B"],
-                     ["history", "a.json", "b.json"], ["latest-clip"], ["presets"], ["shortcut", "--desk", "new"],
+                     ["history", "a.json", "b.json"], ["latest-clip"], ["presets"], ["shortcut"],
                      ["test-compensation", "a.wav", "b.wav", "c.wav"], ["directory", "--simulated"], ["inspect"],
                      ["snapshot"], ["record", "x.wav", "--seconds", "3"], ["calibrate"],
                      ["reamp", "d.wav", "--slot", "2F", "--scenes", "AB"],
@@ -444,11 +444,11 @@ class LocalTest(Home):
             run("presets")
         self.assertEqual((self.home / "errors.log").read_text(encoding="utf-8"), log)
 
-    def test_shortcut_passes_the_chosen_desk(self):
-        chosen = []
-        with mock.patch.object(cli, "shortcut", lambda desk=None: chosen.append(desk) or Path("Tone Lab.lnk")):
-            code, out, _ = run("shortcut", "--desk", "new")
-        self.assertEqual((code, out.strip(), chosen), (0, "Tone Lab.lnk", ["new"]))
+    def test_shortcut_says_where_the_shortcut_is(self):
+        made = []
+        with mock.patch.object(cli, "shortcut", lambda: made.append(True) or Path("Tone Lab.lnk")):
+            code, out, _ = run("shortcut")
+        self.assertEqual((code, out.strip(), made), (0, "Tone Lab.lnk", [True]))
 
     def test_the_launcher_is_not_rebuilt_when_current(self):
         root = self.home / "program"

@@ -1,18 +1,30 @@
 """Turn the amp sweep into what each control does, per amp, and a report of what stands out.
 
-Run from the repository root: python research/analyse_amps.py
+Run from the repository root:
+    .venv\\Scripts\\python.exe research\\analyse_amps.py [--measurements FOLDER] [--out FOLDER]
 It reads whatever research/measurements/amps/*.json exist, so it can be run
 while the sweep (measure_amps.py) is still going and again when it is done. It
 writes lab/tables/controls.json, which the app loads through
-tone_lab/measured.py, and research/amp-controls-report.md.
+`lab.knowledge.table("controls")`, and research/amp-controls-report.md.
+`--measurements` names another folder holding `amps` and `amps-low` (a trial
+run's), and `--out` another folder for the table and the report.
 
 A knob's effect is given per tenth of its travel, as the knob rises, so the
 side below the default and the side above it can be compared. Band changes
-have the change of the whole spectrum removed, as probe.gap does, and the
-level change is given beside them.
+have the change of the whole spectrum removed (the mean change of the bands
+that sound), and the level change is given beside them.
+
+The firmware the table is marked with is the one the sweep files say they were
+measured on. A file from before they said so was measured on the firmware of
+the table the app ships, or, without one, on the firmware the USB round trip
+in the data folder was measured on. Files of more than one firmware give a
+mark that names them all, which `lab.knowledge.stale` then reports whatever
+the unit runs.
 """
 
+import argparse
 import json
+import os
 from pathlib import Path
 from statistics import median
 import sys
@@ -21,12 +33,17 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tone_lab import measured, models, session, styles  # noqa: E402
+import catalog_rows as models  # noqa: E402
 
-SOURCE = Path(__file__).resolve().parent / "measurements" / "amps"
-LOW_SOURCE = SOURCE.with_name("amps-low")
-LOW_ROLES = ("bass", "thump")
+from lab import knowledge  # noqa: E402
+from lab.sound.knobs import AMP, AMP_INPUT_GAIN_NAMES, AMP_VOLUME_AS_DRIVE, ROLE_BANDS, ROLES  # noqa: E402
+
+MEASUREMENTS = Path(__file__).resolve().parent / "measurements"
+TABLE = knowledge.SHARED / "controls.json"
 REPORT = Path(__file__).resolve().parent / "amp-controls-report.md"
+LOW_ROLES = ("bass", "thump")
+# The five bands a control's effect is given in: the spectrum cut at EDGES. `ROLE_BANDS` names them by position.
+BANDS = ("below 200 Hz", "200–800 Hz", "800 Hz–3 kHz", "3–6 kHz", "above 6 kHz")
 EDGES = (200., 800., 3000., 6000.)
 SILENT = -80.  # dB. A condition this quiet says nothing about tone.
 SOUNDING = 45.  # dB below the default's loudest band. Quieter bands carry no sound through this cab.
@@ -61,10 +78,19 @@ def per_point(found, points):
 
 
 def role_of(name):
-    for (category, role), controls in styles.ROLES.items():
-        if category == styles.AMP and name in controls:
+    for (category, role), controls in ROLES.items():
+        if category == AMP and name in controls:
             return role, controls[name]
     return None
+
+
+def side_strength(knob, side):
+    """How far a knob moves its role's band on one side of its default, signed so that positive follows the role."""
+    found = knob.get(side) or {}
+    bands = [found["bands"][index] for index in ROLE_BANDS.get(knob.get("role"), ()) if "bands" in found]
+    if not bands or None in bands:
+        return None
+    return round(knob["sign"] * sum(bands) / len(bands), 3)
 
 
 def summarise(result):
@@ -106,7 +132,7 @@ def strengths(amps, role):
     for model_id, amp in amps.items():
         for name, knob in amp["knobs"].items():
             if knob.get("role") == role:
-                sides = [value for value in (measured.side_strength(knob, side) for side in ("low", "high"))
+                sides = [value for value in (side_strength(knob, side) for side in ("low", "high"))
                          if value is not None]
                 if sides:
                     found.append((sum(sides) / len(sides), amp["name"], name, model_id))
@@ -125,11 +151,27 @@ def inert(result):
         abs(a - b) for a, b in zip(row["bands_db"], rows[0]["bands_db"])) < STILL for row in rows[1:])
 
 
-def collect():
+def earlier_firmware():
+    """The firmware of sweep files that do not say theirs: the shipped table's, made from such files, or without
+    one the firmware the USB round trip in the data folder was measured on."""
+    for path in (TABLE, knowledge.home() / "calibration.json"):
+        try:
+            found = json.loads(path.read_text(encoding="utf-8")).get("firmware")
+        except (OSError, ValueError, AttributeError):
+            continue
+        if found:
+            return found
+    return None
+
+
+def collect(measurements=MEASUREMENTS):
+    source, low_source = Path(measurements) / "amps", Path(measurements) / "amps-low"
     amps, refused, silent, meta, untouched = {}, [], [], {}, {}
     lows, tops = [], []  # How far under the loudest band the ends of the spectrum sit, per amp.
-    for path in sorted(SOURCE.glob("*.json"), key=lambda item: int(item.stem)):
+    firmwares, earlier = set(), earlier_firmware()
+    for path in sorted(source.glob("*.json"), key=lambda item: int(item.stem)):
         result = json.loads(path.read_text(encoding="utf-8"))
+        firmwares.add(result.get("firmware") or earlier)
         if result.get("refused") or not result.get("conditions"):
             refused.append(result["name"])
             continue
@@ -140,7 +182,7 @@ def collect():
         if record is None:
             silent.append(result["name"])
             continue
-        low = LOW_SOURCE / path.name
+        low = low_source / path.name
         if low.exists():
             # Bass controls are judged on the low-string phrase, where there is bass to move.
             again = summarise(json.loads(low.read_text(encoding="utf-8")))
@@ -152,17 +194,15 @@ def collect():
         lows.append(float(levels.max() - levels[centres < EDGES[0]].max()))
         tops.append(float(levels.max() - levels[centres >= 7900].max()))
         meta = {"cab": result["cab"], "take": result["take"], "seconds": result["seconds"]}
-    try:
-        firmware = json.loads((session.SESSIONS / "calibration.json").read_text(encoding="utf-8"))["firmware"]
-    except (OSError, ValueError, KeyError):
-        firmware = None
+    firmwares = sorted(found for found in firmwares if found)
+    firmware = " and ".join(firmwares) if firmwares else earlier
     typical = {}
-    for role in measured.ROLE_BANDS:
+    for role in ROLE_BANDS:
         values = [value for value, *_ in strengths(amps, role) if value > 0]
         if values:
             typical[role] = round(median(values), 3)
     meta["quiet_ends"] = {"below_200": round(median(lows), 1), "from_8k": round(median(tops), 1)} if lows else {}
-    table = {"firmware": firmware, **meta, "bands": list(measured.BANDS),
+    table = {"firmware": firmware, **meta, "bands": list(BANDS),
              "unit": "dB per tenth of a control's travel, as it rises. Switches are dB against the default position.",
              "typical": typical, "refused": refused, "silent": silent, "inert": sorted(untouched),
              "inert_names": [untouched[model_id] for model_id in sorted(untouched)], "amps": amps}
@@ -176,7 +216,7 @@ def biggest(found, count=2, scale=1.):
     """The band changes that stand out, in words."""
     ranked = sorted(((abs(value), index) for index, value in enumerate(found["bands"]) if value is not None),
                     reverse=True)[:count]
-    return ", ".join(f"{measured.BANDS[index]} {found['bands'][index] * scale:+.1f}" for _, index in sorted(
+    return ", ".join(f"{BANDS[index]} {found['bands'][index] * scale:+.1f}" for _, index in sorted(
         ranked, key=lambda item: item[1]))
 
 
@@ -216,11 +256,11 @@ def report(table):
 
     out += ["## How strong each kind of control is", "",
             "| Role | Band judged | Controls | Typical | Weakest | Strongest |", "| --- | --- | --- | --- | --- | --- |"]
-    for role, bands in measured.ROLE_BANDS.items():
+    for role, bands in ROLE_BANDS.items():
         found = strengths(amps, role)
         if not found:
             continue
-        span = " and ".join(measured.BANDS[index] for index in bands)
+        span = " and ".join(BANDS[index] for index in bands)
         weakest, strongest = found[0], found[-1]
         out.append(f"| {role} | {span} | {len(found)} | {median(value for value, *_ in found):+.2f} | "
                    f"{weakest[0]:+.2f} ({weakest[1]} {weakest[2].title()}) | "
@@ -233,7 +273,7 @@ def report(table):
         for name, knob in amp["knobs"].items():
             if "role" not in knob:
                 continue
-            measured_sides = [(side, measured.side_strength(knob, side), found) for side, found in sides(knob)]
+            measured_sides = [(side, side_strength(knob, side), found) for side, found in sides(knob)]
             for side, value, found in measured_sides:
                 if value is not None and value <= -WEAK:
                     wrong.append(f"- **{amp['name']} {name.title()}** ({knob['role']}), "
@@ -241,13 +281,13 @@ def report(table):
                                  f"in its own band. Raising it gives level {found['level']:+.2f}, "
                                  f"{biggest(found)}.")
             for side, value, found in measured_sides:
-                own = measured.ROLE_BANDS[knob["role"]]
+                own = ROLE_BANDS[knob["role"]]
                 other = max(((abs(shift), index) for index, shift in enumerate(found["bands"])
                              if shift is not None and index not in own), default=(0., 0))
                 if value is not None and other[0] >= 2 * WEAK and other[0] >= 2 * abs(value):
                     elsewhere.append(f"- **{amp['name']} {name.title()}** ({knob['role']}), "
                                      f"{'below' if side == 'low' else 'above'} its default: {value:+.2f} in its own "
-                                     f"band, {found['bands'][other[1]]:+.2f} {measured.BANDS[other[1]]}, "
+                                     f"band, {found['bands'][other[1]]:+.2f} {BANDS[other[1]]}, "
                                      f"level {found['level']:+.2f}.")
             if measured_sides and all(value is not None and abs(value) < WEAK and abs(found["level"]) < WEAK
                                       for _, value, found in measured_sides):
@@ -255,7 +295,7 @@ def report(table):
                             + ", ".join(f"{value:+.2f} {'below' if side == 'low' else 'above'}"
                                         for side, value, _ in measured_sides) + " dB per point.")
     out += ["", "## Controls that go against their role", "",
-            "`styles.ROLES` says which way each control should move its band. These moved it the other way by "
+            "`lab.sound.knobs.ROLES` says which way each control should move its band. These moved it the other way by "
             f"at least {WEAK} dB per point.", "", *(wrong or ["None."])]
     out += ["", "## Controls that move another band more than their own", "",
             f"Another band moved at least twice as far as the role's own, and at least {2 * WEAK} dB per point. "
@@ -276,7 +316,7 @@ def report(table):
     if out[-2] == "Change against the default position, in dB.":
         out += ["None measured yet.", ""]
 
-    gains = styles.AMP_INPUT_GAIN_NAMES | {"DRIVE", "PREAMP", "PREAMP GAIN", "VOLUME NORMAL", "VOLUME BRIGHT"}
+    gains = AMP_INPUT_GAIN_NAMES | {"DRIVE", "PREAMP", "PREAMP GAIN", "VOLUME NORMAL", "VOLUME BRIGHT"}
     out += ["## Gain controls", "",
             "Level and brightness per point as the control rises. Brightness is the move of the spectral centre in "
             "octaves. A crest that falls as gain rises is compression.", "",
@@ -285,7 +325,7 @@ def report(table):
     below, above = [], []
     for model_id, amp in amps.items():
         for name, knob in amp["knobs"].items():
-            if name in gains or name == "VOLUME" and int(model_id) in styles.AMP_VOLUME_AS_DRIVE:
+            if name in gains or name == "VOLUME" and int(model_id) in AMP_VOLUME_AS_DRIVE:
                 low, high = knob.get("low", {}), knob.get("high", {})
                 cell = lambda side, key, form: "silent" if side.get("silent") else (
                     format(side[key], form) if key in side else "")
@@ -320,14 +360,30 @@ def report(table):
     return "\n".join(out) + "\n"
 
 
-def main():
-    table = collect()
-    measured.PATH.write_text(json.dumps(table, separators=(",", ":"), ensure_ascii=False) + "\n", encoding="utf-8")
-    measured.table.cache_clear()
-    REPORT.write_text(report(table), encoding="utf-8")
+def write_whole(path, text):
+    """Write a file beside itself and then put it in place, so that a failure leaves the one that was there."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    spare = path.with_name(path.name + ".part")
+    spare.write_text(text, encoding="utf-8")
+    os.replace(spare, path)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="What each amp control does, from the sweep files.")
+    parser.add_argument("--measurements", type=Path, default=MEASUREMENTS,
+                        help="the folder holding amps/ and amps-low/ (research/measurements)")
+    parser.add_argument("--out", type=Path, help="a folder for controls.json and the report, in place of the app's")
+    args = parser.parse_args(argv)
+    target = args.out / TABLE.name if args.out else TABLE
+    report_path = args.out / REPORT.name if args.out else REPORT
+    table = collect(args.measurements)
+    write_whole(target, json.dumps(table, separators=(",", ":"), ensure_ascii=False) + "\n")
+    knowledge.table.cache_clear()
+    knowledge.locked.cache_clear()
+    write_whole(report_path, report(table))
     print(f"{len(table['amps'])} amps, {len(table['refused'])} refused, {len(table['silent'])} silent. "
           f"Typical strength per point: {table['typical']}")
-    print(f"Wrote {measured.PATH} and {REPORT}")
+    print(f"Wrote {target} and {report_path}")
 
 
 if __name__ == "__main__":

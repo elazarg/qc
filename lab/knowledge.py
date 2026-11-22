@@ -49,11 +49,12 @@ def home():
 
 
 def device_path():
-    """Where the unit's named settings are kept: the data folder. What the earlier app read into the program
-    folder is copied there once, so the half hour it took is not spent again."""
+    """Where the unit's named settings are kept: the data folder. What an earlier version read into the program
+    folder is copied to the player's own data folder once, so the half hour it took is not spent again. A folder
+    chosen with TONE_LAB_HOME starts without them, as it starts without everything else of the player's."""
     path = home() / DEVICE
     old = REPO / "tone_sessions" / DEVICE
-    if not path.exists() and old.is_file():
+    if not path.exists() and old.is_file() and not os.environ.get("TONE_LAB_HOME"):
         try:
             spare = path.with_suffix(".copying")
             spare.write_bytes(old.read_bytes())

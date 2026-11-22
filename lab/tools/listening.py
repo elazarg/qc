@@ -25,8 +25,9 @@ import json
 from pathlib import Path
 import tkinter as tk
 
+from lab.desk.hints import hint
 from lab.desk.theme import SUBTLE
-from lab.tools.common import WIDTH, FileChoice, Tool, button, disclosure, label, listbox, usual_folders
+from lab.tools.common import FileChoice, Tool, button, disclosure, listbox, room, said, sized, usual_folders
 
 REMEMBERED = "spotify.json"
 EXPORTS = ("my_spotify_data*.zip", "*spotify*.zip", "Streaming_History_Audio_*.json", "StreamingHistory_music_*.json")
@@ -73,22 +74,26 @@ class ListeningTool(Tool):
     def build(self):
         self.songs, self.context = [], {}
         self.reading = None             # the export being read, away from the window
-        self.where = label(self.body, size=9, wrap=WIDTH)
-        self.where.pack(fill="x")
-        self.list = listbox(self.body, height=11)
+        self.where = said(self.body, color=SUBTLE, pady=0)
+        # The songs of the export read, and what is done with one: there once an export was read.
+        self.found = room(self.body)
+        self.list = listbox(self.found, height=11)
         self.list.pack(fill="x", pady=(4, 6))
         self.list.bind("<<ListboxSelect>>", lambda _: self.describe())
-        self.note = label(self.body, size=9, wrap=WIDTH)
-        self.note.pack(fill="x")
-        actions = tk.Frame(self.body, bg=self.body["bg"])
+        self.note = said(self.found, pady=0)
+        actions = tk.Frame(self.found, bg=self.body["bg"])
         actions.pack(fill="x", pady=(6, 0))
         button(actions, "Start this song", self.start).pack(side="left")
         button(actions, "Make it", self.make).pack(side="left", padx=6)
-        button(self.body, "Ask about the artists", self.ask_about_artists, quiet=True).pack(anchor="w", pady=(6, 0))
+        button(actions, "Ask about the artists", self.ask_about_artists, quiet=True).pack(side="left")
+        hint(actions, "The songs are in the order you chose and came back to them. Start this song: the sounds you "
+                      "keep or save from now on become its parts. Make it: that, and three designs for it. Ask "
+                      "about the artists: the assistant says who plays guitar for the artists you listen to most, "
+                      "and how they sound (one call, about a minute).").pack(side="left")
         # The export is chosen once; choosing another is shown on request.
-        self.export = disclosure(self.body, "The Spotify export")
-        label(self.export, "The zip Spotify sends, or its streaming-history files: click each in the list, or paste "
-                           "a path.", size=9, color=SUBTLE, wrap=WIDTH).pack(fill="x")
+        self.export = disclosure(self.body, "The Spotify export",
+                                 note="The zip Spotify sends when you ask for your data, or the streaming-history "
+                                      "files inside it: click each in the list, or paste a path.")
         self.files = FileChoice(self.export, folders=lambda: usual_folders("spotify", self.folder),
                                 patterns=EXPORTS, choose=self.choose, several=True, action="Read this export")
         self.files.pack(fill="x")
@@ -157,8 +162,11 @@ class ListeningTool(Tool):
             mark = "  · preset" if song.get("preset") else ""
             self.list.insert("end", f"{song['artist']} – {song['title']}  ({chosen_words(song)}, {song['days']} days)"
                                     f"{mark}")
-        self.where.configure(text=f"{summary['hours']} hours over {len(summary['years'])} years")
-        self.say("Most chosen and returned to first. Select one for what is known about it.")
+        years = len(summary["years"])
+        self.where.configure(text=f"{summary['hours']} hours over {years} year{'s' if years != 1 else ''}")
+        sized(self.list, 11)
+        self.found.show(bool(self.songs))
+        self.say("")
 
     def chosen(self):
         picked = self.list.curselection()
@@ -208,8 +216,7 @@ class ListeningTool(Tool):
         song = self.chosen()
         if song is not None:
             self.studio.set(song=f"{song['artist']} - {song['title']}")
-            self.say(f"Working on {song['artist']} – {song['title']}. Sounds you keep or save for it become its "
-                     "parts; History lists them.")
+            self.say(f"Working on {song['artist']} – {song['title']}.")
 
     def make(self):
         song = self.chosen()

@@ -1,18 +1,19 @@
 """The Guitar Learner: record or open a dry clip, see what the learner makes of it, tag it.
 
-`GuitarLearner(seat)` is built on the seat the desk gives it (`lab.learner.seat.LearnerSeat`): the guitar and
-input chosen on the desk, the one recording or listening at a time (`seat.submit`), work followed on the
+`GuitarLearner(seat, parent)` is built on the seat the desk gives it (`lab.learner.seat.LearnerSeat`): the guitar
+and input chosen on the desk, the one recording or listening at a time (`seat.submit`), work followed on the
 desk's clock (`seat.later`, `seat.watch`) and the status line. What it says of an estimate and of its
 checks is worded in `lab.learner.report`.
 
-It is shown in the desk's window, in the place of the side panel (`show()`, `Desk.show`), and is laid out for
-that width: the clip and what the learner makes of it first, then the guitar's controls to set as they were,
-then the tagging. It is made once and kept, so it comes back as it was left. Going back to the desk ends a
-recording or a live listening. Nothing is bound to a key, and nothing opens outside the window: a take or a
-WAV is chosen from lists in place.
+It is one of the two views of the learning screen (`lab.learner.screen`), which has the window's whole width:
+the guitar's controls on a photograph at the left, to set as they were, and at the right the clip, what the
+learner makes of it, and the tagging. The takes and WAVs to choose from, and the dataset, are shown in the
+photograph's place and in the whole view's when asked for. It is made once and kept, so it comes back as it
+was left. Leaving the screen ends a recording or a live listening (`hidden`). Nothing is bound to a key, and
+nothing opens outside the window.
 
 `offered_for(instrument)` says whether the learner has a control layout, with its photograph, for an
-instrument; `show()` says so on the desk's line and stays closed when it has none.
+instrument; the screen does not offer this view for one it has none for.
 """
 
 from concurrent.futures import ThreadPoolExecutor
@@ -24,19 +25,25 @@ from uuid import uuid4
 
 import numpy as np
 
+from lab.desk.hints import hint
 from lab.desk.theme import mix
 from lab.learner import configuration as model, dataset as data, folders, gestures, inputs, takes as recorder, worker
-from lab.learner.board import (ACCENT, ALERT, BG, LINE, MUTED, PANEL, WIDTH, GuitarBoard, LAYOUTS_SHOWN, button,
+from lab.learner.board import (ACCENT, ALERT, BG, LINE, MUTED, PANEL, GuitarBoard, LAYOUTS_SHOWN, button,
                                mark_button, word)
 from lab.learner.folders import LOG
 from lab.learner.report import (evaluate, guess_lines, prediction_value, purpose, report_score, setting,
                                 teaching_hint, training_coverage)
-from lab.tools.common import FileChoice, listbox, scrolled, usual_folders, wheel
+from lab.tools.common import FileChoice, listbox, usual_folders
 
-GUIDE = ("Start with a short phrase of clear notes across your usual register. Repeat it after changing one control.",
+GUIDE = ("Start with a short phrase of clear notes across your usual register. Repeat it after changing one control.\n"
          "Then add your normal playing in a few known setups. Keep the input gain steady and vary your picking "
-         "across the examples.",
-         "Check a different performance to see what carries over. Live listening uses the latest usable notes.")
+         "across the examples.\n"
+         "Check a different performance to see what carries over.")
+LIVE = "While it listens, the estimate follows the most recent usable notes. Keep a clip to tag it."
+TAGGING = ("Set the controls on the photograph as the guitar was set, then tag the clip. A clip to teach with is "
+           "learned from; one kept as a check is only ever estimated.")
+BESIDE = 350        # the width of the column at the right: the clip, what the learner makes of it, the tagging
+WRAP = BESIDE - 30  # and of a line of words in it
 
 
 def offered_for(instrument):
@@ -56,10 +63,15 @@ def dataset_line(record, values, layout, use):
 class GuitarLearner:
     TITLE = "Guitar Learner"
 
-    def __init__(self, seat):
+    def __init__(self, seat, parent, beside=None):
+        """`beside` is where the learning screen keeps a view's own controls, at the right of the views' names
+        (`header`: how much is taught, and the dataset); without one they are at the top of the view itself."""
         self.seat = seat
         self.guitar = None
-        self.frame = seat.desk.host_frame()
+        self.frame = tk.Frame(parent, background=BG)
+        self.header = tk.Frame(beside if beside is not None else self.frame, background=BG)
+        if beside is None:
+            self.header.pack(fill="x", pady=(0, 8))
         self.worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix="guitar-learner")
         self.job = None
         self.stop = self.ready = None
@@ -75,7 +87,7 @@ class GuitarLearner:
         self.live_commands = Queue()
         self.live_change = None
         self.last_live_guess = None
-        self.dataset_open = self.guide_open = self.takes_open = False
+        self.dataset_open = self.takes_open = False
         self.dataset_rows = []
         self.take_sources = []
         self.examples, self.tests, self.checks = [], [], []
@@ -84,17 +96,15 @@ class GuitarLearner:
         self.use_guitar(seat.guitar)
 
     def use_guitar(self, guitar):
-        """Work on the guitar chosen on the desk. False, with the reason on the desk's line, when the learner
-        has no control layout for it."""
+        """Work on the guitar chosen on the desk. False when the learner has no control layout for it (the
+        learning screen then shows its other view, and says why)."""
         layouts = offered_for(guitar)
         if not layouts:
-            self.seat.set_status(f"The Guitar Learner has no control layout for the {guitar} yet. Choose a guitar "
-                                 "it knows under More, Instrument.")
             return False
         if guitar == self.guitar:
             return True
         if self.job is not None or self.stop is not None or self.live_stop is not None:
-            self.status.set(f"Still on the {self.guitar}: finish what is running, then open the learner again.")
+            self.status.set(f"Still on the {self.guitar}: finish what is running first.")
             return True
         self.guitar, self.layout = guitar, None
         self.source = self.excerpt = self.full_excerpt = self.used_source = self.guess = None
@@ -103,63 +113,51 @@ class GuitarLearner:
         self.change_layout(saved if saved in layouts else layouts[0], remember=False)
         return True
 
-    # ---- in the desk's window ----
-
-    def show(self):
-        """Show the learner in the desk's window, on the guitar chosen there; it stays closed for a guitar it has
-        no layout for."""
-        if self.use_guitar(self.seat.guitar):
-            self.seat.desk.show(self)
-
-    def showing(self):
-        return self.seat.desk.hosted is self
+    # ---- on the learning screen ----
 
     def shown(self):
-        """The desk has put the learner on show."""
+        """The screen has put this view on show: it works on the guitar chosen on the desk."""
+        self.use_guitar(self.seat.guitar)
 
     def hidden(self):
-        """The desk has gone back from the learner: a recording or a live listening under way is ended."""
+        """The screen has been left, or shows its other view: a recording or a live listening under way is ended."""
         if self.stop:
             self.stop.set()
         if self.live_stop:
             self.live_stop.set()
 
-    def hide(self):
-        """Go back to the desk, if the learner is what is on show."""
-        if self.showing():
-            self.seat.desk.back()
-        else:
-            self.hidden()
-
     # ---- building ----
 
     def build(self):
-        self.scroller, page = scrolled(self.frame)
-        self.scroller.configure(background=PANEL)
-        page.configure(background=PANEL)
-        self.scroller.pack(side="left", fill="both", expand=True)
-        header = tk.Frame(page, background=PANEL)
-        header.pack(fill="x", pady=(0, 6))
+        header = self.header
         self.count = tk.StringVar(master=self.frame)
-        word(header, variable=self.count, color=ACCENT, size=9, bold=True).pack(side="left")
         self.dataset_button = button(header, "Dataset", self.toggle_dataset, compact=True)
-        self.dataset_button.pack(side="right")
-        self.guide_button = button(header, "Guide", self.toggle_guide, compact=True)
-        self.guide_button.pack(side="right", padx=(0, 4))
-        self.guide = tk.Frame(page, background=PANEL)
-        for line in GUIDE:
-            word(self.guide, line, size=9, color=MUTED, wrap=WIDTH).pack(fill="x")
+        self.dataset_button.pack(side="right", padx=(12, 0))
+        hint(header, GUIDE).pack(side="right")
+        word(header, variable=self.count, color=ACCENT, size=9, bold=True).pack(side="right")
 
-        panel = self.workspace = tk.Frame(page, background=PANEL)
-        panel.pack(fill="x")
+        work = self.workspace = tk.Frame(self.frame, background=BG)
+        work.pack(fill="both", expand=True)
+        panel = tk.Frame(work, background=PANEL, padx=14, pady=12, width=BESIDE)
+        panel.pack(side="right", fill="y")
+        panel.pack_propagate(False)
+        # At the left: the guitar's controls, or, when asked for, the takes and WAVs to choose from.
+        self.stage = tk.Frame(work, background=BG)
+        self.stage.pack(side="left", fill="both", expand=True, padx=(0, 12))
+        self.board = GuitarBoard(self.stage, self.change_layout, self.sync)
+        self.board.pack(fill="both", expand=True)
+        self.build_chooser(self.stage)
+
         live = tk.Frame(panel, background=PANEL)
         live.pack(fill="x")
         self.live_button = button(live, "Listen live", self.toggle_live, primary=True, compact=True)
         self.live_button.pack(side="left")
         self.follow_button = button(live, "Follow live", self.follow, compact=True)
         self.keep_button = button(live, "Keep recent clip", self.keep_live, compact=True)
+        self.live_hint = hint(live, LIVE)
+        self.live_hint.pack(side="right")
         self.live_status = tk.StringVar(master=self.frame)
-        self.live_status_line = word(panel, variable=self.live_status, size=9, color=ACCENT, wrap=WIDTH)
+        self.live_status_line = word(panel, variable=self.live_status, size=9, color=ACCENT, wrap=WRAP)
         self.live_status_line.pack(fill="x", pady=(4, 0))
         self.change_tools = tk.Frame(panel, background=PANEL)
         word(self.change_tools, "Last change", color=MUTED, size=9).pack(side="left")
@@ -171,15 +169,16 @@ class GuitarLearner:
 
         self.title = tk.StringVar(master=self.frame)
         self.guidance = tk.StringVar(master=self.frame)
-        word(panel, variable=self.title, size=11, bold=True).pack(fill="x", pady=(8, 2))
-        word(panel, variable=self.guidance, color=MUTED, size=9, wrap=WIDTH).pack(fill="x", pady=(0, 6))
+        word(panel, variable=self.title, size=12, bold=True).pack(fill="x", pady=(8, 2))
+        self.guidance_line = word(panel, variable=self.guidance, color=MUTED, size=9, wrap=WRAP)
+        self.guidance_line.pack(fill="x", pady=(0, 6))
 
         self.source_title = tk.StringVar(master=self.frame, value="No recording selected")
         self.source_detail = tk.StringVar(master=self.frame, value="Dry input")
         self.clip = tk.Frame(panel, background=BG, padx=8, pady=6)
         self.clip.pack(fill="x")
-        word(self.clip, variable=self.source_title, bold=True, size=9, wrap=WIDTH - 20).pack(fill="x")
-        self.wave = tk.Canvas(self.clip, background=BG, width=WIDTH - 40, height=43, borderwidth=0,
+        word(self.clip, variable=self.source_title, bold=True, size=9, wrap=WRAP - 20).pack(fill="x")
+        self.wave = tk.Canvas(self.clip, background=BG, width=WRAP - 20, height=43, borderwidth=0,
                               highlightthickness=0)
         self.wave.pack(fill="x", pady=2)
         self.wave.bind("<Configure>", lambda _: self.draw_wave())
@@ -198,101 +197,102 @@ class GuitarLearner:
         self.record_button.pack(side="left", padx=(0, 4))
         self.takes_button = button(sources, "Use a take or a WAV", self.toggle_takes, compact=True)
         self.takes_button.pack(side="left")
-        # Choosing a take or a WAV, in place: shown when asked for.
-        self.chooser = tk.Frame(panel, background=PANEL)
-        word(self.chooser, "Takes recorded on this guitar", size=9, color=MUTED).pack(fill="x")
-        self.takes = listbox(self.chooser, height=5)
-        self.takes.pack(fill="x")
-        self.take_button = button(self.chooser, "Open this take", self.open_take, compact=True)
-        self.take_button.pack(anchor="w", pady=(4, 6))
-        self.takes.bind("<Double-Button-1>", lambda _: self.open_take())      # the same as the button under it
-        word(self.chooser, "Or a mono dry WAV from elsewhere", size=9, color=MUTED).pack(fill="x")
-        self.wav_choice = FileChoice(self.chooser, folders=lambda: usual_folders("wav", self.seat.studio.folder),
-                                     patterns=("*.wav",), choose=self.choose_wav, action="Open this WAV")
-        self.wav_choice.pack(fill="x")
 
         self.status = tk.StringVar(master=self.frame)
-        self.status_line = word(panel, variable=self.status, color=ALERT, wrap=WIDTH, size=9)
+        self.status_line = word(panel, variable=self.status, color=ALERT, wrap=WRAP, size=9)
         self.status_line.pack(fill="x")
 
         self.report = tk.Frame(panel, background=PANEL)
         self.headline = tk.StringVar(master=self.frame)
         self.details = tk.StringVar(master=self.frame)
         self.note = tk.StringVar(master=self.frame)
-        word(self.report, variable=self.headline, size=11, bold=True, color=ACCENT, wrap=WIDTH).pack(fill="x", pady=(1, 3))
-        word(self.report, variable=self.details, bold=True, size=9, wrap=WIDTH).pack(fill="x")
-        word(self.report, variable=self.note, color=MUTED, wrap=WIDTH, size=9).pack(fill="x", pady=(3, 4))
-
-        word(panel, "The guitar as it was set", size=9, color=MUTED).pack(fill="x", pady=(8, 2))
-        self.board = GuitarBoard(panel, self.change_layout, self.sync)
-        self.board.pack(fill="x")
+        word(self.report, variable=self.headline, size=12, bold=True, color=ACCENT, wrap=WRAP).pack(fill="x", pady=(1, 3))
+        word(self.report, variable=self.details, bold=True, size=9, wrap=WRAP).pack(fill="x")
+        word(self.report, variable=self.note, color=MUTED, wrap=WRAP, size=9).pack(fill="x", pady=(3, 4))
 
         self.tag_row = tk.Frame(panel, background=PANEL)
         self.tag_hint = tk.StringVar(master=self.frame)
-        word(self.tag_row, variable=self.tag_hint, size=9, color=MUTED, wrap=WIDTH).pack(fill="x", pady=(2, 4))
+        word(self.tag_row, variable=self.tag_hint, size=9, color=MUTED, wrap=WRAP).pack(fill="x")
         self.teach = button(self.tag_row, "Teach with this clip", lambda: self.add("example"), primary=True, compact=True)
         self.teach.pack(side="left", padx=(0, 4))
         self.keep_check = button(self.tag_row, "Keep as check", lambda: self.add("test"), compact=True)
         self.keep_check.pack(side="left")
+        hint(self.tag_row, TAGGING).pack(side="left")
         self.tag_row.pack(fill="x", pady=(6, 2))
 
         self.coverage = tk.StringVar(master=self.frame)
-        self.coverage_line = word(panel, variable=self.coverage, color=ACCENT, size=9, wrap=WIDTH)
+        self.coverage_line = word(panel, variable=self.coverage, color=ACCENT, size=9, wrap=WRAP)
         self.coverage_line.pack(fill="x", pady=(6, 0))
         self.score = tk.StringVar(master=self.frame)
-        word(panel, variable=self.score, color=MUTED, size=9, wrap=WIDTH).pack(fill="x", pady=(3, 0))
+        word(panel, variable=self.score, color=MUTED, size=9, wrap=WRAP).pack(fill="x", pady=(3, 0))
         self.bindings = (self.takes_button, self.take_button)
-        self.build_dataset(page)
-        wheel(self.scroller)
+        self.build_dataset()
 
-    def build_dataset(self, page):
-        self.dataset = tk.Frame(page, background=PANEL)
+    def build_chooser(self, stage):
+        """The takes recorded on this guitar and the WAVs found, to open one: shown in the photograph's place."""
+        self.chooser = tk.Frame(stage, background=PANEL, padx=14, pady=10)
+        head = tk.Frame(self.chooser, background=PANEL)
+        head.pack(fill="x", pady=(0, 8))
+        word(head, "Use a take or a WAV", size=11, bold=True).pack(side="left")
+        button(head, "Back to the guitar", self.toggle_takes, compact=True).pack(side="right")
+        other = tk.Frame(self.chooser, background=PANEL)
+        other.pack(side="right", fill="y", padx=(14, 0))
+        word(other, "A mono dry WAV", size=9, color=MUTED).pack(fill="x", pady=(0, 2))
+        self.wav_choice = FileChoice(other, folders=lambda: usual_folders("wav", self.seat.studio.folder),
+                                     patterns=("*.wav",), choose=self.choose_wav, action="Open this WAV", height=8,
+                                     width=230)
+        self.wav_choice.pack(fill="x")
+        mine = tk.Frame(self.chooser, background=PANEL)
+        mine.pack(side="left", fill="both", expand=True)
+        word(mine, "Takes recorded on this guitar", size=9, color=MUTED).pack(fill="x", pady=(0, 2))
+        self.take_button = button(mine, "Open this take", self.open_take, compact=True)
+        self.take_button.pack(side="bottom", anchor="w", pady=(6, 0))
+        self.takes = listbox(mine, height=6)
+        self.takes.pack(fill="both", expand=True)
+        self.takes.bind("<Double-Button-1>", lambda _: self.open_take())      # the same as the button under it
+
+    def build_dataset(self):
+        """Every labelled recording, in the whole view's place."""
+        self.dataset = tk.Frame(self.frame, background=PANEL, padx=14, pady=10)
         self.dataset_summary = tk.StringVar(master=self.frame)
-        word(self.dataset, variable=self.dataset_summary, color=MUTED, size=9, wrap=WIDTH).pack(fill="x", pady=(0, 4))
-        self.table = listbox(self.dataset, height=16)
-        self.table.pack(fill="x")
-        self.table.bind("<<ListboxSelect>>", lambda _: self.sync_dataset_buttons())
-        self.table.bind("<Double-Button-1>", lambda _: self.open_dataset_row())       # the same as Open recording
+        word(self.dataset, variable=self.dataset_summary, color=MUTED, size=9).pack(fill="x", pady=(0, 4))
         bar = tk.Frame(self.dataset, background=PANEL)
-        bar.pack(fill="x", pady=(8, 0))
+        bar.pack(side="bottom", fill="x", pady=(8, 0))
         self.dataset_select = button(bar, "Open recording", self.open_dataset_row, primary=True, compact=True)
         self.dataset_select.pack(side="left")
         self.dataset_remove = button(bar, "Remove tag", self.remove_dataset_tag, compact=True)
         self.dataset_remove.pack(side="left", padx=4)
         self.dataset_hint = tk.StringVar(master=self.frame)
-        word(self.dataset, variable=self.dataset_hint, color=ALERT, size=9, wrap=WIDTH).pack(fill="x", pady=(4, 0))
-
-    def toggle_guide(self):
-        self.guide_open = not self.guide_open
-        if self.guide_open:
-            view = self.dataset if self.dataset_open else self.workspace
-            self.guide.pack(before=view, fill="x", pady=(0, 8))
-        else:
-            self.guide.pack_forget()
-        mark_button(self.guide_button, self.guide_open)
+        word(bar, variable=self.dataset_hint, color=ALERT, size=9).pack(side="left", padx=8)
+        self.table = listbox(self.dataset, height=8)
+        self.table.pack(fill="both", expand=True)
+        self.table.bind("<<ListboxSelect>>", lambda _: self.sync_dataset_buttons())
+        self.table.bind("<Double-Button-1>", lambda _: self.open_dataset_row())       # the same as Open recording
 
     def toggle_dataset(self):
         self.dataset_open = not self.dataset_open
         if self.dataset_open:
             self.workspace.pack_forget()
-            self.dataset.pack(fill="x")
+            self.dataset.pack(fill="both", expand=True)
             self.dataset_button.configure(text="Back to the clip")
             self.refresh_dataset()
         else:
             self.dataset.pack_forget()
-            self.workspace.pack(fill="x")
+            self.workspace.pack(fill="both", expand=True)
             self.dataset_button.configure(text="Dataset")
         mark_button(self.dataset_button, self.dataset_open)
 
     def toggle_takes(self):
-        """Show the takes and WAVs to choose from, under the buttons; pressed again, put them away."""
+        """Show the takes and WAVs to choose from, in the photograph's place; pressed again, the guitar is back."""
         self.takes_open = not self.takes_open
         if self.takes_open:
             self.list_takes()
             self.wav_choice.look()
-            self.chooser.pack(after=self.takes_button.master, fill="x", pady=(0, 6))
+            self.board.pack_forget()
+            self.chooser.pack(fill="both", expand=True)
         else:
             self.chooser.pack_forget()
+            self.board.pack(fill="both", expand=True)
         mark_button(self.takes_button, self.takes_open)
 
     def refresh_dataset(self):
@@ -420,12 +420,13 @@ class GuitarLearner:
         else:
             self.record_button.configure(text="●  Record clip", state="normal" if idle and not listening_live else "disabled")
         following = listening_live and self.follow_live
+        # What to record next is said while there is nothing on show to tag; the rest is behind the hints.
         if following:
             self.title.set("Listening to your guitar")
-            self.guidance.set("The estimate follows the most recent usable notes. Keep a clip to tag it.")
+            self.guidance.set("")
         elif self.source:
             self.title.set("Review this recording")
-            self.guidance.set("Set the controls below as the guitar was set before tagging.")
+            self.guidance.set("")
         else:
             self.title.set("Check a recording")
             self.guidance.set(teaching_hint(self.layout, self.examples, self.board.values))
@@ -434,8 +435,7 @@ class GuitarLearner:
         if available:
             if not self.tag_row.winfo_manager():
                 self.tag_row.pack(fill="x", pady=(6, 2), before=self.coverage_line)
-            self.tag_hint.set("Use to teach takes this recording out of the checks."
-                              if role == "test" else "Tag the actual settings shown on the guitar's controls.")
+            self.tag_hint.set("Use to teach takes this recording out of the checks." if role == "test" else "")
         else:
             self.tag_row.pack_forget()
         self.teach.configure(text={"test": "Use to teach", "example": "Update teaching tag"}.get(role, "Teach with this clip"),

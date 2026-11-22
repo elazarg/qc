@@ -429,6 +429,32 @@ class DeskCase(unittest.TestCase):
         self.studio.put(side, sound)
         self.pump()
 
+    def learn(self, view=None):
+        """Put the learning screen on, as the learning symbol does (at a view, when one is named), and wait until
+        the Guitar Learner has read what it was taught. Returns the screen (`lab.learner.screen`)."""
+        from lab.learner import folders
+
+        if self.desk.seat is None:
+            self.addCleanup(folders.log_to, None)       # the seat points the learner's folders and log at this desk
+            self.addCleanup(folders.use, None)
+        screen = self.desk.learn(view)
+        self.settle_learning()
+        return screen
+
+    def settle_learning(self):
+        """Run the desk's and the seat's clocks until the Guitar Learner is idle. The workers of whatever the
+        learning screen has made by now are waited for when the test ends."""
+        screen, seat = self.desk.learning, self.desk.seat
+        waited = self.__dict__.setdefault("_learning_workers", set())
+        for owner in (seat, screen.learner, screen.teaching):
+            if owner is not None and id(owner) not in waited:
+                waited.add(id(owner))
+                self.addCleanup(owner.worker.shutdown, wait=True)
+        learner = screen.learner
+        until(lambda: (self.studio.poll(), seat.tick(), self.root.update(),
+                       learner is None or (learner.job is None and not learner.queued))[-1],
+              20, "the Guitar Learner to be idle")
+
     def tool(self, name):
         """Open a side tool as the More panel does."""
         from lab.tools.menu import opener

@@ -18,8 +18,7 @@ internal static class Program
     [DllImport("user32.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
     private static extern int MessageBoxW(IntPtr owner, string message, string title, uint flags);
 
-    // Arguments are passed on to start.pyw: "--new" opens the rewritten desk, "--old" the earlier one. Without
-    // either, start.pyw decides (TONE_LAB_DESK, then launcher.json in the data folder, then the rewritten desk).
+    // Arguments are passed on to start.pyw, which opens the desk.
     // start.pyw takes this same AppId for its own process, which is the one that owns the window.
     [STAThread]
     private static int Main(string[] args)

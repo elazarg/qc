@@ -13,7 +13,7 @@ On the computer alone:
     latest-clip                         the newest recorded phrase
     presets                             the presets kept as sounds (see `snapshot`)
     test-compensation REF ROLLED OUT    whether a small EQ offsets a rolled-back tone pot, offline
-    shortcut [--desk new|old]           the Windows shortcut and launcher with Tone Lab's taskbar identity
+    shortcut                            the Windows shortcut and launcher with Tone Lab's taskbar identity
 
 With the unit (each takes --simulated to use the simulated unit instead):
 
@@ -562,10 +562,8 @@ def time_switch_command(args):
 
 # ---- the Windows shortcut ----
 #
-# Carried over from `tone_lab.desktop.shortcut`. Nothing in it depends on the old desk: it builds
-# `Tone Lab.exe` from `desktop_launcher/Program.cs`, which starts `desktop_launcher/start.pyw`, which opens
-# whichever desk is chosen (`--new`, `--old`, TONE_LAB_DESK or launcher.json). `--desk` puts the choice in
-# the shortcut itself.
+# `Tone Lab.exe` is built from `desktop_launcher/Program.cs`; it starts `desktop_launcher/start.pyw`, which
+# opens the desk.
 
 APP_ID = "ToneLab.QuadCortex.Desktop"
 
@@ -616,7 +614,7 @@ def _repair_taskbar_links(file, appdata):
             shell.SHChangeNotify(shellcon.SHCNE_UPDATEITEM, shellcon.SHCNF_PATHW, str(path), None)
 
 
-def shortcut(desk=None):
+def shortcut():
     """`Tone Lab.lnk` in the program folder and the Start menu, and any pinned copy, for the launcher."""
     import pythoncom
     from win32com.propsys import propsys, pscon
@@ -627,7 +625,7 @@ def shortcut(desk=None):
     link = pythoncom.CoCreateInstance(shell.CLSID_ShellLink, None, pythoncom.CLSCTX_INPROC_SERVER,
                                      shell.IID_IShellLink)
     link.SetPath(str(launcher))
-    link.SetArguments(f"--{desk}" if desk else "")
+    link.SetArguments("")
     link.SetWorkingDirectory(str(root))
     link.SetDescription("Tone Lab for Quad Cortex")
     link.SetIconLocation(str(root / "ToneLab.ico"), 0)
@@ -644,7 +642,7 @@ def shortcut(desk=None):
 
 
 def shortcut_command(args):
-    return shortcut(args.desk)
+    return shortcut()
 
 
 # ---- the parser ----
@@ -677,9 +675,7 @@ def parser():
     compensation.add_argument("reference", type=Path, help="Open-tone dry WAV")
     compensation.add_argument("rolled", type=Path, help="Same notes played with the tone pot rolled back")
     compensation.add_argument("output", type=Path, help="New WAV for the result")
-    shortcut_ = sub.add_parser("shortcut", help="Build the launcher and the Windows shortcut")
-    shortcut_.add_argument("--desk", choices=("new", "old"), help="Open this desk from the shortcut; without it, "
-                           "the launcher's own choice (TONE_LAB_DESK or launcher.json)")
+    sub.add_parser("shortcut", help="Build the launcher and the Windows shortcut")
 
     directory_ = unit_command("directory", "List the presets saved on the unit")
     directory_.add_argument("--factory", action="store_true", help="Include the factory presets")

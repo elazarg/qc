@@ -34,11 +34,14 @@ class Guitar:
         return [item for _, item in found]
 
     def setting(self):
-        """The pickup setting the phrase in use was recorded on, if it was noted."""
+        """The pickup setting the phrase in use was recorded on, if it was noted and the phrase was recorded on the
+        instrument now chosen."""
         studio = self.studio
         if not studio.phrase:
             return None
         found = next((item for item in self.recorded() if item["id"] == studio.phrase[0]), None)
+        if found is not None and found.get("instrument") not in (None, studio.state.instrument):
+            return None                   # a phrase recorded on another instrument says nothing of this one's settings
         setting = (found or {}).get("setting")
         return None if not setting or setting == "unknown" else setting
 
@@ -77,8 +80,7 @@ class Guitar:
         studio = self.studio
         takes = self.takes()
         if not takes:
-            return {}, [f"No phrase has been recorded on the {studio.state.instrument} with its pickup setting noted. "
-                        "Record the same short phrase on each setting."]
+            return {}, [f"No phrase has been recorded on the {studio.state.instrument} with its pickup setting noted."]
         return self.profile(studio.state.instrument, takes)
 
     def lines(self):

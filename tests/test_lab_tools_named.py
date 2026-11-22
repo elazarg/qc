@@ -4,6 +4,7 @@ import sys as _sys, pathlib as _pathlib; _sys.path.insert(0, str(_pathlib.Path(_
 import isolated  # noqa: E402,F401  (a data folder of its own; no way to the real unit, driver or Codex)
 
 import json
+import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import threading
@@ -206,15 +207,25 @@ class NamedTest(unittest.TestCase):
                 knowledge.table.cache_clear()
                 knowledge.locked.cache_clear()
 
-    def test_what_the_earlier_app_read_is_copied_to_the_data_folder_once(self):
-        home, old = self.folder / "home", self.folder / "tone_sessions" / "device-presets.json"
+    def test_what_an_earlier_version_read_is_copied_to_the_players_data_folder_once(self):
+        old = self.folder / "tone_sessions" / "device-presets.json"
         old.parent.mkdir(parents=True)
         old.write_text(json.dumps({"firmware": "4.1.1", "models": {}}), encoding="utf-8")
-        with mock.patch.dict("os.environ", {"TONE_LAB_HOME": str(home)}),                 mock.patch.object(knowledge, "REPO", self.folder):
+        environment = {key: value for key, value in os.environ.items() if key != "TONE_LAB_HOME"}
+        environment["LOCALAPPDATA"] = str(self.folder / "profile")
+        (self.folder / "profile" / "Tone Lab").mkdir(parents=True)
+        home = self.folder / "profile" / "Tone Lab"
+        with mock.patch.dict(os.environ, environment, clear=True), mock.patch.object(knowledge, "REPO", self.folder):
             self.assertEqual(knowledge.device_path(), home / "device-presets.json")
             self.assertEqual(json.loads((home / "device-presets.json").read_text(encoding="utf-8"))["firmware"],
                              "4.1.1")
-            self.assertTrue(old.is_file())                    # the earlier app still reads its own
+            self.assertTrue(old.is_file())                    # left where it was
+        # A folder chosen with TONE_LAB_HOME (a test's, a trial's) starts without the player's table.
+        chosen = self.folder / "chosen"
+        with mock.patch.dict(os.environ, {"TONE_LAB_HOME": str(chosen)}), \
+                mock.patch.object(knowledge, "REPO", self.folder):
+            self.assertEqual(knowledge.device_path(), chosen / "device-presets.json")
+            self.assertFalse((chosen / "device-presets.json").exists())
 
     def test_runs_where_the_unit_is_held(self):
         host = Host(self.folder / "host", simulated=True, local=True)

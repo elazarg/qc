@@ -89,7 +89,7 @@ def first(imports, wanted):
 def window_modules():
     """The app's modules that import tkinter."""
     found = set()
-    for root in ("lab", "tone_lab"):
+    for root in ("lab",):
         for path in (REPO / root).rglob("*.py"):
             if "tkinter" in text_of(path) and any(of(name, "tkinter") for name in anywhere(parsed(path))):
                 dotted = ".".join(path.relative_to(REPO).with_suffix("").parts)
@@ -121,7 +121,7 @@ def not_hidden():
             continue
         imports = at_the_top(tree)
         guard = first(imports, lambda name: name == "hidden_tk")
-        risk = first(imports, lambda name: of(name, "tkinter", "lab", "tone_lab") or helper(name))
+        risk = first(imports, lambda name: of(name, "tkinter", "lab") or helper(name))
         if guard is None or (risk is not None and risk < guard):
             short.add(path.name)
     return short

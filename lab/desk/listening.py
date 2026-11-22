@@ -130,13 +130,11 @@ class Listening:
             return f"{side} could not be listened to: {why}"
         heard = self.heard(sound)
         if heard is None or "probe" not in heard:
-            return (f"{side} has not been listened to as it is set now (this take and scene). That happens by itself "
-                    "while nothing plays.")
+            return f"{side} has not been listened to as it is set now."
         if self.evidence(sound) is not None:
             return None
         if self.shaping is not None and self.shaping[0] == sound.id:
-            return (f"{side}'s Shape knobs have not been measured where they stand. That happens by itself a few "
-                    "seconds after they were last turned, while nothing plays.")
+            return f"{side}'s Shape knobs have not been measured where they stand."
         corrected = (heard.get("shaped") or {}).get("corrected")
         return (f"{side}'s Shape knobs " + ("were corrected after they were measured" if corrected else
                                              "were measured on another take, part of it or scene, or not at all")

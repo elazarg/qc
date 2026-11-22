@@ -26,10 +26,10 @@ import tkinter as tk
 from lab.sound import catalog
 from lab.hearing.measure import measure
 from lab.sound.chain import Block, COLUMNS, INTERNAL
-from lab.desk.theme import DIM, INK, PAPER, SUBTLE
+from lab.desk.theme import INK, PAPER
 from lab.qc.unit import CEILING_DB
-from lab.tools.common import (WIDTH, Chips, Tool, button, heard_chain, label, listbox, phrase, render_many,
-                              section)
+from lab.tools.common import (Chips, Tool, button, caption, heard_chain, label, listbox, phrase, render_many,
+                              room, section, sized)
 
 FLOOR_DB = -40.
 DIGITAL_NOTE = ("These are levels of the sound returned over USB. Check the Quad Cortex input meter with your "
@@ -204,9 +204,11 @@ class LevelsTool(Tool):
         self.settings = saved_settings(self.studio.listening)
         self.readings = self.planned = None
         self.targets_measured = {}
-        listen = section(self.body, "Listening level", f"Both sides together, up to {CEILING_DB:+.0f} dB, the "
-                                                       "app's ceiling. Matched keeps A and B equally loud. While "
-                                                       "it is on, the desk says so and offers the way back.")
+        listen = section(self.body, "Listening level",
+                         f"Both sides together, from {FLOOR_DB:+.0f} dB up to {CEILING_DB:+.0f} dB, the app's ceiling. "
+                         "Matched keeps A and B equally loud, as the desk matches them, and moves both; Manual sets "
+                         "the level outright. While an offset or a mute is on, the desk says so and offers the way "
+                         "back.")
         row = tk.Frame(listen, bg=listen["bg"])
         row.pack(fill="x")
         button(row, "Quieter", lambda: self.command("quieter")).pack(side="left")
@@ -227,12 +229,13 @@ class LevelsTool(Tool):
         self.mute.pack(side="left", padx=4)
         button(options, "Reset", lambda: self.command("normal"), quiet=True).pack(side="left")
 
-        match = section(self.body, "Match the loudness of a song's parts",
-                        "The phrase is played silently through each part and the returns measured. " + TRIM_NOTE
-                        + " A and B are matched by the desk itself whenever it plays.")
+        match = section(self.body, "Match a song's parts",
+                        "The phrase is played silently through each part of the song being worked on, and each "
+                        "return measured, for one common loudness. " + TRIM_NOTE + " A and B are matched by the desk "
+                        "itself whenever it plays. " + DIGITAL_NOTE)
         row = tk.Frame(match, bg=match["bg"])
         row.pack(fill="x")
-        label(row, "Bring them to the", size=9, color=SUBTLE).pack(side="left")
+        caption(row, "Bring them to the").pack(side="left")
         self.anchor = tk.StringVar(master=self.frame, value="Quietest")
         Chips(row, self.anchor, ("Quietest", "First"), width=140).pack(side="left", padx=(4, 0))
         row = tk.Frame(match, bg=match["bg"])
@@ -240,9 +243,10 @@ class LevelsTool(Tool):
         button(row, "Measure", self.measure).pack(side="left")
         self.apply_button = button(row, "Apply", self.apply)
         self.apply_button.pack(side="left", padx=6)
-        self.rows = listbox(match, height=6)
+        # What was measured of each part, once there is something measured.
+        self.measured = room(match)
+        self.rows = listbox(self.measured, height=6)
         self.rows.pack(fill="x", pady=(8, 0))
-        label(match, DIGITAL_NOTE, size=8, color=DIM, wrap=WIDTH).pack(fill="x", pady=(6, 0))
         self.sync()
 
     def shown(self):
@@ -303,8 +307,7 @@ class LevelsTool(Tool):
     def measure(self):
         targets = self.targets()
         if len(targets) < 2:
-            self.say("A song needs at least two parts: ask for a song's sounds and keep or save them, and they "
-                     "become its parts.")
+            self.say("A song needs two parts or more: keep or save the sounds you asked for a song.")
             return
         taken = phrase(self.studio)
         if taken is None:
@@ -329,6 +332,7 @@ class LevelsTool(Tool):
         self.rows.delete(0, "end")
         rows = self.planned["rows"] if self.planned else [{"name": name, **found}
                                                          for name, found in (self.readings or {}).items()]
+        self.measured.show(bool(rows))
         for row in rows:
             if row.get("issue") or row.get("lufs") is None:
                 self.rows.insert("end", f"{row['name']}   {row.get('issue') or 'Too quiet for a loudness reading.'}")
@@ -336,6 +340,7 @@ class LevelsTool(Tool):
             trim = row.get("trim_db")
             self.rows.insert("end", f"{row['name']}   {row['lufs']:.1f} LUFS, true peak {row['true_peak_db']:.1f}"
                                     f" dB" + (f"   →  {trim:+.1f} dB" if trim is not None else ""))
+        sized(self.rows, 6)
         if self.planned and self.planned["lowered_for_headroom"]:
             self.say("Lowered further to keep every sound's peaks under the ceiling.")
 

@@ -444,23 +444,27 @@ class GuitarPanelTest(DeskCase):
         walk(self.desk.tray)
         return {button["text"]: button for button in found}
 
-    def test_the_learners_buttons_are_teach_a_control_gestures_and_the_learner_where_it_is_offered(self):
-        from lab.learner import gestures, offered_for
+    def test_the_panel_has_gestures_what_the_instrument_puts_out_and_recording_and_learning_is_elsewhere(self):
+        from lab.desk.hints import Hint
+        from lab.learner import gestures
 
         self.open()
-        self.assertTrue(offered_for(self.studio.state.instrument))
         self.desk.toggle("Guitar")
         buttons = self.buttons()
-        self.assertTrue({"Guitar Learner", "Teach a control", "Gestures on"} <= set(buttons))
-        self.assertNotIn("Input calibration", buttons)
+        self.assertIn("Gestures on", buttons)
+        # Learning the guitar is a screen of its own, behind the symbol at the top left.
+        self.assertFalse({"Guitar Learner", "Teach a control", "Input calibration"} & set(buttons))
+        said = self.panel_text()
+        self.assertIn("What the Charvel puts out", said)
+        self.assertIn("Record a phrase on the Charvel", said)
+        # How long gestures stay on is behind the "?" beside the button, not a paragraph in the panel.
         seconds = f"{gestures.ARM_SECONDS:.0f} s"
-        self.assertTrue(any(f"Gestures on for {seconds}, and {seconds} more after each gesture" in text
-                            for text in self.panel_text()))
-        self.studio.set(instrument="Bass")                # no layout of its controls
-        self.assertFalse(offered_for("Bass"))
-        self.assertNotIn("Guitar Learner", self.buttons())
-        self.assertIn("Teach a control", self.buttons())
-        self.assertTrue(any("not offered for it" in text for text in self.panel_text()))
+        self.assertFalse(any(seconds in text for text in said))
+        hints = [child for child in buttons["Gestures on"].master.winfo_children() if isinstance(child, Hint)]
+        self.assertEqual(len(hints), 1)
+        self.assertIn(f"Gestures stay on for {seconds}, and {seconds} more after each gesture", hints[0].words)
+        self.studio.set(instrument="Bass")                # the panel follows the instrument at once
+        self.assertIn("What the Bass puts out", self.panel_text())
 
     def test_the_gestures_button_says_how_long_it_is_armed_and_the_panel_follows_the_seconds(self):
         from unittest import mock

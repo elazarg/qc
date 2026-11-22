@@ -50,7 +50,7 @@ def prediction_value(key, value, layout):
 
 def teaching_hint(layout, examples, current):
     if not examples:
-        return "Start with a short phrase in a setup you know. Tag the actual settings on the guitar board."
+        return "Record a short phrase in a setup you know, then tag it on the board."
     setups = [row["configuration"] for row in examples]
     pickup_pairs = {(row["wiring"], row["pickup"]) for row in setups} if "wiring" in current else {
         (None, row["pickup"]) for row in setups}

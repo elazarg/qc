@@ -131,11 +131,12 @@ class WidgetsTest(unittest.TestCase):
         choice.look()
         self.assertEqual(choice.list.size(), 2)
 
-    def test_with_nothing_found_the_list_says_where_it_looked(self):
+    def test_with_nothing_found_it_says_so_and_where_it_looked_is_behind_its_hint(self):
         choice = common.FileChoice(self.root, folders=lambda: [self.folder / "Backups"], patterns=("*.pgb",),
                                    choose=lambda path: None)
-        self.assertIn("None found in", choice.said.cget("text"))
-        self.assertIn("Backups", choice.said.cget("text"))
+        self.assertEqual(choice.said.cget("text"), "None found. Paste the path of one.")
+        self.assertIn("Looked in", choice.where.words)
+        self.assertIn("Backups", choice.where.words)
 
 
 class InPlaceOfEachDialogTest(DeskCase):

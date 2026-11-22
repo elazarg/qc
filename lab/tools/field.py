@@ -20,6 +20,7 @@ import math
 import tkinter as tk
 
 from lab.sound.knobs import KNOBS
+from lab.desk.hints import hint
 from lab.desk.theme import ACCENT, DARK, DIM, FONT, PAPER, RULE, SUBTLE, TONE_A
 from lab.tools.common import WIDTH, Chips, Tool, button, disclosure, label, render_many
 from lab.tools.search import BANDS, describe
@@ -182,24 +183,29 @@ class FieldTool(Tool):
         self.drag_job = self.sweep_job = None
         self.plane = tk.StringVar(master=self.frame, value=next(iter(PLANES)))
         Chips(self.body, self.plane, tuple(PLANES), command=self.recenter).pack(fill="x")
-        self.description = label(self.body, size=9, color=SUBTLE, wrap=WIDTH)
-        self.description.pack(fill="x", pady=(2, 4))
         self.canvas = tk.Canvas(self.body, bg=PAPER, width=WIDTH, height=220, highlightthickness=1,
                                 highlightbackground=RULE, highlightcolor=RULE, cursor="crosshair")
-        self.canvas.pack(fill="x")
+        self.canvas.pack(fill="x", pady=(4, 0))
         self.canvas.bind("<Configure>", lambda _: self.paint())
         self.canvas.bind("<Button-1>", self.push)
         self.canvas.bind("<B1-Motion>", self.drag)
         self.canvas.bind("<ButtonRelease-1>", lambda _: self.apply_point())
-        self.controls = label(self.body, size=9, color=SUBTLE, wrap=WIDTH)
-        self.controls.pack(fill="x", pady=(4, 6))
+        # Under the field: the knobs it moves on this sound, and, behind the "?", what the field is for.
+        row = tk.Frame(self.body, bg=self.body["bg"])
+        row.pack(fill="x", pady=(4, 6))
+        self.controls = label(row, size=9, color=SUBTLE, wrap=WIDTH - 30)
+        self.controls.pack(side="left")
+        self.description = hint(row, "")
+        self.description.pack(side="left")
         row = tk.Frame(self.body, bg=self.body["bg"])
         row.pack(fill="x")
         button(row, "Back to the centre", lambda: self.set_point(0., 0.), quiet=True).pack(side="left")
         button(row, "Use current as centre", self.recenter, quiet=True).pack(side="left", padx=4)
 
         # Marking two points and going between them is the rarer use: shown on request.
-        marks = disclosure(self.body, "Remember a contrast")
+        marks = disclosure(self.body, "Remember a contrast",
+                           note="Mark two points of the field as A and B, then jump from one to the other or sweep "
+                                "between them while you play.")
         row = tk.Frame(marks, bg=marks["bg"])
         row.pack(fill="x")
         self.jump = {}
@@ -209,8 +215,8 @@ class FieldTool(Tool):
             self.jump[slot].pack(side="left", padx=(0, 6))
         self.sweep_button = button(marks, "Sweep A → B", self.toggle_sweep, quiet=True)
         self.sweep_button.pack(anchor="w", pady=(4, 0))
-        label(self.body, "How B differs from A as they are set now: Difference, Measure A and B now.", size=9,
-              color=SUBTLE, wrap=WIDTH).pack(fill="x", pady=(8, 0))
+        label(marks, "Measured: Difference, Measure A and B now.", size=9, color=SUBTLE,
+              wrap=WIDTH).pack(fill="x", pady=(6, 0))
         self.sync()
 
     def shown(self):
@@ -254,10 +260,10 @@ class FieldTool(Tool):
 
     def sync(self):
         plane = PLANES[self.plane.get()]
-        self.description.configure(text=plane.description)
+        self.description.say(f"Drag the point; letting go keeps it. {plane.description}")
         available = self.available()
         names = dict.fromkeys((*moves(plane.horizontal, available), *moves(plane.vertical, available)))
-        caption = " · ".join(KNOBS[name][0] for name in names) or "The selected sound has nothing this field moves"
+        caption = " · ".join(KNOBS[name][0] for name in names) or "This sound has nothing this field moves."
         self.controls.configure(text=caption)
         for slot, control in self.jump.items():
             control.configure(state="normal" if slot in self.marks else "disabled")

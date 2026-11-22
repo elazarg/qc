@@ -1,28 +1,20 @@
 """Open Tone Lab and report startup failures even under pythonw.
 
-Two desks can be opened: the rewritten one (`python -m lab`, the default) and
-the earlier one (`tone_lab`), for as long as it is still in the program folder.
-The first of these that says which wins:
-
-1. `--new` or `--old` on the command line (Tone Lab.exe passes its own on);
-2. the environment variable TONE_LAB_DESK set to `new` or `old`;
-3. `{"desk": "old"}` (or "new") in `launcher.json` in the data folder
-   (`%LOCALAPPDATA%\\Tone Lab`, or TONE_LAB_HOME when that is set).
-
-Other arguments go to the new desk, such as `--simulated`.
+Arguments go to the desk, such as `--simulated`. `--new` is accepted and means nothing (shortcuts made while
+there were two desks pass it); `--old` asked for the earlier app, which is no longer part of the program, and
+says so.
 
 Each start is noted in `startup.log` in the data folder, and a failure to open
 is written there with its trace and shown. This process, not the launcher that
 started it, owns the window, so it is this process that takes Tone Lab's
 taskbar identity: the window then sits on the pinned shortcut.
 
-Nothing of the app is imported before the desk is chosen and the log's place is
-known, so that whatever goes wrong importing it is caught and said.
+Nothing of the app is imported before the log's place is known, so that whatever
+goes wrong importing it is caught and said.
 """
 
 import ctypes
 from datetime import datetime
-import json
 import os
 from pathlib import Path
 import sys
@@ -32,7 +24,6 @@ import traceback
 
 ROOT = Path(__file__).resolve().parents[1]
 VISIBLE_ERROR = 0x10 | 0x10000 | 0x40000  # MB_ICONERROR | MB_SETFOREGROUND | MB_TOPMOST
-DESKS = ("old", "new")
 APP_ID = "ToneLab.QuadCortex.Desktop"     # as in Program.cs and the shortcut `python -m lab shortcut` makes
 LOG = "startup.log"
 LOG_LIMIT = 200_000                       # bytes; past it the older half is dropped
@@ -70,26 +61,6 @@ def write_log(message, environ=os.environ):
     return None
 
 
-def setting_file(environ=os.environ):
-    """Where the choice of desk is kept, found without creating the data folder."""
-    return data_folder(environ) / "launcher.json"
-
-
-def chosen_desk(arguments, environ=os.environ):
-    """"old" or "new": the command line first, then TONE_LAB_DESK, then the setting; "new" when none says."""
-    for desk in DESKS:
-        if f"--{desk}" in arguments:
-            return desk
-    value = environ.get("TONE_LAB_DESK", "").strip().lower()
-    if value in DESKS:
-        return value
-    try:
-        value = json.loads(setting_file(environ).read_text(encoding="utf-8")).get("desk", "")
-    except (OSError, ValueError, AttributeError):
-        return "new"
-    return value if value in DESKS else "new"
-
-
 def take_identity():
     """Give this process Tone Lab's taskbar identity. The launcher has it too, but it is gone seconds after it
     starts this process, and a window belongs on the taskbar to the process that made it."""
@@ -99,33 +70,22 @@ def take_identity():
         pass                    # not Windows, or a Windows without it: the window opens all the same
 
 
-def open_new_desk(arguments):
+def open_desk(arguments):
+    if "--old" in arguments:
+        raise RuntimeError("The earlier app (--old) is no longer part of Tone Lab. Start it without --old. "
+                           "The earlier app is in the repository's history, at the tag with-tone_lab.")
     from lab.desk.window import main as desk
 
-    desk([argument for argument in arguments if argument not in ("--new", "--old")])
-
-
-def open_old_desk():
-    if not (ROOT / "tone_lab").is_dir():
-        raise RuntimeError("The earlier app is no longer in the program folder, so there is nothing for --old to "
-                           "open. Start Tone Lab without --old; if `launcher.json` in the data folder or "
-                           "TONE_LAB_DESK says \"old\", remove that.")
-    from tone_lab import desktop
-
-    desktop.open_desk()
+    desk([argument for argument in arguments if argument != "--new"])
 
 
 def main(arguments=None):
     arguments = list(sys.argv[1:] if arguments is None else arguments)
-    desk = chosen_desk(arguments)
-    write_log("Opening Tone Lab" + ("" if desk == "new" else " (the earlier desk)"))
+    write_log("Opening Tone Lab")
     sys.path.insert(0, str(ROOT))
     try:
         take_identity()
-        if desk == "new":
-            open_new_desk(arguments)
-        else:
-            open_old_desk()
+        open_desk(arguments)
     except Exception as error:
         log = write_log(traceback.format_exc())
         message = f"Tone Lab couldn’t open.\n\n{error}"

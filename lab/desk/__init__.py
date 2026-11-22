@@ -1,6 +1,9 @@
 """The desk: one window over one studio.
 
     window       the window: it draws the state and turns clicks into actions
+    chooser      the instrument chooser at the top left: which instrument is played, on every screen
+    pictures     the small pictures drawn from tables of shapes: each kind of instrument, the learning symbol
+    hints        the "?" beside something, which says more while the pointer rests on it
     studio       what the desk does, without the window: what is on show, the unit, playing, the session
     listening    listening silently while the unit is free, checking knobs that were turned, and whether a
                  measurement holds for what plays now

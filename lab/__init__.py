@@ -30,7 +30,7 @@ through the rig. Everything else builds on those three.
   (`requests`), marks and songs (`marks`), the guitar's takes and profile
   (`guitar`), what differs between A and B (`difference`), and the look
   (`theme`).
-- `tools`, `learner`: the side windows and the Guitar Learner.
+- `tools`, `learner`: the side tools, and the learning screen (the Guitar Learner and Teach a control).
 - `gear`: POD Go presets (`podgo`) and the Nano Cortex sheet (`nano`).
 - `knowledge`: tables learned from research and from the unit, with where each
   came from; `cli`, `setup`, `migrate`: the command line, first run, and

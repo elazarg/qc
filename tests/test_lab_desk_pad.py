@@ -159,10 +159,19 @@ class QuietDeskTest(unittest.TestCase):
         self.assertEqual(self.studio.state.mode, before.mode)
         self.assertEqual(self.studio.state.blind, before.blind)
 
-    def test_the_guitar_learner_opens_from_the_guitar_panel(self):
-        self.desk.toggle("Guitar")
-        self.desk.open_learner()
-        self.assertIsNotNone(self.desk.learner)
+    def test_the_learning_symbol_puts_the_guitar_learner_on(self):
+        from lab.learner import folders
+
+        self.addCleanup(folders.log_to, None)       # the seat points the learner's folders and log at this desk
+        self.addCleanup(folders.use, None)
+        self.root.update()
+        self.desk.learn_symbol.event_generate("<ButtonRelease-1>")
+        self.root.update()
+        screen = self.desk.learning
+        self.addCleanup(self.desk.seat.worker.shutdown, wait=True)
+        self.addCleanup(screen.learner.worker.shutdown, wait=True)
+        self.assertTrue(self.desk.learning_on)
+        self.assertEqual((screen.view, screen.learner.guitar), ("Guitar Learner", "Charvel"))
 
     def test_saving_asks_for_the_name_in_place(self):
         self.two_sounds()

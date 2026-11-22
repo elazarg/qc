@@ -1,14 +1,17 @@
-"""The Guitar Learner: tag dry recordings with the guitar's pickup, mini-toggle and knobs, and have it
-tell them from the sound alone.
+"""Learning the guitar that is played: tag dry recordings with the guitar's pickup, mini-toggle and knobs and
+have the app tell them from the sound alone (the Guitar Learner), or teach it one control's settings and map a
+return gesture on it (Teach a control).
 
-    from lab.learner import GuitarLearner, offered_for
-    learner = GuitarLearner(seat)     # seat: lab.learner.seat.LearnerSeat, made by the desk
-    learner.show()                    # stays closed, and says why, for a guitar it has no layout for
-    offered_for("Charvel")            # the control layouts it has for an instrument; none: not offered
+    from lab.learner.screen import LearningScreen
+    screen = LearningScreen(seat, parent)     # seat: lab.learner.seat.LearnerSeat, made by the desk
+    from lab.learner import offered_for
+    offered_for("Charvel")                    # the control layouts the Guitar Learner has for an instrument
 
-    window         the Guitar Learner, shown in the desk's window in the place of the side panel
+    screen         the learning screen, in the place of the desk below its top row: its two views, chosen in
+                   place, on the instrument chosen on the desk
+    window         the Guitar Learner, one of the two views
     report         what it says of its checks and of an estimate, without anything on show
-    teach          teaching one control's settings, shown in the same place: teach.open(seat)
+    teach          Teach a control, the other view, with the gesture mapping
     taught         what was taught about one control, and checking a take against it, without anything on show
     gestures       a return gesture on a guitar control turns a Shape knob: gestures.start(seat), .state(), .stop()
     compensation   whether a high shelf can make up for a rolled-back tone pot
@@ -24,7 +27,6 @@ tell them from the sound alone.
     inputs         where the dry guitar arrives (asked of the engine), and the recording held open until Stop
     seat           what all of this asks of the desk: the data folder, the audio hold, the desk's clock
     folders        where everything is kept, and the one-time copy out of the program folder
-    calibration    the earlier name of `teach`, kept for `calibration.open(seat)`
 """
 
 __all__ = ["GuitarLearner", "offered_for"]

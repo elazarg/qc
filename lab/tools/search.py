@@ -39,8 +39,8 @@ from lab.hearing.measure import match as match_levels, measure
 from lab.qc.unit import Mismatch, Refused, Stopped
 from lab.sound.sounds import describe as describe_chain
 from lab.desk.theme import FONT, INK, SOFT, SUBTLE, TILE
-from lab.tools.common import (WIDTH, Chips, FileChoice, Tool, button, disclosure, gained, heard_chain, label, listbox,
-                              phrase, play, render, section, usual_folders)
+from lab.tools.common import (Chips, FileChoice, Tool, button, caption, disclosure, gained, heard_chain, listbox,
+                              phrase, play, render, room, said, section, sized, usual_folders)
 
 BANDS = (65, 125, 250, 500, 1_000, 2_000, 4_000, 8_000, 12_000)
 MATCH_PRIORITIES = {
@@ -364,8 +364,9 @@ class SearchTool(Tool):
 
     def build(self):
         self.results, self.reference = [], None
-        find = section(self.body, "Find a sound", "Words such as: bright clean, punchy lead no delay, "
-                                                  "something from Rhythm.")
+        find = section(self.body, "Find a sound",
+                       "Words for how it sounds, what it was made for or where it is kept, such as: bright clean, "
+                       "punchy lead no delay, something from Rhythm.")
         row = tk.Frame(find, bg=find["bg"])
         row.pack(fill="x")
         self.query = tk.Entry(row, font=(FONT, 10), bg=TILE, fg=INK, relief="flat", insertbackground=INK)
@@ -374,9 +375,10 @@ class SearchTool(Tool):
         button(row, "Find", self.find).pack(side="left", padx=(6, 0))
 
         # Matching against a reference is the rarer use: shown on request.
-        match = disclosure(self.body, "Match a reference")
-        label(match, "Your sounds are played silently through the unit with the desk's phrase and compared with "
-                     "the reference.", size=9, color=SUBTLE, wrap=WIDTH).pack(fill="x", pady=(0, 4))
+        match = disclosure(self.body, "Match a reference",
+                           note="Your sounds are played silently through the unit with the desk's phrase, and "
+                                "ranked by how close each comes to the reference: a recording, a preset captured "
+                                "from the Sounds panel, or the sound on A.")
         row = tk.Frame(match, bg=match["bg"])
         row.pack(fill="x")
         button(row, "A WAV", lambda: self.offer("wav"), quiet=True).pack(side="left")
@@ -393,12 +395,13 @@ class SearchTool(Tool):
         self.captured_list.pack(fill="x")
         button(self.captured, "Use as the reference", self.use_captured).pack(anchor="w", pady=(4, 0))
         self.captured_found = []
-        self.reference_text = label(match, size=9, color=SOFT, wrap=WIDTH)
-        self.reference_text.pack(fill="x", pady=(6, 0))
-        label(match, "Among", size=9, color=SUBTLE).pack(fill="x", pady=(6, 0))
+        self.reference_text = said(match, color=SOFT, pady=(6, 0))
+        caption(match, "Among").pack(fill="x", pady=(6, 0))
         self.scope = tk.StringVar(master=self.frame, value=SCOPES[0])
         Chips(match, self.scope, SCOPES).pack(fill="x")
-        label(match, "Weighing", size=9, color=SUBTLE).pack(fill="x", pady=(4, 0))
+        caption(match, "Weighing", "What counts most in how close a sound is: its spectrum (Tone), how it answers "
+                                   "the playing (Dynamics), or what rings after it (Space).").pack(fill="x",
+                                                                                                     pady=(4, 0))
         self.priority = tk.StringVar(master=self.frame, value="Balanced")
         Chips(match, self.priority, tuple(MATCH_PRIORITIES)).pack(fill="x")
         row = tk.Frame(match, bg=match["bg"])
@@ -407,15 +410,15 @@ class SearchTool(Tool):
         button(row, "Stop", self.stop, quiet=True).pack(side="left", padx=4)
         button(row, "Hear the reference", self.hear_reference, quiet=True).pack(side="left")
 
-        found = section(self.body, "Results")
+        # What was found, once something was: the list, and what is done with one of them.
+        self.found = found = room(self.body)
         self.box = listbox(found, height=8)
-        self.box.pack(fill="x")
+        self.box.pack(fill="x", pady=(6, 0))
         row = tk.Frame(found, bg=found["bg"])
         row.pack(fill="x", pady=(6, 0))
         for side in ("a", "b"):
             button(row, f"Put on {side.upper()}", lambda side=side: self.put(side)).pack(side="left", padx=(0, 6))
-        self.detail = label(found, size=9, color=SUBTLE, wrap=WIDTH)
-        self.detail.pack(fill="x", pady=(6, 0))
+        self.detail = said(found, color=SUBTLE, pady=(6, 0))
         self.box.bind("<<ListboxSelect>>", lambda _: self.describe_selected())
 
     # finding
@@ -453,12 +456,15 @@ class SearchTool(Tool):
         self.show("No sound answers those words." if not self.results else "")
 
     def show(self, empty=""):
+        self.found.show(bool(self.results))
+        self.detail.configure(text="")
         self.box.delete(0, "end")
         for row in self.results:
             score = f"{row['score']:.0f}" if row["score"] is not None else "–"
             traits = ", ".join(row["traits"])
             self.box.insert("end", f"{score:>4}  {row['title']}" + (f"  ·  {traits}" if traits else "")
                                    + ("  ★" if row["saved"] else ""))
+        sized(self.box, 8)
         self.say(empty)
 
     def describe_selected(self):
@@ -499,6 +505,7 @@ class SearchTool(Tool):
             self.captured_list.delete(0, "end")
             for item in self.captured_found:
                 self.captured_list.insert("end", f"{item['name']} · {item.get('setlist', '')}"[:60])
+            sized(self.captured_list, 4)
             self.captured.pack(fill="x", pady=(4, 0))
             if not self.captured_found:
                 self.say("No preset has been captured yet: Sounds, More with this preset, Use as reference.")
