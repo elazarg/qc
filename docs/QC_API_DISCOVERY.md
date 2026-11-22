@@ -47,4 +47,4 @@ The legacy `inspect` CLI initially reproduced a native PortAudio shutdown crash.
 
 The complete implementation and promotion criteria are in the [discovery plan](QC_API_PLAN.md). Raw traces from this run are private.
 
-The [USB API specification](QC_WIRE_SPEC.md) records the later bidirectional capture and how to reproduce its command and settings analysis. The same nested schema is available to MCP clients at `qc://wire-spec/4.0` and `qc://wire-spec/4.1`.
+The [USB API specification](QC_WIRE_SPEC.md) records the later bidirectional captures, including labeled Cortex Control edits, settings, and preset save and recall. The same nested schema is available to MCP clients at `qc://wire-spec/4.0` and `qc://wire-spec/4.1`.
