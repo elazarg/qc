@@ -108,7 +108,7 @@ def preview_parameter(state, row, column, index, value):
 
 
 STATE_COMMANDS = ("SetlistPosition", "Scene", "PresetDirty")
-SETTINGS = ("Mode", "GlobalTempo", "IOSettings", "GlobalEQ", "MasterVolume")
+SETTINGS = ("GeneralSettings", "Mode", "GlobalTempo", "IOSettings", "GlobalEQ", "MasterVolume")
 READ_ERRORS = (OSError, RuntimeError, QCError)
 
 

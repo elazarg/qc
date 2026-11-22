@@ -650,6 +650,17 @@ def shortcut_command(args):
 def qc_api(args):
     from lab.qc import discovery
 
+    if args.operation == "wire-spec":
+        from lab.qc.wire_spec import schema
+
+        return schema(args.schema)
+    if args.operation == "wire-trace":
+        from lab.qc.wire_spec import capture_fields, decode_rows
+
+        rows = capture_fields(args.tshark, args.path, args.device)
+        for event in decode_rows(rows, args.schema, values=args.values):
+            print(json.dumps(event, allow_nan=False))
+        return None
     if args.operation == "capabilities":
         return discovery.capabilities()
     if args.operation == "catalog":
@@ -759,6 +770,14 @@ def parser():
                                                                                            required=True)
     operations.add_parser("capabilities", help="Inventory the installed protocol, SDK and MCP tools")
     operations.add_parser("catalog", help="List models and their parameter metadata")
+    wire = operations.add_parser("wire-spec", help="Describe every reachable wire message and enum offline")
+    wire.add_argument("--schema", choices=("4.0", "4.1"), default="4.1")
+    trace = operations.add_parser("wire-trace", help="Decode a local Quad Cortex USBPcap capture")
+    trace.add_argument("path", type=Path)
+    trace.add_argument("--device", type=int, choices=range(1, 128), required=True, metavar="USB_ADDRESS")
+    trace.add_argument("--schema", choices=("4.0", "4.1"), default="4.1")
+    trace.add_argument("--tshark", type=Path, default=Path("tshark"))
+    trace.add_argument("--values", action="store_true", help="Include private decoded payloads in the output")
     compare = operations.add_parser("diff", help="Compare two local snapshot JSON files offline")
     compare.add_argument("before", type=Path)
     compare.add_argument("after", type=Path)

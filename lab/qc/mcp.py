@@ -4,6 +4,7 @@ import json
 from typing import Any
 
 from lab.qc import discovery
+from lab.qc.wire_spec import schema
 
 
 def server(*, simulated=False, desk_open):
@@ -20,6 +21,13 @@ def server(*, simulated=False, desk_open):
     def models() -> str:
         """Models, parameters and display units from the installed model catalog."""
         return json.dumps(discovery.model_catalog())
+
+    @app.resource("qc://wire-spec/{version}")
+    def wire_spec(version: str) -> str:
+        """Return the nested wire schema for CorOS 4.0 or 4.1."""
+        if version not in ("4.0", "4.1"):
+            raise ValueError("Choose recovered schema 4.0 or 4.1.")
+        return json.dumps(schema(version))
 
     def observe():
         if not simulated and desk_open():

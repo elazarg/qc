@@ -46,3 +46,5 @@ The legacy `inspect` CLI initially reproduced a native PortAudio shutdown crash.
 - Expose guarded write intents to the CLI or agents after testing the handoff against real intervening edits. The preview fingerprint does not authorize a write. Cortex Control and Tone Lab still take turns when the app needs to write, and the CLI and MCP currently require the desk to release the device before observing it.
 
 The complete implementation and promotion criteria are in the [discovery plan](QC_API_PLAN.md). Raw traces from this run are private.
+
+The [USB API specification](QC_WIRE_SPEC.md) records the later bidirectional capture and how to reproduce its command and settings analysis. The same nested schema is available to MCP clients at `qc://wire-spec/4.0` and `qc://wire-spec/4.1`.
