@@ -73,10 +73,13 @@ class Audio:
     def __init__(self):
         if os.environ.get("TONE_LAB_TESTING"):    # set by tests/isolated.py: no test opens the real driver
             raise RuntimeError("A test tried to open the Quad Cortex's audio driver. Use lab.qc.sim.SimAudio.")
+        self._driver = None
+
+    def _open_driver(self):
+        """Load ASIO on the first audio operation. Reading and editing presets only need USB control."""
         os.environ["SD_ENABLE_ASIO"] = "1"
         import sounddevice
 
-        self.sd = sounddevice
         found = [(index, device) for index, device in enumerate(sounddevice.query_devices())
                  if sounddevice.query_hostapis(device["hostapi"])["name"] == "ASIO"
                  and ("neuraldsp usb audio" in device["name"].lower() or "quad cortex" in device["name"].lower())
@@ -84,7 +87,19 @@ class Audio:
         if len(found) != 1:
             raise RuntimeError("Expected one eight-channel Quad Cortex ASIO device. Connect it and close other "
                                "audio programs.")
-        self.device = found[0][0]
+        self._driver = sounddevice, found[0][0]
+
+    @property
+    def sd(self):
+        if self._driver is None:
+            self._open_driver()
+        return self._driver[0]
+
+    @property
+    def device(self):
+        if self._driver is None:
+            self._open_driver()
+        return self._driver[1]
 
     def reamp(self, dry, *, tail=2., cancel=None):
         """Send a mono phrase out of USB 5 and return what comes back on USB 5/6, from the moment it was sent.

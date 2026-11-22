@@ -55,7 +55,7 @@ from lab.qc.library import SCENES       # "ABCDEFGH"
 
 COMMANDS = ("doctor", "migrate", "pod", "history", "latest-clip", "presets", "test-compensation", "shortcut",
             "directory", "inspect", "snapshot", "record", "calibrate", "reamp", "sweep", "budget", "named-settings",
-            "time-switch")
+            "time-switch", "qc-api")
 
 
 WAIT_FOR_DESK = 5.      # seconds a command waits for a listener on the desk's port to say whether it is a desk
@@ -647,6 +647,50 @@ def shortcut_command(args):
 
 # ---- the parser ----
 
+def qc_api(args):
+    from lab.qc import discovery
+
+    if args.operation == "capabilities":
+        return discovery.capabilities()
+    if args.operation == "catalog":
+        return discovery.model_catalog()
+    if args.operation == "preset-file":
+        return discovery.preset_file(args.path, args.schema)
+    if args.operation == "mcp":
+        from lab.qc.mcp import server
+
+        server(simulated=args.simulated, desk_open=desk_open).run(transport="stdio")
+        return None
+    if args.operation == "diff":
+        return discovery.diff(*(json.loads(path.read_text(encoding="utf-8-sig")) for path in (args.before, args.after)))
+    if args.operation == "preview":
+        state = json.loads(args.snapshot.read_text(encoding="utf-8-sig"))
+        return discovery.preview_parameter(state, args.row - 1, args.column - 1, args.index, args.value)
+    if not args.simulated and desk_open():
+        raise Refused("The desk has the Quad Cortex. Close it before starting a separate observation.")
+
+    def observe():
+        return discovery.observer(simulated=args.simulated)
+
+    if args.operation == "watch":
+        if args.share_editor:
+            if args.simulated:
+                raise ValueError("Choose either the simulated device or a running Cortex Control session.")
+            events = discovery.watch_editor(args.count, args.interval)
+        else:
+            events = discovery.watch(observe, args.count, args.interval)
+        for event in events:
+            print(json.dumps(event, allow_nan=False), flush=True)
+            args.failed |= event["freshness"] == "stale"
+        return None
+    with observe() as (device, correlated):
+        if args.operation == "inventory":
+            return discovery.inventory(device, details=args.details)
+        if args.operation == "settings":
+            return discovery.read_settings(device, correlated=correlated)
+        return discovery.snapshot(device, correlated=correlated).record()
+
+
 def parser():
     command = argparse.ArgumentParser(prog="python -m lab", description="Tone Lab on the new core. Without a "
                                       "command, the desk opens (--simulated: with a simulated unit).")
@@ -711,6 +755,35 @@ def parser():
     named_.add_argument("--path", type=Path, help="Write the table here instead of where the app reads it")
     timing = unit_command("time-switch", "Time switching between A and B, and count what the unit is asked for it")
     timing.add_argument("--switches", type=int, default=10, help="How many times to switch (default 10)")
+    operations = sub.add_parser("qc-api", help="Explore the Quad Cortex API").add_subparsers(dest="operation",
+                                                                                           required=True)
+    operations.add_parser("capabilities", help="Inventory the installed protocol, SDK and MCP tools")
+    operations.add_parser("catalog", help="List models and their parameter metadata")
+    compare = operations.add_parser("diff", help="Compare two local snapshot JSON files offline")
+    compare.add_argument("before", type=Path)
+    compare.add_argument("after", type=Path)
+    preview = operations.add_parser("preview", help="Preview one parameter change in display units")
+    preview.add_argument("snapshot", type=Path)
+    preview.add_argument("row", type=int, help="Row, from 1")
+    preview.add_argument("column", type=int, help="Column, from 1")
+    preview.add_argument("index", type=int, help="Parameter index, from 0")
+    preview.add_argument("value", type=float)
+    preset = operations.add_parser("preset-file", help="Decode a local BinaryPreset .pb copy")
+    preset.add_argument("path", type=Path)
+    preset.add_argument("--schema", choices=("4.0", "4.1"), default="4.1")
+    mcp = operations.add_parser("mcp", help="Serve the read-only discovery interface to an MCP client over stdio")
+    mcp.add_argument("--simulated", action="store_true")
+    for name in ("snapshot", "watch", "settings", "inventory"):
+        operation = operations.add_parser(name)
+        operation.add_argument("--simulated", action="store_true")
+        if name == "watch":
+            operation.add_argument("--share-editor", action="store_true",
+                                   help="Listen to Cortex Control traffic without sending commands")
+        if name == "inventory":
+            operation.add_argument("--details", action="store_true", help="Include private asset names and keys")
+        if name == "watch":
+            operation.add_argument("--count", type=int, default=5)
+            operation.add_argument("--interval", type=float, default=2.)
     return command
 
 
@@ -718,7 +791,7 @@ RUN = {"doctor": doctor, "migrate": migrate, "pod": pod, "history": history, "la
        "presets": presets, "test-compensation": test_compensation, "shortcut": shortcut_command,
        "directory": directory, "inspect": inspect_command, "snapshot": snapshot, "record": record,
        "calibrate": calibrate, "reamp": reamp, "sweep": sweep, "budget": budget, "named-settings": named_settings,
-       "time-switch": time_switch_command}
+       "time-switch": time_switch_command, "qc-api": qc_api}
 
 
 def run(args):

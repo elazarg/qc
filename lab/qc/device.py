@@ -64,7 +64,7 @@ class Device:
     is re-entrant, so a caller already holding it (`Unit.position`) can ask.
     """
 
-    QUIET = ("read_state", "read_message", "get_setlist_position", "list_directory", "get_current_preset")
+    QUIET = ("read_state", "read_message", "get_setlist_position", "list_directory", "get_current_preset", "request")
 
     def __init__(self, qc):
         object.__setattr__(self, "_qc", qc)
@@ -91,17 +91,27 @@ class Device:
                     pending.clear()
         return cleared
 
+    def passive_commands(self, seconds):
+        """Collect report types from a handle that sends nothing."""
+        with self._qc._io_lock:
+            self._qc._pending.clear()
+            try:
+                self._qc._collect(seconds)
+                return [command for command, _, _, _ in self._qc._pending]
+            finally:
+                self._qc._pending.clear()
 
 @contextmanager
-def connect(*, write=False, opener=_library, editor=editor_running):
+def connect(*, write=False, exclusive=False, opener=_library, editor=editor_running):
     """The unit, open, as the object `unit.Unit` drives. Closed when the block ends.
 
+    `exclusive` also reserves the handle for a sequence of correlated reads.
     `opener(share)` makes the library's device object and `editor()` says
     whether Cortex Control is running; both are replaced in tests.
     """
     if editor():
         raise EditorActive(HANDOFF)
-    qc = opener(not write)
+    qc = opener(not (write or exclusive))
     try:
         try:
             if editor():
@@ -114,13 +124,28 @@ def connect(*, write=False, opener=_library, editor=editor_running):
             if ("exclusive" in said or "sharing violation" in said or "access is denied" in said) and editor():
                 raise EditorActive(HANDOFF) from error
             raise
-        if write and editor():   # It started while the connection was being made.
+        if (write or exclusive) and editor():   # It started while the connection was being made.
             raise EditorActive(HANDOFF)
         if not getattr(qc, "protocol_version_verified", False):
             raise RuntimeError("The Quad Cortex firmware could not be read, so Tone Lab will not write to it.")
         yield Device(qc)
     finally:
         qc.close()
+
+
+@contextmanager
+def observe_editor(*, opener=_library, editor=editor_running):
+    """Listen to the Windows shared HID handle without calling the SDK handshake or sending a read."""
+    if not editor():
+        raise EditorActive("Open Cortex Control before starting the shared observer.")
+    qc = opener(True)
+    try:
+        qc.io.open()
+        if not editor():
+            raise EditorActive("Cortex Control closed before the shared observer started.")
+        yield Device(qc)
+    finally:
+        qc.io.close()
 
 
 def recording_channels(device, physical_input):

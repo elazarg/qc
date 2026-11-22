@@ -72,6 +72,8 @@ $lab = '.\.venv\Scripts\python.exe'
 
 `python -m lab --help` lists the rest. Every command that uses the unit takes `--simulated`.
 
+`python -m lab qc-api --help` lists the API discovery commands. See [Quad Cortex API discovery](docs/QC_API_DISCOVERY.md) for hardware results, offline tools, and MCP setup.
+
 ## Installation
 
 Windows, Python 3.13, the Quad Cortex's ASIO driver (installed with Cortex Control), Git, and the Codex CLI for the assistant.
