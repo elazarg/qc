@@ -112,10 +112,21 @@ class Requests:
 
         instrument, setting = studio.state.instrument, studio.guitar.setting()
         takes = studio.guitar.takes(instrument)
+        source = studio.phrase[1] if studio.phrase is not None and options.get("by") != "app" else None
 
         def work():
+            engineering = None
+            if source is not None:
+                import numpy as np
+
+                from lab.hearing.audio import db
+
+                peak = float(np.max(np.abs(source), initial=0.))
+                if peak > 0:
+                    engineering = {"dry_peak_dbfs": round(db(peak), 1), "dry_reached_full_scale": peak >= .999}
             found = studio.guitar.profile(instrument, takes)[0] if takes else None
-            return function(*args, guitar=facts(found, setting) if found else None, setting=setting, **options)
+            return function(*args, guitar=facts(found, setting) if found else None, setting=setting,
+                            engineering=engineering, **options)
 
         return studio.thinking.submit(work)
 

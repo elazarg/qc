@@ -120,7 +120,7 @@ class Studio:
         self.said_stale = False           # the remark about tables from another firmware was made
         self.showing = None               # the making-ready of A and B in flight
         self.shows = self.plays = 0       # counted, so that only the newest one's outcome is acted on
-        self.level_sent = {}              # side -> the level last asked of the unit
+        self.level_sent = {}              # side -> the level and peak limit last asked of the unit
         self.unit_scene = 0               # the scene last asked of the unit
         self.hearing_base = set()         # sides heard without their Shape knobs for now
         self.audio_held_by = None         # who holds the audio input outside the engine: a key of HOLDERS
@@ -599,16 +599,20 @@ class Studio:
         key = "loudness_lufs" if all(record.get("loudness_lufs") is not None for record in heard.values()) \
             else "level_db"
         levels = {side: record[key] for side, record in heard.items()}
+        limits = {side: -3. - record["true_peak_db"] for side, record in heard.items()
+                  if record.get("true_peak_db") is not None}
         if len(levels) < 2:
             # Nothing fair to match by: both play at the preview level, and no earlier trim stays on either.
             wanted = {side: PREVIEW_DB for side, sound in sounds.items() if sound is not None}
         else:
-            quietest = min(levels.values())
-            wanted = {side: PREVIEW_DB + quietest - level for side, level in levels.items()}
+            baseline = min(PREVIEW_DB + min(levels.values()),
+                           min((levels[side] + limit for side, limit in limits.items()), default=float("inf")))
+            wanted = {side: baseline - level for side, level in levels.items()}
         for side, level in wanted.items():
-            if side not in self.level_sent or abs(self.level_sent[side] - level) > .05:
-                self.level_sent[side] = level
-                self.later(self.host.call("level", side, level), lambda result: None)
+            request = round(level, 3), limits.get(side)
+            if self.level_sent.get(side) != request:
+                self.level_sent[side] = request
+                self.later(self.host.call("level", side, level, peak_limit=request[1]), lambda result: None)
 
     def scene(self, scene):
         """Hear another scene of the sounds on show."""
@@ -617,6 +621,8 @@ class Studio:
         sound = self.sound(self.state.side)
         label = sound.chain.labels[scene] if sound and scene < len(sound.chain.labels) else ""
         self.later(self.host.call("scene", scene), lambda result: None)
+        if self.state.mode:
+            self._match_levels()
         self.say(f"Scene {'ABCDEFGH'[scene]}" + (f" · {label}" if label else ""))
 
     def scenes(self, side=None):

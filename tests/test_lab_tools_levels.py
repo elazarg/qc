@@ -90,6 +90,15 @@ class PlanTest(unittest.TestCase):
 
 
 class TrimTest(unittest.TestCase):
+    def test_a_split_signal_is_trimmed_after_its_paths_rejoin(self):
+        from lab.sound.chain import Block, Chain, Row
+
+        sound = Chain((Row((Block(PLEXI),), inlet=1, outlet=19, split=(1, 5)),
+                       Row((None, Block(V30)))))
+        changed, _ = levels.with_trim(sound, -3.)
+        self.assertIsNone(changed.block(0, 1))
+        self.assertAlmostEqual(changed.block(0, 5).display(0), -3., places=3)
+
     def test_a_trim_goes_on_a_gain_block_and_stops_at_the_ceiling(self):
         trimmed, applied = levels.with_trim(chain(PLEXI, V30), -4.)
         self.assertEqual(applied, -4.)
@@ -103,6 +112,27 @@ class TrimTest(unittest.TestCase):
 
 
 class OnTheUnitTest(unittest.TestCase):
+    def test_two_scenes_are_rendered_and_trimmed_independently_in_one_preset(self):
+        from lab.sound.chain import Block
+
+        with TemporaryDirectory() as folder:
+            unit = host(folder)
+            try:
+                sound = chain().with_block(0, 0, Block(catalog.GAIN_BLOCK).set(
+                    0, tuple(catalog.to_norm(catalog.GAIN_BLOCK, 0, db) for db in (0., -9.) + (0.,) * 6)))
+                sounds, scenes = {"Rhythm": sound, "Solo +2 dB": sound}, {"Rhythm": 0, "Solo +2 dB": 1}
+                dry = phrase()
+                readings = unit.call("lab.tools.levels.measure_sounds", sounds, dry, scenes).result(60)
+                self.assertAlmostEqual(readings["Rhythm"]["lufs"] - readings["Solo +2 dB"]["lufs"], 9., delta=.3)
+                plan = levels.plan(readings, offsets={name: levels.part_offset(name) for name in sounds})
+                for row in plan["rows"]:
+                    sound, _ = levels.with_trim(sound, row["trim_db"], scene=scenes[row["name"]])
+                self.assertAlmostEqual(sound.block(0, 0).display(0, 2), 0., places=3)
+                after = unit.call("lab.tools.levels.measure_sounds", dict.fromkeys(sounds, sound), dry, scenes).result(60)
+                self.assertAlmostEqual(after["Solo +2 dB"]["lufs"] - after["Rhythm"]["lufs"], 2., delta=.3)
+            finally:
+                unit.close()
+
     def test_sounds_measured_on_the_unit_come_out_matched_once_trimmed(self):
         with TemporaryDirectory() as folder:
             unit = host(folder)
@@ -134,6 +164,9 @@ class OnTheUnitTest(unittest.TestCase):
                 self.assertEqual(played["b"], -6.)
                 # Put back: each side at what the desk asked for it, no offset.
                 self.assertEqual(unit.call("lab.tools.levels.clear").result(10), {"a": 3., "b": -12.})
+                unit.call("level", "a", 3., peak_limit=-4.).result(10)
+                played = unit.call("lab.tools.levels.install", {"loudness_db": 6}).result(10)
+                self.assertEqual(played["a"], -4.)
             finally:
                 unit.close()
 

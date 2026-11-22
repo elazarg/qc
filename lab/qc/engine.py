@@ -77,7 +77,7 @@ class Engine:
         self.chosen_scene = None                # the scene heard, kept across making ready and recalling
         self.borrowed = None
         self.offset = None
-        self.asked, self.listening = {}, None      # see `level`
+        self.asked, self.peak_limits, self.listening = {}, {}, None
 
     # ---- the session ----
 
@@ -325,12 +325,14 @@ class Engine:
             (row + first, column, index) for (row, column, index) in targets}}
         return knobs.moves(chain, values)
 
-    def level(self, side, db):
+    def level(self, side, db, *, peak_limit=None):
         """Set the level a side is played at. `listening`, when set, maps what is asked to what is played (the
         Levels window's listening level); the result stays within the floor and the ceiling."""
         self.asked[side] = db
+        self.peak_limits[side] = peak_limit
         played = self.listening(db) if self.listening else db
-        before, self.levels[side] = self.levels[side], max(-40., min(CEILING_DB, played))
+        ceiling = CEILING_DB if peak_limit is None else min(CEILING_DB, peak_limit)
+        before, self.levels[side] = self.levels[side], max(-40., min(ceiling, played))
         # A level that is already the one played is not written again: the desk matches levels at every play.
         if self.mode is not None and side == self.active and abs(self.levels[side] - before) > .05:
             self.play(side, self.mode)
@@ -339,7 +341,7 @@ class Engine:
         """Play every side through `listening` (asked dB -> played dB) from now on, or as asked when None."""
         self.listening = listening
         for side in ("a", "b"):
-            self.level(side, self.asked.get(side, PREVIEW_DB))
+            self.level(side, self.asked.get(side, PREVIEW_DB), peak_limit=self.peak_limits.get(side))
         return dict(self.levels)
 
     # ---- listening, reading, saving ----

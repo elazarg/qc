@@ -131,26 +131,34 @@ def take_report(dry, wet=None):
     checks += [f"The {kind} signal is too quiet for a loudness reading. Check the routing."
                for kind, found in readings.items() if found["lufs"] is None]
     if readings["dry"]["peak_db"] > HEADROOM_DB and not readings["dry"]["clipped"]:
-        checks.append(f"The dry peak is within {-HEADROOM_DB:.0f} dB of full scale. A harder attack may clip "
-                      "the input; lower the input gain on the unit.")
+        cut = round(readings["dry"]["peak_db"] + 12.)
+        checks.append(f"Try reducing the Quad Cortex input gain by about {cut} dB, then play your hardest again. "
+                      "That leaves about 12 dB of headroom on this take.")
+    if wet is not None and readings["wet"]["true_peak_db"] > -3.:
+        checks.append("The USB return is within 3 dB of full scale. Lower clean output level after the drive and "
+                      "check it again.")
+    mono_loss = readings.get("wet", {}).get("mono_fold_down_db")
+    if mono_loss is not None and mono_loss < -6.:
+        checks.append("The stereo sound loses more than 6 dB folded to mono. Check phase and stereo effects "
+                      "before sending it to a mono PA.")
     return {**readings, "checks": checks, "headroom_db": round(-readings["dry"]["peak_db"], 1)}
 
 
 # ---- operations, run where the unit is held ----
 
-def check(engine, chain=None, dry=None, seconds=6., *, stop=None):
+def check(engine, chain=None, dry=None, seconds=6., scene=None, *, stop=None):
     """Record the dry input for `seconds` (or take `dry`), and play it silently through `chain`, if one."""
     if dry is None:
         dry = engine.record(seconds, stop=stop)[:, :1]
     dry = np.asarray(dry, dtype=np.float32)
     if len(dry) < RATE // 2:
         raise RuntimeError("Nothing was recorded.")
-    wet = render(engine, chain, dry, tail=0., stop=stop) if chain is not None else None
+    wet = render(engine, chain, dry, scene=scene, tail=.5, stop=stop) if chain is not None else None
     return take_report(dry, wet)
 
 
-def stage_render(engine, chain, dry, *, stop=None):
-    return render(engine, chain, dry, tail=.5, stop=stop)
+def stage_render(engine, chain, dry, scene=None, *, stop=None):
+    return render(engine, chain, dry, scene=scene, tail=.5, stop=stop)
 
 
 # ---- the tool ----
@@ -202,7 +210,8 @@ class SoundCheckTool(Tool):
                 self.say("Record or choose a phrase on the desk first.")
                 return
             dry = taken[1]
-        self.call("lab.tools.soundcheck.check", chain, dry, 6., done=self.show_take, renders=True,
+        self.call("lab.tools.soundcheck.check", chain, dry, 6., self.studio.state.scene,
+                  done=self.show_take, renders=True,
                   working="Recording 6 s: play your hardest now…" if record else "Measuring the phrase…")
 
     def show_take(self, report):
@@ -249,7 +258,8 @@ class SoundCheckTool(Tool):
                  + [button(self.players, "Which was which?", self.reveal, quiet=True)])
             self.stage_text.configure(text=f"{CONTEXTS[context]['name']} · {sound.name}")
 
-        self.call("lab.tools.soundcheck.stage_render", heard_chain(sound), taken[1], done=rendered,
+        self.call("lab.tools.soundcheck.stage_render", heard_chain(sound), taken[1], self.studio.state.scene,
+                  done=rendered,
                   working="Playing the phrase silently through the sound…", renders=True)
 
     def play(self, letter):

@@ -322,7 +322,8 @@ class SimAudio:
                 found = catalog.model(cell.hash) if cell.hash else None
                 if not found or self.unit.working.bypass[lane.row].colBypass[column].sceneBypass[self.unit.scene].bypass:
                     continue
-                first = cell.params[0].param_values[0]
+                parameter = cell.params[0]
+                first = parameter.param_values[self.unit.scene if parameter.scene_mode else 0]
                 value = first.float_value if first.WhichOneof("value") == "float_value" else 0.
                 if found.category in ("Guitar Amplifier", "Guitar Overdrive", "Bass Amplifier", "Bass Overdrive"):
                     push = 10 ** (40 * value / 20)

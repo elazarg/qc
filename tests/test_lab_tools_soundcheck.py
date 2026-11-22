@@ -76,7 +76,8 @@ class StageCheckTest(unittest.TestCase):
 
     def test_the_take_check_warns_of_a_hot_input(self):
         report = soundcheck.take_report(phrase(level=.8))
-        self.assertTrue(any("headroom" not in check and "full scale" in check for check in report["checks"]))
+        self.assertTrue(any("reducing the Quad Cortex input gain" in check and "headroom" in check
+                            for check in report["checks"]))
         quiet = soundcheck.take_report(phrase(level=.05))
         self.assertEqual(quiet["checks"], [])
         self.assertGreater(quiet["headroom_db"], 20)

@@ -132,6 +132,16 @@ def offered(text, kind, chain=None):
     return [model_id for model_id in dict.fromkeys(ids) if model_id in held or usable(model_id, kind)]
 
 
+def inventory(chain=None):
+    """Grid models the designer can use. Routing components and unbound assets have their own representations."""
+    internal = {"Internal Routing", "Splitter", "Mixer", "Lane output control", "Tempo control", "InputGateControl",
+                "Neural Capture Internal", "Neural Capture", "IRLoaders", "IOSettings Internal", "Utility_Deprecated"}
+    locked = knowledge.locked()
+    return list(dict.fromkeys([*(block.model for _, _, block in (chain.blocks if chain else ())),
+                              *(m.id for m in catalog.models() if m.category not in internal and m.id not in locked
+                                and (not m.category.startswith("Cabsim") or m.is_stock_cab))]))
+
+
 # ---- The player's own impulse responses ----
 #
 # An IR on the unit is not a model: every one loads into the same IR loader. A design names one by an id of its
@@ -175,6 +185,36 @@ def player_irs(text, chain=None, known=None):
     return {ASSET_IDS + number: asset for number, asset in enumerate(unique[:8])}
 
 
+def design_assets(text, chain, known):
+    """Prioritize familiar IRs, then index the local library without sending any device file keys."""
+    if known is None:
+        known = assets.cached() or ()
+    found = list(player_irs(text, chain, known).values())
+    for _, _, block in chain.blocks if chain else ():
+        held = assets.bound(block, known)
+        if held and held.kind == "capture" and held.capture_version in assets.CAPTURE_VERSIONS:
+            if all(asset.key.casefold() != held.key.casefold() for asset in found):
+                found.append(held)
+    seen = {asset.key.casefold() for asset in found}
+    said = _tokens(text)
+    for asset in known:
+        named = bool(_tokens(asset.name) & said) and asset.name.casefold() in text.casefold()
+        readable = asset.kind == "ir" or asset.capture_version in assets.CAPTURE_VERSIONS
+        if asset.name and readable and (asset.source == "user" or named) and asset.key.casefold() not in seen:
+            seen.add(asset.key.casefold())
+            found.append(asset)
+    return {ASSET_IDS + offset: asset for offset, asset in enumerate(found)}
+
+
+def asset_card(asset_id, asset):
+    if asset.kind == "ir":
+        return ir_card(asset_id, asset)
+    model = assets.CAPTURE_VERSIONS[asset.capture_version]
+    return {**card(model), "id": asset_id, "name": asset.name, "category": f"Neural Capture V{asset.capture_version}",
+            "about": "A loaded capture. Use the name to infer what it captures. If cab content is unclear, "
+                     "offer another design with a known amp and cab."}
+
+
 def _ir_controls():
     names = controls(catalog.IR_LOADER)
     return {name: ((names[name][0][0],), *names[name][1:]) for name in IR_CONTROLS if name in names}
@@ -192,13 +232,13 @@ def ir_card(asset_id, asset):
     return found
 
 
-def _ir_ids(chain, irs):
-    """Where the sound being revised holds one of the player's IRs: (row, column) -> its id in `irs`."""
+def _asset_ids(chain, irs):
+    """Where the sound being revised holds an indexed asset, as (row, column) -> its temporary ID."""
     by_key = {asset.key.casefold(): asset_id for asset_id, asset in (irs or {}).items()}
     found = {}
     for r, column, block in chain.blocks:
         held = assets.bound(block)
-        if held is not None and held.kind == "ir" and held.key.casefold() in by_key:
+        if held is not None and held.key.casefold() in by_key:
             found[(r, column)] = by_key[held.key.casefold()]
     return found
 
@@ -275,9 +315,9 @@ def _fields(**properties):
     return {"type": "object", "additionalProperties": False, "required": list(properties), "properties": properties}
 
 
-def design_schema(model_ids):
+def design_schema():
     text, number, whole, flag = {"type": "string"}, {"type": "number"}, {"type": "integer"}, {"type": "boolean"}
-    block = _fields(column=whole, model_id={"type": "integer", "enum": sorted(set(model_ids))},
+    block = _fields(column=whole, model_id=whole,
                     settings={"type": "array", "items": _fields(name=text, value=number)},
                     scene_settings={"type": "array", "items": _fields(scene=whole, name=text, value=number)},
                     off_in_scenes={"type": "array", "items": whole}, off=flag)
@@ -289,13 +329,13 @@ def design_schema(model_ids):
                    sources={"type": "array", "items": _fields(title=text, url=text)})
 
 
-def round_schema(model_ids):
+def round_schema():
     word = lambda kind: {"type": "string", "enum": list(AIM[kind])}
     text = {"type": "string"}
     return _fields(aim=_fields(distortion=word("distortion"), brightness=word("brightness"), tail=word("tail"),
                                note=text),
                    song=_fields(artist=text, title=text, part=text),
-                   designs={"type": "array", "items": design_schema(model_ids)})
+                   designs={"type": "array", "items": design_schema()})
 
 
 # ---- From a chain to the form, and back ----
@@ -342,13 +382,15 @@ def as_form(chain, irs=None):
     player's IRs in `irs` is shown by that IR's id and name. Given back unchanged, `to_chain` returns the chain
     as it is."""
     rows = []
-    held = _ir_ids(chain, irs)
-    for r, row in enumerate(chain.rows[:2]):
+    held = _asset_ids(chain, irs)
+    for r, row in enumerate(chain.rows):
         blocks = []
         for column, block in row.blocks:
             if (r, column) in held:
                 asset_id = held[(r, column)]
-                blocks.append(_block_form(column, block, _ir_controls(), asset_id, irs[asset_id].name))
+                asset = irs[asset_id]
+                names = _ir_controls() if asset.kind == "ir" else controls(block.model)
+                blocks.append(_block_form(column, block, names, asset_id, asset.name))
             else:
                 blocks.append(_block_form(column, block, controls(block.model), block.model, block.name))
         if blocks or row.split:
@@ -376,10 +418,12 @@ def _listed(found, what, problems):
     return found
 
 
-def _identity(block):
-    """What makes a block of the sound being revised the same block in an answer: the IR it holds, or its model."""
+def _identity(block, indexed):
+    """Use the ID of an indexed asset, or the model ID used by older forms and unbound blocks."""
     held = assets.bound(block)
-    return ("ir", held.key.casefold()) if held is not None and held.kind == "ir" else ("model", block.model)
+    if held is not None and (held.kind == "ir" or held.key.casefold() in indexed):
+        return held.kind, held.key.casefold()
+    return "model", block.model
 
 
 def _continued(base, given, irs):
@@ -394,19 +438,21 @@ def _continued(base, given, irs):
         for spec in item.get("blocks") if isinstance(item.get("blocks"), list) else []:
             if isinstance(spec, dict) and _whole(spec.get("column")) and _whole(spec.get("model_id")):
                 model_id = spec["model_id"]
-                identity = ("ir", irs[model_id].key.casefold()) if model_id in irs else ("model", model_id)
+                asset = irs.get(model_id)
+                identity = (asset.kind, asset.key.casefold()) if asset else ("model", model_id)
                 wanted.append(((r, spec["column"]), identity))
-    left = {(r, column): block for r in (0, 1) for column, block in base.rows[r].blocks}
+    left = {(r, column): block for r in given for column, block in base.rows[r].blocks}
+    indexed = {asset.key.casefold() for asset in irs.values()}
     found = {}
     for place, identity in wanted:                              # in the same place
-        if place in left and place not in found and _identity(left[place]) == identity:
+        if place in left and place not in found and _identity(left[place], indexed) == identity:
             found[place] = left.pop(place)
     for same_row in (True, False):                              # moved along its row, then to the other row
         for place, identity in sorted(wanted):
             if place in found:
                 continue
             for other in sorted(left):
-                if (other[0] == place[0]) == same_row and _identity(left[other]) == identity:
+                if (other[0] == place[0]) == same_row and _identity(left[other], indexed) == identity:
                     found[place] = left.pop(other)
                     break
     return found
@@ -443,7 +489,7 @@ def _paths(rows):
 def to_chain(design, *, offered_ids, base=None, physical_input=1, irs=None):
     """The chain an answer describes, and the problems that stop it being used (empty when it can be).
 
-    `base` is the sound a revision revises: its routing, levels and rows 2 and 3 are kept, and so is everything
+    `base` is the sound a revision revises: its routing, levels and untouched rows are kept, and so is everything
     about a block the answer gives back as `as_form(base)` showed it. `irs` numbers the player's IRs the answer
     may name (see `player_irs`); each becomes an IR loader holding it.
     """
@@ -457,14 +503,14 @@ def to_chain(design, *, offered_ids, base=None, physical_input=1, irs=None):
     given = {}
     for item in _listed(design.get("rows"), "rows", problems):
         r = item.get("row") if isinstance(item, dict) else None
-        if not _whole(r) or r not in (0, 1):
-            problems.append("Use rows 0 and 1 only, each given with its number, split and blocks.")
+        if not _whole(r) or not 0 <= r < len(rows):
+            problems.append("Use grid rows 0 to 3, each with its number, split and blocks.")
         elif r in given:
             problems.append(f"Row {r} is given twice.")
         else:
             given[r] = item
     kept = _continued(base, given, irs) if base else {}
-    for r in (0, 1):
+    for r in range(len(rows)):
         item = given.get(r)
         if item is None:
             continue
@@ -482,7 +528,12 @@ def to_chain(design, *, offered_ids, base=None, physical_input=1, irs=None):
                 continue
             was = kept.get((r, column))
             if _whole(model_id) and model_id in irs and model_id in offered_ids:
-                block, wrong = _ir_block(spec, irs[model_id], count, was)
+                asset = irs[model_id]
+                if asset.kind == "capture":
+                    binding = assets.block_for(asset)
+                    block, wrong = _block({**spec, "model_id": binding.model}, count, was or binding, label=asset.name)
+                else:
+                    block, wrong = _ir_block(spec, asset, count, was)
             elif _whole(model_id) and was is not None and was.model == model_id and catalog.model(model_id) is None:
                 block, wrong = replace(was, bypass=_switching(spec, count, was, was.name, problems)), []
             elif not _whole(model_id) or model_id not in offered_ids or catalog.model(model_id) is None:
@@ -495,8 +546,8 @@ def to_chain(design, *, offered_ids, base=None, physical_input=1, irs=None):
                 block, wrong = _block(spec, count, was)
                 if model_id in catalog.CAPTURE_MODELS and assets.bound(block) is None \
                         and (was is None or assets.bound(was) is not None):
-                    wrong.append(f"The {block.name} block in row {r} column {column} holds no capture. A capture "
-                                 "block can only be one the current chain already has: keep it, or leave it out.")
+                    wrong.append(f"The {block.name} block in row {r} column {column} holds no capture. "
+                                 "Choose a loaded capture by its asset ID or leave the block out.")
             problems += wrong
             cells[column] = block
         split_at, join_at = item.get("split_at", -1), item.get("join_at", -1)
@@ -507,11 +558,19 @@ def to_chain(design, *, offered_ids, base=None, physical_input=1, irs=None):
             split = None if (split_at, join_at) == (-1, -1) else (split_at, join_at)
         if base is not None and split == base.rows[r].split:
             pass                                    # A revision may keep a layout the rules would not allow anew.
-        elif split and (r != 0 or not 0 <= split[0] < split[1] <= COLUMNS - 1):
-            problems.append("Only row 0 can split, at a column before the one where it joins.")
+        elif split and (r % 2 or not 0 <= split[0] < split[1] <= COLUMNS - 1):
+            problems.append("Rows 0 and 2 can split, at a column before the one where they join.")
             split = None
         rows[r] = replace(rows[r], cells=tuple(cells), split=split)
     rows[0] = _joined(rows, design, base, problems)
+    if any(r in given for r in (2, 3)):
+        later = Chain(tuple(base.rows[2:])) if base else None
+        rows[2] = _joined(rows[2:], {}, later, problems)
+        if rows[2].blocks or rows[2].split:
+            if base is None or not (base.rows[2].blocks or base.rows[2].split):
+                rows[2] = replace(rows[2], inlet=physical_input, outlet=MULTI_OUT)
+        if base is None and not (rows[0].blocks or rows[0].split):
+            rows[0] = replace(rows[0], inlet=0, outlet=0)
     chain = Chain(tuple(rows), labels)
     for pair in ((0, 1), (2, 3)):
         models = [block.model for r in pair for _, block in chain.rows[r].blocks]
@@ -670,7 +729,8 @@ def _block(spec, count, kept=None, *, names=None, label=None):
 
 # ---- Asking ----
 
-def facts(text, instrument, *, chain=None, earlier=None, models=(), irs=None, guitar=None, listening=None):
+def facts(text, instrument, *, chain=None, earlier=None, models=(), irs=None, guitar=None, listening=None,
+          eligible=(), engineering=None):
     notes = knowledge.guitar_notes(instrument.get("name")) if instrument else None
     recipe = _recipe(text) if chain is None else None
     irs = irs or {}
@@ -682,15 +742,20 @@ def facts(text, instrument, *, chain=None, earlier=None, models=(), irs=None, gu
             **({"community_recipe": recipe} if recipe else {}),
             **({"current_chain": as_form(chain, irs)} if chain is not None else {}),
             **({"earlier": earlier} if earlier else {}),
-            "available_models": [ir_card(model_id, irs[model_id]) if model_id in irs else card(model_id)
-                                 for model_id in models if model_id in irs or catalog.model(model_id)]}
+            **({"soundcheck": engineering} if engineering else {}),
+            "available_models": [asset_card(model_id, irs[model_id]) if model_id in irs else card(model_id)
+                                 for model_id in models if model_id in irs or catalog.model(model_id)],
+            "catalog": [[m.id, m.name, m.category] for model_id in eligible if model_id not in models
+                        and (m := catalog.model(model_id)) is not None],
+            "local_assets": [[key, asset.name, asset.kind, asset.capture_version] for key, asset in irs.items()
+                             if key not in models]}
 
 
 def _with_irs(models, irs, chain=None):
     """The models offered with the player's IRs added. A bare IR loader the sound holds is left out when each
     one holds an IR shown by its id, so that an empty loader is never offered."""
     loaders = [(r, column) for r, column, block in (chain.blocks if chain else ()) if block.model in assets.IR_MODELS]
-    covered = set(_ir_ids(chain, irs)) if chain else set()
+    covered = set(_asset_ids(chain, irs)) if chain else set()
     if loaders and all(place in covered for place in loaders):
         models = [model_id for model_id in models if model_id not in assets.IR_MODELS]
     return [*models, *irs]
@@ -758,7 +823,7 @@ def played_on(instrument, setting=None, guitar=None):
 
 
 def round_of_three(assistant, text, instrument, *, earlier=None, by="player", cancel=None, assets_known=None,
-                   guitar=None, setting=None, listening=None):
+                   guitar=None, setting=None, listening=None, engineering=None):
     """An aim and up to three sounds that reach it by different routes.
 
     `listening` (`lab.player.listening.prior`) says what guitar music the player listens to most; the assistant uses
@@ -772,12 +837,14 @@ def round_of_three(assistant, text, instrument, *, earlier=None, by="player", ca
     Two usable designs are enough; fewer get one repair. After it, even one design is a round: what could be
     used is never thrown away with what could not."""
     kind = (instrument or {}).get("kind", "electric")
-    irs = player_irs(text, known=assets_known)
-    models = _with_irs(offered(text, kind), irs)
-    names = ("task", "chain", craft_for(kind), *(("input",) if guitar else ()),
+    irs = design_assets(text, None, assets_known)
+    models = _with_irs(inventory(), irs)
+    detailed = [*offered(text, kind), *list(irs)[:8]]
+    names = ("task", "chain", craft_for(kind), *(("input",) if guitar else ()), "soundcheck",
              *(("listening",) if listening else ()), "scenes", "paths", "budget", "round", "song")
     prompt = sections(*names) + "\n\n" + json.dumps(
-        facts(text, instrument, earlier=earlier, models=models, irs=irs, guitar=guitar, listening=listening),
+        facts(text, instrument, earlier=earlier, models=detailed, eligible=inventory(), irs=irs, guitar=guitar,
+              listening=listening, engineering=engineering),
         ensure_ascii=False)
     source = played_on(instrument, setting, guitar)
     origin = {"kind": "designed", "request": text, **({"input": source} if source else {})}
@@ -815,21 +882,24 @@ def round_of_three(assistant, text, instrument, *, earlier=None, by="player", ca
             return best[0], []
         return (aim, designs), problems or ["The answer holds no designs."]
 
-    return _ask_checked(assistant, "round", prompt, round_schema(models), check, by=by, web=False, seconds=180,
+    return _ask_checked(assistant, "round", prompt, round_schema(), check, by=by, web=by == "player", seconds=180,
                         cancel=cancel)
 
 
 def revise(assistant, sound, text, instrument, *, by="player", cancel=None, assets_known=None, guitar=None,
-           setting=None):
+           setting=None, engineering=None):
     """A new sound: `sound` changed as the request asks, everything else kept, with the assistant's account of
     what it changed as its explanation. The player's IRs the sound holds or the request names are offered as
     models (`assets_known`, `guitar` and `setting` as for `round_of_three`)."""
     kind = (instrument or {}).get("kind", "electric")
-    irs = player_irs(text, sound.chain, known=assets_known)
-    models = _with_irs(offered(text, kind, sound.chain), irs, sound.chain)
-    names = ("task", "chain", "revise", craft_for(kind), *(("input",) if guitar else ()), "scenes", "paths", "budget")
+    irs = design_assets(text, sound.chain, assets_known)
+    models = _with_irs(inventory(sound.chain), irs, sound.chain)
+    detailed = [*offered(text, kind, sound.chain), *list(irs)[:8]]
+    names = ("task", "chain", "revise", craft_for(kind), *(("input",) if guitar else ()), "soundcheck",
+             "scenes", "paths", "budget")
     prompt = sections(*names) + "\n\n" + json.dumps(
-        facts(text, instrument, chain=sound.chain, models=models, irs=irs, guitar=guitar), ensure_ascii=False)
+        facts(text, instrument, chain=sound.chain, models=detailed, eligible=inventory(sound.chain), irs=irs,
+              guitar=guitar, engineering=engineering), ensure_ascii=False)
     source = played_on(instrument, setting, guitar)
 
     def check(reply, final=False):
@@ -838,8 +908,8 @@ def revise(assistant, sound, text, instrument, *, by="player", cancel=None, asse
         said = reply if isinstance(reply, dict) else {}
         return (chain, said.get("explanation"), said.get("sources")), problems
 
-    chain, explanation, sources = _ask_checked(assistant, "revise", prompt, design_schema(models), check, by=by,
-                                               web=False, seconds=120, cancel=cancel)
+    chain, explanation, sources = _ask_checked(assistant, "revise", prompt, design_schema(), check, by=by,
+                                               web=by == "player", seconds=120, cancel=cancel)
     revised = _sound({"name": sound.name, "explanation": explanation, "sources": sources}, chain,
                      {"kind": "revised", "request": text, "from": sound.id, **({"input": source} if source else {})})
     revised.parent = sound.id

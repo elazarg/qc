@@ -130,8 +130,8 @@ class DesignTest(unittest.TestCase):
         self.assertIn("GAIN 99 is outside", script.asked[1][0])
         self.assertIn("same chain as an earlier one", script.asked[1][0])
         schema = script.asked[0][1]
-        self.assertIn(FUZZ, schema["properties"]["designs"]["items"]["properties"]["rows"]["items"]["properties"]
-                      ["blocks"]["items"]["properties"]["model_id"]["enum"])
+        self.assertEqual(schema["properties"]["designs"]["items"]["properties"]["rows"]["items"]["properties"]
+                         ["blocks"]["items"]["properties"]["model_id"], {"type": "integer"})
         ledger = [json.loads(line) for line in (self.folder / "ledger.jsonl").read_text().splitlines()]
         self.assertEqual([entry["kind"] for entry in ledger], ["round", "round repair"])
         self.assertEqual({entry["by"] for entry in ledger}, {"player"})
@@ -242,6 +242,33 @@ class PlayerIRTest(unittest.TestCase):
         self.addCleanup(folder.cleanup)
         self.folder = Path(folder.name)
 
+    def test_a_new_design_can_use_the_second_processor_pair(self):
+        draft = answer("Four-row mix", [block(PLEXI, 0), block(V30, 1)])
+        draft["rows"].extend([
+            {"row": 2, "split_at": 0, "join_at": 3, "blocks": [block(DELAY, 1)]},
+            {"row": 3, "split_at": -1, "join_at": -1, "blocks": [block(FUZZ, 1)]},
+        ])
+        chain, problems = design.to_chain(draft, offered_ids={PLEXI, V30, DELAY, FUZZ})
+        self.assertEqual(problems, [])
+        self.assertEqual(chain.rows[2].route, (1, 19))
+        self.assertEqual(chain.rows[2].split, (0, 3))
+        self.assertEqual(chain.block(3, 1).model, FUZZ)
+
+    def test_a_new_design_can_use_a_model_outside_the_starting_points_and_a_loaded_capture(self):
+        capture = Asset("capture", "f" * 64, "Bench preamp", "user", 2)
+        indexed = set(design.inventory())
+        stereo_cab = next(model.id for model in catalog.models()
+                          if model.category == "Cabsim Guitar (ST)" and model.id in indexed)
+        self.assertNotIn(stereo_cab, design.offered("clean electronic rig", "electric"))
+        script = Scripted(reply(answer("Capture", [block(design.ASSET_IDS, 0), block(V30, 1)]),
+                                answer("Stereo", [block(PLEXI, 0), block(stereo_cab, 1)])))
+        _, rounds = design.round_of_three(Assistant(self.folder, run=script), "clean electronic rig", CHARVEL,
+                                          assets_known=[capture])
+        self.assertEqual(assets.bound(rounds[0][0].chain.block(0, 0)).key, capture.key)
+        self.assertEqual(rounds[1][0].chain.block(0, 1).model, stereo_cab)
+        self.assertNotIn(capture.key, script.asked[0][0])
+        self.assertTrue(script.asked[0][2])
+
     def test_the_irs_a_request_names_are_offered_and_no_others(self):
         self.assertEqual(design.player_irs("Plexi crunch through YA MES 212 V30 Mix 04", known=KNOWN),
                          {design.ASSET_IDS: MIX04})
@@ -260,8 +287,8 @@ class PlayerIRTest(unittest.TestCase):
                                            assets_known=KNOWN)
         prompt, schema = script.asked[0][:2]
         self.assertIn("YA MES 212 V30 Mix 04 (the player's IR)", prompt)
-        self.assertIn(design.ASSET_IDS, schema["properties"]["designs"]["items"]["properties"]["rows"]["items"]
-                      ["properties"]["blocks"]["items"]["properties"]["model_id"]["enum"])
+        self.assertEqual(schema["properties"]["designs"]["items"]["properties"]["rows"]["items"]
+                         ["properties"]["blocks"]["items"]["properties"]["model_id"], {"type": "integer"})
         loader = designs[0][0].chain.block(0, 1)
         self.assertEqual(assets.bound(loader), MIX04)
         self.assertAlmostEqual(loader.display(5), 9000, delta=50)        # the first IR's LOW PASS only
@@ -344,6 +371,12 @@ class RevisionTest(unittest.TestCase):
         self.assertEqual(chain.block(0, 1), fuzz)                      # still off, as it was
         self.assertEqual(assets.bound(chain.block(0, 2)).key, DARK_JAZZ.key)     # the capture went with its block
         self.assertEqual(chain.block(0, 3), cab)                       # microphones, and each one's own position
+        indexed = design.design_assets("add compression", saved, [])
+        shown = design.as_form(saved, indexed)
+        self.assertEqual(shown["rows"][0]["blocks"][1]["model_id"], design.ASSET_IDS)
+        reply = shifted(shown, first=new_block(COMP, 0))
+        chain, problems = design.to_chain(reply, offered_ids={FUZZ, V30, COMP, *indexed}, base=saved, irs=indexed)
+        self.assertEqual((problems, chain.block(0, 2)), ([], capture))
 
     def test_blocks_of_one_model_are_told_apart_and_a_block_may_move_to_the_other_path(self):
         first, second = Block(DELAY).set_display(0, 20.), Block(DELAY).set_display(0, 50.)
@@ -416,7 +449,7 @@ class RevisionTest(unittest.TestCase):
     def test_the_assistant_can_switch_a_block_on_and_off(self):
         saved = Chain((Row((Block(FUZZ, bypass=True), Block(DELAY, bypass=(False, True) + (False,) * 6), Block(PLEXI)),
                            inlet=1, outlet=19),), ("A", "B"))
-        block_schema = design.design_schema([FUZZ])["properties"]["rows"]["items"]["properties"]["blocks"]["items"]
+        block_schema = design.design_schema()["properties"]["rows"]["items"]["properties"]["blocks"]["items"]
         self.assertEqual(block_schema["properties"]["off"], {"type": "boolean"})
         self.assertIn("off", block_schema["required"])
         self.assertIn("off is true", design.sections("chain"))
@@ -507,7 +540,7 @@ class OfferedTest(unittest.TestCase):
             self.assertFalse({"Guitar Amplifier", "Cabsim Guitar (M)"} & categories, text)
         every = [model.id for model in catalog.models() if model.category == "Bass Amplifier" and design.usable(model.id, "bass")]
         self.assertTrue(every and set(every) <= set(design.offered("x", "bass")))
-        self.assertIn("Bass Amplifier", design.sections("bass"))
+        self.assertIn("bass amp", design.sections("bass"))
         amp, cab = every[0], next(model.id for model in catalog.models() if model.category == "Cabsim Bass (M)"
                                   and design.usable(model.id, "bass"))
         chain, problems = design.to_chain(answer("Bass", [block(amp, 0), block(cab, 1)]),
@@ -517,7 +550,7 @@ class OfferedTest(unittest.TestCase):
         for kind in ("acoustic", "classical"):                         # no amp and no cab, as their sections say
             categories = {catalog.model(model_id).category for model_id in design.offered("warm fingerstyle", kind)}
             self.assertFalse({category for category in categories if "Amplifier" in category or "Cabsim" in category})
-            self.assertIn("none is in available_models", design.sections(kind))
+            self.assertIn("Start with direct EQ", design.sections(kind))
 
     def test_a_stock_cab_offers_its_microphones_filters_and_a_bounded_level_and_nothing_internal(self):
         found = design.card(V30)

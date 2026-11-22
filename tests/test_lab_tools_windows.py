@@ -63,6 +63,8 @@ class ToolsTest(DeskCase):
         trims = {row["name"]: row["trim_db"] for row in tool.planned["rows"]}
         self.assertAlmostEqual(trims["Lead"] - trims["Clean"], -9., delta=.3)
         tool.apply()
+        self.pump()
+        self.assertIn("Levels verified", tool.status.get())
         parts = self.studio.store.song("Time")["parts"]
         leveled = [self.studio.store.sound(part["sound"]) for part in parts]
         self.assertTrue(all(sound.chain.rows[0].blocks[-1][1].model == catalog.GAIN_BLOCK for sound in leveled))

@@ -223,13 +223,16 @@ class Measurement:
         return {key: (list(value) if isinstance(value, tuple) else value) for key, value in asdict(self).items()}
 
 
+def _true_peak(sides):
+    upsampled = signal.resample_poly(sides, 4, 1, axis=0) if len(sides) > 64 else sides
+    return db(float(np.max(np.abs(upsampled), initial=0.)))
+
+
 def measure(samples):
     sides = _channels(samples)
     if not sides.size:
         return Measurement(0., db(0.), db(0.), db(0.), 0., None, tuple(-200. for _ in CENTRES), 0., 0., 0)
     peak = float(np.max(np.abs(sides)))
-    upsampled = signal.resample_poly(sides, 4, 1, axis=0) if len(sides) > 64 else sides
-    true_peak = float(np.max(np.abs(upsampled)))
     try:
         loudness = float(pyloudnorm.Meter(RATE).integrated_loudness(sides if sides.shape[1] > 1 else sides[:, 0]))
     except ValueError:
@@ -247,7 +250,7 @@ def measure(samples):
         left, right = sides[:, 0], sides[:, 1]
         scale = math.sqrt(float(np.dot(left, left) * np.dot(right, right)))
         width = 1 - abs(float(np.dot(left, right)) / scale) if scale else 0.
-    return Measurement(len(sides) / RATE, level(sides), db(peak), db(true_peak), crest(sides),
+    return Measurement(len(sides) / RATE, level(sides), db(peak), _true_peak(sides), crest(sides),
                        loudness if math.isfinite(loudness) else None, tuple(bands), centroid, width,
                        int(np.count_nonzero(np.abs(sides) >= .999)))
 
@@ -301,6 +304,8 @@ class Heard:
     first_rise_ms: float | None = None       # median 10%-90% rise to the first peak of a note: the pick's attack
     first_rise_soft_ms: float | None = None  # the same, played 12 dB softer
     soft_gated: bool | None = None      # the phrase played 12 dB softer did not come through at all
+    true_peak_db: float | None = None   # USB return, including the processed tail
+    clipped: bool | None = None
 
     @property
     def distortion(self):
@@ -351,7 +356,7 @@ class Heard:
                 "brightness_db": None if self.brightness_db is None else round(self.brightness_db, 2),
                 "band_levels_db": dict(self.band_levels_db) if self.band_levels_db else None,
                 "brightness_bands_db": dict(self.brightness_bands_db) if self.brightness_bands_db else None,
-                "soft_gated": self.soft_gated, "probe": self.probe, **self.words()}
+                "soft_gated": self.soft_gated, "clipped": self.clipped, "probe": self.probe, **self.words()}
 
 
 def summary(found):
@@ -382,6 +387,8 @@ def measured_lines(record):
     if not record or "probe" not in record:
         return ["Not measured with the current tests yet."]
     probe, lines = record["probe"] or {}, []
+    if record.get("clipped"):
+        lines.append("USB return reached full scale. Lower clean level inside the preset and measure again.")
     current = probe.get("version", 1) >= 2        # the test signal's second layout (lab.hearing.probe)
     if _number(probe.get("distortion_db")) and _number(probe.get("distortion_soft_db")):
         line = (f"Distortion: harmonics {-probe['distortion_db']:.0f} dB below the tone played firmly, "
@@ -583,7 +590,9 @@ def heard(dry, loud, soft, tail, probe=None, soft_gated=False):
                  attack_soft_ms=None if soft_gated else attack_ms(soft, starts),
                  brightness_db=None if bright is None else float(bright), band_levels_db=bands,
                  first_rise_ms=first_rise_ms(loud, starts),
-                 first_rise_soft_ms=None if soft_gated else first_rise_ms(soft, starts), soft_gated=bool(soft_gated))
+                 first_rise_soft_ms=None if soft_gated else first_rise_ms(soft, starts), soft_gated=bool(soft_gated),
+                 true_peak_db=max(loud_m.true_peak_db, _true_peak(tail)),
+                 clipped=bool(loud_m.clipped or (len(tail) and np.max(np.abs(tail)) >= .999)))
 
 
 def match(measurements, *, target_lufs=-23., offset_db=0., ceiling_db=-3., max_boost_db=0.):
