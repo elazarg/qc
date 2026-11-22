@@ -291,6 +291,10 @@ class Studio:
                 changes["round"] = record["round"]
             desk = record.get("desk")
             self.desk_session = dict(desk) if isinstance(desk, dict) else {}
+            from lab.tools.levels import at_rest, saved_settings
+
+            listening = saved_settings(self.desk_session.get("listening"))
+            self.listening = None if at_rest(listening) else listening
         except Exception as error:  # noqa: BLE001  whatever is wrong with it, the desk must still open
             self.set_aside(error)
             return None
@@ -455,6 +459,8 @@ class Studio:
                 self.notice = ""
             note += self._stale_words()
             self._set(status="Ready." + note)
+            if self.listening is not None:
+                self.later(self.host.call("lab.tools.levels.install", self.listening), lambda levels: None)
             if self.restored:
                 self.restored = False
                 shown = [f"{side.upper()} {self.sound(side).name}" for side in ("a", "b") if self.sound(side)]
@@ -1049,9 +1055,22 @@ class Studio:
 
     def clear_listening(self):
         """Play at the desk's own levels again: no offset and no mute from the Levels tool (`self.listening`)."""
-        self.listening = None
-        self.later(self.host.call("lab.tools.levels.clear"), lambda levels: None)
+        self.set_listening(None)
         self._set(status="Back at the desk's own level.")
+
+    def set_listening(self, value):
+        """Apply the desk-wide volume and remember it. Mute is temporary."""
+        from lab.tools.levels import at_rest, saved_settings
+
+        settings = saved_settings(value)
+        self.listening = None if at_rest(settings) else settings
+        remembered = {**settings, "muted": False}
+        self.remember(listening=None if at_rest(remembered) else remembered)
+        if self.listening is None:
+            self.later(self.host.call("lab.tools.levels.clear"), lambda levels: None)
+        else:
+            self.later(self.host.call("lab.tools.levels.install", self.listening), lambda levels: None)
+        self._set()
 
     @property
     def media_reference(self):

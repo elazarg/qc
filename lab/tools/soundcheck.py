@@ -17,6 +17,7 @@ The relative levels of a song's parts, which this card also planned on the old d
 Every level here is measured the one way the app measures (`hearing.measure`).
 """
 
+from dataclasses import replace
 import tkinter as tk
 
 import numpy as np
@@ -24,6 +25,7 @@ from scipy import signal
 
 from lab.hearing.audio import RATE, db
 from lab.hearing.measure import measure
+from lab.sound.chain import Block, INTERNAL, SCENES
 from lab.tools.common import (Chips, Tool, button, caption, disclosure, flow, heard_chain, phrase, play, render,
                               said, section)
 from lab.tools.workbench import auditions, comparison
@@ -49,6 +51,7 @@ NOTES = [
     "output pairs, and the unit may bypass it on heavy presets.",
 ]
 HEADROOM_DB = -6.      # a dry peak above this leaves little room for a harder attack
+UTILITY_GATE = 16002
 
 
 # ---- the stage EQ variants (from stage_check) ----
@@ -161,6 +164,68 @@ def stage_render(engine, chain, dry, scene=None, *, stop=None):
     return render(engine, chain, dry, scene=scene, tail=.5, stop=stop)
 
 
+def _idle_rms(samples):
+    return db(float(np.sqrt(np.mean(np.square(samples, dtype=np.float64)))))
+
+
+def _input_gate(chain, threshold, scene):
+    """Insert before processing on a single input path. Preserve an existing gate and split layout."""
+    fed = [r for r, row in enumerate(chain.rows) if row.inlet not in INTERNAL]
+    if len(fed) != 1 or any("Gate" in block.name for _, _, block in chain.blocks):
+        return None
+    r = fed[0]
+    row = chain.rows[r]
+    empty = next((col for col, block in enumerate(row.cells) if block is None), None)
+    if empty is None or (row.split and empty >= row.split[0]):
+        return None
+    bypass = tuple(index != scene for index in range(SCENES)) if chain.scenes_in_use() > 1 else False
+    gate = (Block(UTILITY_GATE, bypass=bypass).set_display(0, threshold).set_display(1, 1.)
+            .set_display(2, 100.).set_display(3, 250.).set_display(4, -18.))
+    return chain.with_row(r, replace(row, cells=(gate, *row.cells[:empty], *row.cells[empty + 1:])))
+
+
+def idle_check(engine, chain, knobs, phrase_dry, scene, *, stop=None):
+    """Compare real muted strings with a zero input, then verify any gate against a soft replay."""
+    from lab.tools.common import with_knobs
+
+    idle = np.asarray(engine.record(3., stop=stop)[RATE // 2:, :1], dtype=np.float32)
+    if len(idle) < RATE:
+        raise ValueError("Too little input was captured. Mute the strings and try again.")
+    quiet = np.zeros((2 * RATE, 1), dtype=np.float32)
+    playing = np.asarray(phrase_dry, dtype=np.float32).reshape(-1, 1) * .25
+    probe = np.concatenate((quiet, idle, playing))
+    where = len(quiet) + len(idle)
+
+    def audition(candidate):
+        return render(engine, with_knobs(candidate, knobs), probe, scene=scene, tail=1.5, stop=stop)
+
+    before = audition(chain)
+    window = RATE // 2
+    zero_db, idle_db = (_idle_rms(before[end - window:end]) for end in (len(quiet), where))
+    dry_db = _idle_rms(idle)
+    result = {"dry_db": dry_db, "idle_db": idle_db, "zero_db": zero_db, "chain": None}
+    if idle_db <= zero_db + 6.:
+        result["note"] = ("Noise remains with a silent input. Check the amp or effects and the monitoring path."
+                          if zero_db > -85. else "The USB return was quiet. If you still hear noise, check monitoring.")
+        return result
+    threshold = max(-90., min(-20., db(float(np.quantile(np.abs(idle), .999))) + 6.))
+    candidate = _input_gate(chain, threshold, scene)
+    if candidate is None:
+        result["note"] = "Noise rises with the guitar input. Check its cable, pickup and any existing gate."
+        return result
+    after = audition(candidate)
+    gain = idle_db - _idle_rms(after[where - window:where])
+    frame = RATE // 10
+    soft = [_idle_rms(before[start:start + frame]) for start in range(where, len(before) - frame + 1, frame)]
+    checked = [i for i, level in enumerate(soft) if level > idle_db + 10.]
+    if gain < 6. or not checked or any(abs(soft[i] - _idle_rms(after[where + i * frame:where + (i + 1) * frame])) > 2.
+                                      for i in checked):
+        result["note"] = "The trial gate did not cut the noise cleanly while keeping soft notes. Check the input first."
+        return result
+    result.update(chain=candidate, reduction_db=round(gain, 1))
+    return result
+
+
 # ---- the tool ----
 
 class SoundCheckTool(Tool):
@@ -177,6 +242,15 @@ class SoundCheckTool(Tool):
         button(row, "Check: play now", lambda: self.check(record=True)).pack(side="left")
         button(row, "Check the phrase", lambda: self.check(record=False), quiet=True).pack(side="left", padx=6)
         self.take_text = said(take, pady=(6, 0))
+
+        idle = disclosure(self.body, "Noise while idle",
+                          note="Keep guitar volume and pickup where you play them. Mute the strings for three seconds. "
+                               "The check compares that signal with digital silence and tests any gate on a soft "
+                               "version of your selected phrase.")
+        button(idle, "Check with strings muted", self.check_idle, quiet=True).pack(anchor="w")
+        self.idle_text = said(idle, pady=(6, 0))
+        self.keep_idle = button(idle, "Use quieter copy", self.use_idle, quiet=True)
+        self.idle_candidate = None
 
         # The two rarer checks are shown on request.
         unit = disclosure(self.body, "The Quad Cortex",
@@ -226,6 +300,53 @@ class SoundCheckTool(Tool):
                          + (f", mono fold-down {mono:+.1f} dB" if mono is not None else ""))
         lines += report["checks"]
         self.take_text.configure(text="\n".join(lines))
+
+    def check_idle(self):
+        if self.busy:
+            return
+        studio = self.studio
+        sound, taken = self.selected(), phrase(studio)
+        if sound is None or taken is None:
+            self.say("Choose a sound and a guitar phrase first.")
+            return
+        signature = (studio.state.instrument, studio.state.side, studio.state.scene, sound.id, sound.knobs,
+                     studio.phrase_key())
+        self.idle_candidate = None
+        self.keep_idle.pack_forget()
+        self.idle_text.configure(text="Mute the strings. Keep the guitar volume up.")
+
+        def checked(found):
+            result = (f"Dry {found['dry_db']:.0f} dBFS RMS · Wet {found['idle_db']:.0f} · "
+                      f"With silent input {found['zero_db']:.0f}")
+            if found["chain"] is not None:
+                self.idle_candidate = signature, found["chain"]
+                result += f"\nGate reduced idle noise by {found['reduction_db']:.0f} dB. Soft replay verified."
+                self.keep_idle.pack(anchor="w", pady=(4, 0))
+            else:
+                result += "\n" + found["note"]
+            self.idle_text.configure(text=result)
+
+        self.call("lab.tools.soundcheck.idle_check", sound.chain, sound.knobs, taken[1], studio.state.scene,
+                  done=checked, renders=True, working="Measuring idle noise and checking soft notes…")
+
+    def use_idle(self):
+        from lab.sound.sounds import Sound
+
+        studio, sound = self.studio, self.selected()
+        if self.idle_candidate is None or sound is None:
+            return
+        signature, chain = self.idle_candidate
+        if signature != (studio.state.instrument, studio.state.side, studio.state.scene, sound.id, sound.knobs,
+                         studio.phrase_key()):
+            self.say("Your guitar, sound, scene or phrase changed. Run the idle check again.")
+            return
+        copy = Sound(sound.name, chain, {**sound.origin, "kind": "revised", "from": sound.id,
+                                        "request": "measured idle noise reduction"}, parent=sound.id,
+                     knobs=dict(sound.knobs), explanation=sound.explanation, sources=list(sound.sources))
+        studio.put(studio.state.side, copy)
+        self.keep_idle.pack_forget()
+        self.idle_candidate = None
+        self.say("Quieter copy ready. Play it, or use Save to QC.")
 
     def unit_check(self):
         def shown(found):

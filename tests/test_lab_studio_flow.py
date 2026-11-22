@@ -608,6 +608,17 @@ class SessionTest(FlowCase):
         studio = Studio(self.host, self.folder, assistant=self.studio.assistant)
         return studio, studio.restore()
 
+    def test_music_reference_and_listening_offset_persist_across_songs_and_restarts(self):
+        reference = {"lufs": -16., "endpoint": "Quad Cortex"}
+        self.studio.set_media_reference(reference)
+        self.studio.set_listening({"loudness_db": 5, "muted": True})
+        self.studio.set(song="Another song", instrument="Les Paul")
+        self.studio.remember()
+        studio, _ = self.again()
+        self.assertEqual(studio.media_reference, reference)
+        self.assertEqual(studio.listening["loudness_db"], 5)
+        self.assertFalse(studio.listening["muted"])
+
     def test_a_sound_whose_file_cannot_be_read_is_not_put_back_and_the_rest_is(self):
         self.a_round()
         self.studio.copy_to_a()

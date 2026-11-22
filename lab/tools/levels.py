@@ -358,13 +358,8 @@ class LevelsTool(Tool):
         """Play at these settings from now on (None: the desk's own levels). They stay on when the tool is left:
         `studio.listening` holds them, and the desk shows them with a way back."""
         self.settings = saved_settings(settings)
-        self.studio.listening = None if at_rest(self.settings) else self.settings
+        self.studio.set_listening(self.settings)
         self.sync()
-        if at_rest(self.settings):
-            self.call("lab.tools.levels.clear", done=lambda levels: None, working="Back to the desk's own level…")
-        else:
-            self.call("lab.tools.levels.install", self.settings, done=lambda levels: None,
-                      working="Setting the level…")
 
     def sync(self):
         settings = self.settings
