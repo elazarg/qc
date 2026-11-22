@@ -103,6 +103,27 @@ def setting_name(layout, values):
     return f"{place} · {values['wiring']}" if values.get("wiring") else place
 
 
+def suggested_setup(record, instrument):
+    """Compact physical settings for a sound, shown only for the instrument they describe."""
+    if not isinstance(record, dict) or record.get("instrument") != instrument:
+        return ""
+    layout = record.get("layout")
+    if layout not in layouts_for(instrument):
+        return ""
+    try:
+        values = configuration(layout, record.get("values"))
+    except ValueError:
+        return ""
+    pickup = setting_name(layout, values)
+    pieces = [pickup]
+    for key in LAYOUTS[layout]["knobs"]:
+        if (pickup == "Neck" and key.startswith("bridge_")) or (pickup == "Bridge" and key.startswith("neck_")):
+            continue
+        label = key.replace("volume", "vol").replace("_", " ").capitalize()
+        pieces.append(f"{label} {values[key]:g}")
+    return " · ".join(pieces)
+
+
 def _instrument(value):
     name = value.strip()
     if not name:

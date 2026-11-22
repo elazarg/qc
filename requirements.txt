@@ -1,6 +1,7 @@
 numpy>=2.1,<3
 scipy>=1.14,<2
 sounddevice>=0.5.3,<0.6
+SoundCard>=0.4.5,<0.5; sys_platform == "win32"
 pyloudnorm>=0.1.1,<0.3
 mcp>=2,<3
 pywin32>=306; sys_platform == "win32"    # the Windows shortcut (python -m lab shortcut)

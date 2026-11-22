@@ -323,6 +323,8 @@ def design_schema():
                     off_in_scenes={"type": "array", "items": whole}, off=flag)
     row = _fields(row=whole, split_at=whole, join_at=whole, blocks={"type": "array", "items": block})
     return _fields(name=text, target=text, explanation=text, differs=text,
+                   guitar_setup=_fields(pickup=whole, wiring=text,
+                                        knobs={"type": "array", "items": _fields(name=text, value=number)}),
                    scenes={"type": "array", "items": text},
                    rows={"type": "array", "items": row},
                    blend=_fields(level_db=number, spread=number),
@@ -731,11 +733,18 @@ def _block(spec, count, kept=None, *, names=None, label=None):
 
 def facts(text, instrument, *, chain=None, earlier=None, models=(), irs=None, guitar=None, listening=None,
           eligible=(), engineering=None):
+    from lab.learner.dataset import LAYOUTS, layouts_for
+
     notes = knowledge.guitar_notes(instrument.get("name")) if instrument else None
+    layouts = layouts_for((instrument or {}).get("name", ""))
+    layout = LAYOUTS[layouts[0]] if layouts else None
     recipe = _recipe(text) if chain is None else None
     irs = irs or {}
     return {"request": text,
             "instrument": {key: instrument.get(key) for key in ("name", "kind", "about")} if instrument else None,
+            **({"guitar_controls": {"pickup_positions": dict(enumerate(layout["pickups"], 1)),
+                                    "wiring_options": layout.get("wiring", ()), "knobs": layout["knobs"]}}
+               if layout else {}),
             **({"instrument_notes": notes} if notes else {}),
             **({"guitar_profile": guitar} if guitar else {}),
             **({"player_listening": listening} if listening else {}),
@@ -806,7 +815,25 @@ def _ask_checked(assistant, kind, prompt, schema, check, *, by, web, seconds, ca
     return result
 
 
-def _sound(item, chain, origin):
+def _sound(item, chain, origin, instrument=None):
+    from lab.learner.dataset import configuration, layouts_for
+
+    name = (instrument or {}).get("name", "")
+    layouts = layouts_for(name)
+    setup = item.get("guitar_setup")
+    if layouts and isinstance(setup, dict):
+        layout = layouts[0]
+        knobs = setup.get("knobs")
+        values = {"pickup": setup.get("pickup"), **{knob["name"]: knob.get("value")
+                  for knob in (knobs if isinstance(knobs, list) else ())
+                  if isinstance(knob, dict) and isinstance(knob.get("name"), str)}}
+        if setup.get("wiring"):
+            values["wiring"] = setup["wiring"]
+        try:
+            origin = {**origin, "guitar_setup": {"instrument": name, "layout": layout,
+                                               "values": configuration(layout, values)}}
+        except ValueError:
+            pass
     sources = item.get("sources") if isinstance(item.get("sources"), list) else []
     return Sound(name=str(item.get("name") or "Untitled")[:24], chain=chain, origin=origin,
                  explanation=str(item.get("explanation") or "")[:600],
@@ -840,7 +867,7 @@ def round_of_three(assistant, text, instrument, *, earlier=None, by="player", ca
     irs = design_assets(text, None, assets_known)
     models = _with_irs(inventory(), irs)
     detailed = [*offered(text, kind), *list(irs)[:8]]
-    names = ("task", "chain", craft_for(kind), *(("input",) if guitar else ()), "soundcheck",
+    names = ("task", "chain", craft_for(kind), "guitar_setup", *(("input",) if guitar else ()), "soundcheck",
              *(("listening",) if listening else ()), "scenes", "paths", "budget", "round", "song")
     prompt = sections(*names) + "\n\n" + json.dumps(
         facts(text, instrument, earlier=earlier, models=detailed, eligible=inventory(), irs=irs, guitar=guitar,
@@ -873,7 +900,7 @@ def round_of_three(assistant, text, instrument, *, earlier=None, by="player", ca
                 problems.append(f"Design {number} is the same chain as an earlier one.")
                 continue
             seen.add(chain.digest())
-            designs.append((_sound(item, chain, dict(origin)), str(item.get("differs") or "")[:160]))
+            designs.append((_sound(item, chain, dict(origin), instrument), str(item.get("differs") or "")[:160]))
         if not best or len(designs) > len(best[0][1]):
             best[:] = [(aim, designs)]
         if len(designs) >= 2 or (designs and not problems):
@@ -895,7 +922,7 @@ def revise(assistant, sound, text, instrument, *, by="player", cancel=None, asse
     irs = design_assets(text, sound.chain, assets_known)
     models = _with_irs(inventory(sound.chain), irs, sound.chain)
     detailed = [*offered(text, kind, sound.chain), *list(irs)[:8]]
-    names = ("task", "chain", "revise", craft_for(kind), *(("input",) if guitar else ()), "soundcheck",
+    names = ("task", "chain", "revise", craft_for(kind), "guitar_setup", *(("input",) if guitar else ()), "soundcheck",
              "scenes", "paths", "budget")
     prompt = sections(*names) + "\n\n" + json.dumps(
         facts(text, instrument, chain=sound.chain, models=detailed, eligible=inventory(sound.chain), irs=irs,
@@ -906,11 +933,16 @@ def revise(assistant, sound, text, instrument, *, by="player", cancel=None, asse
         chain, problems = to_chain(reply, offered_ids=set(models), base=sound.chain,
                                    physical_input=(instrument or {}).get("input", 1), irs=irs)
         said = reply if isinstance(reply, dict) else {}
-        return (chain, said.get("explanation"), said.get("sources")), problems
+        return (chain, said), problems
 
-    chain, explanation, sources = _ask_checked(assistant, "revise", prompt, design_schema(), check, by=by,
-                                               web=by == "player", seconds=120, cancel=cancel)
-    revised = _sound({"name": sound.name, "explanation": explanation, "sources": sources}, chain,
-                     {"kind": "revised", "request": text, "from": sound.id, **({"input": source} if source else {})})
+    chain, answer = _ask_checked(assistant, "revise", prompt, design_schema(), check, by=by,
+                                 web=by == "player", seconds=120, cancel=cancel)
+    revised = _sound({**answer, "name": sound.name}, chain,
+                     {"kind": "revised", "request": text, "from": sound.id, **({"input": source} if source else {})},
+                     instrument)
     revised.parent = sound.id
+    previous = sound.origin.get("guitar_setup")
+    if not revised.origin.get("guitar_setup") and isinstance(previous, dict) and source and (
+            previous.get("instrument") == source["instrument"]):
+        revised.origin["guitar_setup"] = previous
     return revised

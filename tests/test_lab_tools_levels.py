@@ -31,7 +31,7 @@ def sine(hz=440, level=.2, seconds=1, phase=0):
 class ListeningLevelTest(unittest.TestCase):
     def test_settings_stay_within_the_floor_and_the_ceiling(self):
         settings = levels.saved_settings({"loudness_db": 40, "master_db": 3})
-        self.assertEqual(settings["loudness_db"], CEILING_DB)
+        self.assertEqual(settings["loudness_db"], levels.MAX_OFFSET_DB)
         self.assertEqual(settings["master_db"], 0)
         self.assertEqual(levels.saved_settings({"loudness_db": float("nan")})["loudness_db"], 0)
         louder = levels.listening_command(levels.saved_settings({}), "louder")

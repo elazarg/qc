@@ -591,9 +591,10 @@ class Studio:
         different brightness better than a plain level does (docs/TONE_RESEARCH.md, 13); by RMS level only when one of
         the two was measured before loudness was recorded. A level the unit already has is not sent again."""
         from lab.qc.engine import PREVIEW_DB
+        from lab.qc.unit import CEILING_DB
 
         sounds = {side: self.sound(side) for side in ("a", "b")}
-        heard = {side: self.ear.evidence(sound) for side, sound in sounds.items() if sound}
+        heard = {side: self.ear.level_evidence(sound) for side, sound in sounds.items() if sound}
         heard = {side: record for side, record in heard.items()
                  if record and record.get("level_db") is not None and record["level_db"] > -90}
         key = "loudness_lufs" if all(record.get("loudness_lufs") is not None for record in heard.values()) \
@@ -601,7 +602,13 @@ class Studio:
         levels = {side: record[key] for side, record in heard.items()}
         limits = {side: -3. - record["true_peak_db"] for side, record in heard.items()
                   if record.get("true_peak_db") is not None}
-        if len(levels) < 2:
+        if self.media_reference is not None:
+            measured = {side: record["loudness_lufs"] for side, record in heard.items()
+                        if record.get("loudness_lufs") is not None and side in limits and not record.get("clipped")}
+            target = self.media_reference["lufs"]
+            wanted = {side: min(target - measured[side], CEILING_DB, limits[side]) if side in measured else PREVIEW_DB
+                      for side, sound in sounds.items() if sound is not None}
+        elif len(levels) < 2:
             # Nothing fair to match by: both play at the preview level, and no earlier trim stays on either.
             wanted = {side: PREVIEW_DB for side, sound in sounds.items() if sound is not None}
         else:
@@ -1045,6 +1052,18 @@ class Studio:
         self.listening = None
         self.later(self.host.call("lab.tools.levels.clear"), lambda levels: None)
         self._set(status="Back at the desk's own level.")
+
+    @property
+    def media_reference(self):
+        from lab.hearing.media import reference
+
+        return reference(self.desk_session.get("media_reference"))
+
+    def set_media_reference(self, value):
+        self.remember(media_reference=value)
+        if self.state.mode:
+            self._match_levels()
+        self._set()
 
     # ---- phrases and the guitar ----
 

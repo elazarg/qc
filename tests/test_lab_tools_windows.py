@@ -70,6 +70,27 @@ class ToolsTest(DeskCase):
         self.assertTrue(all(sound.chain.rows[0].blocks[-1][1].model == catalog.GAIN_BLOCK for sound in leveled))
         self.assertNotIn(quiet.id, {part["sound"] for part in parts})
 
+    def test_music_reference_is_saved_and_fits_a_preset_copy_without_the_preview_cut(self):
+        original = Sound("Quiet lead", chain(gain_db=-9.), {"kind": "preset"})
+        self.put("b", original)
+        tool = self.tool("levels")
+        taken = self.studio.phrase[1]
+        reading = self.studio.host.call("lab.tools.levels.measure_sounds", {"lead": original.chain}, taken).result(20)
+        target = round(reading["lead"]["lufs"] + 4., 1)
+        reference = {"lufs": target, "endpoint": "Quad Cortex on the simulated desk"}
+        with mock.patch("lab.tools.levels.media.capture", return_value=reference):
+            tool.measure_music()
+            self.pump()
+        self.assertEqual(self.studio.media_reference, reference)
+        tool.fit_selected()
+        self.pump()
+        self.assertIn("Verified +4.", tool.status.get())
+        self.assertNotEqual(self.studio.sound("b").id, original.id)
+        self.assertEqual(self.studio.store.sound(original.id).chain, original.chain)
+        self.studio.play("phrase")
+        self.pump()
+        self.assertAlmostEqual(self.look()["levels"]["b"], 0., delta=.25)
+
     def test_a_listening_level_stays_on_when_the_tool_is_left_and_the_desk_offers_the_way_back(self):
         self.put("a", Sound("Quiet", chain(gain_db=-9.), {"kind": "designed"}))
         self.put("b", Sound("Loud", chain(gain_db=0.), {"kind": "designed"}))

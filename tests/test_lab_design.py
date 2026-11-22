@@ -269,6 +269,19 @@ class PlayerIRTest(unittest.TestCase):
         self.assertNotIn(capture.key, script.asked[0][0])
         self.assertTrue(script.asked[0][2])
 
+    def test_the_designer_recommends_the_actual_selected_guitars_controls(self):
+        from lab.learner.dataset import suggested_setup
+
+        guess = {"pickup": 5, "wiring": "Series",
+                 "knobs": [{"name": "volume", "value": 10}, {"name": "tone", "value": 7}]}
+        lead = {**answer("Smooth lead", [block(PLEXI, 0), block(V30, 1)]), "guitar_setup": guess}
+        script = Scripted(reply(lead))
+        _, rounds = design.round_of_three(Assistant(self.folder, run=script), "smooth lead", CHARVEL, assets_known=[])
+        self.assertIn('"5": "Neck"', script.asked[0][0])
+        suggested = rounds[0][0].origin["guitar_setup"]
+        self.assertEqual(suggested_setup(suggested, "Charvel"), "Neck · Series · Vol 10 · Tone 7")
+        self.assertEqual(suggested_setup(suggested, "Les Paul"), "")
+
     def test_the_irs_a_request_names_are_offered_and_no_others(self):
         self.assertEqual(design.player_irs("Plexi crunch through YA MES 212 V30 Mix 04", known=KNOWN),
                          {design.ASSET_IDS: MIX04})

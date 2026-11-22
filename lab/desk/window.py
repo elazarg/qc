@@ -411,7 +411,10 @@ class Desk:
     def caption(self, sound):
         if sound is None:
             return "Ask for a sound, or bring in a preset from Sounds."
-        parts = []
+        from lab.learner.dataset import suggested_setup
+
+        setup = suggested_setup(sound.origin.get("guitar_setup"), self.studio.state.instrument)
+        parts = [setup] if setup else []
         origin = sound.origin.get("kind")
         if origin == "preset":
             parts.append("Saved on the Quad Cortex")

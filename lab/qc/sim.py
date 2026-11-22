@@ -24,7 +24,7 @@ from threading import Lock
 from types import SimpleNamespace
 
 import numpy as np
-from qc_mcp import preset as wire
+from qc_mcp import leveling, preset as wire
 
 from lab.sound import catalog
 from lab.sound.chain import COLUMNS, ROWS, SCENES
@@ -54,7 +54,7 @@ def blank(name=""):
         for index, param in enumerate(catalog.model(catalog.MIXER).params):
             mixer.params.add().param_values.add().float_value = catalog.to_norm(catalog.MIXER, index, param.default or 0)
         control = lane.output_control.add()
-        for value in (.769, .5, 0., 0., 0.):  # volume at 0 dB, pan centred, not muted
+        for value in (leveling.norm_of(0.), .5, 0., 0., 0.):  # volume at 0 dB, pan centred, not muted
             control.params.add().param_values.add().float_value = value
         bypass = grid.bypass.add()
         bypass.row = row
@@ -293,8 +293,8 @@ class SimAudio:
 
     The row whose input is USB and whose output is USB is played. Each amp or
     drive pushes the signal into a soft clipper by its first parameter (its
-    gain); the app's level block applies its trim; a delay or reverb adds a
-    decaying copy; a muted row returns silence. Nothing here sounds like a
+    gain); Gain and the output level apply their trims; a delay or reverb adds
+    a decaying copy; a muted row returns silence. Nothing here sounds like a
     guitar amp. It only moves the measures the app relies on the right way.
     """
 
@@ -336,6 +336,9 @@ class SimAudio:
                     for repeat in range(1, 6):
                         echo[repeat * step:] += sound[:-repeat * step] * (.35 ** repeat)
                     sound = sound + echo
+            if control:
+                volume = control[catalog.LANE_VOLUME].param_values[0].float_value
+                sound *= 10 ** (leveling.db_of(volume) / 20)
             out += sound
         out = np.concatenate([np.zeros(self.LATENCY), out])[:len(signal)]
         return np.stack([out, out], axis=1).astype(np.float32)

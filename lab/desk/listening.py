@@ -104,6 +104,14 @@ class Listening:
         made_on = self.made_on({**heard, **{key: shaped[key] for key in ("phrase", "scene") if key in shaped}})
         return shaped if shaped.get("knobs") == sound.knobs and made_on == self.playing_as(sound) else None
 
+    def level_evidence(self, sound):
+        """A full listen, or the independent peak and loudness measured by Fit selected."""
+        fitted = sound.origin.get("music_fit")
+        if (isinstance(fitted, dict) and fitted.get("knobs") == sound.knobs
+                and self.made_on(fitted) == self.playing_as(sound)):
+            return self.evidence(sound) or fitted
+        return self.evidence(sound)
+
     def unheard(self, sound):
         """Why `sound` could not be listened to as it plays now, or None when it could or has not been tried."""
         heard = self.heard(sound) if sound is not None else None
