@@ -125,8 +125,12 @@ class Requests:
                 if peak > 0:
                     engineering = {"dry_peak_dbfs": round(db(peak), 1), "dry_reached_full_scale": peak >= .999}
             found = studio.guitar.profile(instrument, takes)[0] if takes else None
+            from lab.sound.layers import references
+
+            text = args[1] if function is design.round_of_three else args[2]
+            examples = references(text, studio.store.sounds()) if options.get("by") != "app" else None
             return function(*args, guitar=facts(found, setting) if found else None, setting=setting,
-                            engineering=engineering, **options)
+                            engineering=engineering, references=examples, **options)
 
         return studio.thinking.submit(work)
 

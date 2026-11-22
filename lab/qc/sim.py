@@ -317,31 +317,46 @@ class SimAudio:
             control = lane.output_control[0].params if len(lane.output_control) else []
             if len(control) > catalog.LANE_MUTE and control[catalog.LANE_MUTE].param_values[0].float_value >= .5:
                 continue
-            sound = signal.copy()
-            for column, cell in enumerate(lane.models):
-                found = catalog.model(cell.hash) if cell.hash else None
-                if not found or self.unit.working.bypass[lane.row].colBypass[column].sceneBypass[self.unit.scene].bypass:
-                    continue
-                parameter = cell.params[0]
-                first = parameter.param_values[self.unit.scene if parameter.scene_mode else 0]
-                value = first.float_value if first.WhichOneof("value") == "float_value" else 0.
-                if found.category in ("Guitar Amplifier", "Guitar Overdrive", "Bass Amplifier", "Bass Overdrive"):
-                    push = 10 ** (40 * value / 20)
-                    sound = np.tanh(sound * push) * .3
-                elif cell.hash == catalog.GAIN_BLOCK:
-                    sound = sound * 10 ** (catalog.to_display(cell.hash, 0, value) / 20)
-                elif found.category in ("Delay", "Reverb"):
-                    echo = np.zeros_like(sound)
-                    step = rate // 4
-                    for repeat in range(1, 6):
-                        echo[repeat * step:] += sound[:-repeat * step] * (.35 ** repeat)
-                    sound = sound + echo
+            point = lane.split_control_points[0]
+            if 0 <= point.split < point.mix and lane.row % 2 == 0:
+                source = self.process(lane, signal, range(point.split))
+                main = self.process(lane, source, range(point.split, point.mix))
+                branch = self.unit.working.chains[lane.row + 1]
+                extra = self.process(branch, source, range(point.split, point.mix), parallel=True)
+                mixer = lane.mixer[0].params
+                blend = catalog.to_display(catalog.MIXER, 2, mixer[2].param_values[0].float_value)
+                sound = self.process(lane, main + extra * 10 ** (blend / 20), range(point.mix, COLUMNS))
+            else:
+                sound = self.process(lane, signal, range(COLUMNS))
             if control:
                 volume = control[catalog.LANE_VOLUME].param_values[0].float_value
                 sound *= 10 ** (leveling.db_of(volume) / 20)
             out += sound
         out = np.concatenate([np.zeros(self.LATENCY), out])[:len(signal)]
         return np.stack([out, out], axis=1).astype(np.float32)
+
+    def process(self, lane, source, columns, *, parallel=False):
+        sound = source.copy()
+        for column in columns:
+            cell = lane.models[column]
+            found = catalog.model(cell.hash) if cell.hash else None
+            if not found or self.unit.working.bypass[lane.row].colBypass[column].sceneBypass[self.unit.scene].bypass:
+                continue
+            parameter = cell.params[0]
+            first = parameter.param_values[self.unit.scene if parameter.scene_mode else 0]
+            value = first.float_value if first.WhichOneof("value") == "float_value" else 0.
+            if found.category in ("Guitar Amplifier", "Guitar Overdrive", "Bass Amplifier", "Bass Overdrive"):
+                sound = np.tanh(sound * 10 ** (40 * value / 20)) * .3
+            elif cell.hash == catalog.GAIN_BLOCK:
+                sound *= 10 ** (catalog.to_display(cell.hash, 0, value) / 20)
+            elif found.category in ("Delay", "Reverb"):
+                echo = np.zeros_like(sound)
+                step = 48000 // 4
+                for repeat in range(1, 6):
+                    echo[repeat * step:] += sound[:-repeat * step] * (.35 ** repeat)
+                sound = echo if parallel and found.category == "Delay" and found.params[0].name == "MIX" \
+                    and value >= .999 else sound + echo
+        return sound
 
     def record(self, seconds, channels, *, cancel=None, started=None):
         """A plucked note, as if the player had played one."""

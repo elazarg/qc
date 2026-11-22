@@ -23,6 +23,7 @@ from lab.hearing.audio import write_wave
 from lab.qc import engine as engine_module
 from lab.qc.host import Host
 from lab.qc.unit import Stopped
+from lab.sound import design
 from lab.sound.chain import Block, Chain, Row
 from lab.sound.sounds import Sound
 from support import StudioCase
@@ -108,10 +109,10 @@ class RequestRoutingTest(FlowCase):
         self.studio.ask("Comfortably Numb, the second solo")
         self.settle()
         self.assertNotEqual(self.studio.state.round, first)                 # a round of its own, not a revision
-        self.assertEqual(self.studio.sound("b").name, "Solo one")
+        self.assertEqual(self.studio.sound("b").name, "Solo one Studio")
         self.assertEqual(self.studio.state.song, "Pink Floyd - Comfortably Numb")
         second = self.studio.state.round
-        self.script.answers.append(REVISION)
+        self.script.answers.append({**REVISION, **design.as_form(self.studio.sound("b").chain)})
         self.studio.ask("more sustain from the fuzz, without more mud")
         self.settle()
         revised = self.studio.sound("b")

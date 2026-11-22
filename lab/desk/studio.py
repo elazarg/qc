@@ -872,6 +872,9 @@ class Studio:
             return
         side = self.state.side
         sound = self.sound(side)
+        if sound and text.casefold().rstrip(".! ") in ("add parallel space", "add a stereo layer"):
+            self.add_parallel_space()
+            return
         reading = words.read(text)
         moves = said = None
         base = dict(sound.knobs) if sound else {}
@@ -981,6 +984,24 @@ class Studio:
                      parent=sound.id, explanation=sound.explanation, sources=list(sound.sources), knobs=dict(sound.knobs))
         self.put("b", copy)
         self.say(what + " Undo takes it back.")
+
+    def add_parallel_space(self):
+        from lab.sound.layers import parallel_space
+
+        side = self.state.side
+        sound = self.sound(side)
+        if sound is None:
+            return
+        try:
+            chain = parallel_space(sound.chain)
+        except ValueError as error:
+            self.say(str(error))
+            return
+        copy = Sound(sound.name, chain, {**sound.origin, "kind": "revised", "from": sound.id,
+                                        "request": "Added parallel stereo echoes and plate"}, parent=sound.id,
+                     explanation=sound.explanation, sources=list(sound.sources), knobs=dict(sound.knobs))
+        self.put("b", copy)
+        self.say("Added parallel stereo echoes and plate. Undo takes it back.")
 
     def _instrument(self):
         return self.store.instrument(self.state.instrument)

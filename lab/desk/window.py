@@ -661,6 +661,7 @@ class Desk:
             self.shape_pad(values, [key for key in knob_table.PAD if key in available])
         knobs_view, knob_rows = scrolled(self.tray)
         knobs_view.pack(fill="both", expand=True)
+        button(knob_rows, "Add parallel space", studio.add_parallel_space).pack(anchor="w", pady=(0, 6))
         for key in available:
             if key in knob_table.PAD:
                 continue

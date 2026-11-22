@@ -257,6 +257,7 @@ class PlayerIRTest(unittest.TestCase):
 
     def test_a_new_design_can_use_the_second_processor_pair(self):
         draft = answer("Four-row mix", [block(PLEXI, 0), block(V30, 1)])
+        draft["second_blend"] = {"level_db": -11., "spread": 30}
         draft["rows"].extend([
             {"row": 2, "split_at": 0, "join_at": 3, "blocks": [block(DELAY, 1)]},
             {"row": 3, "split_at": -1, "join_at": -1, "blocks": [block(FUZZ, 1)]},
@@ -266,6 +267,20 @@ class PlayerIRTest(unittest.TestCase):
         self.assertEqual(chain.rows[2].route, (1, 19))
         self.assertEqual(chain.rows[2].split, (0, 3))
         self.assertEqual(chain.block(3, 1).model, FUZZ)
+        self.assertEqual(design.as_form(chain)["second_blend"], draft["second_blend"])
+        revised, problems = design.to_chain(design.as_form(chain), offered_ids={PLEXI, V30, DELAY, FUZZ}, base=chain)
+        self.assertEqual((revised, problems), (chain, []))
+
+    def test_a_wide_request_gets_a_parallel_first_audition_when_the_reply_is_thin(self):
+        script = Scripted(reply(answer("Lead", [block(PLEXI, 0), block(V30, 1)])))
+        _, candidates = design.round_of_three(Assistant(self.folder, run=script), "Andy Timmons wide lead", CHARVEL,
+                                             assets_known=[])
+        studio, original = [sound for sound, _ in candidates]
+        self.assertEqual(studio.chain.rows[0].blocks, original.chain.rows[0].blocks)
+        self.assertEqual(studio.chain.rows[0].split, (2, 7))
+        self.assertEqual(studio.chain.block(1, 2).display(0), 100.)
+        self.assertIn("player_references", script.asked[0][0])
+        self.assertIn("Keeley", script.asked[0][0])
 
     def test_a_new_design_can_use_a_model_outside_the_starting_points_and_a_loaded_capture(self):
         capture = Asset("capture", "f" * 64, "Bench preamp", "user", 2)

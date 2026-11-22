@@ -9630,6 +9630,26 @@
  ],
  "recipes": [
   {
+   "target": "Andy Timmons singing stereo lead",
+   "aliases": ["Timmons lead", "Halo dual echo", "Resolution guitar"],
+   "documented_gear": "Andy Timmons and Keeley describe Halo as a modulated dual echo. A focused lead voice with filtered, lightly modulated repeats on a parallel return is a Quad Cortex interpretation.",
+   "chain": [
+    {"block": "direct lead", "choice": "Touch-sensitive drive, full amp and cab", "why": "Keep a centered attack and enough low mids to support bends."},
+    {"block": "wet return", "choice": "Dual Delay and plate", "settings": "Stagger the tap times, filter the repeats, and blend the return under the lead", "why": "The echoes occupy time and stereo space while the pick stays forward."}
+   ],
+   "verified_sources": [{"title": "Keeley HALO Andy Timmons Dual Echo", "url": "https://robertkeeley.com/product/halo-andy-timmons-dual-echo/"}]
+  },
+  {
+   "target": "Pink Floyd Comfortably Numb",
+   "aliases": ["Comfortably Numb outro", "Comfortably Numb second solo", "Gilmour Comfortably Numb"],
+   "documented_gear": "Producer Bob Ezrin recalls Hiwatt amplifiers and Yamaha rotary speaker cabinets. Guitar tech Phil Taylor describes Big Muff and delay as ingredients in the characteristic solo voice. The specific blocks and controls below are a Quad Cortex interpretation.",
+   "chain": [
+    {"block": "direct lead", "choice": "Muff-style sustain into a British high-headroom amp and cab", "why": "A firm midrange and audible attack prevent the long notes from disappearing into the backing."},
+    {"block": "motion and space", "choice": "Subtle slow rotary or modulation, filtered echo and a room or plate return", "why": "Keep a stable direct voice beside the movement. Use less sustain and a clearer attack for the first solo."}
+   ],
+   "verified_sources": [{"title": "Bob Ezrin on the recording of The Wall", "url": "https://www.guitarworld.com/features/pink-floyd-wall-sound"}, {"title": "Phil Taylor on David Gilmour's rigs", "url": "https://pfco.neptunepinkfloyd.co.uk/band/interviews/other/othertaylor.html"}]
+  },
+  {
    "target": "Eagles Hotel California",
    "aliases": ["Hotel California solo", "Hotel California 12-string intro", "Don Felder and Joe Walsh"],
    "documented_gear": "Don Felder described a 1959 Les Paul into a cranked narrow-panel Fender Tweed Deluxe for his electric part. Joe Walsh recalled using a Telecaster. Felder's separately recorded 12-string introduces the song. The outro alternates two players, then has both playing harmonies.",

@@ -44,7 +44,8 @@ class PadPanelTest(unittest.TestCase):
         sound = SimpleNamespace(knobs=knobs)
         studio = SimpleNamespace(state=SimpleNamespace(side="b"), sound=lambda side: sound,
                                  available=lambda: available, turn=turned.append,
-                                 undo=lambda: None, base=lambda: None, hearing_base=set())
+                                 undo=lambda: None, base=lambda: None, add_parallel_space=lambda: None,
+                                 hearing_base=set())
         desk = Desk.__new__(Desk)
         desk.studio, desk.tray = studio, tk.Frame(self.root, bg=DARK)
         desk.panel_shape()

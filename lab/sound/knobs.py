@@ -123,6 +123,7 @@ KNOBS = {
     "brightness": ("Brightness", -1, [*BRIGHTER, *scaled(MIC_TO_EDGE, -2.5), *scaled(HIGH_CUT, -.8)]),
     "texture": ("Texture", -1, [*ROUGHER, *scaled(HIGH_CUT, -1.), *scaled(MIC_TO_EDGE, -1.5)]),
     "space": ("Space", -1, [("Delay", "MIX", 18.0), ("Delay", "FEEDBACK", 12.0),
+                            ("Delay", "FEEDBACK L", 10.0), ("Delay", "FEEDBACK R", 10.0),
                             ("Reverb", "MIX", 12.0), ("IRLoaders", "ROOM MIX", 10.0)]),
     "tightness": ("Tightness", -1, [*role(AMP, "bass", -2.0), *role(AMP, "thump", -2.5),
                                       (CAPTURE, "BASS", -3.0), *role(PEDAL, "bass", -1.8), *scaled(LOW_CUT, .65)]),
@@ -136,7 +137,8 @@ KNOBS = {
     "presence": ("Presence", -1, [*role(AMP, "presence", 2.5), (CAPTURE, "TREBLE", 2.0),
                                     *role(PEDAL, "treble", 1.7)]),
     "delay": ("Echoes", -1, [("Delay", "MIX", 30.0)]),
-    "delay_time": ("Echo timing", -1, [("Delay", "DELAY TIME", 150.0)]),
+    "delay_time": ("Echo timing", -1, [("Delay", "DELAY TIME", 150.0), ("Delay", "DELAY TIME L", 105.0),
+                                       ("Delay", "DELAY TIME R", 145.0)]),
     "reverb": ("Room", -1, [("Reverb", "MIX", 25.0), ("IRLoaders", "ROOM MIX", 10.0)]),
     "modulation": ("Movement", -1, [("Modulation", "MIX", 25.0), ("Modulation", "DEPTH", 20.0)]),
     "width": ("Width", -1, [("Modulation", "WIDTH", 30.0), ("Delay", "WIDTH", 25.0),
@@ -145,7 +147,8 @@ KNOBS = {
                                       ("Compressor", "RATIO", 1.4)]),
     "punch": ("Pick bite", -1, [*role(AMP, "presence", 1.8), *role(AMP, "treble", .9), (CAPTURE, "MID", .8),
                                  (CAPTURE, "TREBLE", 1.3), ("Equalizer", "2kHz", 1.8)]),
-    "tail": ("Tail length", -1, [("Reverb", "DECAY", .75), ("Delay", "FEEDBACK", 25.0)]),
+    "tail": ("Tail length", -1, [("Reverb", "DECAY", .75), ("Delay", "FEEDBACK", 25.0),
+                                 ("Delay", "FEEDBACK L", 20.0), ("Delay", "FEEDBACK R", 20.0)]),
     "motion": ("Movement speed", -1, [("Modulation", "RATE", 1.2), ("Modulation", "CHR RATE", .6),
                                     ("Modulation", "VIB RATE", 1.7)]),
     "bloom": ("Bloom", 0, [("Compressor", "THRESHOLD", -5.0), ("Compressor", "MIX", 12.0),
@@ -306,9 +309,9 @@ def _heard_in(block, scene):
     return None if block.bypass else 0
 
 
-def _sync_enabled(block, info, at):
+def _sync_enabled(block, info, at, name="SYNC"):
     for param in info.params:
-        if param.name == "SYNC":
+        if param.name == name:
             stored = block.values.get(param.index)
             value = None if stored is None else in_scene(stored, at)
             return isinstance(value, float) and value >= .5
@@ -396,7 +399,7 @@ def _move(block, info, param, current, rules, drive, *, auditioned, synced, owns
         return None
     if not delta and not (drive and category in DRIVE_CATEGORIES) and not (name == "MIX" and auditioned):
         return None
-    if category == "Delay" and name == "DELAY TIME" and synced:
+    if category == "Delay" and name.startswith("DELAY TIME") and synced:
         return None
     low, high = param.low, param.high
     if category in SCALED_CATEGORIES:
@@ -449,7 +452,10 @@ def _block_edits(row, column, block, rules, previews, drive, owners, scene):
         current = _number(block, param.index, scene)
         if current is None:
             continue
-        moved = _move(block, info, param, current, rules, drive, auditioned=auditioned, synced=synced,
+        tap_synced = synced
+        if param.name in ("DELAY TIME L", "DELAY TIME R"):
+            tap_synced = _sync_enabled(block, info, at, "SYNC " + param.name[-1])
+        moved = _move(block, info, param, current, rules, drive, auditioned=auditioned, synced=tap_synced,
                       owns=lambda stage: owners.get((row, stage)) == column)
         if moved is None:
             continue

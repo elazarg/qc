@@ -150,6 +150,23 @@ class ToolsTest(DeskCase):
             self.assertIn("With silent input", tool.idle_text.cget("text"))
         self.assertEqual(len(list((self.home / "learner" / "idle").rglob("*.wav"))), 1)
 
+    def test_parallel_space_adds_an_audible_tail_to_a_copy_and_can_be_undone(self):
+        from lab.sound.chain import Row
+
+        original = Sound("Focused lead", chain(PLEXI, V30).with_row(1, Row(output=((0, .769),))), {"kind": "preset"})
+        self.put("b", original)
+        self.studio.add_parallel_space()
+        self.pump()
+        layered = self.studio.sound("b")
+        self.assertNotEqual(layered.id, original.id)
+        self.assertIn("delay_time", self.studio.available())
+        returns = self.studio.host.call("lab.tools.levels.measure_sounds", {"dry": original.chain, "layer": layered.chain},
+                                        self.studio.phrase[1]).result(15)
+        self.assertNotEqual(returns["dry"]["lufs"], returns["layer"]["lufs"])
+        self.studio.undo()
+        self.pump()
+        self.assertEqual(self.studio.sound("b").id, original.id)
+
     def test_a_listening_level_stays_on_when_the_tool_is_left_and_the_desk_offers_the_way_back(self):
         self.put("a", Sound("Quiet", chain(gain_db=-9.), {"kind": "designed"}))
         self.put("b", Sound("Loud", chain(gain_db=0.), {"kind": "designed"}))

@@ -37,6 +37,8 @@ Panels open beside the tiles:
 
 New tone requests have access to a compact catalog of eligible Quad Cortex blocks, local IRs and captures with known versions. The designer gets detailed starting points for familiar gear and can choose other entries or use rows 2 and 3. It can look up gear for requests where a source could change the sound, such as a specific song. You can ask it to research further in the same request box.
 
+Rounds can compare a focused chain with a studio version that uses a second voice or parallel effects. Requests for width and depth get a layered starting point when the grid has room. **Shape → Add parallel space** adds filtered stereo echoes and plate behind the selected sound. Shape can then move both echo times and feedback amounts. Requesting a saved preset by name in a new design can share its grid structure, model names and scene bypass states with the designer.
+
 **Levels → Match a song’s parts** measures the chosen scenes of the song's parts and verifies the proposed trims with the same phrase before keeping matched copies. Add a target offset to a part name, such as `Solo +2 dB`, to keep an intentional level difference. **Setup and sound check** reports input headroom, a suggested input-gain cut if needed, USB output peaks and mono compatibility. The guitar and phrase audition controls still work before measurements are ready.
 
 New designs show suggested pickup, wiring and knob positions for the selected Charvel or Les Paul. When installed, the ML Sound Lab IR is the default for new electric sounds that need a cab. A recording still uses the settings it was played on.

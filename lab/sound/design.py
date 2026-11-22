@@ -25,7 +25,8 @@ from lab.sound import catalog
 from lab import knowledge
 from lab.sound.assistant import Cancelled
 from lab.sound.chain import Block, COLUMNS, Chain, MULTI_OUT, Row, SCENES, TOLERANCE, in_scene
-from lab.sound.sounds import Sound
+from lab.sound.sounds import Sound, new_id
+from lab.sound import layers
 
 INSTRUCTIONS = Path(__file__).with_name("designer.md")
 EVERYDAY = (16003, 5005, 1, 4, 5, 10, 11, 15, 18, 22, 25, 29, 1011, 1018, 1045, 1079, 1081, 1084, 1093, 1095, 1100,
@@ -328,6 +329,7 @@ def design_schema():
                    scenes={"type": "array", "items": text},
                    rows={"type": "array", "items": row},
                    blend=_fields(level_db=number, spread=number),
+                   second_blend=_fields(level_db=number, spread=number),
                    sources={"type": "array", "items": _fields(title=text, url=text)})
 
 
@@ -399,7 +401,9 @@ def as_form(chain, irs=None):
             rows.append({"row": r, "split_at": row.split[0] if row.split else -1,
                          "join_at": row.split[1] if row.split else -1, "blocks": blocks})
     blend = _blend(chain.rows[0])
-    return {"rows": rows, "scenes": _scene_names(chain), **({"blend": blend} if blend else {})}
+    second_blend = _blend(chain.rows[2])
+    return {"rows": rows, "scenes": _scene_names(chain), **({"blend": blend} if blend else {}),
+            **({"second_blend": second_blend} if second_blend else {})}
 
 
 def _whole(value):
@@ -567,7 +571,7 @@ def to_chain(design, *, offered_ids, base=None, physical_input=1, irs=None):
     rows[0] = _joined(rows, design, base, problems)
     if any(r in given for r in (2, 3)):
         later = Chain(tuple(base.rows[2:])) if base else None
-        rows[2] = _joined(rows[2:], {}, later, problems)
+        rows[2] = _joined(rows[2:], {"blend": design.get("second_blend")}, later, problems, first_row=2)
         if rows[2].blocks or rows[2].split:
             if base is None or not (base.rows[2].blocks or base.rows[2].split):
                 rows[2] = replace(rows[2], inlet=physical_input, outlet=MULTI_OUT)
@@ -587,32 +591,38 @@ def to_chain(design, *, offered_ids, base=None, physical_input=1, irs=None):
     return chain, problems
 
 
-def _joined(rows, design, base, problems):
+def _joined(rows, design, base, problems, *, first_row=0):
     """Row 0 with the mixer that joins its two paths, and the layout rules of a split said as problems.
 
     The rules and the polarity of the join are worked out for a new design, and for a revision whenever its
     split or the amps and cabs on either path differ from the sound it revises; a layout a revision leaves as
     it was is kept, whatever the rules. The blend is written when the layout is new or the answer changes it."""
     first = rows[0]
+    second_row = first_row + 1
     if not first.split:
         if rows[1].blocks and (base is None or base.rows[0].split):
-            problems.append("Row 1 is used only as the second path of a split on row 0." if base is None else
-                            "Row 1 still holds blocks, and without a split on row 0 nothing reaches them.")
+            problems.append(f"Row {second_row} is used only as the second path of a split on row {first_row}."
+                            if base is None else f"Row {second_row} still holds blocks, and without a split on "
+                            f"row {first_row} nothing reaches them.")
         return first
     low, high = first.split
-    new = base is None or first.split != base.rows[0].split or _paths(rows) != _paths(base.rows)
-    if new:
+    layout_changed = (base is None or first.split != base.rows[0].split or
+                      [column for column, _ in rows[1].blocks] != [column for column, _ in base.rows[1].blocks])
+    new = layout_changed or _paths(rows) != _paths(base.rows)
+    if layout_changed:
         stray = [column for column, _ in rows[1].blocks if not low <= column < high]
         if stray:
-            problems.append(f"Row 1 blocks must sit between the split and the join (columns {low} to {high - 1}).")
+            problems.append(f"Row {second_row} blocks must sit between the split and the join "
+                            f"(columns {low} to {high - 1}).")
         if not rows[1].blocks:
-            problems.append("A split needs at least one block on the second path (row 1): an empty path is the "
+            problems.append(f"A split needs at least one block on the second path (row {second_row}): an empty path is the "
                             "bare guitar mixed in. For one path, leave split_at and join_at at -1.")
+    if new:
         second = [block for _, block in rows[1].blocks]
         shared_cab = any(assets.is_cab(block) for column, block in first.blocks if column >= high)
         if any(assets.is_amp(block) for block in second) and not any(assets.is_cab(block) for block in second) \
                 and not shared_cab:
-            problems.append("The amp on the second path needs its own cab, or a cab on row 0 after the join.")
+            problems.append(f"The amp on the second path needs its own cab, or a cab on row {first_row} after the join.")
     mixer = dict(first.mixer) if base is not None else {}
     blend = design.get("blend")
     asked = None
@@ -734,7 +744,7 @@ def _block(spec, count, kept=None, *, names=None, label=None):
 # ---- Asking ----
 
 def facts(text, instrument, *, chain=None, earlier=None, models=(), irs=None, guitar=None, listening=None,
-          eligible=(), engineering=None):
+          eligible=(), engineering=None, references=None):
     from lab.learner.dataset import LAYOUTS, layouts_for
 
     notes = knowledge.guitar_notes(instrument.get("name")) if instrument else None
@@ -756,6 +766,7 @@ def facts(text, instrument, *, chain=None, earlier=None, models=(), irs=None, gu
                if preferred and chain is None and (instrument or {}).get("kind", "electric") == "electric" else {}),
             **({"current_chain": as_form(chain, irs)} if chain is not None else {}),
             **({"earlier": earlier} if earlier else {}),
+            **({"player_references": references} if references else {}),
             **({"soundcheck": engineering} if engineering else {}),
             "available_models": [asset_card(model_id, irs[model_id]) if model_id in irs else card(model_id)
                                  for model_id in models if model_id in irs or catalog.model(model_id)],
@@ -855,7 +866,7 @@ def played_on(instrument, setting=None, guitar=None):
 
 
 def round_of_three(assistant, text, instrument, *, earlier=None, by="player", cancel=None, assets_known=None,
-                   guitar=None, setting=None, listening=None, engineering=None):
+                   guitar=None, setting=None, listening=None, engineering=None, references=None):
     """An aim and up to three sounds that reach it by different routes.
 
     `listening` (`lab.player.listening.prior`) says what guitar music the player listens to most; the assistant uses
@@ -871,12 +882,13 @@ def round_of_three(assistant, text, instrument, *, earlier=None, by="player", ca
     kind = (instrument or {}).get("kind", "electric")
     irs = design_assets(text, None, assets_known)
     models = _with_irs(inventory(), irs)
-    detailed = [*offered(text, kind), *list(irs)[:8]]
+    detailed = list(dict.fromkeys([*offered(text, kind), *(model for model in layers.MODELS if model in models),
+                                  *list(irs)[:8]]))
     names = ("task", "chain", craft_for(kind), "guitar_setup", *(("input",) if guitar else ()), "soundcheck",
              *(("listening",) if listening else ()), "scenes", "paths", "budget", "round", "song")
     prompt = sections(*names) + "\n\n" + json.dumps(
         facts(text, instrument, earlier=earlier, models=detailed, eligible=inventory(), irs=irs, guitar=guitar,
-              listening=listening, engineering=engineering),
+              listening=listening, engineering=engineering, references=references),
         ensure_ascii=False)
     source = played_on(instrument, setting, guitar)
     origin = {"kind": "designed", "request": text, **({"input": source} if source else {})}
@@ -919,24 +931,37 @@ def round_of_three(assistant, text, instrument, *, earlier=None, by="player", ca
             return best[0], []
         return (aim, designs), problems or ["The answer holds no designs."]
 
-    return _ask_checked(assistant, "round", prompt, round_schema(), check, by=by, web=by == "player", seconds=180,
-                        cancel=cancel)
+    aim, designs = _ask_checked(assistant, "round", prompt, round_schema(), check, by=by, web=by == "player",
+                                seconds=180, cancel=cancel)
+    if kind != "electric" or not layers.wants_layers(text) or any(layers.has_layers(sound.chain) for sound, _ in designs):
+        return aim, designs
+    for first, _ in designs:
+        try:
+            fuller = layers.parallel_space(first.chain)
+        except ValueError:
+            continue
+        detail = "Parallel stereo echoes into a filtered plate under the direct tone."
+        layered = replace(first, id=new_id(), name=f"{first.name[:17]} Studio", chain=fuller,
+                          explanation=f"{first.explanation} {detail}".strip())
+        return aim, [(layered, detail), *designs[:DESIGNS - 1]]
+    return aim, designs
 
 
 def revise(assistant, sound, text, instrument, *, by="player", cancel=None, assets_known=None, guitar=None,
-           setting=None, engineering=None):
+           setting=None, engineering=None, references=None):
     """A new sound: `sound` changed as the request asks, everything else kept, with the assistant's account of
     what it changed as its explanation. The player's IRs the sound holds or the request names are offered as
     models (`assets_known`, `guitar` and `setting` as for `round_of_three`)."""
     kind = (instrument or {}).get("kind", "electric")
     irs = design_assets(text, sound.chain, assets_known)
     models = _with_irs(inventory(sound.chain), irs, sound.chain)
-    detailed = [*offered(text, kind, sound.chain), *list(irs)[:8]]
+    detailed = list(dict.fromkeys([*offered(text, kind, sound.chain), *(model for model in layers.MODELS if model in models),
+                                  *list(irs)[:8]]))
     names = ("task", "chain", "revise", craft_for(kind), "guitar_setup", *(("input",) if guitar else ()), "soundcheck",
              "scenes", "paths", "budget")
     prompt = sections(*names) + "\n\n" + json.dumps(
         facts(text, instrument, chain=sound.chain, models=detailed, eligible=inventory(sound.chain), irs=irs,
-              guitar=guitar, engineering=engineering), ensure_ascii=False)
+              guitar=guitar, engineering=engineering, references=references), ensure_ascii=False)
     source = played_on(instrument, setting, guitar)
 
     def check(reply, final=False):
