@@ -90,4 +90,4 @@ recordings, sounds, listening history, the unit's inventory, analyses of his dat
   without it.
 - Docstrings and comments say what the code does and why, not how it came to be.
 - Text the player reads is plain and says what happened and what to do next.
-- Commit finished work and push it; the working branch is `rewrite` until it is merged.
+- Commit finished work and push it, on `main`.
