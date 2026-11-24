@@ -179,7 +179,7 @@ class ToolsTest(DeskCase):
         self.pump()
         self.assertEqual(self.look()["levels"], {"a": -40., "b": -40.})     # still on, and the desk says so
         self.assertEqual(self.desk.level_row.winfo_manager(), "pack")
-        self.assertEqual(self.desk.level_note["text"], "Listening level: Muted")
+        self.assertEqual(self.desk.level_note["text"], "Volume: Muted")
         self.desk.clear_listening()                                         # the desk's own way back
         self.pump()
         found = self.look()

@@ -60,5 +60,22 @@ class NextRemedyTest(DeskCase):
         self.assertEqual(self.desk.next_link.winfo_manager(), "")
 
 
+class UsageTest(DeskCase):
+    def test_what_is_used_on_the_desk_is_noted_in_the_usage_log(self):
+        import json
+
+        self.put("b", Sound("Rhythm", chain(PLEXI, GREENBACK), {"kind": "designed"}))
+        self.desk.toggle("Shape")
+        self.studio.ask("muddy")
+        self.studio.play("guitar")
+        self.studio.undo()
+        self.desk.toggle("Chain")
+        rows = [json.loads(line) for line in (self.home / "ui-usage.jsonl").read_text(encoding="utf-8").splitlines()]
+        self.assertEqual([(row["event"], row["view"]) for row in rows],
+                         [("open", "Shape"), ("ask", "remark"), ("play", "guitar"), ("undo", "Tightness on B"),
+                          ("close", "Shape"), ("open", "Chain")])
+        self.assertEqual(rows[2]["side"], "b")
+
+
 if __name__ == "__main__":
     unittest.main()

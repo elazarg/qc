@@ -10,3 +10,6 @@ my_spotify_data*.zip
 *Streaming_History*
 *StreamingHistory*
 personal/
+
+# Pictures of every screen (tests/gallery.py): made again whenever they are wanted.
+/gallery/

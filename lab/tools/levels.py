@@ -3,7 +3,7 @@
 Carried over from the old Levels card (`volume_ui`) and its offline trim planner (`level_plan`), onto the new
 core:
 
-- **Listening level.** One offset for both sides, from −40 dB up to the app's ceiling (`unit.CEILING_DB`),
+- **Volume.** One offset for both sides, from −40 dB up to the app's ceiling (`unit.CEILING_DB`),
   with Quieter, Louder, Reset and Mute. "Matched" keeps the desk's own A/B matching and moves both together;
   "manual" sets the level outright. The engine plays each side at a level of its own (`Engine.level`); the
   tool's offset is added to whatever the desk asks for there, and never takes a row past the ceiling. While
@@ -349,7 +349,7 @@ class LevelsTool(Tool):
         verify = disclosure(backing, "Verify a preset level", note="Reamp and verify the saved level if you want an "
                             "independent check before saving.")
         button(verify, "Verify and prepare copy", self.fit_selected, quiet=True).pack(anchor="w")
-        listen = section(self.body, "Listening level",
+        listen = section(self.body, "Volume",
                          f"Both sides together, from {FLOOR_DB:+.0f} dB up to {CEILING_DB:+.0f} dB, the app's ceiling. "
                          "Matched keeps A and B equally loud, as the desk matches them, and moves both; Manual sets "
                          "the level outright. While an offset or a mute is on, the desk says so and offers the way "

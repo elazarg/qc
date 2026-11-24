@@ -1,7 +1,8 @@
 """Usage and feedback: which tools are opened, what the assistant cost each day, and the player's notes.
 
-- **Usage** is a local log of tool windows opened and closed (`ui-usage.jsonl` in the data folder), as the
-  old desk kept for its panels.
+- **Usage** is a local log of what is used on the desk (`ui-usage.jsonl` in the data folder): the side tools
+  and the desk's panels opened and closed, how each request was read (a remark, a revision, a new round, a
+  preset's name), what was played, and what Undo took back.
 - **The assistant's ledger** (`ledger.jsonl`, written by `lab.sound.assistant`) is read back day by day: how many
   calls, whose (the player's or the app's own), of which kind, how long they took, how much was sent, how
   they ended, against the daily allowance. A day is the player's own day (`assistant.local_day`), as the

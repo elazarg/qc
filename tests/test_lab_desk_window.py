@@ -534,10 +534,10 @@ class ListeningLevelTest(DeskCase):
         self.studio.listening = dict(self.SETTINGS)       # as the Levels tool leaves it while an offset is on
         self.studio.say("Louder.")
         self.assertEqual(self.desk.level_row.winfo_manager(), "pack")
-        self.assertEqual(self.desk.level_note["text"], "Listening level: +3 dB from matched")
+        self.assertEqual(self.desk.level_note["text"], "Volume: +3 dB from matched")
         self.studio.listening = {**self.SETTINGS, "muted": True}
         self.studio.say("Muted.")
-        self.assertEqual(self.desk.level_note["text"], "Listening level: Muted")
+        self.assertEqual(self.desk.level_note["text"], "Volume: Muted")
         self.desk.clear_listening()
         self.assertIsNone(self.studio.listening)
         self.assertEqual(self.desk.level_row.winfo_manager(), "")

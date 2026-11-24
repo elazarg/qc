@@ -111,7 +111,7 @@ class RemedyOrderTest(unittest.TestCase):
         self.assertEqual(words.usable(words.read("tighter"), {"reverb"}), ())
 
     def test_a_tip_comes_with_a_complaint_but_not_with_a_wish(self):
-        self.assertIn("listening level", words.read("thin").tip)
+        self.assertIn("volume", words.read("thin").tip)
         self.assertEqual(words.read("make it thin").tip, "")
         self.assertIn("Headphones", words.read("more sustain").tip)
 

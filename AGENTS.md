@@ -48,7 +48,9 @@ fed with files that hold the player's presets (keep them in the data folder or `
   call in a test passes `--simulated`.
 - **Never put a window on the screen from a test.** A test that creates Tk imports `hidden_tk` first. To look
   at what you built, take a picture of the hidden window: `tests/picture.py` (`picture.save(root, path)`)
-  writes a PNG without showing anything. Look at every screen you change, at 1100x680 and at 980x620.
+  writes a PNG without showing anything. Look at every screen you change, at 1100x680 and at 980x620:
+  `.\.venv\Scripts\python.exe tests\gallery.py` pictures every screen at both sizes into `gallery/` (git
+  ignores it). Run it before and after a change to the desk and compare the two.
 - **Never read or write the player's data from a test.** Everything goes in a temporary folder; `TONE_LAB_HOME`
   points the app's data folder at it.
 - **Do not drive the real unit from an agent session unless the player asked for it in that session.** A job
@@ -63,6 +65,22 @@ fed with files that hold the player's presets (keep them in the data folder or `
 - **Few words on the screen.** A sentence that explains how something works, and does not change with what
   is happening, is left out when the control's name says it, and otherwise goes behind a `hint`
   (`lab/desk/hints.py`). Names, values, results and the status line stay in the open.
+- **A word only for what only a word can say:** a name, an abstract quality (a Shape knob), a rare action with
+  consequences (Save to QC), a fault and what to do about it. Otherwise prefer a state shown on the thing
+  itself, a symbol everybody reads (`theme.GLYPH`, with its name on hover through `hints.named`), a mark on a
+  scale, a default that makes the control unneeded, or dropping onto a tile. A control that cannot act now is
+  dimmed and says why on hover; the status line does not repeat what the screen already shows.
+- **Where a new control goes.** Name what the player is doing when they need it, and find the control that
+  already serves that: extend it, or replace something there. A new panel, a new entry in More, or a second
+  way to do something that exists needs a sentence in the commit saying why the existing place could not
+  hold it. The usage log (`ui-usage.jsonl`, `lab/tools/usage.py`) says what is used together; it is a reason
+  to move a thing nearer or further, never to drop it.
+- **One word, one meaning.** The app's nouns: *sound* (a chain on A or B, or kept in History); *preset* (one
+  saved on the unit); *round* (an aim and three designs); *design* (one of a round's three); *phrase* (the
+  stretch of dry guitar that plays through A and B); *take* (one recording of the guitar, which a phrase is
+  cut from); *setting* (a position of the guitar's pickup selector, and nothing else: a model's settings are
+  *named settings*); *listen* (the app measuring a sound silently, and nothing else: how loud the player hears
+  it is the *volume*); *reference* (a preset kept for Tone search). Check new text against this list.
 - **The instrument is global.** It is chosen in the top row and everything follows it at once; nothing keeps
   an instrument of its own.
 - **Name what is measured.** A measurement is named for the quantity it measures. A conclusion drawn from it

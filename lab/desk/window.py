@@ -464,7 +464,7 @@ class Desk:
         if studio.listening is not None:
             from lab.tools.levels import reading
 
-            self.level_note.configure(text=f"Listening level: {reading(studio.listening)}")
+            self.level_note.configure(text=f"Volume: {reading(studio.listening)}")
             if not self.level_row.winfo_manager():
                 self.level_row.pack(fill="x", pady=(6, 0), before=self.scene_row)
         elif self.level_row.winfo_manager():
@@ -872,13 +872,20 @@ class Desk:
             self.back()
             if self.panel == name:      # the panel the hosted thing was opened from: it is on show again
                 return
+        from lab.tools import usage
+
         if self.panel == name:
             self.panel = None
             self.studio.remember(panel=None)
             self.tray.grid_remove()
+            usage.record(self.studio.folder, "close", name)
             return
+        if self.panel is not None:
+            usage.record(self.studio.folder, "close", self.panel)
         self.panel = name
         self.studio.remember(panel=name)
+        usage.record(self.studio.folder, "open", name, side=self.studio.state.side,
+                     playing=self.studio.state.mode or "")
         self.tray.grid(row=0, column=1, sticky="ns", padx=(14, 0))
         self.fill_panel()
 

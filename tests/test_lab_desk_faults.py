@@ -140,6 +140,29 @@ class PanelsThatOverflowTest(DeskCase):
             holder = holder.master
         return inside(found[0], self.desk.tray)
 
+    def test_every_panel_shows_all_of_itself_or_scrolls_to_it_at_either_size(self):
+        from lab.desk.window import PANELS
+
+        for panel in PANELS:
+            if self.desk.panel != panel:
+                self.desk.toggle(panel)
+            self.pump()
+            for size in (DEFAULT_SIZE, SMALLEST_SIZE):
+                self.resize(size)
+                out = []
+                for widget in every(self.desk.tray):
+                    if widget.winfo_class() not in ("Button", "Label", "Listbox", "Entry", "Scale", "Canvas"):
+                        continue
+                    if hasattr(widget, "inner") or not widget.winfo_manager():
+                        continue
+                    holder = widget.master
+                    while holder is not self.desk.tray and not hasattr(holder, "inner"):
+                        holder = holder.master
+                    if holder is self.desk.tray and not (widget.winfo_ismapped() and inside(widget, self.desk.tray)):
+                        out.append((widget.winfo_class(), str(widget.cget("text"))[:30]
+                                    if widget.winfo_class() in ("Button", "Label") else ""))
+                self.assertEqual(out, [], (panel, size))
+
     def test_the_chain_panel_scrolls_to_its_last_part(self):
         self.desk.toggle("Chain")
         for size in (DEFAULT_SIZE, SMALLEST_SIZE):

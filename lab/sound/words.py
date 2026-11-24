@@ -63,7 +63,7 @@ LEXICON = {
         when={"leads": (r("more midrange, which is what makes a single note sound big", mids=.3),
                         r("more sustain under the note", sustain=.3))},
         tips={"leads": "On the guitar, the neck pickup or series wiring thickens single notes at the source.",
-              "": "Check the listening level first: quiet monitoring makes any tone sound thin."}),
+              "": "Check the volume first: quiet monitoring makes any tone sound thin."}),
     "fat": Word(toward=(
         r("more bass and low-end weight in the amp", body=.3),
         r("more midrange", mids=.2),
@@ -116,7 +116,7 @@ LEXICON = {
         r("less presence", presence=-.3)),
         away=(r("a brighter tone across the amp, drive and cab microphones", brightness=.3),
               r("more presence", presence=.3)),
-        tips={"": "Check the listening level first: quiet monitoring makes any tone sound dull."}),
+        tips={"": "Check the volume first: quiet monitoring makes any tone sound dull."}),
     # Warm is round against rough, not dark against bright (docs/TONE_RESEARCH.md, finding 1).
     "warm": Word(toward=(
         r("a rounder top: fewer high harmonics, less presence, the cab's low-pass lower", texture=-.3),

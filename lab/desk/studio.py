@@ -371,6 +371,7 @@ class Studio:
             self.say("Nothing to undo.")
             return
         before, knob_values = self.history.pop()
+        self._used("undo", self.undo_names[-1] if self.undo_names else "")
         if self.undo_names:
             self.undo_names.pop()
         self.remark = None
@@ -468,6 +469,14 @@ class Studio:
             self._set(mode=None, shown=None, status="Another preset was chosen on the Quad Cortex, so Tone Lab "
                                                     "stopped sending sound and leaves it alone. Press Guitar or "
                                                     "Phrase to come back.")
+
+    def _used(self, event, what):
+        """Note in the usage log what the player did on the desk (`lab.tools.usage`): which panels are opened,
+        how requests are read, what is played and what is taken back. Kept on this computer; it tells what to
+        move nearer or further, never what to drop."""
+        from lab.tools import usage
+
+        usage.record(self.folder, event, what, side=self.state.side, playing=self.state.mode or "")
 
     def log_error(self, error, trace):
         try:
@@ -597,6 +606,8 @@ class Studio:
             self.say("Nothing is on A or B yet.")
             return
         self.ear.came_back()
+        if mode != self.state.mode:
+            self._used("play", mode)
         # A silent listen has the unit: the player comes first, and it is listened to again later.
         interrupted = self.ear.hearing is not None
         if interrupted:
@@ -951,10 +962,12 @@ class Studio:
             sound.notes.append({"at": now(), "text": text})
             self.store.save(sound)
             self.remark = {**remark, "after": dict(sound.knobs)} if remark else None
+            self._used("ask", "remark" if remark else "direction")
             self.say(said)
             return
         named = self._preset_named(text)
         if named is not None:
+            self._used("ask", "preset name")
             slot, name = named
             self.work_on(slot, name, note=f"That is your preset's name. For a new design in its spirit, "
                                           f"ask \"make {name}\".")
@@ -963,8 +976,10 @@ class Studio:
         # was asked, until the answer comes.
         self._set(status="")
         if sound is not None and reads_as_change(text):
+            self._used("ask", "revision")
             self.asking.revise(sound, text, side)
         else:
+            self._used("ask", "new round")
             self.asking.new_round(text)
 
     def next_remedy(self):
