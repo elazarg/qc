@@ -585,9 +585,7 @@ class Tool:
         self.folder = Path(self.studio.folder)
         self.pending = 0
         self.frame = desk.host_frame()
-        self.status = tk.StringVar(master=self.frame)
-        label(self.frame, variable=self.status, size=9, color=SOFT, wrap=WIDTH).pack(side="bottom", fill="x",
-                                                                                      pady=(4, 0))
+        self.status = tk.StringVar(master=self.frame)       # what the tool said last; shown on the desk's line
         self.scroller, self.body = scrolled(self.frame)
         self.scroller.pack(side="left", fill="both", expand=True)
         try:
@@ -628,8 +626,17 @@ class Tool:
             self.desk.back()
 
     def say(self, text):
+        """Say something on the desk's status line, the one place the app says what happened."""
         if self.alive():
             self.status.set(text)
+            if text:
+                self.studio.say(text)
+
+    def fault(self, text):
+        """Say that something went wrong, in the colour of a fault."""
+        if self.alive():
+            self.status.set(text)
+            self.studio.fault(text)
 
     def after(self, milliseconds, action):
         return self.frame.after(milliseconds, action)
@@ -647,18 +654,18 @@ class Tool:
         def finished(result):
             self.pending -= 1
             if self.alive():
-                self.say("")
+                self.status.set("")
                 done(result)
 
         def broke(error):
             self.pending -= 1
-            (failed or (lambda error: self.say(str(error))))(error)
+            (failed or (lambda error: self.fault(str(error))))(error)
 
         if not send(self.studio, name, *args, done=finished, failed=broke, working=working, renders=renders):
             self.say(f"{self.studio.held_words()} Stop it there first.")
             return False
         self.pending += 1
-        self.say(working)
+        self.status.set(working)            # the desk's working line shows it
         return True
 
     def stop(self):

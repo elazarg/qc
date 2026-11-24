@@ -47,8 +47,8 @@ from lab.desk.hints import hint, named
 from lab.desk.pictures import learning_symbol
 from lab.desk.studio import RATE, Studio
 from lab.learner.seat import LearnerSeat  # noqa: F401  (the desk makes one; tests import it from here)
-from lab.desk.theme import (ACCENT, DARK, DIM, FAULT, FONT, GLYPH, INK, LIVE, PAPER, RULE, SIDE, SOFT, SUBTLE,
-                            TILE, icon_font, mix)
+from lab.desk.theme import (ACCENT, DARK, DIM, FAULT, FONT, GLYPH, INK, LIVE, PAPER, RECORDING, RULE, SIDE, SOFT,
+                            SUBTLE, TILE, icon_font, mix)
 
 PANELS = ("Shape", "Chain", "Difference", "Phrase", "Sounds", "History", "Guitar", "More")
 SIDED = ("Shape", "Chain", "Sounds")       # panels that act on or show the sound on the selected side
@@ -84,6 +84,19 @@ def button(parent, text, action, *, dark=True):
                      cursor="hand2", font=(FONT, 10, "bold"), bg=TILE if dark else "#252834", fg=INK,
                      activebackground=RULE, activeforeground=INK, highlightthickness=1, highlightbackground=RULE,
                      highlightcolor=RULE)
+
+
+def take_words(item, instrument):
+    """A take as its row in the Phrase panel: the pickup setting, how long, what was played, and when; the
+    instrument too when it is not the one chosen now."""
+    seconds = item.get("seconds")
+    parts = [str(item.get("setting") or "setting not noted"),
+             f"{float(seconds):.0f} s" if isinstance(seconds, (int, float)) else "",
+             str(item.get("gesture") or "")[:40],
+             str(item.get("recorded", ""))[5:16].replace("T", " ")]
+    if item.get("instrument") and item.get("instrument") != instrument:
+        parts.insert(0, str(item["instrument"]))
+    return " · ".join(part for part in parts if part)
 
 
 def search_line(parent, query):
@@ -529,8 +542,11 @@ class Desk:
         elif self.level_row.winfo_manager():
             self.level_row.pack_forget()
         since = studio.loop_since[1] if studio.loop_since and state.mode == "phrase" else None
-        self.phrase_strip.show(studio.phrase_whole if studio.phrase else None, since)
-        self.record_symbol.configure(fg=DIM if self.unable("record") else SOFT)
+        # While a take is recorded the dot is a lamp: half lit while the input opens, lit while it records.
+        taking = studio.recording if "record" in studio.doing and studio.recording else None
+        self.phrase_strip.show(studio.phrase_whole if studio.phrase else None, since, taking)
+        self.record_symbol.configure(fg=(RECORDING if taking[0] is not None else mix(RECORDING, PAPER, .5)) if taking
+                                     else DIM if self.unable("record") else SOFT)
         self.draw_strip(sounds["b"])
         self.draw_scenes()
         if self.panel and self.hosted is None and not self.dragging and self.drawn_from(sounds) != self.panel_key:
@@ -748,16 +764,23 @@ class Desk:
         self.scene_key = None               # until they are drawn whole
         for child in self.scene_row.winfo_children():
             child.destroy()
-        if scenes:
-            label(self.scene_row, "Scene", size=9, color=DIM).pack(side="left", padx=(0, 6))
+        # Drawn as the unit's footswitches, the chosen one lit in the side's colour, each with its scene's name:
+        # the letters A to H are the unit's, and the desk's A and B are sides. The letter is said on hover.
+        color = SIDE[self.studio.state.side]
         for scene, name in scenes:
             chosen = scene == self.studio.state.scene
-            chip = tk.Label(self.scene_row, text=f"{'ABCDEFGH'[scene]}{'  ' + name if name else ''}", padx=8, pady=3,
-                            cursor="hand2", font=(FONT, 9, "bold" if chosen else "normal"),
-                            bg=mix(SIDE[self.studio.state.side], DARK, .3) if chosen else TILE,
-                            fg=INK if chosen else SOFT)
-            chip.pack(side="left", padx=(0, 4))
-            chip.bind("<ButtonRelease-1>", lambda _, scene=scene: self.studio.scene(scene))
+            switch = tk.Frame(self.scene_row, bg=PAPER, cursor="hand2")
+            switch.pack(side="left", padx=(0, 10))
+            lamp = tk.Canvas(switch, width=16, height=16, bg=PAPER, highlightthickness=0, cursor="hand2")
+            lamp.create_oval(2, 2, 14, 14, fill=color if chosen else TILE, outline=color if chosen else SUBTLE,
+                             width=2, tags="switch")
+            lamp.pack(side="left")
+            words = tk.Label(switch, text=name or f"Scene {'ABCDEFGH'[scene]}", bg=PAPER, cursor="hand2",
+                             font=(FONT, 9, "bold" if chosen else "normal"), fg=INK if chosen else SOFT, padx=4)
+            words.pack(side="left")
+            for part in (switch, lamp, words):
+                part.bind("<ButtonRelease-1>", lambda _, scene=scene: self.studio.scene(scene))
+            named(lamp, f"Scene {'ABCDEFGH'[scene]}")
         self.scene_key = key
 
     def draw_strip(self, on_b=None):
@@ -779,7 +802,7 @@ class Desk:
             self.strip_key = key
             return
         if found.get("previous"):
-            back = tk.Label(self.chips, text="‹", padx=6, pady=5, cursor="hand2", font=(FONT, 10), bg=PAPER, fg=SOFT)
+            back = tk.Label(self.chips, text="‹", padx=10, pady=2, cursor="hand2", font=(FONT, 13), bg=PAPER, fg=SOFT)
             back.bind("<ButtonRelease-1>", lambda _: studio.round_back())
         for place, candidate in enumerate(found["candidates"]):
             sound = studio.store.sound(candidate["sound"])
@@ -1223,12 +1246,18 @@ class Desk:
             shown += [item for item in recorded if item["id"] == current]
         for item in shown:
             chosen = item["id"] == current
-            row = tk.Label(self.into, text=f"{item.get('instrument', '')} · {item.get('setting', '')} · "
-                                           f"{str(item.get('recorded', ''))[5:16].replace('T', ' ')}",
-                           bg=TILE if chosen else DARK, fg=INK if chosen else SOFT, font=(FONT, 9), anchor="w",
-                           padx=6, pady=2, cursor="hand2")
-            row.pack(fill="x")
+            line = tk.Frame(self.into, bg=TILE if chosen else DARK)
+            line.pack(fill="x")
+            row = tk.Label(line, text=take_words(item, studio.state.instrument), bg=line["bg"],
+                           fg=INK if chosen else SOFT, font=(FONT, 9), anchor="w", padx=6, pady=2, cursor="hand2")
+            row.pack(side="left", fill="x", expand=True)
             row.bind("<ButtonRelease-1>", lambda _, item=item: (self.choose_recorded(item), self.fill_panel()))
+            if not chosen:
+                away = tk.Label(line, text=GLYPH["not this"], font=icon_font(9), bg=line["bg"], fg=DIM, padx=6,
+                                cursor="hand2")
+                away.pack(side="right")
+                away.bind("<ButtonRelease-1>", lambda _, item=item: studio.put_take_away(item["id"]))
+                named(away, "Put this take away")
         if len(recorded) > 8:
             more = tk.Label(self.into, text="The newest eight ▴" if self.all_takes
                             else f"All {len(recorded)} takes ▾", bg=DARK, fg=ACCENT, font=(FONT, 9),
@@ -1645,9 +1674,14 @@ class Desk:
                             font=(FONT, 8), padx=6, pady=2, cursor="hand2", anchor="w")
             chip.pack(fill="x", pady=1)
             chip.bind("<ButtonRelease-1>", lambda _, gesture=gesture: self.choose_gesture(gesture))
-        go = button(self.into, f"Record {RECORD_SECONDS:g} s" if self.record_setting else "Choose the setting first",
+        # Until a pickup setting is chosen the button is dimmed and says why on hover; it never reads as a
+        # sentence that looks ready to press.
+        go = button(self.into, f"Record {RECORD_SECONDS:g} s",
                     lambda: self.record_setting and self.studio.record(self.record_setting, RECORD_SECONDS,
                                                                        gesture=self.record_gesture))
+        if not self.record_setting:
+            go.configure(state="disabled", disabledforeground=DIM, cursor="arrow")
+            named(go, "Choose the pickup setting first")
         go.pack(anchor="w", pady=(4, 0))
 
     def choose_setting(self, setting):
@@ -1758,6 +1792,7 @@ class Desk:
                 mode, self.play_when_free = self.play_when_free, None
                 self.studio.play(mode)
             self.follow_gestures()
+            self.phrase_strip.place_head()
             self.show_working()
             self.show_placeholder()
             self.come_forward()

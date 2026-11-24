@@ -182,7 +182,20 @@ class PanelsThatOverflowTest(DeskCase):
         self.desk.fill_panel()
         for size in (DEFAULT_SIZE, SMALLEST_SIZE):
             self.resize(size)
-            self.assertTrue(self.reachable("Choose the setting first"), size)
+            self.assertTrue(self.reachable("Record 8 s"), size)
+
+    def test_record_is_dimmed_until_a_pickup_setting_is_chosen(self):
+        self.desk.toggle("Phrase")
+        self.desk.record_setting = None
+        self.desk.fill_panel()
+        record = [widget for widget in every(self.desk.tray) if widget.winfo_class() == "Button"
+                  and widget.cget("text") == "Record 8 s"]
+        self.assertEqual(str(record[0].cget("state")), "disabled")
+        self.desk.choose_setting("Neck · Series")
+        self.desk.fill_panel()
+        record = [widget for widget in every(self.desk.tray) if widget.winfo_class() == "Button"
+                  and widget.cget("text") == "Record 8 s"]
+        self.assertEqual(str(record[0].cget("state")), "normal")
 
 
 class TileOnAirTest(DeskCase):
@@ -208,14 +221,14 @@ class ListsCutShortTest(DeskCase):
         for index in range(11):
             take(self.home, f"take-{index:02}", "Charvel", "Neck", f"2026-11-{index + 10:02}T10:00:00+00:00")
         self.desk.toggle("Phrase")
-        rows = [text for text in texts(self.desk.tray) if text.startswith("Charvel · Neck")]
+        rows = [text for text in texts(self.desk.tray) if text.startswith("Neck · ") and " · 11-" in text]
         self.assertEqual(len(rows), 8)
         more = [widget for widget in every(self.desk.tray) if widget.winfo_class() == "Label"
                 and widget.cget("text") == "All 11 takes ▾"]
         self.assertEqual(len(more), 1)
         more[0].event_generate("<ButtonRelease-1>")
         self.root.update()
-        self.assertEqual(len([text for text in texts(self.desk.tray) if text.startswith("Charvel · Neck")]), 11)
+        self.assertEqual(len([text for text in texts(self.desk.tray) if text.startswith("Neck · ") and " · 11-" in text]), 11)
 
     def test_a_list_of_captures_cut_short_says_so(self):
         records = [Asset("capture", f"{index:064x}", f"Capture {index}").to_record() for index in range(450)]

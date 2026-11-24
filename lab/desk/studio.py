@@ -133,6 +133,8 @@ class Studio:
         self.unit_scene = 0               # the scene last asked of the unit
         self.hearing_base = set()         # sides heard without their Shape knobs for now
         self.audio_held_by = None         # who holds the audio input outside the engine: a key of HOLDERS
+        self.recording = None             # the take being recorded: (when it began, or None while the input
+                                          # opens; how many seconds), while "record" is being done
         self.audio_quiet = None           # the future of the `quiet` sent for them
         # The phrase.
         self.phrase = phrase              # (id, mono dry audio: the part of the take that loops) or None
@@ -246,6 +248,21 @@ class Studio:
     def recorded_phrases(self):
         """The takes recorded, newest first, as their records."""
         return self.guitar.recorded()
+
+    def put_take_away(self, take_id):
+        """Move a take out of the takes, into "phrases put away" in the data folder: it is no longer listed or
+        taken into what the guitar puts out, and moving its folder back brings it back. The phrase in use stays."""
+        if self.phrase and self.phrase[0] == take_id:
+            self.say("That take is the phrase in use: choose another first.")
+            return
+        source = self.folder / "phrases" / take_id
+        if not (source / "phrase.json").exists():
+            return
+        target = self.folder / "phrases put away"
+        target.mkdir(exist_ok=True)
+        source.replace(target / take_id)
+        self.guitar.version += 1            # what the guitar puts out is worked out again without it
+        self._set(status="Take put away.")
 
     def guitar_profile(self):
         """What the current instrument puts out, as (profile, lines), worked out here and now."""
@@ -1303,10 +1320,14 @@ class Studio:
         side = self.state.side if self.sound(self.state.side) is not None and self.state.shown else None
         heard_through = self.sound(side) if side else None
         self.ear.lent()
+        self.recording = (None, seconds)
         self.begin("record", "Opening the input… wait for “play now”.")
 
         def opened(_):
             if "record" in self.doing:
+                import time
+
+                self.recording = (time.monotonic(), seconds)
                 self.begin("record", f"Recording {seconds:g} s · play now"
                            + (f" (you hear {side.upper()})" if side else "") + "…")
 

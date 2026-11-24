@@ -141,6 +141,31 @@ class Gallery:
         self.shoot("blind", studio.blind)
         studio.blind()
         self.shoot("remark", lambda: studio.ask("a bit tighter"))
+
+        def recording():
+            # Half way through a take of eight seconds. (The simulated unit records in no time, so the state is
+            # set as the studio sets it while a real take is recorded.)
+            from time import monotonic
+
+            studio.doing["record"] = "Recording 8 s · play now (you hear B)…"
+            studio.recording = (monotonic() - 4., 8.)
+            studio._set()
+
+        self.shoot("recording", recording, settle=False)
+        del studio.doing["record"]
+        studio.recording = None
+        studio._set()
+
+        def scenes():
+            from lab.sound.chain import Chain
+            from lab.sound.sounds import Sound
+
+            studio.copy_to_a()
+            named = Chain(rows=studio.sound("b").chain.rows, labels=("Rhythm", "Lead", "Solo"))
+            studio.put("b", Sound("Three scenes", named, {"kind": "designed"}))
+
+        self.shoot("scenes", scenes)
+        studio.undo()
         from lab.desk.window import PANELS
 
         for name in PANELS:

@@ -23,8 +23,8 @@ class Hint(tk.Label):
     """The "?" itself. `words` is what it says; change it with `say`."""
 
     def __init__(self, parent, words, *, color=DIM):
-        super().__init__(parent, text="?", bg=parent["bg"], fg=color, font=(FONT, 8, "bold"), cursor="question_arrow",
-                         padx=5, pady=0, borderwidth=0)
+        super().__init__(parent, text="?", bg=parent["bg"], fg=color, font=(FONT, 10, "bold"),
+                         cursor="question_arrow", padx=7, pady=1, borderwidth=0)
         self.words, self.color = words, color
         self.shown = None           # the label showing the words, while it shows
         self.pinned = False         # shown by a click: it stays until the next click
