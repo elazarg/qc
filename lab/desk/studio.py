@@ -272,6 +272,21 @@ class Studio:
         """The same as lines for the Guitar panel, without waiting (`Guitar.lines`)."""
         return self.guitar.lines()
 
+    def guitar_summary(self):
+        """What the instrument puts out at each setting, once worked out (`Guitar.summary`)."""
+        return self.guitar.summary()
+
+    def step_by(self, places):
+        """Put the design so many places on from the one on B in the round on show, stopping at either end."""
+        found = self.round()
+        if not found or not found["candidates"]:
+            return
+        ids = [item["sound"] for item in found["candidates"]]
+        at = ids.index(self.state.b) if self.state.b in ids else 0
+        to = max(0, min(len(ids) - 1, at + places))
+        if to != at or self.state.b not in ids:
+            self.step(to)
+
     profile_version = property(lambda self: self.guitar.version)
 
     def mark(self, word, side=None):

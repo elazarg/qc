@@ -26,7 +26,9 @@ sizes. Nothing was tried on the real unit.
   (a knob's check says whether it did what it says, with the measure in brackets, and the correction in the
   same clause), W4 (the contrast's four measures renamed for what they measure and drawn as signed bars; the
   band chart in the sides' colours, its bands in Hz, with a key), W5 (the record control is a dot, dimmed with
-  its reason; in the Phrase and Guitar panels "Record 8 s" is dimmed until a setting is chosen).
+  its reason; in the Phrase and Guitar panels "Record 8 s" is dimmed until a setting is chosen), W6 (what
+  the ask line takes besides a request, a preset's exact name, a remark and Next, "add parallel space" and a
+  part's offset such as "Solo +2 dB", is behind a `?` in the line).
 - **Looks:** V1 (the accent is lilac, no longer B's peach), V3 (the dimmest text is 5:1 on the panels), V4 (a
   one-pixel rule round the tiles and the buttons), V6 (Shape's knobs are tracks with a mark where each rests,
   a bar to where it stands in the side's colour, and the position), L3
@@ -43,7 +45,11 @@ sizes. Nothing was tried on the real unit.
   and the cross, the three symbols between the tiles, the phrase strip with its playhead and record dot, and
   the lines that restated a click. N2 (scenes drawn as footswitches with their names, the letter on hover),
   N3 in part (the clock moves the playhead, which it did not before; a recording drains the strip over its
-  seconds), N4 in part (red for recording: the dot is a lamp, half lit while the input opens).
+  seconds), N4 in part (red for recording: the dot is a lamp, half lit while the input opens). G2 (the wheel
+  over the round's chips steps through its designs, stopping at either end). The Guitar panel's paragraphs
+  are a chart: a bar per pickup setting to the peak of its held notes, a dashed line where the humbucker
+  presets assume peaks, a tick for the largest peak and a mark for the noise; the sentences are behind
+  "In words ▾".
 
 Waiting, and why:
 
@@ -52,9 +58,9 @@ Waiting, and why:
   what the engine does or what the player is used to.
 - **The player's call:** I1–I3 and I5 (merging Phrase and Guitar, one place for the guitar's setting,
   renaming Sounds and the tools). The usage log now records the desk, so these can be argued from use.
-- **Not started:** W6, L1–L2, L4, V2, V5, T1–T3, G2, the rest of N3 (progress for a listen or a request
-  beyond the seconds) and the rest of the table of marks (rings on what is being worked on, charts in Guitar
-  and Chain). The learning screen's own status line (R8) stays: that screen hides the desk's.
+- **Not started:** L1–L2, L4, V2, V5, T1–T3, the rest of N3 (progress for a listen or a request beyond the
+  seconds) and the rest of the table of marks (rings on what is being worked on, charts for Chain's
+  measurements). The learning screen's own status line (R8) stays: that screen hides the desk's.
 
 Findings are numbered so that they can be picked up one at a time. Each says what was seen, where, and what
 would mend it inside the rules of the design in `AGENTS.md` (one window, few words, no shortcuts, side

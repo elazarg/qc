@@ -110,6 +110,15 @@ class Guitar:
                        lambda error: arrived(error=error))
         return [f"Working out what the {instrument} puts out from {len(takes)} takes…"]
 
+    def summary(self):
+        """What the current instrument puts out at each pickup setting, as worked out from its takes as they are
+        now: {} with no takes, None while it is still being worked out (`lines` starts that)."""
+        takes = self.takes()
+        if not takes:
+            return {}
+        held = self.profiles.get(self.studio.state.instrument)
+        return held[1][0] if held is not None and held[0] == _made_from(takes) else None
+
     def told(self, found):
         """What the designer is told of the pickup setting the phrase in use was recorded on (`profile.facts`),
         as lines: its level against what presets assume, and what it was, or could not be, compared on."""

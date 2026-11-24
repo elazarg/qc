@@ -54,6 +54,11 @@ PANELS = ("Shape", "Chain", "Difference", "Phrase", "Sounds", "History", "Guitar
 SIDED = ("Shape", "Chain", "Sounds")       # panels that act on or show the sound on the selected side
 SCROLLED = ("Chain", "Difference", "Phrase", "Guitar", "More")      # panels built into a part that scrolls
 RECORD_SECONDS = 8.
+# What the ask line takes besides a request for a sound, said behind its "?".
+CONVENTIONS = ("The exact name of one of your presets brings it in. A remark in players' words (“a bit tighter”, "
+               "“fizzy”) moves the Shape knobs at once, and Next under the line offers the remedy after it. "
+               "“add parallel space” adds stereo echoes and a plate behind the sound. In Levels, a song's part "
+               "named with an offset (“Solo +2 dB”) keeps that much above the others.")
 SHORTEST_LOOP = RATE // 2       # a loop is at least half a second
 PLACEHOLDER = "Ask for a sound, a song, or a change"
 SHOWN_AT_MOST = 400     # rows of IRs or captures listed at once; the filter reaches the rest
@@ -204,6 +209,7 @@ class Desk:
         self.hosted = None              # the tool on show in the side panel's place
         self.sounds_query = ""          # what the Sounds panel's presets are filtered by
         self.history_query = ""         # what History's sounds are filtered by
+        self.guitar_words = False       # the Guitar panel says its chart in sentences too
         self.preset_more = False        # whether the Sounds panel shows what else can be done with a preset
         self.reference_scene = "Default scene"      # the scene a preset is captured in as a reference
         self.contrast = None            # what "Measure A and B now" found, and for which sounds and phrase
@@ -388,6 +394,7 @@ class Desk:
         self.chips = tk.Frame(self.strip, bg=PAPER)
         self.chips.pack(fill="x")
         self.chips.bind("<Configure>", lambda event: self.flow_chips(event.width), add="+")
+        self.chips.bind("<MouseWheel>", self.wheel_round)
         self.strip_note = label(self.strip, size=9, color=SUBTLE, wrap=600)
         self.strip_note.pack(fill="x", pady=(4, 0))
 
@@ -454,6 +461,8 @@ class Desk:
         self.placeholder = tk.Label(ask, text=PLACEHOLDER, bg=DARK, fg=DIM, font=(FONT, 12), cursor="xterm")
         self.placeholder.bind("<ButtonRelease-1>", lambda _: self.request.focus_set())
         self.show_placeholder()
+        # What the line takes besides a request, which nothing else on the screen shows.
+        hint(ask, CONVENTIONS).pack(side="right", padx=(0, 8))
         # What is under the tiles is given its room first, from the bottom up, so that in a small window the
         # tiles give way and the ask line, the buttons and the round's chips are never squeezed.
         for widget in (ask, self.working_row, self.line, row, self.strip, self.scene_row):
@@ -813,6 +822,7 @@ class Desk:
                             font=(FONT, 9, "bold" if chosen else "normal"),
                             bg=mix(SIDE["b"], DARK, .3) if chosen else TILE, fg=INK if chosen else SOFT)
             chip.bind("<ButtonRelease-1>", self.drags.click(lambda place=place: studio.step(place)))
+            chip.bind("<MouseWheel>", self.wheel_round)
             self.drags.source(chip, lambda event, sound=sound: ("design", sound.id), self.dragged_name)
             named(chip, lambda sound=sound: aim_against(found["aim"], None if studio.unheard(sound) else sound.heard,
                                                        studio.unheard(sound)))
@@ -831,6 +841,11 @@ class Desk:
         more.bind("<ButtonRelease-1>", lambda _: studio.round_forward())
         self.flow_chips()
         self.strip_key = key
+
+    def wheel_round(self, event):
+        """The wheel over the round's chips steps through its designs: away from you to the next, towards you to
+        the one before."""
+        self.studio.step_by(-1 if event.delta > 0 else 1)
 
     def flow_chips(self, width=None):
         """The round's chips, as many to a line as the column has room for: with a panel open in the smallest
@@ -1717,10 +1732,28 @@ class Desk:
         hint(row, f"A return gesture taught on a guitar control (Teach a control, on the learning screen) turns its "
                   f"Shape knob on the sound on show. Gestures stay on for {gestures.ARM_SECONDS:.0f} s, and "
                   f"{gestures.ARM_SECONDS:.0f} s more after each gesture.").pack(side="left")
-        label(self.into, f"What the {instrument} puts out", size=10, bold=True).pack(fill="x")
+        head = tk.Frame(self.into, bg=DARK)
+        head.pack(fill="x")
+        label(head, f"What the {instrument} puts out", size=10, bold=True).pack(side="left")
         # Worked out away from the window (reading the takes takes a second or more); the panel is drawn again
-        # when it arrives.
-        for line in self.studio.guitar_lines():
+        # when it arrives. Once it has, it is a chart, and the sentences that say its figures are a click away.
+        lines = self.studio.guitar_lines()
+        found = self.studio.guitar_summary()
+        if found:
+            from lab.desk import guitar_chart
+
+            hint(head, guitar_chart.words(found)).pack(side="left")
+            chart = tk.Canvas(self.into, bg=DARK, width=400, highlightthickness=0)
+            chart.pack(fill="x", pady=(4, 0))
+            guitar_chart.draw(chart, found, width=400, chosen=self.studio.guitar.setting())
+            opener = tk.Label(self.into, text="In words ▴" if self.guitar_words else "In words ▾", bg=DARK,
+                              fg=ACCENT, font=(FONT, 9), cursor="hand2", anchor="w")
+            opener.pack(fill="x", pady=(4, 2))
+            opener.bind("<ButtonRelease-1>", lambda _: (setattr(self, "guitar_words", not self.guitar_words),
+                                                        self.fill_panel()))
+            if not self.guitar_words:
+                lines = []
+        for line in lines:
             label(self.into, line, size=9, wrap=400).pack(fill="x", pady=2)
         self.recording_controls()
 
