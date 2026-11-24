@@ -98,9 +98,9 @@ class Requests:
         request is an activity of its own."""
         studio = self.studio
         if stop is self.latest:
-            studio._set(status=str(error))
+            studio.fault(str(error))
         else:
-            studio.say(f"An earlier request failed ({error}); the latest is still on its way.")
+            studio.fault(f"An earlier request failed ({error}); the latest is still on its way.")
 
     # ---- asking ----
 
@@ -141,7 +141,7 @@ class Requests:
         quietly = by == "app"
         stop = self.signal(quietly)
         if not quietly:
-            studio.begin(stop, saying or "Designing three ways to get there. About a minute…")
+            studio.begin(stop, saying or f"New round for “{text[:60]}” · about a minute…")
         future = self.design(design.round_of_three, studio.assistant, text, studio._instrument(), earlier=earlier,
                               by=by, cancel=stop, assets_known=studio._assets(),
                               listening=None if quietly else studio._listening())
@@ -224,10 +224,12 @@ class Requests:
         self.new_round(found["request"], earlier=earlier, by=by, after=found["id"],
                        saying="Designing three more, from what was heard and what you marked…")
 
-    def revise(self, sound, text):
+    def revise(self, sound, text, side="b"):
+        """A copy of `sound` changed as `text` asks, put on `side` (the side it was on) when it comes, if that
+        side has not changed meanwhile."""
         studio = self.studio
         stop = self.signal()
-        studio.begin(stop, f"Revising {sound.name}…")
+        studio.begin(stop, f"Revising {side.upper()} · “{text[:60]}”…")
         future = self.design(design.revise, studio.assistant, sound, text, studio._instrument(), cancel=stop,
                               assets_known=studio._assets())
         revision = studio.state.revision
@@ -242,10 +244,10 @@ class Requests:
                 studio.say(f"The revision for an earlier request ({text[:40]}) is in History; the latest request's "
                          "answer is the one shown.")
             elif studio.state.revision == revision:
-                studio.put("b", result)
+                studio.put(side, result)
                 studio.say(f"{result.name}, revised: {text}")
             else:
-                studio.say(f"The revision of {sound.name} is ready in History. B changed meanwhile.")
+                studio.say(f"The revision of {sound.name} is ready in History. {side.upper()} changed meanwhile.")
 
         def failed(error):
             self.requests.discard(stop)

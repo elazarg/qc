@@ -78,6 +78,7 @@ class State:
     shown: str | None = None          # "pair" or "recall" once A and B are ready on the unit
     round: str | None = None          # the round on show
     status: str = ""
+    status_kind: str = ""             # "fault" when the status says something went wrong or was refused
     working: str = ""                 # what is being done, while it is: the newest of `Studio.doing`
     instrument: str = "Charvel"
     song: str | None = None           # the song the round on show is for
@@ -151,6 +152,8 @@ class Studio:
         self._set(**changes)
 
     def _set(self, **changes):
+        if "status" in changes:
+            changes.setdefault("status_kind", "")      # a new status is plain unless it says it is a fault
         before = self.state
         self.state = replace(self.state, **changes, working=self._working())
         if any(getattr(before, key) != getattr(self.state, key) for key in KEPT):
@@ -179,6 +182,10 @@ class Studio:
 
     def say(self, text):
         self._set(status=text)
+
+    def fault(self, text):
+        """Say that something went wrong or could not be done: the desk shows it in the colour of a fault."""
+        self._set(status=text, status_kind="fault")
 
     def sound(self, side):
         sound_id = getattr(self.state, side)
@@ -211,8 +218,8 @@ class Studio:
     def more(self, **options):
         self.asking.more(**options)
 
-    def revise(self, sound, text):
-        self.asking.revise(sound, text)
+    def revise(self, sound, text, side="b"):
+        self.asking.revise(sound, text, side)
 
     def cancel(self):
         """Drop every request the assistant is working on for the player. True when there was one."""
@@ -426,13 +433,13 @@ class Studio:
             handler(value)
         except Exception as error:  # noqa: BLE001
             self.log_error(error, traceback.format_exc())
-            self._set(status=f"Something went wrong: {error}. The details are in errors.log in the data folder.")
+            self.fault(f"Something went wrong: {error}. The details are in errors.log in the data folder.")
 
     def _failed(self, error):
         """What a failure says when its job has nothing of its own to say. A command dropped by Stop says nothing:
         Stop has said it."""
         if getattr(error, "kind", "") != "Stopped":
-            self._set(status=str(error))
+            self.fault(str(error))
 
     def _watched(self, result):
         if result.get("moved") and self.state.mode:
@@ -472,7 +479,7 @@ class Studio:
                 self._show()
 
         def refused(error):
-            self._set(status=f"{error}")
+            self.fault(f"{error}")
             if self.host.failed is None:
                 self.retry_open_at = time.monotonic() + 5     # tried again until the unit lets it
 
@@ -557,7 +564,7 @@ class Studio:
                 self._show(native=True)
                 return
             # Nothing is ready, so nothing plays: the desk must not say it does.
-            self._set(mode=None, status=str(error))
+            self._set(mode=None, status=str(error), status_kind="fault")
 
         self.later(self.host.call("show", *(chain for chain, _, _ in planned)), shown, failed, doing=key)
 
@@ -620,7 +627,7 @@ class Studio:
             # Nothing plays: the desk must not go on saying it does. A play that Stop dropped, or that a newer
             # one has replaced, has nothing to say.
             if ticket == self.plays and getattr(error, "kind", "") != "Stopped":
-                self._set(mode=None, status=str(error))
+                self._set(mode=None, status=str(error), status_kind="fault")
 
         self.later(self.host.call("play", side, mode, phrase), playing, failed)
 
@@ -921,9 +928,8 @@ class Studio:
             self.work_on(slot, name, note=f"That is your preset's name. For a new design in its spirit, "
                                           f"ask \"make {name}\".")
             return
-        b = self.sound("b")
-        if b is not None and reads_as_change(text):
-            self.asking.revise(b, text)
+        if sound is not None and reads_as_change(text):
+            self.asking.revise(sound, text, side)
         else:
             self.asking.new_round(text)
 
@@ -968,9 +974,10 @@ class Studio:
         its amp (and cab, when the capture has one)."""
         from lab.qc import assets
 
-        sound = self.sound("b") or self.sound("a")
+        side = self.state.side
+        sound = self.sound(side)
         if sound is None:
-            self.say("Put a sound on B first; the IR or capture goes into it.")
+            self.say(f"Put a sound on {side.upper()} first; the IR or capture goes into it.")
             return
         try:
             if asset.kind == "ir":
@@ -982,7 +989,7 @@ class Studio:
             return
         copy = Sound(sound.name, chain, {**sound.origin, "kind": "revised", "from": sound.id, "request": what},
                      parent=sound.id, explanation=sound.explanation, sources=list(sound.sources), knobs=dict(sound.knobs))
-        self.put("b", copy)
+        self.put(side, copy)
         self.say(what + " Undo takes it back.")
 
     def add_parallel_space(self):
@@ -1000,7 +1007,7 @@ class Studio:
         copy = Sound(sound.name, chain, {**sound.origin, "kind": "revised", "from": sound.id,
                                         "request": "Added parallel stereo echoes and plate"}, parent=sound.id,
                      explanation=sound.explanation, sources=list(sound.sources), knobs=dict(sound.knobs))
-        self.put("b", copy)
+        self.put(side, copy)
         self.say("Added parallel stereo echoes and plate. Undo takes it back.")
 
     def _instrument(self):
@@ -1230,7 +1237,7 @@ class Studio:
                 info, dry, level = phrases.keep(self.folder, audio, instrument=self.state.instrument,
                                                 setting=setting, heard_through=heard_through, gesture=gesture)
             except phrases.NotKept as error:
-                self._set(status=str(error))
+                self.fault(str(error))
                 return
             self.guitar.version += 1            # the guitar's profile has a new take to take in
             self.use_phrase(info["id"], dry.copy(), 0, len(dry))
@@ -1240,7 +1247,7 @@ class Studio:
 
         def failed(error):
             if getattr(error, "kind", "") != "Stopped":
-                self._set(status=f"Recording: {error}")
+                self.fault(f"Recording: {error}")
 
         self.later(self.host.call("record", seconds, side, dict(heard_through.knobs) if heard_through else None,
                                   progress=lambda value: self.progress.append((opened, value))), recorded, failed,

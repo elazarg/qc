@@ -305,6 +305,9 @@ class TeachPanel:
     def load_selection(self):
         if self.live_running:
             return
+        offered = taught.controls(self.instrument.get())
+        if self.control.get() not in offered:          # a control this instrument does not have: its first
+            self.control.set(next(iter(offered)))
         try:
             selected = self.selection()
         except ValueError as error:
@@ -397,10 +400,20 @@ class TeachPanel:
                               state="normal" if (recording_example and stop_allowed or start_allowed and setting) else "disabled")
         self.record_test.configure(text="Stop and check" if recording_check else "Record a fresh check",
                                    state="normal" if (recording_check and stop_allowed or start_allowed and valid_profile) else "disabled")
+        offered = taught.controls(self.instrument.get())
         for title, choice in self.control_buttons.items():
             selected = title == self.control.get()
             choice.configure(state="normal" if editable else "disabled", bg=ACCENT if selected else "#2c303c",
                              fg=INK if selected else TEXT)
+            # Only the controls the instrument has, in their order.
+            if title not in offered:
+                choice.pack_forget()
+            elif not choice.winfo_manager():
+                choice.pack(side="left", padx=(0, 4))
+                for later in list(self.control_buttons)[list(self.control_buttons).index(title) + 1:]:
+                    if self.control_buttons[later].winfo_manager():
+                        choice.pack_configure(before=self.control_buttons[later])
+                        break
         self.setting_chips.enable(editable)
         self.setting_entry.configure(state="normal" if editable else "disabled")
         for widget, ready in ((self.use_latest, editable and self.latest_dry is not None),

@@ -12,6 +12,36 @@ signals (`probe.late_energy_db`), and only otherwise from what followed the phra
 
 import math
 
+# The three qualities a round aims for, as the designer and listening both name them (`lab.sound.design.AIM`,
+# `lab.hearing.measure.WORDS`), and what they are called where a short name is wanted.
+QUALITIES = (("distortion", "gain"), ("brightness", "bright"), ("tail", "tail"))
+
+
+def misses(aim, heard):
+    """The qualities (their short names) where what was heard is not the word the round aimed for. Only words
+    both have count: a quality either leaves out is not a miss."""
+    found = []
+    for key, short in QUALITIES:
+        wanted, got = (aim or {}).get(key), (heard or {}).get(key)
+        if isinstance(wanted, str) and isinstance(got, str) and wanted and got and wanted != got:
+            found.append(short)
+    return found
+
+
+def aim_against(aim, heard, unheard=None):
+    """One line for a design of a round: what the round aims for, and what listening took the design to be, with
+    the qualities that miss named. The words of listening are an inference from what it measured, and are called
+    what was heard, not what was measured."""
+    from lab.hearing.measure import summary
+
+    line = f"aim {summary(aim)}"
+    if unheard:
+        return f"{line} · could not be listened to"
+    if not summary(heard):
+        return f"{line} · not listened to yet"
+    missed = misses(aim, heard)
+    return f"{line} · heard as {summary(heard)}" + (f" · misses on {', '.join(missed)}" if missed else "")
+
 
 def number(record, path):
     """The value at a dotted path of a record ("probe.late_energy_db") when it is a finite number, else None."""

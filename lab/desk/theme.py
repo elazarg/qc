@@ -17,6 +17,7 @@ FONT = "Segoe UI"
 TONE_A = "#8fb2ff"
 TONE_B = "#f7b889"
 LIVE = "#6fdd9f"
+FAULT = "#ff9e8f"                # something went wrong, or could not be done
 SIDE = {"a": TONE_A, "b": TONE_B}
 
 

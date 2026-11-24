@@ -532,6 +532,10 @@ class FoldedIntoTheDeskTest(DeskCase):
         walk(self.desk.tray)
         return found
 
+    def charts(self):
+        """The canvases of the open panel that draw something: not the one a panel scrolls in."""
+        return [canvas for canvas in self.widgets("Canvas") if not hasattr(canvas, "inner")]
+
     def assert_all_on_show(self):
         """Nothing in the open panel is pushed out of it, at the desk's smallest size either."""
         from support import DEFAULT_SIZE, SMALLEST_SIZE, inside
@@ -619,19 +623,19 @@ class FoldedIntoTheDeskTest(DeskCase):
         self.put("a", Sound("Clean", chain(gain_db=0.), {"kind": "designed"}))
         self.put("b", Sound("Plexi", chain(PLEXI, V30), {"kind": "designed"}))
         self.desk.toggle("Difference")
-        self.assertEqual(self.widgets("Canvas"), [])
+        self.assertEqual(self.charts(), [])
         self.press("Measure A and B now")
         self.pump()
         self.root.update()
         texts = self.texts(self.desk.tray)
         self.assertTrue(any(text.startswith("B against A, level aside") for text in texts), texts)
         self.assertTrue(any("Brightness" in text and "Tail continuity" in text for text in texts))
-        chart, = self.widgets("Canvas")
+        chart, = self.charts()
         self.assertGreater(len(chart.find_all()), 8)        # a bar for each octave band
         self.assertEqual(len(self.desk.contrast["spectrum_db"]), 8)
         self.studio.turn({"brightness": .5}, "b")           # B is not the sound that was measured any more
         self.pump()
-        self.assertEqual(self.widgets("Canvas"), [])
+        self.assertEqual(self.charts(), [])
 
     def test_the_field_no_longer_measures_and_says_where_that_is(self):
         self.put("b", Sound("Plexi", chain(PLEXI, V30), {"kind": "designed"}))

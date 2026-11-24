@@ -340,7 +340,7 @@ class Listening:
             fresh.heard = {"failed": str(error), "phrase": phrase_key, "digest": digest, "scene": scene}
             fresh.tags = [tag for tag in fresh.tags if not tag.startswith("heard:")]
             studio.store.save(fresh)
-            studio._set(status=f"Could not listen to {name}: {error}")
+            studio.fault(f"Could not listen to {name}: {error}")
 
         studio.later(studio.host.call("hear", sound.chain, studio.phrase[1], scene), heard, failed, doing="listen")
 
@@ -432,7 +432,7 @@ class Listening:
             if kind in NOT_THE_SOUND:
                 self.turned_away(kind, error)
             else:
-                studio._set(status=f"Could not listen to the shaped sound: {error}")
+                studio.fault(f"Could not listen to the shaped sound: {error}")
 
         studio.later(studio.host.call("hear_shaped", sound.chain, values, inputs[1], scene), heard, failed,
                    doing="listen")

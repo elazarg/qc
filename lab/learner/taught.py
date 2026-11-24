@@ -61,6 +61,17 @@ def settings(instrument, control):
     return SETTINGS[control]
 
 
+def controls(instrument):
+    """The controls of an instrument that can be taught, by title, as `CONTROLS`. A pickup selector only when the
+    instrument has one: an instrument the app knows with fewer than two pickup settings (a bass, an acoustic or a
+    classical guitar with one pickup) has none. One the app does not know is offered all three."""
+    key = (instrument or "").strip().casefold()
+    known = next((item for item in INSTRUMENTS if item["name"].casefold() == key), None)
+    if known is not None and len(known.get("settings") or ()) < 2:
+        return {title: value for title, value in CONTROLS.items() if value != "pickup"}
+    return dict(CONTROLS)
+
+
 def instruments():
     """The electric guitars the app knows, and any other that something was taught for."""
     names = list(GUITARS)
