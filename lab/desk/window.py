@@ -36,7 +36,8 @@ from lab.hearing.audio import read_wave
 from lab.knowledge import REPO, home
 from lab.hearing.measure import summary
 from lab.desk.chooser import InstrumentChooser
-from lab.desk.difference import aim_against
+from lab.desk.difference import against, aim_against
+from lab.desk.studio import COPY_REQUEST
 from lab.desk.hints import hint, named
 from lab.desk.pictures import learning_symbol
 from lab.desk.studio import RATE, Studio
@@ -44,6 +45,7 @@ from lab.learner.seat import LearnerSeat  # noqa: F401  (the desk makes one; tes
 from lab.desk.theme import ACCENT, DARK, DIM, FAULT, FONT, INK, LIVE, PAPER, RULE, SIDE, SOFT, SUBTLE, TILE, mix
 
 PANELS = ("Shape", "Chain", "Difference", "Phrase", "Sounds", "History", "Guitar", "More")
+SIDED = ("Shape", "Chain", "Sounds")       # panels that act on or show the sound on the selected side
 SCROLLED = ("Chain", "Difference", "Phrase", "Guitar", "More")      # panels built into a part that scrolls
 RECORD_SECONDS = 8.
 SHORTEST_LOOP = RATE // 2       # a loop is at least half a second
@@ -293,6 +295,7 @@ class Desk:
         self.blind_link.pack(side="left")
         # Shown once there is something to take back.
         self.undo_link = link(row, "Undo", lambda: self.studio.undo())
+        named(self.undo_link, self.studio.undo_words)       # what it would take back, while the pointer rests
         self.phrase_link = tk.Label(row, text="No phrase", bg=PAPER, fg=SUBTLE, font=(FONT, 9), cursor="hand2",
                                     anchor="e")
         self.phrase_link.pack(side="right", padx=(8, 0))
@@ -373,7 +376,7 @@ class Desk:
             sound = sounds[side]
             hidden = state.blind and sound is not None
             name.configure(text="?" if hidden else (sound.name if sound else "Empty"))
-            caption.configure(text="Hidden while you compare" if hidden else self.caption(sound))
+            caption.configure(text="Hidden while you compare" if hidden else self.caption(sound, side))
             selected = state.side == side
             on_air = state.mode and selected
             # The tile first: everything on it takes its colour, the letter and the marks included.
@@ -471,18 +474,24 @@ class Desk:
                 tuple(sides), self.show_nano, tuple(sorted(self.expanded)), studio.phrase_key(),
                 tuple(sorted(studio.hearing_base)), studio.profile_version if self.panel == "Guitar" else None)
 
-    def caption(self, sound):
+    def caption(self, sound, side="b"):
+        """The line under a sound's name. On B, first, what B has that A has not: what the player listens for."""
         if sound is None:
             return ""           # the ask line says what to do, once, instead of both tiles
         from lab.learner.dataset import suggested_setup
 
         setup = suggested_setup(sound.origin.get("guitar_setup"), self.studio.state.instrument)
         parts = [setup] if setup else []
+        if side == "b":
+            differs = against(sound, self.studio.sound("a"), "A")
+            if differs:
+                parts.insert(0, differs)
         origin = sound.origin.get("kind")
+        request = sound.origin.get("request") or ""
         if origin == "preset":
             parts.append("Saved on the Quad Cortex")
-        elif origin == "revised":
-            parts.append("Revised: " + sound.origin["request"][:60] if sound.origin.get("request") else "A copy to work on")
+        elif origin == "revised" and request and request != COPY_REQUEST:      # a copy says nothing new
+            parts.append("Revised: " + request[:60])
         if self.studio.unheard(sound):
             parts.append("could not be listened to")
         elif summary(sound.heard):
@@ -693,7 +702,13 @@ class Desk:
         self.dragging = False
         for child in self.tray.winfo_children():
             child.destroy()
-        label(self.tray, self.panel, size=11, bold=True).pack(fill="x", pady=(0, 6))
+        head = tk.Frame(self.tray, bg=DARK)
+        head.pack(fill="x", pady=(0, 6))
+        label(head, self.panel, size=11, bold=True).pack(side="left")
+        # A panel that changes or shows one sound says whose, in that side's colour.
+        if self.panel in SIDED:
+            side = self.studio.state.side
+            label(head, f"  {side.upper()}", size=11, bold=True, color=SIDE[side]).pack(side="left")
         # A panel whose length depends on what it shows (the measurements, the takes, what the guitar puts out)
         # scrolls when it is taller than the window leaves room for. The others keep a list that takes the room
         # that is left, with their buttons under it, and scroll inside the list.
@@ -731,10 +746,9 @@ class Desk:
         # are placed first, from the bottom, and the knobs scroll in the room that is left.
         actions = tk.Frame(self.tray, bg=DARK)
         actions.pack(side="bottom", fill="x", pady=(10, 0))
-        button(actions, "Undo", studio.undo).pack(side="left")
         without = studio.state.side in studio.hearing_base
         button(actions, "Hear it with the knobs again" if without else "Hear it without the knobs",
-               studio.base).pack(side="left", padx=6)
+               studio.base).pack(side="left")
         if set(knob_table.PAD) & set(available):
             self.shape_pad(values, [key for key in knob_table.PAD if key in available])
         knobs_view, knob_rows = scrolled(self.tray)
@@ -815,7 +829,7 @@ class Desk:
         if sound is None:
             label(self.into, "Nothing here yet.", color=SUBTLE).pack(fill="x")
             return
-        label(self.into, f"{studio.state.side.upper()} · {sound.name}", size=12, bold=True, wrap=400).pack(fill="x")
+        label(self.into, sound.name, size=12, bold=True, wrap=400).pack(fill="x")
         if sound.explanation:
             label(self.into, sound.explanation, size=9, color=SOFT, wrap=400).pack(fill="x", pady=(2, 6))
         from lab.knowledge import named_settings

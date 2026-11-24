@@ -28,10 +28,9 @@ class Marks:
             self.choice(sound, word)
         studio.store.save(sound)
         if blind_choice:
-            # The choice is made: now say which was which.
+            # The choice is made: now say which was which, and put them back where they were.
             side = (side or studio.state.side).upper()
-            studio._set(blind=False,
-                      status=f"{side}: {word}. A was {studio.sound('a').name}, B was {studio.sound('b').name}.")
+            studio.reveal(f"{side}: {word}. ")
         else:
             studio.say(f"{sound.name}: " + (", ".join(sound.marks) if sound.marks else "no marks"))
         if word == "keeper" and word in sound.marks:

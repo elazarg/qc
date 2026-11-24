@@ -43,6 +43,38 @@ def aim_against(aim, heard, unheard=None):
     return f"{line} · heard as {summary(heard)}" + (f" · misses on {', '.join(missed)}" if missed else "")
 
 
+def against(sound, other, other_letter):
+    """What `sound` has that `other` has not, in a few words, for its tile: blocks added or taken out, blocks
+    whose settings differ, and Shape knobs that stand elsewhere. "" when they are the same, or there is no other.
+
+    Said of the chain as it is written and of the knobs as they stand, not of what was heard: that is the
+    Difference panel's."""
+    from collections import Counter
+
+    from lab.sound import knobs
+
+    if sound is None or other is None or sound.id == other.id:
+        return ""
+    parts = []
+    mine = Counter(block.name for _, _, block in sound.chain.blocks)
+    theirs = Counter(block.name for _, _, block in other.chain.blocks)
+    parts += [f"+ {name}" for name in (mine - theirs)]
+    parts += [f"no {name}" for name in (theirs - mine)]
+    placed = {(r, column): block for r, column, block in other.chain.blocks}
+    changed = [block.name for r, column, block in sound.chain.blocks
+               if (r, column) in placed and placed[(r, column)].model == block.model and placed[(r, column)] != block]
+    if changed:
+        parts.append(f"{', '.join(dict.fromkeys(changed))} set differently")
+    for key, (title, _, _) in knobs.KNOBS.items():
+        step = sound.knobs.get(key, 0.) - other.knobs.get(key, 0.)
+        if abs(step) >= .01:
+            parts.append(f"{title} {step:+.2f}")
+    if not parts:
+        return ""
+    shown = parts[:3] + ([f"{len(parts) - 3} more"] if len(parts) > 3 else [])
+    return f"against {other_letter}: " + ", ".join(shown)
+
+
 def number(record, path):
     """The value at a dotted path of a record ("probe.late_energy_db") when it is a finite number, else None."""
     value = record

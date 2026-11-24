@@ -60,6 +60,7 @@ from lab.desk.listening import Listening
 from lab.desk.marks import Marks
 from lab.desk.requests import Requests, Rounds, reads_as_change, song_name
 
+COPY_REQUEST = "a copy to compare against"     # what a copy of B on A is, in its origin
 PHRASE_SECONDS = 3.5    # the part of a take that loops, until its edges are dragged
 RATE = 48000
 # Who may hold the audio input outside the engine, as the desk names them.
@@ -105,6 +106,8 @@ class Studio:
         self.state = State()
         self.listeners = []
         self.history = []                 # earlier (state, knob positions), for undo
+        self.undo_names = []              # what each of them came before, in a few words
+        self.blind_swapped = False        # A and B were swapped for the blind comparison on show
         self.jobs = []                    # (future, done, failed, the activity it ends)
         self.progress = []                # (handler, value) reported by the unit's worker, handled by `poll`
         self.doing = {}                   # what is going on, by key, oldest first: the working line shows the newest
@@ -336,14 +339,23 @@ class Studio:
 
     # ---- undo ----
 
-    def checkpoint(self):
-        """Keep what is on show and the knob positions of both sounds, for undo."""
+    def checkpoint(self, what=""):
+        """Keep what is on show and the knob positions of both sounds, for undo. `what` names the change that
+        follows, for the desk to say what Undo would take back."""
         knob_values = {}
         for side in ("a", "b"):
             sound = self.sound(side)
             if sound is not None:
                 knob_values[sound.id] = dict(sound.knobs)
         self.history = (self.history + [(self.state, knob_values)])[-40:]
+        self.undo_names = (self.undo_names + [what])[-40:]
+
+    def undo_words(self):
+        """What Undo would take back, in a few words, or "Nothing to undo"."""
+        if not self.history:
+            return "Nothing to undo"
+        what = self.undo_names[-1] if self.undo_names else ""
+        return f"Undo {what}" if what else "Undo the last change"
 
     def undo(self):
         """Put back the sounds on show and their knob positions as they were. Playing is not undone: what plays
@@ -352,6 +364,8 @@ class Studio:
             self.say("Nothing to undo.")
             return
         before, knob_values = self.history.pop()
+        if self.undo_names:
+            self.undo_names.pop()
         self.remark = None
         for sound_id, values in knob_values.items():
             try:
@@ -502,7 +516,7 @@ class Studio:
     def put(self, side, sound, **changes):
         """Put a sound on A or B, and get both ready on the unit. `changes` are other things on show that change
         with it (the round, the song), so that one Undo takes all of it back."""
-        self.checkpoint()
+        self.checkpoint(f"{sound.name} on {side.upper()}")
         self.store.save(sound)
         self._set(**{side: sound.id, "side": side, "revision": self.state.revision + 1, **changes})
         self._show()
@@ -801,8 +815,11 @@ class Studio:
         sound = self.sound(side)
         if sound is None:
             return
-        self.checkpoint()
         before = dict(sound.knobs)
+        moved = [knobs.KNOBS[key][0] for key in knobs.KNOBS
+                 if before.get(key, 0) != (values.get(key) or 0)]
+        self.checkpoint(f"{', '.join(moved[:2])}{' and more' if len(moved) > 2 else ''} on {side.upper()}"
+                        if moved else "")
         sound.knobs = {key: value for key, value in values.items() if value}
         self.store.save(sound)
         self.hearing_base.discard(side)
@@ -1080,7 +1097,7 @@ class Studio:
         if b is None:
             self.say("Nothing is on B to copy.")
             return
-        copy = Sound(b.name, b.chain, {"kind": "revised", "from": b.id, "request": "a copy to compare against"},
+        copy = Sound(b.name, b.chain, {"kind": "revised", "from": b.id, "request": COPY_REQUEST},
                      parent=b.id, knobs=dict(b.knobs), explanation=b.explanation, heard=b.heard)
         self.put("a", copy)
         self._set(side="b")
@@ -1091,17 +1108,31 @@ class Studio:
         import random
 
         if self.state.blind:
-            self._set(blind=False, status=f"A was {self.sound('a').name}, B was {self.sound('b').name}.")
+            self.reveal()
             return
         if self.sound("a") is None or self.sound("b") is None:
             self.say("Blind comparison needs a sound on both A and B.")
             return
-        if random.random() < .5:
-            self.checkpoint()
+        self.blind_swapped = random.random() < .5
+        if self.blind_swapped:
             self._set(a=self.state.b, b=self.state.a, revision=self.state.revision + 1)
             self._show()
         self._set(blind=True, status="Names hidden. Play A and B, then choose Keep or Not this on one of them, or "
                                      "click Show which was which.")
+
+    def reveal(self, said=""):
+        """End a blind comparison: say which was which, and put A and B back on their own sides if they were
+        swapped for it, so that what was being worked on is on B again and the round's chips light it."""
+        a, b = self.sound("a"), self.sound("b")
+        which = f"A was {a.name}, B was {b.name}" if a and b else ""
+        if self.blind_swapped:
+            self.blind_swapped = False
+            self._set(a=self.state.b, b=self.state.a, side="b" if self.state.side == "a" else "a",
+                      revision=self.state.revision + 1, blind=False,
+                      status=f"{said}{which}; they are back on their own sides.")
+            self._show()
+        else:
+            self._set(blind=False, status=f"{said}{which}.")
 
     # ---- presets on the unit ----
 
@@ -1115,7 +1146,7 @@ class Studio:
             copy = Sound(held_name, chain, {"kind": "revised", "from": original.id}, parent=original.id)
             self.store.save(original)
             self.store.save(copy)
-            self.checkpoint()
+            self.checkpoint(f"bringing in {held_name}")
             self._set(a=original.id, b=copy.id, side="b", revision=self.state.revision + 1,
                       status=f"{held_name} is on A as saved, and on B to work on. {note}".strip())
             self._show()

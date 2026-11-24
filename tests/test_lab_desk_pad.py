@@ -54,9 +54,9 @@ class PadPanelTest(unittest.TestCase):
     def test_the_pad_comes_above_the_other_knobs_and_takes_the_place_of_their_sliders(self):
         tray = self.panel(["drive", "brightness", "texture", "body"], {"brightness": .5, "texture": -.25})
         children = tray.winfo_children()
-        # Undo and hearing it without the knobs are placed first, at the bottom, so they stay on show; the pad is
-        # the first thing from the top, and the sliders scroll in the room between.
-        self.assertEqual([part["text"] for part in children[0].winfo_children()], ["Undo", "Hear it without the knobs"])
+        # Hearing it without the knobs is placed first, at the bottom, so it stays on show (Undo is the desk's, by
+        # the tiles); the pad is the first thing from the top, and the sliders scroll in the room between.
+        self.assertEqual([part["text"] for part in children[0].winfo_children()], ["Hear it without the knobs"])
         self.assertEqual(children[0].pack_info()["side"], "bottom")
         pad = children[1]
         self.assertIsInstance(pad, tk.Canvas)
