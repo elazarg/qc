@@ -34,7 +34,12 @@ What falls behind is everything that was added since:
    command shows every screen, no test checks that a panel fits its height, and the usage log records the
    side tools only.
 
-The last one is why the first four keep coming back. Section 10 is about that.
+6. **The app says in sentences what a state, a symbol, a mark or a default would say.** The desk can say
+   about 166 different things on its lines; nearly a quarter of them are "do something else first", for a
+   control that should not have looked pressable. Guitar is a button the player presses again after every
+   save, recording and measurement. Section 11, added after the owner read the first ten, is about that.
+
+The fifth is why the first four keep coming back. Section 10 is about that.
 
 ## 1. Faults, verified in pictures and code
 
@@ -323,17 +328,203 @@ Four changes to how work is done would keep them from coming back. They are smal
   are never reached. Usage is a reason to move a thing nearer or further, never to drop it.
 - **P5. A word list** (W1): the app's nouns, one meaning each, checked when text is written.
 
+## 11. Words where something else would say it
+
+The first ten sections judge the words. This one asks which of them should be words at all. The player has a
+guitar on: both hands are busy, the eyes are often on the fretboard, and the screen is at arm's length or
+further. A 9-point sentence is the most expensive thing to give that player, and a click is the second most
+expensive, because a hand has to leave the strings for the mouse.
+
+### What the count says
+
+Words and controls on show, counted from the widgets of the hidden window (labels, buttons, list rows, text
+drawn on a canvas), with the made-up round of section 1 on the desk:
+
+| Screen | Words | Controls |
+| --- | --- | --- |
+| The desk, empty | 51 | 16 |
+| The desk, a round on show, A and B | 97 | 25 |
+| Chain panel | 251 | 0 |
+| Guitar panel | 204 | 17 |
+| Phrase panel | 88 | 18 |
+| Teach a control | 108 | 22 |
+| Guitar Learner | 101 | 19 |
+| Every other panel and tool | 10 to 54 | 2 to 18 |
+
+The resting desk nearly doubles its words when there is something on it, and two panels are pages of prose
+with nothing to press.
+
+The lines can say about 166 different things (every `say`, `status=` and working line in `lab/desk`,
+`lab/tools` and `lab/learner`; a count from the source, so near enough). Of those:
+
+- **About 38 are "not yet".** 27 end in "first." ("Choose a preset in the list first.", "Record or choose a
+  phrase first.", "Measure music first.") and the rest begin "Nothing …" or say what is needed. Each is the
+  answer to a press on a control that looked ready.
+- **About 33 are progress** ("Playing the phrase silently through each part…", "Getting A and B ready on
+  the Quad Cortex…"): a sentence for the fact that time is passing.
+- **About 15 of the desk's own restate the click that caused them**: "Stopped.", "Undone.", "Scene B",
+  "B · Hiwatt Push · phrase", "Gestures off.", "Plexi Crunch: keeper", "Plexi Crunch is on A too, to compare
+  the next change on B against."
+
+That leaves about half that carry something the screen does not already show: results, faults, and what the
+assistant decided.
+
+### N1. A rule for what gets a word
+
+A word is kept for what only a word can say:
+
+- a name somebody gave: the sound, the request, the designer's line on how a design differs;
+- an abstract quality: the Shape knobs ("Jazz", "Band fit" have no picture);
+- an action that is rare and has consequences: Save to QC;
+- a fault, and what to do about it.
+
+Everything else has a cheaper form: a **state** shown on the thing itself, a **symbol** for an action
+everybody knows, a **mark** on a scale for a value, **motion** for time, a **default** so that the control
+is not needed, or a **drag** so that the target need not be named. A symbol is used alone only where it is
+universal (play, loop, record, stop, undo, heart, ✕, eye, pin, search, warning); `lab/desk/hints.py:named`
+already gives a drawn symbol its name while the pointer rests on it, and `lab/desk/pictures.py` already
+draws the app's own. Windows ships an icon font (Segoe MDL2 Assets, Segoe Fluent Icons), so the common
+symbols need no image files; how they look at 1100×680 is a thing to check in a picture, not to assume.
+
+### Controls a default would remove
+
+- **D1. Guitar is the resting state, not a button.** The player came to play. Today the guitar is connected
+  only after Guitar is pressed, and the app takes it away in seven places and gives it back in two: Stop;
+  Save to QC (`studio.py:1112`); recording a phrase (`:1215`); every measurement a tool or panel makes
+  (`tools/common.py:546`); the Guitar Learner taking the input (`studio.py:758`); a preset chosen by hand
+  on the unit (`:440`); a failure (`:560`, `:623`). It comes back by itself only when A and B are made
+  ready while it was still on (`:547`) and beside gesture listening (`:754`). So Guitar is pressed over and
+  over to put back what the app removed. With the guitar live whenever A or B is ready, the button becomes
+  a lamp (the instrument at the top left, lit in the live colour) and one control to pause.
+
+  Three things have to hold, and none was tried on the unit:
+  1. *Silent listening needs the unit.* It disconnects the input and builds the sound somewhere else
+     (`engine.py:361-367`), and today it starts once nothing has played for two seconds. With the guitar
+     always on, "nothing plays" has to be heard, and in Guitar mode the app opens no audio driver: the route
+     is made on the unit (`engine.py:173-215`). Gesture listening does watch the dry input while the guitar
+     plays (`studio.py:66-69`), so the means exist. The listen would start when the strings have been quiet
+     for a few seconds and stop at the first note, at the cost of the half second a recall takes.
+  2. *A preset chosen by hand on the unit is left alone*, as now. Clicking a tile is the way back; that
+     replaces "Press Guitar or Phrase to come back."
+  3. *A pause stays*, for tuning, talking, or using the unit by hand.
+- **D2. Phrase is a transport, not a mode.** The phrase can only loop (`hearing/audio.py:204`, "round and
+  round"). Three symbols say more than the one word: ▶ plays it once through the selected sound and gives
+  the guitar back; ⟳ loops it; ⇄ loops it and changes side at each pass, which is an A/B comparison with no
+  hand on the mouse and is what a blind comparison wants too. ● beside them records (D5). The phrase itself
+  is the strip to their right: its shape, the part that loops, the place it is at. That strip replaces the
+  words "Phrase · Neck", is the loop editor of the Phrase panel moved to where the phrase is played, and
+  gives the row a playhead, which is the one piece of motion the desk most lacks.
+- **D3. A is "before" unless it is pinned.** Copy B to A exists so that a change to B can be compared with
+  what B was; the app's own sentence says so. The app knows when a change is about to be made. If the
+  sound B had goes to A by itself whenever B is revised (and never when A is pinned or was put there by
+  hand), the usual use of the control is gone, and "is this better than before" is always one click on A.
+- **D4. A control that cannot act is dimmed.** That is the 38 sentences. The app already dims in places
+  ("Learn settings", "Newer", Guitar and Phrase while the input is held); the reason goes on the dimmed
+  control's hover, where it is read only by somebody who wonders.
+- **D5. Recording takes one press.** With the guitar's setting kept (I2), ● records on the setting last
+  used. "Choose the setting first" (W5) and the form of ten chips before every take go away; the setting
+  can be corrected on the take afterwards.
+
+### Dragging, and no hands
+
+- **G1. The tiles take whatever is dropped on them.** B onto A is Copy B to A. A chip of the round onto A
+  keeps that design to compare the next against, which today takes three clicks (the chip, Copy B to A, the
+  next chip). A row of History, a preset, an IR or a capture onto a tile puts it there. That removes six
+  buttons (Copy B to A, Put on A, Put on B, Work on this, Put in B's cab, Instead of B's amp) and it answers
+  section 3 without a rule: what a thing acts on is where it was dropped. Dragging is easy to miss, so three
+  things go with it: the pointer changes over what can be dragged, both tiles light as targets the moment a
+  drag starts, and one click path stays (the arrow between the tiles; a double click on a row, as the
+  presets list already has). In this toolkit it is a press, a motion and a frame that follows the pointer
+  inside the one window, like the list of the instrument chooser; the pad and the loop's edges are already
+  dragged.
+- **G2. The wheel steps through the round** while the pointer is over its chips or over B. It is a pointer
+  gesture, not a key.
+- **G3. The comparison that matters most is made with no free hand.** Flipping between A and B while
+  playing is the app's central act and needs the mouse each time. D2's ⇄ covers it for the phrase. For the
+  guitar the app already listens for taught gestures, but only to turn one Shape knob, and only for 20
+  seconds after a button in a panel. Whether A and B can be flipped from a footswitch of the unit, or by a
+  gesture on the muted strings, is worth finding out on the unit before anything on the screen is polished:
+  nothing here is known about it.
+
+### Marks instead of sentences
+
+| Now, in words | Instead |
+| --- | --- |
+| "measured: crunch, balanced, dry" on the tile, again under the chips, "aiming for crunch, balanced, dry" at the right, "Aiming for …" on the status line | Three short scales on each tile (gain, bright, tail): a ring where the aim is, a dot in the side's colour where the sound was heard. A miss is a gap between ring and dot, seen without reading (A4). The words stay on hover. |
+| "Brit Plexi 50 Normal", "412 Brit 60B GB 71 (M)" as lines in a panel | The chain as a row of block symbols on the tile, as the unit itself draws it; a block that differs from the other side is outlined (A3). A click on a block opens its settings. |
+| " · not listened to yet", " · could not be listened to", "Listening to Plexi Slap, silently…" | A pip on the design's chip: hollow, filling while it is listened to, full, or a warning sign with the reason on hover. |
+| "● guitar", "B · Hiwatt Push · phrase", "Stopped." | The lit tile and the transport already say it. |
+| Keep, Not this | A heart and a ✕ at the tile's corner, filled when set (A6). |
+| Copy B to A, Compare blind / Show which was which, Undo | Three symbols between the tiles: an arrow, an eye that is struck through while names are hidden, a turned-back arrow whose hover says what it undoes (A7). |
+| "Revised: a copy to compare against", "shaped", "saved as Lead 2" | Small marks on the tile: a knob when the knobs are off zero, the slot ("3A") when saved. The first says nothing the player did not just do. |
+| "Getting A and B ready on the Quad Cortex…" | The tiles drawn hatched until they are ready. |
+| Thirty-three working sentences | A ring on the thing being worked on: B's tile for a request, the pip for a listen, the list for a read of the unit. One short line stays for which. |
+| "Opening the input… wait for “play now”.", "Recording 8 s · play now (you hear B)…" | A lamp that turns red when the input is open, a ring that drains in eight seconds, the input's level as a bar. A sentence cannot be read while counting in; a colour can. |
+| "Gestures off · armed 17 s", rewritten every second | A ring that drains. |
+| Four paragraphs under "What the Charvel puts out" | One bar per pickup setting against a line where "the humbucker most presets assume" is, and a tick for the noise. The paragraphs are the numbers of that chart written out. |
+| Thirteen lines under Measured in Chain (W2) | Two small charts the app half has: harmonics by order, level by band (`tools/field.py:draw_bands`). The exact numbers on hover. |
+| "Brightness −1.0 oct · Variation +11.7 dB · Stereo sides +0.0 pp · Tail continuity −7.9 pp" | Four signed bars from a centre line, in B's colour to the right and A's to the left, as the band chart beside it already does. |
+| Scene chips "A  Rhythm", "B  Lead" | The unit's row of eight footswitches, the chosen one lit, with the scene's name. |
+
+- **N2. Scenes and sides share their letters.** Scenes are drawn as A to H (`window.py:445`) directly under
+  two tiles called A and B, and the status line says "Scene B" while B is also a side. Drawing scenes as
+  the unit's footswitches ends it.
+- **N3. Time is shown nowhere.** The phrase has no playhead, a listen of 25 seconds and a request of a
+  minute have no progress, a recording has no count, gestures count down in rewritten text. The window's
+  clock already ticks every 80 ms (`window.py:1339`); a ring or a bar drawn on a canvas at that rate is
+  within the toolkit. Fades and slides are not, and are not needed.
+- **N4. Colour says three things and could say six.** Blue and peach are the sides and green is on air.
+  Free to take: red for recording, one colour for a fault or a refusal (R7), and a quiet grey for "the unit
+  is yours, the app is leaving it alone". Each colour goes with a change of shape as well, so that it
+  never stands alone.
+
+### The desk this adds up to
+
+```
+[● guitar picture  Charvel  ●○○○○]                         Shape   Sounds   Unit   More
++-------------------------------+  <-  +-------------------------------+
+| A                    pin ♥ ✕  |      | B                        ♥ ✕  |
+| Plexi Crunch                  |  eye | Hiwatt Push                   |
+| [amp] > [cab]                 |      | [drive] > [amp] > [cab]       |
+| gain   ---(o)-----            | undo | gain   ---( )------o--        |
+| bright -----(o)---            |      | bright -----( )-----o-        |
+| tail   (o)--------            |      | tail   (o)--------            |
++-------------------------------+      +-------------------------------+
+[● 1 Plexi Crunch] [● 2 Hiwatt Push] [○ 3 Plexi Slap]  [› 3 more · 1 min]
+[live] [▶] [⟳] [⇄] [●]  [ phrase: shape, loop, playhead ............ ]  [Save to QC]
+[ Ask for a sound, a song, or a change                                             ]
+```
+
+About thirty words where there are 97, and every one of them a name. Chain and Difference are no longer
+panels to open, since the tile shows the chain and the two tiles show the difference; Phrase and Guitar are
+the strip and the instrument; that leaves four names at the top right where there are eight. This is one
+frame of a direction to argue with, not a specification. It keeps the resting desk's rule: nothing in it
+explains anything.
+
+### What this cannot settle
+
+Nothing in this section was heard or tried on the unit. D1 depends on hearing that the strings are quiet,
+D2 on a phrase that ends, G3 on what the unit's footswitches can be given to do. Symbols and marks have to
+be looked at in pictures at both sizes before they are believed. And a mark that replaces a sentence must
+still name what is measured: the three scales show what the app took the sound to be, and their hover
+keeps saying so.
+
 ## Order of work
 
 1. **The faults** F1–F9. Hours each; F1, F3 and F4 block things outright.
 2. **The request loop** R1–R5 and R7: the placeholder, the request kept on show, the reading said at once,
    the working line and Cancel above the ask line, the seconds, three looks for the line.
-3. **A and B** A1–A4: one rule for what a change acts on, the side named in every panel that changes a
-   sound, blind comparison putting things back, the line of what differs, the aim against what was heard.
-4. **The process** P2–P4, before any regrouping, so that the regrouping is looked at whole and argued from
+3. **Fewer sentences without new machinery**: dim what cannot act (D4), the pips on the chips, the heart
+   and the ✕, the three symbols between the tiles, the transport's symbols over what exists (loop and
+   stop), drop the lines that restate a click.
+4. **A and B** A1–A4, with D3 and the drops of G1: what a change acts on, blind comparison putting things
+   back, the scales with aim and heard, the chain on the tile.
+5. **The process** P2–P4, before any regrouping, so that the regrouping is looked at whole and argued from
    use.
-5. **The merges that are plainly duplication** I1–I4, then words (W1–W5) and looks (V1–V6, L1–L6).
-6. **History and the other lists** S1–S3.
+6. **On the unit, with the player**: guitar live by default (D1), play once and alternate (D2), flipping
+   A and B with no hand (G3). These change what the engine does and need hearing.
+7. **The merges that are plainly duplication** I1–I4, then words (W1–W5) and looks (V1–V6, L1–L6).
+8. **History and the other lists** S1–S3.
 
 What should not change: the resting desk, one window, hints behind a `?`, disclosure in place, the unit's
 rules, the side features themselves.
