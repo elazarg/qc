@@ -91,6 +91,13 @@ class LinesThatWrapTest(DeskCase):
             column = self.desk.line.master
             for line in (self.desk.line, self.desk.strip_note):
                 self.assertLessEqual(line.winfo_reqwidth(), column.winfo_width(), (size, line.cget("text")[:30]))
+            # The round's chips go on to a second line rather than past the column's edge.
+            self.root.update()
+            for chip in self.desk.chips.winfo_children():
+                self.assertTrue(inside(chip, column), (size, chip.cget("text")))
+            # And the ask line, under them, keeps its whole height.
+            self.assertGreaterEqual(self.desk.request.winfo_height(), self.desk.request.winfo_reqheight(), size)
+            self.assertTrue(inside(self.desk.request, self.root), size)
 
     def test_the_aim_is_said_once_with_what_was_heard_and_what_misses(self):
         from lab.desk.difference import aim_against

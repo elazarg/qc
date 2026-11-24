@@ -320,6 +320,7 @@ class Desk:
         self.strip.pack(fill="x", pady=(10, 0))
         self.chips = tk.Frame(self.strip, bg=PAPER)
         self.chips.pack(fill="x")
+        self.chips.bind("<Configure>", lambda event: self.flow_chips(event.width), add="+")
         self.strip_note = label(self.strip, size=9, color=SUBTLE, wrap=600)
         self.strip_note.pack(fill="x", pady=(4, 0))
 
@@ -386,6 +387,10 @@ class Desk:
         self.placeholder = tk.Label(ask, text=PLACEHOLDER, bg=DARK, fg=DIM, font=(FONT, 12), cursor="xterm")
         self.placeholder.bind("<ButtonRelease-1>", lambda _: self.request.focus_set())
         self.show_placeholder()
+        # What is under the tiles is given its room first, from the bottom up, so that in a small window the
+        # tiles give way and the ask line, the buttons and the round's chips are never squeezed.
+        for widget in (ask, self.working_row, self.line, row, self.strip, self.scene_row):
+            widget.pack_configure(side="bottom", before=pair)
 
     # ---- drawing ----
 
@@ -466,7 +471,7 @@ class Desk:
 
             self.level_note.configure(text=f"Volume: {reading(studio.listening)}")
             if not self.level_row.winfo_manager():
-                self.level_row.pack(fill="x", pady=(6, 0), before=self.scene_row)
+                self.level_row.pack(side="bottom", fill="x", pady=(6, 0), after=self.scene_row)
         elif self.level_row.winfo_manager():
             self.level_row.pack_forget()
         since = studio.loop_since[1] if studio.loop_since and state.mode == "phrase" else None
@@ -721,7 +726,6 @@ class Desk:
             return
         if found.get("previous"):
             back = tk.Label(self.chips, text="‹", padx=6, pady=5, cursor="hand2", font=(FONT, 10), bg=PAPER, fg=SOFT)
-            back.pack(side="left")
             back.bind("<ButtonRelease-1>", lambda _: studio.round_back())
         for place, candidate in enumerate(found["candidates"]):
             sound = studio.store.sound(candidate["sound"])
@@ -731,7 +735,6 @@ class Desk:
             chip = tk.Label(self.chips, text=f"{pip} {place + 1}  {sound.name}", padx=10, pady=5, cursor="hand2",
                             font=(FONT, 9, "bold" if chosen else "normal"),
                             bg=mix(SIDE["b"], DARK, .3) if chosen else TILE, fg=INK if chosen else SOFT)
-            chip.pack(side="left", padx=(0, 5))
             chip.bind("<ButtonRelease-1>", self.drags.click(lambda place=place: studio.step(place)))
             self.drags.source(chip, lambda event, sound=sound: ("design", sound.id), self.dragged_name)
             named(chip, lambda sound=sound: aim_against(found["aim"], None if studio.unheard(sound) else sound.heard,
@@ -748,9 +751,16 @@ class Desk:
         more = tk.Label(self.chips, text="›  next three" if ready else "Three more · about a minute", padx=10, pady=5,
                         cursor="hand2", font=(FONT, 9, "bold" if ready else "normal"), bg=PAPER,
                         fg=ACCENT if ready else SOFT)
-        more.pack(side="left", padx=(4, 0))
         more.bind("<ButtonRelease-1>", lambda _: studio.round_forward())
+        self.flow_chips()
         self.strip_key = key
+
+    def flow_chips(self, width=None):
+        """The round's chips, as many to a line as the column has room for: with a panel open in the smallest
+        window they go on to a second line rather than past its edge."""
+        chips = self.chips.winfo_children()
+        if chips:
+            flow(self.chips, chips, width=max(200, (width or self.chips.winfo_width() or 600) - 4), gap=5)
 
     # ---- panels ----
 
@@ -1499,7 +1509,7 @@ class Desk:
         self.save_name.delete(0, "end")
         if not self.studio.state.blind:     # filled in with the name only when it is not hidden
             self.save_name.insert(0, sound.name[:24])
-        self.save_row.pack(fill="x", pady=(8, 0), after=self.save_row_after)
+        self.save_row.pack(side="bottom", fill="x", pady=(8, 0), before=self.save_row_after)
         self.save_name.focus_set()
 
     def saved(self):
