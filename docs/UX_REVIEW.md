@@ -7,7 +7,7 @@ were then read in `lab/desk/window.py`, `lab/desk/studio.py` and `lab/desk/reque
 the real unit, so timing and anything audible are not judged here. The pictures named below are in
 `docs/ux-review/`.
 
-## Status on 2026-11-24
+## Status on 2026-11-25
 
 Done the same day, each with tests (`tests/test_lab_desk_faults.py`, `test_lab_desk_asking.py`,
 `test_lab_desk_sides.py`, `test_lab_desk_symbols.py`) and looked at in `tests/gallery.py`'s pictures at both
@@ -20,10 +20,17 @@ sizes. Nothing was tried on the real unit.
   Sounds name the side), A2, A3 (B's tile lists the knobs that differ; blocks that differ are outlined), A4
   (scales with aim and heard; the misses named under the chips), A5, A6, A7.
 - **Where things live:** I4 (the open panel's name is lit). **Words:** W2 (Chain's measurements behind
-  "Measured ▾"), W1 in part ("Volume" for how loud the player hears it; the word list is in `AGENTS.md`).
-- **Looks:** V1 (the accent is lilac, no longer B's peach), V3 (the dimmest text is 5:1 on the panels), L3
+  "Measured ▾"), W1 in part ("Volume" for how loud the player hears it; the word list is in `AGENTS.md`), W3
+  (a knob's check says whether it did what it says, with the measure in brackets, and the correction in the
+  same clause), W4 (the contrast's four measures renamed for what they measure and drawn as signed bars; the
+  band chart in the sides' colours, its bands in Hz, with a key), W5 (the record control is a dot, dimmed with
+  its reason).
+- **Looks:** V1 (the accent is lilac, no longer B's peach), V3 (the dimmest text is 5:1 on the panels), V4 (a
+  one-pixel rule round the tiles and the buttons), V6 (Shape's knobs are tracks with a mark where each rests,
+  a bar to where it stands in the side's colour, and the position), L3
   (the rows under the tiles keep their room; the tiles give way), L6 through D4.
-- **Lists:** S2.
+- **Lists:** S1 (History grouped under the request each sound came from, newest first, with ♥, ✕ and ★, and a
+  line to narrow it; the lists that filter carry a magnifying glass), S2.
 - **Process:** P1–P5: `tests/gallery.py`, a fit test of every panel with real content, the usage log sees the
   desk, and the placement rule and word list in `AGENTS.md`.
 - **Section 11:** N1 (in `AGENTS.md`), D4, D5, G1 (tiles, the round's chips, History rows and IRs; not
@@ -38,8 +45,8 @@ Waiting, and why:
   what the engine does or what the player is used to.
 - **The player's call:** I1–I3 and I5 (merging Phrase and Guitar, one place for the guitar's setting,
   renaming Sounds and the tools). The usage log now records the desk, so these can be argued from use.
-- **Not started:** R8, W3–W6, L1–L2, L4–L5, V2, V4–V6, S1, S3, T1–T3, G2, N2–N4 and the rest of the table of
-  marks (rings on what is being worked on, a recording lamp, charts in Guitar, Chain and Difference).
+- **Not started:** R8, W6, L1–L2, L4–L5, V2, V5, S3, T1–T3, G2, N2–N4 and the rest of the table of marks
+  (rings on what is being worked on, a recording lamp, charts in Guitar and Chain).
 
 Findings are numbered so that they can be picked up one at a time. Each says what was seen, where, and what
 would mend it inside the rules of the design in `AGENTS.md` (one window, few words, no shortcuts, side

@@ -307,8 +307,9 @@ class HistoryPanelTest(DeskCase):
                                          created=f"2026-11-01T10:{index:02d}:00+00:00"))
         self.desk.toggle("History")
         box = [child for child in self.desk.tray.winfo_children() if isinstance(child, tk.Listbox)][0]
-        self.assertEqual(box.size(), 70)                                   # all of them, newest first
-        self.assertTrue(box.get(0).startswith("Sound 69"))
+        self.assertEqual(box.size(), 71)                                   # all of them under one heading
+        self.assertEqual(box.get(0), "Other sounds")
+        self.assertEqual(box.get(1).strip(), "Sound 69")                   # newest first
         chosen = history_rows(self.home)[5][0]
         measured = self.studio.store.sound(chosen)                         # measured after the panel was drawn
         measured.heard = {"phrase": "p", "digest": measured.chain.digest(), "level_db": -20.}
@@ -317,6 +318,31 @@ class HistoryPanelTest(DeskCase):
         self.press("Put on B")
         self.assertEqual(self.studio.state.b, chosen)
         self.assertEqual(self.studio.store.sound(chosen).heard["level_db"], -20.)
+
+    def test_sounds_are_grouped_under_the_request_they_came_from_with_their_marks(self):
+        self.open()
+        store = self.studio.store
+        first = Sound("Plexi", one_row(PLEXI, V30), {"kind": "designed", "request": "classic rock crunch"},
+                      created="2026-11-01T10:00:00+00:00", marks=["keeper"])
+        store.save(first)
+        store.save(Sound("Hiwatt", one_row(PLEXI, V30), {"kind": "designed", "request": "classic rock crunch"},
+                         created="2026-11-01T10:00:01+00:00", marks=["not this"]))
+        store.save(Sound("Lead", one_row(PLEXI, V30), {"kind": "designed", "request": "a singing lead"},
+                         created="2026-11-01T11:00:00+00:00"))
+        store.save(Sound("Plexi", one_row(PLEXI, V30), {"kind": "revised", "from": first.id, "request": "tighter"},
+                         created="2026-11-01T12:00:00+00:00", saved=True))
+        store.save(Sound("My preset", one_row(PLEXI, V30), {"kind": "preset"}, created="2026-11-01T09:00:00+00:00"))
+        self.assertEqual([text for _, text in history_rows(self.home)],
+                         ["“classic rock crunch”", "    ↳ Plexi  ★", "    Hiwatt  ✕", "    Plexi  ♥",
+                          "“a singing lead”", "    Lead", "From the unit", "    My preset"])
+        self.assertEqual([text for _, text in history_rows(self.home, "lead")], ["“a singing lead”", "    Lead"])
+        self.assertEqual([text for _, text in history_rows(self.home, "crunch hiwatt")],
+                         ["“classic rock crunch”", "    Hiwatt  ✕"])
+        self.desk.toggle("History")
+        box = [child for child in self.desk.tray.winfo_children() if isinstance(child, tk.Listbox)][0]
+        box.selection_set(0)                                               # a heading is not a sound
+        self.press("Put on A")
+        self.assertIn("Choose a sound", self.studio.state.status)
 
     def test_put_with_nothing_chosen_says_so(self):
         self.open()

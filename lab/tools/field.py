@@ -11,8 +11,8 @@ the Shape panel always agree. A gesture (a drag from press to release, a sweep f
 unit while it lasts and becomes the sound's knob positions once, at its end: one step for the desk's Undo,
 one write of the sound, one check by listening. "Measure A and B" plays the phrase silently through both
 sounds on the unit and says how B differs from A, level aside: octave-band balance, brightness, how much the
-level moves, stereo sides and what rings on. It is asked for in the desk's Difference panel, which shows
-what `contrast` found with `contrast_lines` and `draw_bands`; the field itself is the plane.
+level moves, stereo sides and what carries on after notes. It is asked for in the desk's Difference panel,
+which draws what `contrast` found with `draw_deltas` and `draw_bands`; the field itself is the plane.
 """
 
 from dataclasses import dataclass
@@ -21,7 +21,7 @@ import tkinter as tk
 
 from lab.sound.knobs import KNOBS
 from lab.desk.hints import hint
-from lab.desk.theme import ACCENT, DARK, DIM, FONT, PAPER, RULE, SUBTLE, TONE_A
+from lab.desk.theme import ACCENT, DARK, DIM, FONT, PAPER, RULE, SUBTLE, TONE_A, TONE_B
 from lab.tools.common import WIDTH, Chips, Tool, button, disclosure, label, render_many
 from lab.tools.search import BANDS, describe
 
@@ -123,10 +123,10 @@ def difference(before, after):
     a, b = describe(before), describe(after)
     return Fingerprint(
         tuple(right - left for left, right in zip(a.spectrum, b.spectrum)),
-        (("Brightness", b.brightness - a.brightness, "oct"),
-         ("Variation", b.dynamics - a.dynamics, "dB"),
-         ("Stereo sides", (b.width - a.width) * 100, "pp"),
-         ("Tail continuity", (b.tails - a.tails) * 100, "pp")),
+        (("Spectral centre", b.brightness - a.brightness, "octave"),
+         ("Loudness spread", b.dynamics - a.dynamics, "dB"),
+         ("Power in the sides", (b.width - a.width) * 100, "points"),
+         ("Carry-over after notes", (b.tails - a.tails) * 100, "points")),
     )
 
 
@@ -139,25 +139,50 @@ def contrast(engine, a, b, dry, *, stop=None):
     return {"spectrum_db": list(found.spectrum_db), "perceptual_delta": [list(item) for item in found.perceptual_delta]}
 
 
-def contrast_lines(found):
-    """What `contrast` found, in two lines of words."""
-    return ["B against A, level aside:",
-            "  ·  ".join(f"{name} {value:+.1f} {unit}" for name, value, unit in found["perceptual_delta"])]
+# How far a bar of `draw_deltas` reaches, by unit: a change this large or larger fills its half. Fixed, so that
+# two measurements can be compared by eye. "points" are percentage points: the share of the power in the stereo
+# sides, and an index of how much level carries on after a note, from 0 to 100.
+REACH = {"octave": 1., "dB": 12., "points": 50.}
+DELTA_ROW = 18
+
+
+def draw_deltas(chart, deltas, *, width):
+    """Draw `contrast`'s "perceptual_delta" as one signed bar each from a centre line: to the right in B's colour
+    where B has more, to the left in A's where A has more, with the measure's name and B's change in figures."""
+    chart.delete("all")
+    chart.configure(height=len(deltas) * DELTA_ROW + 4)
+    name, value_room = 150, 96
+    half = (width - name - value_room) / 2 - 4
+    centre = name + half + 4
+    chart.create_line(centre, 0, centre, len(deltas) * DELTA_ROW + 4, fill=RULE)
+    for row, (title, value, unit) in enumerate(deltas):
+        y = row * DELTA_ROW + DELTA_ROW / 2 + 2
+        chart.create_text(0, y, text=title, anchor="w", font=(FONT, 9), fill=SUBTLE)
+        reach = max(-1., min(1., value / REACH.get(unit, max(abs(value), 1.))))
+        if abs(reach) >= .01:
+            chart.create_rectangle(centre, y - 5, centre + reach * half, y + 5, fill=TONE_B if value > 0 else TONE_A,
+                                   outline="")
+        chart.create_text(width, y, text=f"{value:+.1f} {unit}", anchor="e", font=(FONT, 9), fill=SUBTLE)
 
 
 def draw_bands(chart, values, *, width, height):
-    """Draw the difference in each octave band (`contrast`'s "spectrum_db") as bars up and down from a line."""
+    """Draw the difference in each octave band (`contrast`'s "spectrum_db") as bars up and down from a line: up in
+    B's colour where B has more of the band, down in A's where A has more. The bands are named by their centre in
+    Hz."""
     chart.delete("all")
-    centre = (height - 18) / 2
+    centre = (height - 18) / 2 + 6
     chart.create_line(4, centre, width - 4, centre, fill=RULE)
     scale = max(6., max(abs(value) for value in values))
     step = (width - 10) / len(values)
     for index, (value, name) in enumerate(zip(values, BAND_NAMES)):
         x = 5 + step * (index + .5)
-        y = centre - value / scale * (centre - 5)
-        chart.create_rectangle(x - step * .28, centre, x + step * .28, y, fill=ACCENT if value > 0 else TONE_A,
+        y = centre - value / scale * (centre - 14)
+        chart.create_rectangle(x - step * .28, centre, x + step * .28, y, fill=TONE_B if value > 0 else TONE_A,
                                outline="")
-        chart.create_text(x, height - 8, text=name, font=(FONT, 8), fill=SUBTLE)
+        chart.create_text(x, height - 8, text=name + (" Hz" if index == len(values) - 1 else ""), font=(FONT, 8),
+                          fill=SUBTLE)
+    chart.create_text(4, 3, anchor="nw", text="▲ more in B", font=(FONT, 8), fill=TONE_B)
+    chart.create_text(84, 3, anchor="nw", text="▼ more in A", font=(FONT, 8), fill=TONE_A)
     chart.create_text(width - 4, 3, anchor="ne", text=f"±{scale:.0f} dB", font=(FONT, 8), fill=SUBTLE)
 
 

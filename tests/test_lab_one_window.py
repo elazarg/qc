@@ -54,7 +54,8 @@ NOT_A_KEY = re.compile(r"^<(Button(Press|Release)?(-\d)?|Double-Button-\d|B\d-Mo
 KEYS = {
     "desk/window.py": [
         ("<Return>", 2, "Return in the Ask line sends the request; Return in the name typed for a save saves it"),
-        ("<KeyRelease>", 2, "the lists of presets and of IRs and captures follow what is typed in their filter"),
+        ("<KeyRelease>", 3, "the lists of presets, of IRs and captures, and of History's sounds follow what is "
+                            "typed in their filter"),
     ],
     "tools/common.py": [("<Return>", 1, "Return in the line a file's path is typed into checks and takes that path")],
     "tools/search.py": [("<Return>", 1, "Return in the line the words are typed into finds by them")],
@@ -629,8 +630,10 @@ class FoldedIntoTheDeskTest(DeskCase):
         self.root.update()
         texts = self.texts(self.desk.tray)
         self.assertTrue(any(text.startswith("B against A, level aside") for text in texts), texts)
-        self.assertTrue(any("Brightness" in text and "Tail continuity" in text for text in texts))
-        chart, = self.charts()
+        deltas, chart = self.charts()
+        said = [deltas.itemcget(item, "text") for item in deltas.find_all() if deltas.type(item) == "text"]
+        self.assertIn("Spectral centre", said)
+        self.assertIn("Carry-over after notes", said)
         self.assertGreater(len(chart.find_all()), 8)        # a bar for each octave band
         self.assertEqual(len(self.desk.contrast["spectrum_db"]), 8)
         self.studio.turn({"brightness": .5}, "b")           # B is not the sound that was measured any more

@@ -145,6 +145,7 @@ class Gallery:
 
         for name in PANELS:
             self.shoot(f"panel-{name.lower()}", lambda name=name: self.panel(name))
+        self.shoot("panel-difference-measured", lambda: (self.panel("Difference"), desk.measure_difference()))
         self.panel("Sounds")
         for kind in ("IRs", "Captures"):
             def show(kind=kind):

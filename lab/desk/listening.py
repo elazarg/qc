@@ -30,6 +30,8 @@ IDLE_SECONDS = 2.       # silent listening starts once the unit has been left al
 # The one correction a check may make to a knob, as a factor on its position: further when it did too little,
 # back when it did the opposite of what it is for.
 CORRECTION = {"too small": 1.6, "opposite": .5}
+# What a check found of a knob, as the status line says it.
+VERDICT = {"as intended": "did what it says", "too small": "did little here", "opposite": "went the other way"}
 CORRECTION_LIMIT = .4   # never more than this much of a knob's travel
 # Why a silent listen can end without saying anything about the sound it was listening to: it was stopped, or the
 # unit was not the app's to use just then.
@@ -149,8 +151,8 @@ class Listening:
             return f"{side}'s Shape knobs have not been measured where they stand."
         corrected = (heard.get("shaped") or {}).get("corrected")
         return (f"{side}'s Shape knobs " + ("were corrected after they were measured" if corrected else
-                                             "were measured on another take, part of it or scene, or not at all")
-                + ", and are not measured again by themselves: turn one to have them measured where they stand.")
+                                             "were measured on another take, part or scene, or not at all")
+                + ": turn one to measure them where they stand.")
 
     # ---- listening while the unit is free ----
 
@@ -467,7 +469,9 @@ def _measured(entry):
 
 
 def _checked_words(found, turned, correction):
-    """What listening measured of the knobs just turned, in one line for the status."""
+    """What listening measured of the knobs just turned, in one line for the status, in the player's terms:
+    whether each knob did what its name says, with the measure it was judged by in brackets, and the one
+    correction made."""
     parts, unmeasured = [], []
     for key in sorted(turned, key=lambda key: list(knobs.KNOBS).index(key) if key in knobs.KNOBS else 99):
         entry = found.get(key)
@@ -478,15 +482,14 @@ def _checked_words(found, turned, correction):
             unmeasured.append(title)
             continue
         # A knob without a measure of its own is judged by another quality's, and the line says so.
-        proxy = f" (judged by the measure of another quality, {knobs.PROXY[key]})" if entry.get("proxy") else ""
-        parts.append(f"{title}: {_measured(entry)}, {entry['verdict']}{proxy}")
-    line = "Measured with the knobs, against without: " + ("; ".join(parts) if parts else "nothing that listening "
-                                                                                           "measures") + "."
+        proxy = f"; judged by the measure of another quality, {knobs.PROXY[key]}" if entry.get("proxy") else ""
+        part = f"{title} {VERDICT.get(entry['verdict'], entry['verdict'])} ({_measured(entry)}{proxy})"
+        if correction and correction[0] == key:
+            _, old, new = correction
+            part += (f", so it was turned {'further' if abs(new) > abs(old) else 'back'}, from {old:+.2f} to "
+                     f"{new:+.2f}, once")
+        parts.append(part)
+    line = ("; ".join(parts) + ".") if parts else "Listening measures none of the knobs just turned."
     if unmeasured:
-        line += f" Not measured: {', '.join(unmeasured)}."
-    if correction:
-        key, old, new = correction
-        how = "further" if abs(new) > abs(old) else "back"
-        line += (f" {knobs.KNOBS[key][0]} turned {how}, from {old:+.2f} to {new:+.2f}, once; "
-                 "not measured again.")
+        line += f" Listening cannot measure {', '.join(unmeasured)}."
     return line

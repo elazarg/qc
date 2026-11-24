@@ -37,6 +37,7 @@ from lab.knowledge import REPO, home
 from lab.hearing.measure import summary
 from lab.desk.chooser import InstrumentChooser
 from lab.desk.drag import Drags
+from lab.desk.knob_track import KnobTrack
 from lab.desk.phrase_strip import PhraseStrip
 from lab.desk.scales import Scales
 from lab.tools.common import flow
@@ -78,9 +79,22 @@ def label(parent, text="", *, size=10, color=INK, bold=False, wrap=0):
 
 
 def button(parent, text, action, *, dark=True):
-    return tk.Button(parent, text=text, command=action, relief="flat", borderwidth=0, padx=12, pady=6,
+    # A one-pixel rule round it, so that it parts from the panel by its edge as well as by its words.
+    return tk.Button(parent, text=text, command=action, relief="flat", borderwidth=0, padx=12, pady=5,
                      cursor="hand2", font=(FONT, 10, "bold"), bg=TILE if dark else "#252834", fg=INK,
-                     activebackground=RULE, activeforeground=INK)
+                     activebackground=RULE, activeforeground=INK, highlightthickness=1, highlightbackground=RULE,
+                     highlightcolor=RULE)
+
+
+def search_line(parent, query):
+    """A line to type words into that filter a list, behind a magnifying glass, holding `query` to begin with.
+    Returns the frame, to be packed, and the entry."""
+    frame = tk.Frame(parent, bg=TILE)
+    tk.Label(frame, text=GLYPH["search"], font=icon_font(10), bg=TILE, fg=SUBTLE, padx=6).pack(side="left")
+    entry = tk.Entry(frame, font=(FONT, 10), bg=TILE, fg=INK, relief="flat", insertbackground=INK)
+    entry.insert(0, query)
+    entry.pack(side="left", fill="x", expand=True, ipady=4)
+    return frame, entry
 
 
 def link(parent, text, action, *, color=SOFT):
@@ -90,18 +104,54 @@ def link(parent, text, action, *, color=SOFT):
     return found
 
 
-def history_rows(folder):
-    """Every sound kept, newest first, as (id, name, where it came from, whether it is saved on the unit). Read
-    from the files as they are, without building the chains: the list is long and is drawn often."""
-    rows = []
+def history_rows(folder, query=""):
+    """Every sound kept, as the rows of the History panel: grouped under the request it came from (a revision
+    under the request of the sound it was made from), the newest request first and the newest sound first in
+    it. Rows are (id, text); a request's heading has no id. A sound shows the player's marks (♥ keep, ✕ not this)
+    and ★ when saved on the unit. With `query`, only sounds whose name or request has every word of it.
+
+    Read from the files as they are, without building the chains: the list is long and is drawn often."""
+    records = {}
     for path in (Path(folder) / "sounds").glob("*.json"):
         try:
             record = json.loads(path.read_text(encoding="utf-8"))
-            rows.append((str(record.get("created", "")), record["id"], str(record["name"]),
-                         str((record.get("origin") or {}).get("kind", "")), bool(record.get("saved"))))
+            records[str(record["id"])] = {"id": str(record["id"]), "name": str(record["name"]),
+                                          "created": str(record.get("created", "")),
+                                          "origin": dict(record.get("origin") or {}),
+                                          "marks": [str(mark) for mark in record.get("marks") or []],
+                                          "saved": bool(record.get("saved"))}
         except (OSError, ValueError, KeyError, TypeError, AttributeError):
             continue
-    return [row[1:] for row in sorted(rows, reverse=True)]
+
+    def first(record):
+        seen = set()
+        while record["origin"].get("from") in records and record["id"] not in seen:
+            seen.add(record["id"])
+            record = records[record["origin"]["from"]]
+        return record
+
+    groups = {}
+    for record in records.values():
+        origin = first(record)["origin"]
+        request = str(origin.get("request") or "").strip()
+        heading = (f"“{request[:60]}{'…' if len(request) > 60 else ''}”" if request else
+                   "From the unit" if origin.get("kind") in ("preset", "imported") else "Other sounds")
+        groups.setdefault(heading, []).append(record)
+    words = query.casefold().split()
+    rows = []
+    for heading, members in sorted(groups.items(), key=lambda item: max(record["created"] for record in item[1]),
+                                   reverse=True):
+        members = [record for record in members if all(word in f"{heading} {record['name']}".casefold()
+                                                       for word in words)]
+        if not members:
+            continue
+        rows.append((None, heading))
+        for record in sorted(members, key=lambda record: record["created"], reverse=True):
+            marks = record["marks"]
+            rows.append((record["id"], "    " + ("↳ " if record["origin"].get("from") in records else "")
+                         + record["name"] + ("  ♥" if "keeper" in marks else "") + ("  ✕" if "not this" in marks else "")
+                         + ("  ★" if record["saved"] else "")))
+    return rows
 
 
 def loop_edges(edges, at, shortest=SHORTEST_LOOP):
@@ -140,6 +190,7 @@ class Desk:
         self.tools = {}                 # the side tools made so far, by title (`lab.tools.common.Tool.open`)
         self.hosted = None              # the tool on show in the side panel's place
         self.sounds_query = ""          # what the Sounds panel's presets are filtered by
+        self.history_query = ""         # what History's sounds are filtered by
         self.preset_more = False        # whether the Sounds panel shows what else can be done with a preset
         self.reference_scene = "Default scene"      # the scene a preset is captured in as a reference
         self.contrast = None            # what "Measure A and B now" found, and for which sounds and phrase
@@ -251,7 +302,7 @@ class Desk:
         # Dragging onto a tile: the other tile, a design of the round, a sound from History, an IR or a capture.
         self.drags = Drags(self.root, targets={}, dropped=self.dropped, lit=self.light_targets)
         for column, side in ((0, "a"), (2, "b")):
-            tile = tk.Frame(pair, bg=DARK, padx=16, pady=13, highlightthickness=2, highlightbackground=DARK,
+            tile = tk.Frame(pair, bg=DARK, padx=16, pady=13, highlightthickness=2, highlightbackground=RULE,
                             cursor="hand2")
             tile.grid(row=0, column=column, sticky="nsew")
             # At the top: whether it plays, and the player's marks, a heart and a cross, filled when given.
@@ -435,7 +486,7 @@ class Desk:
             selected = state.side == side
             on_air = state.mode and selected
             # The tile first: everything on it takes its colour, the letter and the marks included.
-            tile.configure(highlightbackground=SIDE[side] if selected else DARK,
+            tile.configure(highlightbackground=SIDE[side] if selected else RULE,
                            bg=mix(SIDE[side], DARK, .14) if on_air else DARK)
             for widget in (name, caption, air, marks, badge, air.master, self.blocks[side]):
                 widget.configure(bg=tile["bg"])
@@ -974,12 +1025,9 @@ class Desk:
             row = tk.Frame(knob_rows, bg=DARK)
             row.pack(fill="x")
             label(row, title, size=9, color=SOFT).pack(side="left")
-            scale = tk.Scale(row, from_=low, to=1, resolution=.05, orient="horizontal", length=230, showvalue=False,
-                             bg=DARK, fg=INK, troughcolor=TILE, highlightthickness=0, borderwidth=0)
-            scale.set(values.get(key, 0.))
-            scale.pack(side="right")
-            scale.bind("<Button-1>", lambda _: setattr(self, "dragging", True), add="+")
-            scale.bind("<ButtonRelease-1>", lambda _, key=key, scale=scale: self.turned(key, scale.get()))
+            KnobTrack(row, low, values.get(key, 0.), SIDE[studio.state.side],
+                      pressed=lambda: setattr(self, "dragging", True),
+                      released=lambda value, key=key: self.turned(key, value)).pack(side="right")
         wheel(knobs_view)
 
     def shape_pad(self, values, usable):
@@ -1129,11 +1177,13 @@ class Desk:
                   "whatever their levels.").pack(side="left")
         found = self.contrast
         if found and found["key"] == self.contrast_key():
-            for line in field.contrast_lines(found):
-                label(self.into, line, size=9, wrap=400).pack(fill="x", pady=(4, 0))
-            chart = tk.Canvas(self.into, bg=PAPER, width=400, height=100, highlightthickness=0)
-            chart.pack(fill="x", pady=(6, 0))
-            field.draw_bands(chart, found["spectrum_db"], width=400, height=100)
+            label(self.into, "B against A, level aside", size=9, color=SOFT).pack(fill="x", pady=(4, 2))
+            deltas = tk.Canvas(self.into, bg=DARK, width=400, highlightthickness=0)
+            deltas.pack(fill="x")
+            field.draw_deltas(deltas, found["perceptual_delta"], width=400)
+            chart = tk.Canvas(self.into, bg=PAPER, width=400, height=110, highlightthickness=0)
+            chart.pack(fill="x", pady=(8, 0))
+            field.draw_bands(chart, found["spectrum_db"], width=400, height=110)
 
     def contrast_key(self):
         """What a measured contrast holds for: the two sounds as they are set, and the phrase."""
@@ -1256,9 +1306,8 @@ class Desk:
             label(top, "Not read yet." if entries is None else "No presets of yours on the unit.",
                   color=SUBTLE).pack(side="left")
             return
-        search = tk.Entry(top, font=(FONT, 10), bg=TILE, fg=INK, relief="flat", insertbackground=INK)
-        search.insert(0, self.sounds_query)
-        search.pack(side="left", fill="x", expand=True, ipady=4, padx=(0, 8))
+        line, search = search_line(top, self.sounds_query)
+        line.pack(side="left", fill="x", expand=True, padx=(0, 8))
         # What is under the list is placed first, from the bottom, so that the list takes the room that is left
         # and nothing under it is pushed out of the panel.
         foot = tk.Frame(self.tray, bg=DARK)
@@ -1362,8 +1411,8 @@ class Desk:
         if not found:
             label(top, "Not read yet.", color=SUBTLE).pack(side="left")
             return
-        search = tk.Entry(top, font=(FONT, 10), bg=TILE, fg=INK, relief="flat", insertbackground=INK)
-        search.pack(side="left", fill="x", expand=True, ipady=4, padx=(0, 8))
+        line, search = search_line(top, "")
+        line.pack(side="left", fill="x", expand=True, padx=(0, 8))
         mine = tk.BooleanVar(value=True)
         box = tk.Listbox(self.tray, bg=DARK, fg=INK, selectbackground=TILE, relief="flat", highlightthickness=0,
                          font=(FONT, 9), height=22)
@@ -1447,7 +1496,7 @@ class Desk:
 
     def panel_history(self):
         """Songs and their parts, collected from requests for songs; what the player's choices say; then every
-        sound kept, newest first, to put on A or B."""
+        sound kept, under the request it came from, to put on A or B."""
         studio = self.studio
         for song in studio.store.songs():
             parts = []
@@ -1460,28 +1509,48 @@ class Desk:
                 label(self.tray, f"{song['name']} · " + ", ".join(parts), size=9, wrap=400).pack(fill="x", pady=1)
         for line in studio.taste_lines():
             label(self.tray, line, size=9, color=SOFT, wrap=400).pack(fill="x", pady=1)
-        rows = history_rows(studio.folder)
+        line, search = search_line(self.tray, self.history_query)
+        line.pack(fill="x", pady=(4, 6))
         box = tk.Listbox(self.tray, bg=DARK, fg=INK, selectbackground=TILE, relief="flat", highlightthickness=0,
-                         font=(FONT, 9), height=24)
-        box.pack(fill="both", expand=True)
-        for _, name, kind, saved in rows:
-            box.insert("end", f"{name}  ·  {kind}" + ("  ★" if saved else ""))
+                         font=(FONT, 9), height=24, exportselection=False)
+        rows = []
+
+        def fill(*_):
+            # Every word typed must be in the sound's name or in the request it came from.
+            self.history_query = search.get()
+            rows[:] = history_rows(studio.folder, self.history_query)
+            box.delete(0, "end")
+            for index, (sound_id, text) in enumerate(rows):
+                box.insert("end", text)
+                if sound_id is None:
+                    box.itemconfigure(index, foreground=DIM, selectbackground=DARK, selectforeground=DIM)
+
+        def skip_headings(_=None):
+            for index in box.curselection():
+                if rows[index][0] is None:
+                    box.selection_clear(index)
+
+        fill()
+        search.bind("<KeyRelease>", fill)       # the list follows what is typed
+        box.bind("<<ListboxSelect>>", skip_headings)
         # A row dragged onto a tile goes on that side, as the buttons under the list do.
-        self.drags.source(box, lambda event: ("sound", rows[box.nearest(event.y)][0]) if rows else None,
-                          self.dragged_name)
+        self.drags.source(box, lambda event: ("sound", rows[box.nearest(event.y)][0])
+                          if rows and rows[box.nearest(event.y)][0] else None, self.dragged_name)
 
         def put(side):
-            chosen = box.curselection()
+            chosen = [index for index in box.curselection() if rows[index][0]]
             if not chosen:
                 studio.say("Choose a sound in the list first.")
                 return
             # As it is on disk now: what was listed may have been measured or marked since.
             studio.put(side, studio.store.sound(rows[chosen[0]][0]))
 
+        # The buttons are placed first, from the bottom, so that the list takes the room that is left.
         row = tk.Frame(self.tray, bg=DARK)
-        row.pack(fill="x", pady=(6, 0))
+        row.pack(side="bottom", fill="x", pady=(6, 0))
         for side in ("a", "b"):
             button(row, f"Put on {side.upper()}", lambda side=side: put(side)).pack(side="left", padx=(0, 6))
+        box.pack(fill="both", expand=True)
 
     # ---- actions ----
 

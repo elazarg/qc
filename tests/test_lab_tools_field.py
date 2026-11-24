@@ -68,9 +68,30 @@ class FieldTest(unittest.TestCase):
 
 
 class OnTheUnitTest(unittest.TestCase):
-    def test_what_the_contrast_found_is_said_in_two_lines_for_the_difference_panel(self):
-        lines = field.contrast_lines({"perceptual_delta": [("Brightness", 1.25, "ERB"), ("Tail continuity", -3., "dB")]})
-        self.assertEqual(lines, ["B against A, level aside:", "Brightness +1.2 ERB  ·  Tail continuity -3.0 dB"])
+    def test_what_the_contrast_found_is_drawn_as_signed_bars_in_the_colour_of_the_side_that_has_more(self):
+        import tkinter as tk
+
+        from lab.desk.theme import TONE_A, TONE_B
+
+        root = tk.Tk()
+        try:
+            chart = tk.Canvas(root)
+            field.draw_deltas(chart, [("Spectral centre", .5, "octave"), ("Carry-over after notes", -80., "points"),
+                                      ("Loudness spread", 0., "dB")], width=400)
+            texts = [chart.itemcget(item, "text") for item in chart.find_all() if chart.type(item) == "text"]
+            self.assertIn("+0.5 octave", texts)
+            self.assertIn("Carry-over after notes", texts)
+            bars = [chart.coords(item) + [chart.itemcget(item, "fill")] for item in chart.find_all()
+                    if chart.type(item) == "rectangle"]
+            self.assertEqual(len(bars), 2)                                  # nothing drawn for no change
+            centre = [chart.coords(item) for item in chart.find_all() if chart.type(item) == "line"][0][0]
+            (b_left, _, b_right, _, first), (a_left, _, a_right, _, second) = bars
+            self.assertEqual((first, second), (TONE_B, TONE_A))
+            self.assertEqual(b_left, centre)                                # B's to the right of the centre
+            self.assertEqual(a_right, centre)                               # A's to the left
+            self.assertAlmostEqual((b_right - b_left) * 2, a_right - a_left)  # half the reach against all of it
+        finally:
+            root.destroy()
 
     def test_the_contrast_of_a_and_b_is_measured_silently(self):
         with TemporaryDirectory() as folder:
@@ -80,7 +101,7 @@ class OnTheUnitTest(unittest.TestCase):
             finally:
                 unit.close()
         deltas = {name: value for name, value, _ in found["perceptual_delta"]}
-        self.assertGreater(deltas["Tail continuity"], 0)
+        self.assertGreater(deltas["Carry-over after notes"], 0)
         self.assertEqual(len(found["spectrum_db"]), len(field.BAND_NAMES))
 
 

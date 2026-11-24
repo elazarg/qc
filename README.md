@@ -29,12 +29,12 @@ The desk shows what is done with a thing, not a paragraph about it: what is wort
 
 Panels open beside the tiles:
 
-- **Shape**, **Chain** and **Sounds** act on the selected sound and say which side that is. **Shape**: the knobs this chain can move, and hearing it without the knobs. After a turn the app listens and says whether the knob did what it is for.
+- **Shape**, **Chain** and **Sounds** act on the selected sound and say which side that is. **Shape**: the knobs this chain can move, each with a mark where it rests and its position, and hearing it without the knobs. After a turn the app listens and says whether the knob did what it says, with what it measured.
 - **Chain**: the blocks, each with its model's named settings, and the Nano Cortex sheet.
-- **Difference**: what listening heard differ between A and B; **Measure A and B now** plays the phrase silently through both and shows the difference in each octave band.
+- **Difference**: what listening heard differ between A and B; **Measure A and B now** plays the phrase silently through both and draws the difference, level aside: four measures as bars from a centre line, and each octave band, in B's colour where B has more and A's where A has more.
 - **Phrase**: the phrases recorded, recording a new one with its pickup setting and, to compare settings, what was played, and the loop's edges to drag.
 - **Sounds** lets you find presets by name or slot. **Work on this** puts one on A and an editable copy on B. **More with this preset** keeps it as a Tone search reference in the chosen scene or leaves it selected on the unit. Auditioning and saving copies preserve splitter settings, scene assignments, expression ranges and stomp assignments. Sounds with performance assignments use independent audition slots. **Put in A's (or B's) cab** uses your IR on both stock cab slots or both sides of a stereo loader, with the sound's name and cab filters preserved. Captures can replace the selected sound's amp alone or its amp and cab.
-- **History**: songs, what your choices say, and every sound, newest first.
+- **History**: songs, what your choices say, and every sound, under the request it came from, newest first, with your marks; type to narrow it.
 - **Guitar**: **Gestures on**, which listens for 20 s, and 20 s more after each gesture, and shows the seconds left; what each pickup setting of your instrument puts out, compared only on takes marked as the same gesture; and recording a phrase with its pickup setting.
 - **More**: the side tools, each shown in the panel's place with **‹ Back**: **Levels**, **Tone search**, **Tone field**, **Comparison workbench**, **Versions and the unit**, **Setup and sound check**, **Usage and feedback**, **POD Go presets**, **Songs you listen to**; and measuring the USB round trip.
 

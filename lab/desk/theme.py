@@ -39,6 +39,7 @@ GLYPH = {
     "undo": "",
     "loop": "",
     "record": "",
+    "search": "",                          # a magnifying glass, before a line that filters a list
 }
 
 

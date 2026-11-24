@@ -9,6 +9,7 @@ import tkinter as tk
 import unittest
 
 from lab.desk import window as desk_module
+from lab.desk.knob_track import KnobTrack
 from lab.desk.window import Desk, pad_point, pad_values
 from lab.desk.theme import DARK
 from lab.sound.assistant import Assistant
@@ -72,10 +73,39 @@ class PadPanelTest(unittest.TestCase):
     def slider_rows(self, widget):
         found = []
         for child in widget.winfo_children():
-            if isinstance(child, tk.Frame) and any(isinstance(part, tk.Scale) for part in child.winfo_children()):
+            if isinstance(child, tk.Frame) and any(isinstance(part, KnobTrack) for part in child.winfo_children()):
                 found.append(child)
             found += self.slider_rows(child)
         return found
+
+    def test_a_knob_shows_where_it_rests_how_far_it_is_turned_and_by_how_much(self):
+        from lab.desk.theme import TONE_B
+
+        tray = self.panel(["drive", "body"], {"drive": .5})
+        drive, body = [[part for part in row.winfo_children() if isinstance(part, KnobTrack)][0]
+                       for row in self.slider_rows(tray)]
+        rest = drive.coords(drive.find_withtag("rest")[0])[0]
+        self.assertEqual(rest, drive.x_of(0.))                          # a knob that goes both ways rests mid-track
+        self.assertAlmostEqual(rest, (drive.x_of(-1.) + drive.x_of(1.)) / 2)
+        bar = drive.coords(drive.find_withtag("bar")[0])
+        self.assertEqual((bar[0], bar[2]), (rest, drive.x_of(.5)))
+        self.assertEqual(drive.itemcget(drive.find_withtag("bar")[0], "fill"), TONE_B)
+        self.assertEqual(drive.itemcget(drive.find_withtag("figures")[0], "text"), "+0.50")
+        self.assertEqual(body.find_withtag("bar"), ())                  # at rest: no bar, and +0.00
+        self.assertEqual(body.itemcget(body.find_withtag("figures")[0], "text"), "+0.00")
+
+    def test_letting_go_of_a_knob_turns_it_once_on_a_step(self):
+        tray = self.panel(["drive"], {})
+        track = [part for row in self.slider_rows(tray) for part in row.winfo_children()
+                 if isinstance(part, KnobTrack)][0]
+        turned = []
+        track.released = turned.append
+        at = SimpleNamespace(x=track.x_of(.32), y=10)
+        track.press(at)
+        track.move(at)
+        self.assertEqual(turned, [])
+        track.release(at)
+        self.assertEqual(turned, [.3])
 
     def test_no_pad_when_the_sound_has_nothing_for_either_axis(self):
         tray = self.panel(["drive"], {})

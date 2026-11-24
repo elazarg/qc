@@ -240,9 +240,8 @@ class StudioTest(StudioCase):
         self.assertEqual(shaped["corrected"], ["brightness", .3, .48])
         self.assertEqual(sound.knobs, {"brightness": .48})
         status = self.studio.state.status
-        self.assertIn("Measured with the knobs", status)
-        self.assertIn("Brightness: spectral centre", status)
-        self.assertIn("from +0.30 to +0.48, once; not measured again", status)
+        self.assertIn("Brightness did little here (spectral centre", status)
+        self.assertIn("so it was turned further, from +0.30 to +0.48, once", status)
         self.assertIsNone(self.studio.shaping)           # the correction is not checked again: no loop
         self.assertEqual(self.studio.state.shown, "pair")  # A and B are back on the unit
 
@@ -263,7 +262,7 @@ class StudioTest(StudioCase):
         self.assertEqual(sound.heard["shaped"]["check"]["drive"]["verdict"], "as intended")
         self.assertIsNone(sound.heard["shaped"]["corrected"])
         self.assertEqual(sound.knobs, {"drive": .3})
-        self.assertIn("Distortion: harmonics", self.studio.state.status)
+        self.assertIn("Distortion did what it says (harmonics", self.studio.state.status)
         self.assertNotIn("turned", self.studio.state.status)
 
     def test_a_cancelled_request_leaves_b_alone(self):

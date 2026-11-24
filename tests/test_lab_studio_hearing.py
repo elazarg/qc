@@ -85,7 +85,8 @@ class ChecksTest(unittest.TestCase):
                  "drive": {"measure": "distortion_db", "change": 6., "sign": 1, "verdict": "as intended",
                            "units": "dB", "proxy": False}}
         line = _checked_words(found, {"sustain", "drive"}, None)
-        self.assertIn("as intended (judged by the measure of another quality, compression)", line)
+        self.assertIn("Sustain did what it says (compression +0.120; judged by the measure of another quality, "
+                      "compression)", line)
         self.assertEqual(line.count("judged by"), 1)
 
 
