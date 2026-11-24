@@ -130,6 +130,7 @@ class Desk:
         self.dragging = False           # something in the panel is being dragged: the panel is left as it is
         self.expanded = set()           # blocks whose named settings are shown in the Chain panel
         self.show_nano = False
+        self.show_measured = False      # whether the Chain panel lists what was measured, line by line
         self.all_takes = False          # whether the Phrase panel lists every take, or the newest eight
         self.sounds_kind = "Presets"    # which list the Sounds panel shows
         self.capture_version = 2        # what an unlabelled capture is taken to be
@@ -213,10 +214,12 @@ class Desk:
         self.suggestion.pack(side="left", padx=(8, 0))
         self.names = tk.Frame(top, bg=PAPER)        # the panels' names: not shown while the learning screen is on
         self.names.pack(side="right")
+        self.openers = {}               # the panels' names, by name: the open one is lit
         for name in PANELS[::-1]:
             opener = tk.Label(self.names, text=name, bg=PAPER, fg=SUBTLE, font=(FONT, 10), cursor="hand2", padx=8)
             opener.pack(side="right")
             opener.bind("<ButtonRelease-1>", lambda _, name=name: self.toggle(name))
+            self.openers[name] = opener
 
         body = self.body = tk.Frame(page, bg=PAPER)
         body.pack(fill="both", expand=True, pady=(12, 0))
@@ -657,7 +660,7 @@ class Desk:
             sides.append(None if sound is None else (sound.id, json.dumps(sound.heard, sort_keys=True, default=str),
                                                      json.dumps(sound.knobs, sort_keys=True), tuple(sound.marks)))
         return (self.panel, state.side, state.round, state.blind, state.scene, state.song, state.instrument,
-                tuple(sides), self.show_nano, tuple(sorted(self.expanded)), studio.phrase_key(),
+                tuple(sides), self.show_nano, self.show_measured, tuple(sorted(self.expanded)), studio.phrase_key(),
                 tuple(sorted(studio.hearing_base)), studio.profile_version if self.panel == "Guitar" else None)
 
     def caption(self, sound, side="b"):
@@ -888,6 +891,7 @@ class Desk:
             self.panel = None
             self.studio.remember(panel=None)
             self.tray.grid_remove()
+            self.light_names()
             usage.record(self.studio.folder, "close", name)
             return
         if self.panel is not None:
@@ -899,7 +903,14 @@ class Desk:
         self.tray.grid(row=0, column=1, sticky="ns", padx=(14, 0))
         self.fill_panel()
 
+    def light_names(self):
+        """The open panel's name is lit at the top right: it says which is open, and that a click closes it."""
+        for name, opener in self.openers.items():
+            opener.configure(fg=INK if name == self.panel else SUBTLE,
+                             font=(FONT, 10, "bold" if name == self.panel else "normal"))
+
     def fill_panel(self):
+        self.light_names()
         self.panel_key = self.drawn_from()
         self.dragging = False
         for child in self.tray.winfo_children():
@@ -1070,10 +1081,20 @@ class Desk:
                                       studio.named(r, column, name))
         from lab.hearing.measure import measured_lines
 
-        label(self.into, "Measured", size=8, color=DIM).pack(fill="x", pady=(10, 0))
+        # What was measured is behind a line to click: the tile's scales show what it amounts to.
         why = studio.unheard(sound)
-        for line in ([f"It could not be listened to as it is set now: {why}"] if why else measured_lines(sound.heard)):
-            label(self.into, line, size=9, color=SOFT, wrap=400).pack(fill="x", pady=1)
+        if why:
+            label(self.into, f"It could not be listened to as it is set now: {why}", size=9, color=SOFT,
+                  wrap=400).pack(fill="x", pady=(10, 1))
+        else:
+            measured = tk.Label(self.into, text="Measured ▴" if self.show_measured else "Measured ▾", bg=DARK,
+                                fg=ACCENT, font=(FONT, 9), cursor="hand2")
+            measured.pack(anchor="w", pady=(10, 2))
+            measured.bind("<ButtonRelease-1>", lambda _: (setattr(self, "show_measured", not self.show_measured),
+                                                          self.fill_panel()))
+            if self.show_measured:
+                for line in measured_lines(sound.heard):
+                    label(self.into, line, size=9, color=SOFT, wrap=400).pack(fill="x", pady=1)
         nano = tk.Label(self.into, text="Nano Cortex sheet ▴" if self.show_nano else "Nano Cortex sheet ▾", bg=DARK,
                         fg=ACCENT, font=(FONT, 9), cursor="hand2")
         nano.pack(anchor="w", pady=(8, 2))

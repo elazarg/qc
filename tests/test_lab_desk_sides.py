@@ -12,7 +12,7 @@ from lab.desk.difference import against
 from lab.desk.theme import SIDE
 from lab.sound.sounds import Sound
 
-from support import DELAY, GREENBACK, HIWATT, PLEXI, V30, DeskCase, chain
+from support import DELAY, GREENBACK, HIWATT, PLEXI, V30, DeskCase, chain, settle_until
 
 
 class PanelSideTest(DeskCase):
@@ -44,6 +44,34 @@ class PanelSideTest(DeskCase):
         self.assertEqual(self.studio.undo_words(), "Undo Rhythm on B")
         self.studio.undo()
         self.assertEqual(self.studio.undo_words(), "Nothing to undo")
+
+
+class PanelNamesTest(DeskCase):
+    def test_the_open_panels_name_is_lit_and_goes_out_when_it_is_closed(self):
+        from lab.desk.theme import INK, SUBTLE
+
+        self.desk.toggle("Chain")
+        lit = {name for name, opener in self.desk.openers.items() if str(opener.cget("fg")) == INK}
+        self.assertEqual(lit, {"Chain"})
+        self.desk.toggle("Chain")
+        self.assertTrue(all(str(opener.cget("fg")) == SUBTLE for opener in self.desk.openers.values()))
+
+    def test_what_was_measured_is_one_click_away_in_the_chain_panel(self):
+        self.put("b", Sound("Rhythm", chain(PLEXI, V30), {"kind": "designed"}))
+        self.studio.idle_seconds = 0.
+        settle_until(self.studio, lambda: "probe" in (self.studio.sound("b").heard or {}), 30, "B to be listened to",
+                     root=self.root)
+        self.studio.idle_seconds = 1e9
+        self.desk.toggle("Chain")
+        said = self.texts(self.desk.tray)
+        self.assertIn("Measured ▾", said)
+        self.assertFalse(any(text.startswith("Distortion: harmonics") for text in said))
+        self.root.update()                              # drawn inside the part that scrolls before it is clicked
+        opener = [widget for widget in self.desk.into.winfo_children()
+                  if widget.winfo_class() == "Label" and widget.cget("text") == "Measured ▾"][0]
+        opener.event_generate("<ButtonRelease-1>")
+        self.root.update()
+        self.assertTrue(any(text.startswith("Distortion: harmonics") for text in self.texts(self.desk.tray)))
 
 
 class BlindPutsBackTest(DeskCase):
