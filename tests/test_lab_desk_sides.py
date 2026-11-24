@@ -56,7 +56,7 @@ class PanelNamesTest(DeskCase):
         self.desk.toggle("Chain")
         self.assertTrue(all(str(opener.cget("fg")) == SUBTLE for opener in self.desk.openers.values()))
 
-    def test_what_was_measured_is_one_click_away_in_the_chain_panel(self):
+    def test_what_was_measured_is_drawn_in_the_chain_panel_and_said_one_click_away(self):
         self.put("b", Sound("Rhythm", chain(PLEXI, V30), {"kind": "designed"}))
         self.studio.idle_seconds = 0.
         settle_until(self.studio, lambda: "probe" in (self.studio.sound("b").heard or {}), 30, "B to be listened to",
@@ -64,14 +64,38 @@ class PanelNamesTest(DeskCase):
         self.studio.idle_seconds = 1e9
         self.desk.toggle("Chain")
         said = self.texts(self.desk.tray)
-        self.assertIn("Measured ▾", said)
+        self.assertIn("In words ▾", said)
         self.assertFalse(any(text.startswith("Distortion: harmonics") for text in said))
+        charts = [widget for widget in self.desk.into.winfo_children() if widget.winfo_class() == "Canvas"]
+        harmonics = [chart for chart in charts if chart.find_withtag("harmonic")]
+        bands = [chart for chart in charts if chart.find_withtag("band")]
+        self.assertEqual((len(harmonics), len(bands)), (1, 1))
+        self.assertEqual(harmonics[0].itemcget(harmonics[0].find_withtag("harmonic")[0], "fill"), SIDE["b"])
         self.root.update()                              # drawn inside the part that scrolls before it is clicked
         opener = [widget for widget in self.desk.into.winfo_children()
-                  if widget.winfo_class() == "Label" and widget.cget("text") == "Measured ▾"][0]
+                  if widget.winfo_class() == "Label" and widget.cget("text") == "In words ▾"][0]
         opener.event_generate("<ButtonRelease-1>")
         self.root.update()
         self.assertTrue(any(text.startswith("Distortion: harmonics") for text in self.texts(self.desk.tray)))
+
+
+class ToneFieldFromShapeTest(DeskCase):
+    def test_the_tone_field_opens_from_beside_shapes_pad(self):
+        self.put("b", Sound("Rhythm", chain(PLEXI, V30), {"kind": "designed"}))
+        self.desk.toggle("Shape")
+        found = []
+
+        def walk(widget):
+            for child in widget.winfo_children():
+                if child.winfo_class() == "Label" and child.cget("text") == "Tone field ›":
+                    found.append(child)
+                walk(child)
+
+        walk(self.desk.tray)
+        self.assertEqual(len(found), 1)
+        self.root.update()
+        found[0].event_generate("<ButtonRelease-1>")
+        self.assertEqual(self.desk.hosted.TITLE, "Tone field")
 
 
 class BlindPutsBackTest(DeskCase):

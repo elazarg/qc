@@ -38,7 +38,7 @@ from lab.qc.library import SCENES as SCENE_LETTERS   # "ABCDEFGH": the one place
 from lab.qc.rig import USB
 from lab.qc.unit import Stopped
 from lab.desk.hints import hint
-from lab.desk.theme import ACCENT, DIM, FONT, INK, PAPER, RULE, SOFT, SUBTLE, TILE, WHITE
+from lab.desk.theme import ACCENT, CHOSEN, DIM, FONT, INK, PAPER, RULE, SOFT, SUBTLE, TILE, WHITE
 
 
 # ---- operations, run where the unit is held ----
@@ -319,7 +319,7 @@ class Chips(tk.Frame):
         chosen = self.variable.get()
         for option, chip in self.chips.items():
             lit = option == chosen
-            chip.configure(bg=TILE if lit else self["bg"], fg=(INK if lit else SOFT) if self.enabled else DIM)
+            chip.configure(bg=CHOSEN if lit else self["bg"], fg=(INK if lit else SOFT) if self.enabled else DIM)
 
 
 def scrolled(parent):

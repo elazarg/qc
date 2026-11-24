@@ -56,8 +56,8 @@ def button(parent, label, command, *, accent=False, compact=False):
         parent, text=label, command=command, font=(FONT, 9 if compact else 10, "bold"), relief="flat", cursor="hand2",
         borderwidth=0, padx=8 if compact else 12, pady=4 if compact else 7,
         background=ACCENT if accent else palette.TILE, foreground=INK if accent else TEXT,
-        activebackground="#ffd7b7" if accent else palette.RULE, activeforeground=INK if accent else TEXT,
-        disabledforeground="#8a8b9a" if not accent else "#7a5a43",
+        activebackground=palette.mix(ACCENT, "#ffffff", .6) if accent else palette.RULE,
+        activeforeground=INK if accent else TEXT, disabledforeground=palette.DIM,
     )
 
 
@@ -403,8 +403,8 @@ class TeachPanel:
         offered = taught.controls(self.instrument.get())
         for title, choice in self.control_buttons.items():
             selected = title == self.control.get()
-            choice.configure(state="normal" if editable else "disabled", bg=ACCENT if selected else "#2c303c",
-                             fg=INK if selected else TEXT)
+            choice.configure(state="normal" if editable else "disabled", bg=palette.CHOSEN if selected else palette.TILE,
+                             fg=TEXT)
             # Only the controls the instrument has, in their order.
             if title not in offered:
                 choice.pack_forget()

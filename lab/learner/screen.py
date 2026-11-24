@@ -17,7 +17,7 @@ gesture listening goes on, so that the guitar can be played on the desk.
 
 import tkinter as tk
 
-from lab.desk.theme import DARK, DIM, FONT, INK, PAPER, SOFT, SUBTLE, TILE
+from lab.desk.theme import CHOSEN, DARK, DIM, FONT, INK, PAPER, SOFT, SUBTLE
 
 LEARNER, TEACH, IDLE = "Guitar Learner", "Teach a control", "Idle reference"
 
@@ -119,7 +119,7 @@ class LearningScreen:
         view.shown()
         for name, tab in self.tabs.items():
             chosen = name == title
-            tab.configure(bg=TILE if chosen else DARK, fg=INK if chosen else SOFT,
+            tab.configure(bg=CHOSEN if chosen else DARK, fg=INK if chosen else SOFT,
                           font=(FONT, 11, "bold" if chosen else "normal"))
 
     def board_setup(self, guitar):

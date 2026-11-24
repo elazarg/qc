@@ -11,6 +11,7 @@ SUBTLE = "#a5a6b5"
 DIM = "#8b8fa5"                  # the quietest text: still 4.5:1 or more on the panels
 ACCENT = "#c9b2ff"                # what can be clicked to go somewhere: a colour no sound or state has
 ACCENT_INK = "#1a1718"
+CHOSEN = "#4a4e5e"               # behind a choice that is chosen, with INK on it: one look on every screen
 FONT = "Segoe UI"
 
 # Colour carries identity and state. It is never used for emphasis alone.

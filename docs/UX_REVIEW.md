@@ -29,7 +29,9 @@ sizes. Nothing was tried on the real unit.
   its reason; in the Phrase and Guitar panels "Record 8 s" is dimmed until a setting is chosen), W6 (what
   the ask line takes besides a request, a preset's exact name, a remark and Next, "add parallel space" and a
   part's offset such as "Solo +2 dB", is behind a `?` in the line).
-- **Looks:** V1 (the accent is lilac, no longer B's peach), V3 (the dimmest text is 5:1 on the panels), V4 (a
+- **Looks:** V1 (the accent is lilac, no longer B's peach), V2 (one look for "chosen" on the desk, in the tools
+  and on the learning screen: a lighter tile, `theme.CHOSEN`, with bright ink; the accent fills only what is
+  done, such as "Listen live"), V3 (the dimmest text is 5:1 on the panels), V4 (a
   one-pixel rule round the tiles and the buttons), V6 (Shape's knobs are tracks with a mark where each rests,
   a bar to where it stands in the side's colour, and the position), L3
   (the rows under the tiles keep their room; the tiles give way), L5 in part (the `?` and the round's ‹ are
@@ -49,7 +51,9 @@ sizes. Nothing was tried on the real unit.
   over the round's chips steps through its designs, stopping at either end). The Guitar panel's paragraphs
   are a chart: a bar per pickup setting to the peak of its held notes, a dashed line where the humbucker
   presets assume peaks, a tick for the largest peak and a mark for the noise; the sentences are behind
-  "In words ▾".
+  "In words ▾". Chain's measurements are two charts in the side's colour, the harmonics of a tone by order
+  and the level by band against the dry guitar, with the figures on hover and the sentences behind
+  "In words ▾". T3: the Tone field opens from beside Shape's pad ("Tone field ›"), and stays in More.
 
 Waiting, and why:
 
@@ -58,9 +62,8 @@ Waiting, and why:
   what the engine does or what the player is used to.
 - **The player's call:** I1–I3 and I5 (merging Phrase and Guitar, one place for the guitar's setting,
   renaming Sounds and the tools). The usage log now records the desk, so these can be argued from use.
-- **Not started:** L1–L2, L4, V2, V5, T1–T3, the rest of N3 (progress for a listen or a request beyond the
-  seconds) and the rest of the table of marks (rings on what is being worked on, charts for Chain's
-  measurements). The learning screen's own status line (R8) stays: that screen hides the desk's.
+- **Not started:** L1–L2, L4, V5, T1–T2, the rest of N3 (progress for a listen or a request beyond the
+  seconds) and rings on what is being worked on. The learning screen's own status line (R8) stays: that screen hides the desk's.
 
 Findings are numbered so that they can be picked up one at a time. Each says what was seen, where, and what
 would mend it inside the rules of the design in `AGENTS.md` (one window, few words, no shortcuts, side

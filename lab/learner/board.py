@@ -57,7 +57,9 @@ def button(parent, title, command, *, primary=False, compact=False):
 
 
 def mark_button(control, selected):
-    control.configure(background=ACCENT if selected else SURFACE, foreground=ACTIVE_INK if selected else INK)
+    """A choice shown chosen as everywhere in the app (a lighter tile, bright ink): the accent is for what is done,
+    not for what is chosen."""
+    control.configure(background=theme.CHOSEN if selected else SURFACE, foreground=INK)
 
 
 def defaults(layout):

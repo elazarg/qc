@@ -47,7 +47,7 @@ from lab.desk.hints import hint, named
 from lab.desk.pictures import learning_symbol
 from lab.desk.studio import RATE, Studio
 from lab.learner.seat import LearnerSeat  # noqa: F401  (the desk makes one; tests import it from here)
-from lab.desk.theme import (ACCENT, DARK, DIM, FAULT, FONT, GLYPH, INK, LIVE, PAPER, RECORDING, RULE, SIDE, SOFT,
+from lab.desk.theme import (ACCENT, CHOSEN, DARK, DIM, FAULT, FONT, GLYPH, INK, LIVE, PAPER, RECORDING, RULE, SIDE, SOFT,
                             SUBTLE, TILE, icon_font, mix)
 
 PANELS = ("Shape", "Chain", "Difference", "Phrase", "Sounds", "History", "Guitar", "More")
@@ -1087,8 +1087,12 @@ class Desk:
         x, y = pad_point(point[across], point[up], size)
         dot = canvas.create_oval(x - radius, y - radius, x + radius, y + radius, fill=SIDE[self.studio.state.side],
                                  outline="")
-        note = label(self.tray, size=9, color=SUBTLE)
-        note.pack(fill="x", pady=(0, 8))
+        under = tk.Frame(self.tray, bg=DARK)
+        under.pack(fill="x", pady=(0, 8))
+        note = label(under, size=9, color=SUBTLE)
+        note.pack(side="left")
+        # The same idea at more depth: six planes over these knobs and others, with points to mark and sweep.
+        link(under, "Tone field ›", self.open_field, color=ACCENT).pack(side="right")
 
         def show():
             note.configure(text=f"{knob_table.KNOBS[across][0]} {point[across]:+.2f} · "
@@ -1113,6 +1117,11 @@ class Desk:
         canvas.bind("<B1-Motion>", drag)
         canvas.bind("<ButtonRelease-1>", done)
         show()
+
+    def open_field(self):
+        from lab.tools.menu import opener
+
+        opener("field")(self)
 
     def turned(self, key, value):
         self.dragging = False
@@ -1173,7 +1182,20 @@ class Desk:
             label(self.into, f"It could not be listened to as it is set now: {why}", size=9, color=SOFT,
                   wrap=400).pack(fill="x", pady=(10, 1))
         else:
-            measured = tk.Label(self.into, text="Measured ▴" if self.show_measured else "Measured ▾", bg=DARK,
+            # What was measured, drawn: the harmonics of a tone, and the level by band. The sentences that say
+            # every measurement are a click away.
+            from lab.desk import measured_charts as charts
+
+            heard, color = sound.heard or {}, SIDE[studio.state.side]
+            for figures, draw, words in (((heard.get("probe") or {}).get("harmonics_db"), charts.draw_harmonics,
+                                          charts.harmonics_words),
+                                         (heard.get("band_levels_db"), charts.draw_bands, charts.bands_words)):
+                if figures:
+                    chart = tk.Canvas(self.into, bg=DARK, width=400, highlightthickness=0)
+                    chart.pack(fill="x", pady=(10, 0))
+                    draw(chart, figures, width=400, color=color)
+                    named(chart, words(figures))
+            measured = tk.Label(self.into, text="In words ▴" if self.show_measured else "In words ▾", bg=DARK,
                                 fg=ACCENT, font=(FONT, 9), cursor="hand2")
             measured.pack(anchor="w", pady=(10, 2))
             measured.bind("<ButtonRelease-1>", lambda _: (setattr(self, "show_measured", not self.show_measured),
@@ -1261,7 +1283,7 @@ class Desk:
             shown += [item for item in recorded if item["id"] == current]
         for item in shown:
             chosen = item["id"] == current
-            line = tk.Frame(self.into, bg=TILE if chosen else DARK)
+            line = tk.Frame(self.into, bg=CHOSEN if chosen else DARK)
             line.pack(fill="x")
             row = tk.Label(line, text=take_words(item, studio.state.instrument), bg=line["bg"],
                            fg=INK if chosen else SOFT, font=(FONT, 9), anchor="w", padx=6, pady=2, cursor="hand2")
@@ -1332,7 +1354,7 @@ class Desk:
         for kind in ("Presets", "IRs", "Captures"):
             chosen = kind == self.sounds_kind
             tab = tk.Label(kinds, text=kind, padx=8, pady=3, cursor="hand2", font=(FONT, 9, "bold" if chosen else "normal"),
-                           bg=TILE if chosen else DARK, fg=INK if chosen else SUBTLE)
+                           bg=CHOSEN if chosen else DARK, fg=INK if chosen else SUBTLE)
             tab.pack(side="left", padx=(0, 4))
             tab.bind("<ButtonRelease-1>", lambda _, kind=kind: (setattr(self, "sounds_kind", kind), self.fill_panel()))
         if self.sounds_kind != "Presets":
@@ -1391,7 +1413,7 @@ class Desk:
         scenes.pack(fill="x", pady=(2, 2))
         for index, scene in enumerate(("Default scene", *SCENE_LETTERS)):
             lit = scene == self.reference_scene
-            chip = tk.Label(scenes, text=scene, bg=TILE if lit else DARK, fg=INK if lit else SOFT, font=(FONT, 8),
+            chip = tk.Label(scenes, text=scene, bg=CHOSEN if lit else DARK, fg=INK if lit else SOFT, font=(FONT, 8),
                             padx=6, pady=2, cursor="hand2")
             chip.grid(row=0, column=index, padx=(0, 2))
             chip.bind("<ButtonRelease-1>", lambda _, scene=scene: (setattr(self, "reference_scene", scene),
@@ -1507,7 +1529,7 @@ class Desk:
             label(versions, "If the unit does not say, the capture is", size=9, color=SUBTLE).pack(side="left")
             for value in (1, 2):
                 chosen_version = value == self.capture_version
-                chip = tk.Label(versions, text=f"V{value}", bg=TILE if chosen_version else DARK,
+                chip = tk.Label(versions, text=f"V{value}", bg=CHOSEN if chosen_version else DARK,
                                 fg=INK if chosen_version else SOFT, font=(FONT, 9), padx=6, cursor="hand2")
                 chip.pack(side="left", padx=(6, 0))
                 chip.bind("<ButtonRelease-1>", lambda _, value=value: (setattr(self, "capture_version", value),
@@ -1669,7 +1691,7 @@ class Desk:
         chips = []
         for setting in settings:
             chosen = setting == self.record_setting
-            chip = tk.Label(grid, text=setting, bg=TILE if chosen else DARK, fg=INK if chosen else SOFT, font=(FONT, 8),
+            chip = tk.Label(grid, text=setting, bg=CHOSEN if chosen else DARK, fg=INK if chosen else SOFT, font=(FONT, 8),
                             padx=6, pady=2, cursor="hand2")
             chip.bind("<ButtonRelease-1>", lambda _, setting=setting: self.choose_setting(setting))
             chips.append(chip)
@@ -1685,7 +1707,7 @@ class Desk:
                      "thing on each setting and mark it here; otherwise leave it.").pack(side="left")
         for gesture in GESTURES:
             chosen = gesture == self.record_gesture
-            chip = tk.Label(self.into, text=gesture, bg=TILE if chosen else DARK, fg=INK if chosen else SOFT,
+            chip = tk.Label(self.into, text=gesture, bg=CHOSEN if chosen else DARK, fg=INK if chosen else SOFT,
                             font=(FONT, 8), padx=6, pady=2, cursor="hand2", anchor="w")
             chip.pack(fill="x", pady=1)
             chip.bind("<ButtonRelease-1>", lambda _, gesture=gesture: self.choose_gesture(gesture))

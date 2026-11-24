@@ -88,5 +88,18 @@ class ConventionsTest(DeskCase):
             self.assertIn(convention, CONVENTIONS)
 
 
+class ChosenLookTest(unittest.TestCase):
+    def test_a_chosen_choice_on_the_learning_screen_looks_as_one_on_the_desk_and_not_like_an_action(self):
+        from lab.desk.theme import ACCENT, CHOSEN, INK
+        from lab.learner.board import mark_button
+
+        root = tk.Tk()
+        self.addCleanup(root.destroy)
+        choice = tk.Button(root)
+        mark_button(choice, True)
+        self.assertEqual((choice.cget("background"), choice.cget("foreground")), (CHOSEN, INK))
+        self.assertNotEqual(choice.cget("background"), ACCENT)
+
+
 if __name__ == "__main__":
     unittest.main()

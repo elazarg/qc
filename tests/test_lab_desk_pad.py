@@ -67,7 +67,8 @@ class PadPanelTest(unittest.TestCase):
         dot = [item for item in pad.find_all() if pad.type(item) == "oval"][0]
         x0, y0, x1, y1 = pad.coords(dot)
         self.assertEqual(((x0 + x1) / 2, (y0 + y1) / 2), pad_point(.5, -.25))
-        self.assertEqual(children[2]["text"], "Brightness +0.50 · Texture -0.25")
+        self.assertEqual(children[2].winfo_children()[0]["text"], "Brightness +0.50 · Texture -0.25")
+        self.assertEqual(children[2].winfo_children()[1]["text"], "Tone field ›")
         self.assertEqual([row.winfo_children()[0]["text"] for row in self.slider_rows(tray)], ["Distortion", "Body"])
 
     def slider_rows(self, widget):
