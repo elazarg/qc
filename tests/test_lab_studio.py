@@ -7,6 +7,7 @@ import json
 import unittest
 
 from lab.desk.studio import Studio
+from lab.hearing.measure import summary as measured_words
 from lab.player import taste
 from lab.qc.host import Host
 from lab.sound.assistant import Assistant
@@ -31,8 +32,9 @@ class StudioTest(StudioCase):
         state = self.studio.state
         self.assertEqual(self.studio.sound("b").name, "Fuzz")
         self.assertEqual(state.shown, "pair")
-        self.assertIn("Aiming for saturated, balanced, ambient", state.status)
+        self.assertEqual(state.status, "1 of 3 is on B · Fuzz")
         found = self.studio.round()
+        self.assertEqual(measured_words(found["aim"]), "saturated, balanced, ambient")     # under the round's chips
         self.assertEqual(len(found["candidates"]), 3)
         heard = [self.studio.store.sound(c["sound"]).heard for c in found["candidates"]]
         self.assertTrue(all(heard))           # Listened to silently while the unit was free.
@@ -217,8 +219,8 @@ class StudioTest(StudioCase):
         settle(self.studio, 20)
         self.studio.ask("muddy")
         first = dict(self.studio.sound("b").knobs)
-        self.assertIn("Say it again for", self.studio.state.status)
-        self.studio.ask("muddy")
+        self.assertIsNotNone(self.studio.next_remedy())          # offered on the desk as the next thing to try
+        self.studio.try_next_remedy()
         second = dict(self.studio.sound("b").knobs)
         self.assertNotEqual(first, second)
         self.assertEqual(len(self.script.asked), 1)

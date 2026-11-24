@@ -897,9 +897,9 @@ class Studio:
                 if again:
                     base = dict(last["before"])       # the earlier remedy is taken back, and the next one tried
                 moves = dict(ways[turn].moves)
-                remark = {"text": text.casefold(), "sound": sound.id, "turn": turn, "before": dict(base)}
-                following = f" Say it again for: {ways[turn + 1].say}." if turn + 1 < len(ways) else ""
-                said = f"{reading.said}: {ways[turn].say}.{following}"
+                remark = {"text": text.casefold(), "sound": sound.id, "turn": turn, "before": dict(base),
+                          "asked": text, "next": ways[turn + 1].say if turn + 1 < len(ways) else None}
+                said = f"{reading.said}: {ways[turn].say}."
             elif ways and again:
                 # Every remedy this chain can perform was tried, and the last one is still on. Nothing is sent
                 # to the assistant for a word said once more: that is asked for on purpose.
@@ -928,10 +928,26 @@ class Studio:
             self.work_on(slot, name, note=f"That is your preset's name. For a new design in its spirit, "
                                           f"ask \"make {name}\".")
             return
+        # The line under the tiles no longer says what it said before the request: the working line says what
+        # was asked, until the answer comes.
+        self._set(status="")
         if sound is not None and reads_as_change(text):
             self.asking.revise(sound, text, side)
         else:
             self.asking.new_round(text)
+
+    def next_remedy(self):
+        """What the last remark would try next if said again, while the knobs are still where it left them:
+        the desk offers it as something to click. None when there is no next one."""
+        remark, sound = self.remark, self.sound(self.state.side)
+        if not remark or sound is None or remark["sound"] != sound.id or remark["after"] != sound.knobs:
+            return None
+        return remark.get("next")
+
+    def try_next_remedy(self):
+        """The last remark said again: its remedy is taken back and the next one tried."""
+        if self.next_remedy() is not None:
+            self.ask(self.remark["asked"])
 
     def _preset_named(self, text):
         """A request that is exactly the name of one of the player's presets on the unit means that preset."""

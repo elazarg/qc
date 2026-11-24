@@ -186,8 +186,7 @@ class Requests:
             on_show = {"round": record["id"], "song": song_name(song) if song else None}
             if studio.state.revision == revision:
                 studio.put("b", studio.store.sound(record["candidates"][0]["sound"]), **on_show)
-                studio.say(f"Aiming for {summary(aim)}. "
-                         f"1 of {len(designs)} is on B · {designs[0][0].name}")
+                studio.say(f"1 of {len(designs)} is on B · {designs[0][0].name}")
             else:
                 studio._set(**on_show)
                 studio.say(f"{len(designs)} designs are ready. B changed meanwhile, so it was left alone.")

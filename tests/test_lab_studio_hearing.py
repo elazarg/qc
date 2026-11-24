@@ -207,15 +207,17 @@ class WordsTest(FlowCase):
         self.a_round()
         asked = len(self.script.asked)
         said = []
+        offered = []
         for _ in range(8):
             self.studio.ask("muddy")
             said.append(self.studio.state.status)
+            offered.append(self.studio.next_remedy())
             if "last thing players try" in said[-1]:
                 break
         knobs = dict(self.studio.sound("b").knobs)
         self.assertIn("That was the last thing players try for “muddy”", said[-1])
         self.assertGreater(len(said), 1)                  # a remedy or more came first
-        self.assertNotIn("Say it again", said[-2])        # and the one before it had said it was the last
+        self.assertIsNone(offered[-2])                    # and the one before it offered no next one
         self.studio.ask("muddy")                          # said yet again: the same, and still no call
         self.assertIn("last thing players try", self.studio.state.status)
         self.assertEqual((len(self.script.asked), self.studio.cancellable(), self.studio.state.working),

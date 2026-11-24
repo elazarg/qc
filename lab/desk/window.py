@@ -47,6 +47,7 @@ PANELS = ("Shape", "Chain", "Difference", "Phrase", "Sounds", "History", "Guitar
 SCROLLED = ("Chain", "Difference", "Phrase", "Guitar", "More")      # panels built into a part that scrolls
 RECORD_SECONDS = 8.
 SHORTEST_LOOP = RATE // 2       # a loop is at least half a second
+PLACEHOLDER = "Ask for a sound, a song, or a change"
 SHOWN_AT_MOST = 400     # rows of IRs or captures listed at once; the filter reaches the rest
 PAD_SIZE = 200      # the Brightness x Texture pad, in pixels a side
 
@@ -318,6 +319,9 @@ class Desk:
         self.cancel_link = link(self.working_row, "Cancel", lambda: self.studio.cancel(), color=ACCENT)
         self.working = label(self.working_row, size=9, color=SOFT)
         self.working.pack(side="left", fill="x")
+        # After a remark, while nothing is being worked on: the next remedy players try, to click instead of
+        # typing the same words again.
+        self.next_link = link(self.working_row, "", lambda: self.studio.try_next_remedy(), color=ACCENT)
         self.working_text, self.working_since = "", 0.
         self.line_said, self.line_moment = None, None   # the status last drawn, and what was on the desk then
         # Lines that say something follow the width of their column: a panel open narrows it.
@@ -327,6 +331,11 @@ class Desk:
         self.request = tk.Entry(ask, font=(FONT, 12), bg=DARK, fg=INK, relief="flat", insertbackground=INK)
         self.request.pack(side="left", fill="x", expand=True, ipady=9, padx=12)
         self.request.bind("<Return>", lambda _: self.ask())
+        # What the line is for, in it, while nothing is typed: the line has no name of its own. A click on the
+        # words is a click in the line.
+        self.placeholder = tk.Label(ask, text=PLACEHOLDER, bg=DARK, fg=DIM, font=(FONT, 12), cursor="xterm")
+        self.placeholder.bind("<ButtonRelease-1>", lambda _: self.request.focus_set())
+        self.show_placeholder()
 
     # ---- drawing ----
 
@@ -442,6 +451,13 @@ class Desk:
         shown = f"{text}  {seconds:.0f} s" if text and seconds >= 3 else text
         if self.working.cget("text") != shown:
             self.working.configure(text=shown)
+        following = None if text else self.studio.next_remedy()
+        if following:
+            self.next_link.configure(text=f"Next: {following}  ›")
+            if not self.next_link.winfo_manager():
+                self.next_link.pack(side="left", padx=0)
+        elif self.next_link.winfo_manager():
+            self.next_link.pack_forget()
 
     def drawn_from(self, sounds=None):
         """What the open panel shows depends on: the sounds on show, what is known of them, the round, the scene."""
@@ -457,7 +473,7 @@ class Desk:
 
     def caption(self, sound):
         if sound is None:
-            return "Ask for a sound, or bring in a preset from Sounds."
+            return ""           # the ask line says what to do, once, instead of both tiles
         from lab.learner.dataset import suggested_setup
 
         setup = suggested_setup(sound.origin.get("guitar_setup"), self.studio.state.instrument)
@@ -1243,10 +1259,19 @@ class Desk:
         self.studio.play(mode)
 
     def ask(self):
+        """Send what was typed. The focus stays in the line, for the next request."""
         text = self.request.get()
         self.request.delete(0, "end")
-        self.root.focus_set()
         self.studio.ask(text)
+        self.show_placeholder()
+
+    def show_placeholder(self):
+        """The words in the ask line while nothing is typed in it."""
+        empty = not self.request.get()
+        if empty and not self.placeholder.winfo_manager():
+            self.placeholder.place(x=13, rely=.5, anchor="w")
+        elif not empty and self.placeholder.winfo_manager():
+            self.placeholder.place_forget()
 
     def save(self):
         """Show the name to save under, in place, filled in with the sound's own."""
@@ -1414,6 +1439,7 @@ class Desk:
                 self.studio.play(mode)
             self.follow_gestures()
             self.show_working()
+            self.show_placeholder()
             self.come_forward()
         finally:
             self.clock = self.root.after(80, self.tick)
