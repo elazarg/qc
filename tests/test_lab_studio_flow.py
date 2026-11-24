@@ -287,7 +287,7 @@ class WorkingLineTest(FlowCase):
         self.studio._set(shown=None)                      # as after another preset was chosen on the unit
         self.studio.ask("more sustain from the amp, without more mud")
         self.studio.play("guitar")
-        self.until(lambda: self.studio.state.shown == "pair" and "guitar" in self.studio.state.status)
+        self.until(lambda: self.studio.state.shown == "pair" and self.studio.sounding == ("b", "guitar"))
         self.assertEqual(self.studio.state.mode, "guitar")
 
     def test_a_callers_own_working_line_is_one_activity_among_the_others(self):
@@ -317,12 +317,15 @@ class PlayTest(FlowCase):
         self.assertNotIn("watch", [name for name, _ in sent])               # nothing plays: nothing to watch
         self.assertIn("_serve", self.log())                                 # the trace from where the unit is held
 
-    def test_stop_says_stopped_and_writes_no_fault(self):
+    def test_stop_says_no_fault_and_writes_none(self):
         self.a_round()
         self.studio.play("guitar")
+        said = self.studio.state.status
         self.studio.stop()                                # with the play and its levels still waiting
         self.settle()
-        self.assertEqual(self.studio.state.status, "Stopped.")
+        self.assertIsNone(self.studio.state.mode)
+        self.assertEqual(self.studio.state.status_kind, "")         # the buttons show it stopped: nothing is said
+        self.assertIn(self.studio.state.status, (said, ""))
         self.assertIsNone(self.studio.state.mode)
         self.assertEqual(self.log(), "")
 
@@ -358,7 +361,7 @@ class PlayTest(FlowCase):
         self.until(listening.is_set)
         started = time.monotonic()
         self.studio.play("guitar")
-        self.until(lambda: "guitar" in self.studio.state.status, 6)
+        self.until(lambda: (self.studio.sounding or ("", ""))[1] == "guitar", 6)
         self.assertLess(time.monotonic() - started, 3.)
         self.assertEqual(self.log(), "")                                    # stopping it is no fault
         self.assertIsNone(self.studio.sound("b").heard)                     # and says nothing about the sound
@@ -387,9 +390,10 @@ class PlayTest(FlowCase):
         self.until(listening.is_set)
         self.studio.step(1)                               # A and B are to be made ready again, behind the listen
         self.studio.play("guitar")
-        self.until(lambda: "guitar" in self.studio.state.status, 8)
+        self.until(lambda: (self.studio.sounding or ("", ""))[1] == "guitar", 8)
         self.assertEqual((self.studio.state.mode, self.studio.state.shown), ("guitar", "pair"))
-        self.assertIn("Two", self.studio.state.status)
+        self.assertEqual(self.studio.sound(self.studio.sounding[0]).name, "Two")
+        self.assertNotIn("Getting ready", self.studio.state.status)    # said while it was, and not after
 
 
 class ShapeTest(FlowCase):
@@ -779,7 +783,7 @@ class LinesTest(FlowCase):
         self.studio.copy_to_a()
         self.settle()
         self.studio.blind()
-        self.assertIn("Show which was which", self.studio.state.status)
+        self.assertIn("see which was which", self.studio.state.status)
         source = Path(studio_module.__file__).read_text(encoding="utf-8")
         for words in ("press N", "Z undoes", "press X", "the 0 key"):
             self.assertNotIn(words, source)

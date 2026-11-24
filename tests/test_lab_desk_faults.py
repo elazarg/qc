@@ -97,7 +97,7 @@ class LinesThatWrapTest(DeskCase):
 
         aim = {"distortion": "crunch", "brightness": "balanced", "tail": "dry"}
         self.assertEqual(aim_against(aim, {"distortion": "saturated", "brightness": "bright", "tail": "dry"}),
-                         "aim crunch, balanced, dry · heard as saturated, bright, dry · misses on gain, bright")
+                         "aim crunch, balanced, dry · heard as saturated, bright, dry · misses on distortion, brightness")
         self.assertEqual(aim_against(aim, dict(aim)), "aim crunch, balanced, dry · heard as crunch, balanced, dry")
         self.assertEqual(aim_against(aim, None), "aim crunch, balanced, dry · not listened to yet")
         self.assertEqual(aim_against(aim, None, "Nothing came back."),
@@ -106,8 +106,8 @@ class LinesThatWrapTest(DeskCase):
         self.studio.ask("make a classic rock crunch")
         self.pump()
         said = " ".join(texts(self.desk.chips) + [self.desk.strip_note.cget("text")])
-        self.assertEqual(said.count("aim saturated, balanced, ambient"), 1)
-        self.assertNotIn("aiming for", said)          # once, in the note, not also at the right
+        self.assertNotIn("aim", said)                   # the aim is drawn on B's tile, and said there on hover
+        self.assertEqual(self.desk.scales["b"].drawn[0]["distortion"], "saturated")          # once, in the note, not also at the right
 
 
 class PanelsThatOverflowTest(DeskCase):
@@ -164,8 +164,9 @@ class TileOnAirTest(DeskCase):
         self.pump()
         tile = self.desk.tiles["b"][0]
         self.assertNotEqual(tile.cget("bg"), self.desk.tiles["a"][0].cget("bg"))
+        blocks = every(self.desk.blocks["b"])               # the chain's blocks are chips of their own colour
         for widget in every(tile):
-            if widget.winfo_class() == "Label" and widget.winfo_manager():
+            if widget.winfo_class() == "Label" and widget.winfo_manager() and widget not in blocks:
                 self.assertEqual(widget.cget("bg"), tile.cget("bg"), widget.cget("text"))
 
 

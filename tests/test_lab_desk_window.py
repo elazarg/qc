@@ -353,13 +353,13 @@ class DrawingTest(DeskCase):
         self.desk.drag_ends()
         self.assertNotEqual(self.desk.tray.winfo_children(), before)
 
-    def test_undo_is_on_the_desk_once_there_is_something_to_take_back(self):
+    def test_undo_is_dimmed_until_there_is_something_to_take_back(self):
         self.open()
-        self.assertEqual(self.desk.undo_link.winfo_manager(), "")
+        self.assertEqual(str(self.desk.undo_link["fg"]), desk_module.DIM)
         self.a_round()
-        self.assertEqual(self.desk.undo_link.winfo_manager(), "pack")
+        self.assertEqual(str(self.desk.undo_link["fg"]), desk_module.SOFT)
         self.studio.undo()
-        self.assertEqual(self.desk.undo_link.winfo_manager(), "")
+        self.assertEqual(str(self.desk.undo_link["fg"]), desk_module.DIM)
 
     def test_the_button_for_the_base_says_what_pressing_it_does(self):
         self.open()

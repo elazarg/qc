@@ -60,6 +60,7 @@ from lab.desk.listening import Listening
 from lab.desk.marks import Marks
 from lab.desk.requests import Requests, Rounds, reads_as_change, song_name
 
+GETTING_READY = "Getting ready. It plays as soon as it is."
 COPY_REQUEST = "a copy to compare against"     # what a copy of B on A is, in its origin
 PHRASE_SECONDS = 3.5    # the part of a take that loops, until its edges are dragged
 RATE = 48000
@@ -108,6 +109,8 @@ class Studio:
         self.history = []                 # earlier (state, knob positions), for undo
         self.undo_names = []              # what each of them came before, in a few words
         self.blind_swapped = False        # A and B were swapped for the blind comparison on show
+        self.loop_since = None            # (phrase key, when it began to loop) while the phrase plays
+        self.sounding = None              # (side, mode) the unit confirmed it plays, until it stops
         self.jobs = []                    # (future, done, failed, the activity it ends)
         self.progress = []                # (handler, value) reported by the unit's worker, handled by `poll`
         self.doing = {}                   # what is going on, by key, oldest first: the working line shows the newest
@@ -159,6 +162,10 @@ class Studio:
             changes.setdefault("status_kind", "")      # a new status is plain unless it says it is a fault
         before = self.state
         self.state = replace(self.state, **changes, working=self._working())
+        if self.state.mode != "phrase":
+            self.loop_since = None
+        if self.state.mode is None:
+            self.sounding = None
         if any(getattr(before, key) != getattr(self.state, key) for key in KEPT):
             self.remember()
         for listener in list(self.listeners):
@@ -596,7 +603,7 @@ class Studio:
             self.host.stop()                # which also drops whatever waited behind the listen
             self.level_sent, self.showing = {}, None
         if self.state.shown is None:
-            self._set(mode=mode, side=side, status="Getting ready. It plays as soon as it is.")
+            self._set(mode=mode, side=side, status=GETTING_READY)
             if self.showing is None:
                 self._show()
             return
@@ -632,10 +639,19 @@ class Studio:
             if not sound.played:
                 sound.played = True
                 self.store.save(sound)
+            self.sounding = (side, mode)
+            if mode == "phrase" and (self.loop_since is None or self.loop_since[0] != self.phrase_key()):
+                self.loop_since = (self.phrase_key(), time.monotonic())     # the loop starts again with a new phrase
             if sound.knobs:
                 self.later(self.host.call("turn", side, sound.knobs), lambda moves: None)
-            self.say(f"{side.upper()} · {mode}" if self.state.blind else
-                     f"{side.upper()} · {sound.name} · {mode}{self._level_gap(side, sound)}")
+            # The tile and the buttons show what plays; the line says only what they cannot.
+            gap = "" if self.state.blind else self._level_gap(side, sound)
+            if gap:
+                self.say(f"{sound.name}{gap}")
+            elif self.state.status == GETTING_READY:
+                self.say("")                # it plays now: the tile shows it
+            else:
+                self._set()                 # drawn again: the tile shows it plays
 
         def failed(error):
             # Nothing plays: the desk must not go on saying it does. A play that Stop dropped, or that a newer
@@ -712,12 +728,9 @@ class Studio:
         """Hear another scene of the sounds on show."""
         self.unit_scene = scene
         self._set(scene=scene)
-        sound = self.sound(self.state.side)
-        label = sound.chain.labels[scene] if sound and scene < len(sound.chain.labels) else ""
         self.later(self.host.call("scene", scene), lambda result: None)
         if self.state.mode:
             self._match_levels()
-        self.say(f"Scene {'ABCDEFGH'[scene]}" + (f" · {label}" if label else ""))
 
     def scenes(self, side=None):
         """The scenes of the sound on a side that make a difference, as (index, label)."""
@@ -734,10 +747,11 @@ class Studio:
             self._set(side=side)
 
     def stop(self):
+        """Stop what plays. Nothing is said: the buttons and the tile show it."""
         self.host.stop()
         self.level_sent = {}            # a level that waited behind what was stopped never reached the unit
         self.later(self.host.call("quiet"), lambda result: None)
-        self._set(mode=None, status="Stopped.")
+        self._set(mode=None)
 
     def close(self):
         self.remember()
@@ -1092,16 +1106,20 @@ class Studio:
     # ---- the player's marks, copying, blind comparison ----
 
     def copy_to_a(self):
-        """A copy of B, as it is now, on A: a sound of its own, so turning B's knobs leaves it as it is."""
-        b = self.sound("b")
-        if b is None:
+        """A copy of B, as it is now, on A: a sound of its own, so turning B's knobs leaves it as it is. B stays
+        the side selected: it is the one worked on."""
+        if self.sound("b") is None:
             self.say("Nothing is on B to copy.")
             return
-        copy = Sound(b.name, b.chain, {"kind": "revised", "from": b.id, "request": COPY_REQUEST},
-                     parent=b.id, knobs=dict(b.knobs), explanation=b.explanation, heard=b.heard)
-        self.put("a", copy)
+        self.copy_over(self.sound("b"), "a")
         self._set(side="b")
-        self.say(f"{b.name} is on A too, to compare the next change on B against.")
+
+    def copy_over(self, sound, side):
+        """A copy of `sound`, as it is now (its knobs, what was heard of it), put on `side`: dropping a tile or a
+        design of the round on a tile. A copy, so that changing one leaves the other as it is."""
+        copy = Sound(sound.name, sound.chain, {"kind": "revised", "from": sound.id, "request": COPY_REQUEST},
+                     parent=sound.id, knobs=dict(sound.knobs), explanation=sound.explanation, heard=sound.heard)
+        self.put(side, copy)
 
     def blind(self):
         """Hide the names, and swap A and B or not, at random. Calling it again shows what was where."""
@@ -1117,8 +1135,8 @@ class Studio:
         if self.blind_swapped:
             self._set(a=self.state.b, b=self.state.a, revision=self.state.revision + 1)
             self._show()
-        self._set(blind=True, status="Names hidden. Play A and B, then choose Keep or Not this on one of them, or "
-                                     "click Show which was which.")
+        self._set(blind=True, status="Names hidden: mark one with the heart or the cross, or press the eye again "
+                                     "to see which was which.")
 
     def reveal(self, said=""):
         """End a blind comparison: say which was which, and put A and B back on their own sides if they were

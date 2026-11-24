@@ -36,13 +36,18 @@ from lab.hearing.audio import read_wave
 from lab.knowledge import REPO, home
 from lab.hearing.measure import summary
 from lab.desk.chooser import InstrumentChooser
-from lab.desk.difference import against, aim_against
+from lab.desk.drag import Drags
+from lab.desk.phrase_strip import PhraseStrip
+from lab.desk.scales import Scales
+from lab.tools.common import flow
+from lab.desk.difference import against, aim_against, misses
 from lab.desk.studio import COPY_REQUEST
 from lab.desk.hints import hint, named
 from lab.desk.pictures import learning_symbol
 from lab.desk.studio import RATE, Studio
 from lab.learner.seat import LearnerSeat  # noqa: F401  (the desk makes one; tests import it from here)
-from lab.desk.theme import ACCENT, DARK, DIM, FAULT, FONT, INK, LIVE, PAPER, RULE, SIDE, SOFT, SUBTLE, TILE, mix
+from lab.desk.theme import (ACCENT, DARK, DIM, FAULT, FONT, GLYPH, INK, LIVE, PAPER, RULE, SIDE, SOFT, SUBTLE,
+                            TILE, icon_font, mix)
 
 PANELS = ("Shape", "Chain", "Difference", "Phrase", "Sounds", "History", "Guitar", "More")
 SIDED = ("Shape", "Chain", "Sounds")       # panels that act on or show the sound on the selected side
@@ -138,7 +143,6 @@ class Desk:
         self.reference_scene = "Default scene"      # the scene a preset is captured in as a reference
         self.contrast = None            # what "Measure A and B now" found, and for which sounds and phrase
         self.save_target = None         # (sound id, knob positions) the name being typed is for
-        self.phrase_shown = None        # the phrase the link at the right names
         self.seat = None                # the Guitar Learner's seat, once something of the learner was opened
         self.clock, self.door = None, door      # the `after` of `tick`; the socket a second launch knocks on
         self.drawing_fault = None       # the last fault while drawing, so that it is logged once
@@ -236,35 +240,74 @@ class Desk:
 
         pair = tk.Frame(main, bg=PAPER)
         pair.pack(fill="both", expand=True)
-        pair.columnconfigure((0, 1), weight=1, uniform="pair")
+        pair.columnconfigure((0, 2), weight=1, uniform="pair")
         pair.rowconfigure(0, weight=1)
         self.tiles = {}
-        for column, side in enumerate(("a", "b")):
+        self.scales, self.blocks = {}, {}           # by side: the aim against what was heard; the chain's blocks
+        self.blocks_key = {}                        # by side: what the blocks were drawn from
+        # Dragging onto a tile: the other tile, a design of the round, a sound from History, an IR or a capture.
+        self.drags = Drags(self.root, targets={}, dropped=self.dropped, lit=self.light_targets)
+        for column, side in ((0, "a"), (2, "b")):
             tile = tk.Frame(pair, bg=DARK, padx=16, pady=13, highlightthickness=2, highlightbackground=DARK,
                             cursor="hand2")
-            tile.grid(row=0, column=column, sticky="nsew", padx=(0, 5) if side == "a" else (5, 0))
+            tile.grid(row=0, column=column, sticky="nsew")
+            # At the top: whether it plays, and the player's marks, a heart and a cross, filled when given.
+            top = tk.Frame(tile, bg=DARK)
+            top.pack(side="top", fill="x")
+            air = label(top, size=8, color=LIVE, bold=True)
+            air.pack(side="left")
+            marks = tk.Frame(top, bg=DARK)
+            marks.pack(side="right")
+            for word in ("keeper", "not this"):
+                chip = tk.Label(marks, text=GLYPH["keep" if word == "keeper" else "not this"], font=icon_font(13),
+                                padx=5, pady=2, cursor="hand2", bg=DARK, fg=SUBTLE)
+                chip.pack(side="left")
+                chip.bind("<ButtonRelease-1>", lambda _, side=side, word=word: self.studio.mark(word, side))
+                named(chip, "Keep" if word == "keeper" else "Not this")
             badge = label(tile, side.upper(), size=34, color=SIDE[side], bold=True)
             name = label(tile, size=14, bold=True, wrap=320)
+            blocks = tk.Frame(tile, bg=DARK)
+            scales = Scales(tile)
+            named(scales, lambda scales=scales: scales.words)
             caption = label(tile, size=9, color=SUBTLE, wrap=320)
-            marks = tk.Frame(tile, bg=DARK)
-            for word in ("keeper", "not this"):
-                chip = tk.Label(marks, text="Keep" if word == "keeper" else "Not this", padx=8, pady=2,
-                                font=(FONT, 9), cursor="hand2", bg=DARK, fg=SUBTLE)
-                chip.pack(side="left", padx=(0, 6))
-                chip.bind("<ButtonRelease-1>", lambda _, side=side, word=word: self.studio.mark(word, side))
-            air = label(tile, size=8, color=LIVE, bold=True)
-            air.pack(side="top", fill="x")
-            marks.pack(side="bottom", fill="x", pady=(6, 0))
             caption.pack(side="bottom", fill="x")
+            scales.pack(side="bottom", fill="x", pady=(6, 2))
+            blocks.pack(side="bottom", fill="x", pady=(4, 0))
             name.pack(side="bottom", fill="x")
             badge.pack(side="bottom", fill="x")
-            for widget in (tile, badge, name, caption, air):
-                widget.bind("<ButtonRelease-1>", lambda _, side=side: self.studio.select(side))
+            self.scales[side], self.blocks[side] = scales, blocks
+            for widget in (tile, badge, name, caption, air, top, scales):
+                widget.bind("<ButtonRelease-1>", self.drags.click(lambda side=side: self.studio.select(side)))
+            for widget in (tile, badge, name, caption):
+                self.drags.source(widget, lambda event, side=side: ("side", side) if self.studio.sound(side)
+                                  else None, self.dragged_name)
             # A name or a caption longer than the tile is wide goes on to the next line, however wide the tile is.
-            tile.bind("<Configure>", lambda event, name=name, caption=caption: (
+            tile.bind("<Configure>", lambda event, name=name, caption=caption, blocks=blocks: (
                 name.configure(wraplength=max(100, event.width - 40)),
-                caption.configure(wraplength=max(100, event.width - 40))))
+                caption.configure(wraplength=max(100, event.width - 40)),
+                blocks.winfo_children() and flow(blocks, blocks.winfo_children(), width=max(160, event.width - 40))))
             self.tiles[side] = (tile, name, caption, air, marks, badge)
+        self.drags.targets.update({side: self.tiles[side][0] for side in ("a", "b")})
+        # Between the tiles: B onto A, comparing blind, and undo, as symbols that say their names on hover.
+        between = tk.Frame(pair, bg=PAPER, width=40)
+        between.grid(row=0, column=1, sticky="ns", padx=4)
+        middle = tk.Frame(between, bg=PAPER)
+        middle.place(relx=.5, rely=.5, anchor="center")
+
+        def symbol(glyph, action, words):
+            found = tk.Label(middle, text=glyph, font=icon_font(15), bg=PAPER, fg=SOFT, cursor="hand2", padx=6,
+                             pady=6)
+            found.pack(pady=4)
+            found.bind("<ButtonRelease-1>", lambda _: action())
+            named(found, words)
+            return found
+
+        self.copy_link = symbol(GLYPH["copy"], lambda: self.studio.copy_to_a(),
+                                lambda: self.unable("copy") or "Copy B to A (or drag B onto A)")
+        self.blind_link = symbol(GLYPH["blind"], lambda: self.studio.blind(),
+                                 lambda: self.unable("blind") or ("Show which was which" if self.studio.state.blind
+                                                                  else "Compare blind"))
+        self.undo_link = symbol(GLYPH["undo"], lambda: self.studio.undo(), self.studio.undo_words)
 
         # Shown while the Levels tool's offset or mute is on: nothing else on the desk would say so.
         self.level_row = tk.Frame(main, bg=PAPER)
@@ -283,23 +326,27 @@ class Desk:
         row = tk.Frame(main, bg=PAPER)
         row.pack(fill="x", pady=(12, 0))
         # Placed in the order of what must stay when the row is narrow (a panel open in the smallest window):
-        # saving first, the phrase's name last, which is then cut short.
-        button(row, "Save to QC", self.save).pack(side="right", padx=(8, 0))
+        # saving first, the phrase last, which is then drawn narrower.
+        self.save_button = button(row, "Save to QC", self.save)
+        self.save_button.pack(side="right", padx=(8, 0))
+        named(self.save_button, lambda: self.unable("save") or "Save the selected sound to the Tone Lab setlist")
         self.guitar = button(row, "Guitar", lambda: self.toggle_play("guitar"))
         self.guitar.pack(side="left")
-        self.loop = button(row, "Phrase", lambda: self.toggle_play("phrase"))
+        named(self.guitar, lambda: self.unable("guitar") or "Play the guitar through the selected sound")
+        self.loop = button(row, GLYPH["loop"], lambda: self.toggle_play("phrase"))
+        self.loop.configure(font=icon_font(13), padx=12)
         self.loop.pack(side="left", padx=(2, 0))
-        self.copy_link = link(row, "Copy B to A", lambda: self.studio.copy_to_a())
-        self.copy_link.pack(side="left", padx=(10, 0))
-        self.blind_link = link(row, "Compare blind", lambda: self.studio.blind())
-        self.blind_link.pack(side="left")
-        # Shown once there is something to take back.
-        self.undo_link = link(row, "Undo", lambda: self.studio.undo())
-        named(self.undo_link, self.studio.undo_words)       # what it would take back, while the pointer rests
-        self.phrase_link = tk.Label(row, text="No phrase", bg=PAPER, fg=SUBTLE, font=(FONT, 9), cursor="hand2",
-                                    anchor="e")
-        self.phrase_link.pack(side="right", padx=(8, 0))
-        self.phrase_link.bind("<ButtonRelease-1>", lambda _: self.toggle("Phrase"))
+        named(self.loop, lambda: self.unable("phrase") or "Loop the phrase through the selected sound")
+        # The phrase itself: its shape, the part that loops and where the loop is now. A click opens the Phrase
+        # panel; the dot beside it records a new one on the pickup setting last used.
+        self.record_symbol = tk.Label(row, text=GLYPH["record"], font=icon_font(13), bg=PAPER, fg=SOFT,
+                                      cursor="hand2", padx=6)
+        self.record_symbol.pack(side="right")
+        self.record_symbol.bind("<ButtonRelease-1>", lambda _: self.record_now())
+        named(self.record_symbol, self.record_words)
+        self.phrase_strip = PhraseStrip(row, open_panel=lambda: self.toggle("Phrase"))
+        self.phrase_strip.pack(side="left", fill="x", expand=True, padx=(10, 2))
+        named(self.phrase_strip, self.phrase_words)
         # Naming a save, in place: shown when Save to QC is pressed.
         self.save_row = tk.Frame(main, bg=PAPER)
         label(self.save_row, "Save as", size=9, color=SOFT).pack(side="left")
@@ -382,24 +429,38 @@ class Desk:
             # The tile first: everything on it takes its colour, the letter and the marks included.
             tile.configure(highlightbackground=SIDE[side] if selected else DARK,
                            bg=mix(SIDE[side], DARK, .14) if on_air else DARK)
-            for widget in (name, caption, air, marks, badge):
+            for widget in (name, caption, air, marks, badge, air.master, self.blocks[side]):
                 widget.configure(bg=tile["bg"])
-            # Keep and Not this stay available while comparing blind (choosing shows the names); a mark already
-            # given is not shown then, since it would tell which sound is which.
+            # The heart and the cross stay while comparing blind (choosing shows the names); a mark already given
+            # is not shown then, since it would tell which sound is which. A mark given is drawn filled.
             for chip, word in zip(marks.winfo_children(), ("keeper", "not this")):
                 marked = sound is not None and not hidden and word in sound.marks
-                chip.configure(bg=mix(SIDE[side], DARK, .35) if marked else tile["bg"], fg=INK if marked else SUBTLE)
+                chip.configure(bg=tile["bg"], fg=SIDE[side] if marked else SUBTLE,
+                               text=GLYPH["kept"] if word == "keeper" and marked
+                               else GLYPH["keep" if word == "keeper" else "not this"])
             if sound is None:
                 marks.pack_forget()
-            elif not marks.winfo_ismapped():
-                marks.pack(side="bottom", fill="x", pady=(6, 0), before=caption)
-            air.configure(text=f"● {state.mode}" if on_air else "")
+            elif not marks.winfo_manager():
+                marks.pack(side="right")
+            # Lit once the unit confirmed it plays; until then, that it is on its way.
+            air.configure(text=(f"● {state.mode}" if studio.sounding == (side, state.mode) else "○ getting ready")
+                          if on_air else "")
+            # The chain's blocks, and the aim against what was heard: not while names are hidden, since they
+            # would tell which is which.
+            self.draw_blocks(side, None if hidden else sound, None if hidden else sounds["b" if side == "a" else "a"])
+            heard = None if hidden or sound is None or studio.unheard(sound) else sound.heard
+            self.scales[side].show(None if hidden else self.aim_of(sound), heard, SIDE[side])
         self.paint_line(state)
-        # While something else has the audio input, the two buttons are dimmed; pressing one says who has it.
-        held = bool(studio.audio_held_by)
+        # A control that cannot act now is dimmed, and says why while the pointer rests on it; pressing it says
+        # so too. While something else has the audio input, the two play buttons are dimmed the same way.
         for widget, mode in ((self.guitar, "guitar"), (self.loop, "phrase")):
-            widget.configure(bg=mix(LIVE, TILE, .4) if state.mode == mode else TILE, fg=DIM if held else INK)
-        self.blind_link.configure(text="Show which was which" if state.blind else "Compare blind")
+            widget.configure(bg=mix(LIVE, TILE, .4) if state.mode == mode else TILE,
+                             fg=DIM if self.unable(mode) else INK)
+        self.save_button.configure(fg=DIM if self.unable("save") else INK)
+        self.copy_link.configure(fg=DIM if self.unable("copy") else SOFT)
+        self.blind_link.configure(fg=DIM if self.unable("blind") else SIDE["b"] if state.blind else SOFT,
+                                  text=GLYPH["shown"] if state.blind else GLYPH["blind"])
+        self.undo_link.configure(fg=SOFT if studio.history else DIM)
         if studio.listening is not None:
             from lab.tools.levels import reading
 
@@ -408,22 +469,142 @@ class Desk:
                 self.level_row.pack(fill="x", pady=(6, 0), before=self.scene_row)
         elif self.level_row.winfo_manager():
             self.level_row.pack_forget()
-        if studio.history and not self.undo_link.winfo_manager():
-            self.undo_link.pack(side="left", before=self.phrase_link)
-        elif not studio.history and self.undo_link.winfo_manager():
-            self.undo_link.pack_forget()
-        phrase_id = studio.phrase[0] if studio.phrase else None
-        if (phrase_id, state.instrument) != self.phrase_shown:
-            self.phrase_shown = (phrase_id, state.instrument)
-            item = next((item for item in studio.recorded_phrases() if item["id"] == phrase_id), None)
-            # The instrument is at the top left; the phrase names its own only when it is another one.
-            parts = [item.get("instrument") if item and item.get("instrument") != state.instrument else None,
-                     item.get("setting") if item else None]
-            self.phrase_link.configure(text=" · ".join(["Phrase", *filter(None, parts)]) if phrase_id else "No phrase")
+        since = studio.loop_since[1] if studio.loop_since and state.mode == "phrase" else None
+        self.phrase_strip.show(studio.phrase_whole if studio.phrase else None, since)
+        self.record_symbol.configure(fg=DIM if self.unable("record") else SOFT)
         self.draw_strip(sounds["b"])
         self.draw_scenes()
         if self.panel and self.hosted is None and not self.dragging and self.drawn_from(sounds) != self.panel_key:
             self.fill_panel()
+
+    def unable(self, what):
+        """Why a control of the desk cannot act now, in a few words, or "" when it can. The control is dimmed
+        while it cannot, and says this while the pointer rests on it."""
+        studio, state = self.studio, self.studio.state
+        a, b, chosen = studio.sound("a"), studio.sound("b"), studio.sound(state.side)
+        if what in ("guitar", "phrase", "record") and studio.audio_held_by \
+                and not (what == "guitar" and studio.audio_held_by == "gestures"):
+            return studio.held_words()
+        if what in ("guitar", "phrase") and a is None and b is None:
+            return "Nothing is on A or B yet"
+        if what == "phrase" and studio.phrase is None:
+            return "Record or choose a phrase first"
+        if what == "save" and chosen is None:
+            return f"Nothing is on {state.side.upper()} to save"
+        if what == "copy" and b is None:
+            return "Nothing is on B to copy"
+        if what == "blind" and not state.blind and (a is None or b is None):
+            return "Blind comparison needs a sound on both A and B"
+        return ""
+
+    def aim_of(self, sound):
+        """The aim of the round on show, when `sound` is one of its designs or a copy of one; else None."""
+        found = self.studio.round() if sound is not None else None
+        if not found:
+            return None
+        ids = {candidate["sound"] for candidate in found["candidates"]}
+        return found["aim"] if sound.id in ids or sound.parent in ids else None
+
+    def draw_blocks(self, side, sound, other):
+        """The chain of the sound on a side as a row of its blocks, each named; a block the other side does not
+        have as it is set here is outlined in this side's colour. A click on one opens the Chain panel."""
+        key = None if sound is None else (sound.id, other.id if other else None, sound.chain.digest(),
+                                          other.chain.digest() if other else None)
+        holder = self.blocks[side]
+        if key == self.blocks_key.get(side):
+            return
+        self.blocks_key[side] = key
+        for child in holder.winfo_children():
+            child.destroy()
+        if sound is None:
+            return
+        theirs = {(r, column): block for r, column, block in other.chain.blocks} if other else {}
+        chips = []
+        for r, column, block in sound.chain.blocks:
+            differs = other is not None and theirs.get((r, column)) != block
+            chip = tk.Label(holder, text=block.name if len(block.name) <= 22 else block.name[:21] + "…",
+                            font=(FONT, 8), bg=TILE, fg=INK if differs else SOFT, padx=5, pady=1, cursor="hand2",
+                            highlightthickness=1, highlightbackground=SIDE[side] if differs else TILE)
+            chip.bind("<ButtonRelease-1>", lambda _, side=side: (self.studio.select(side),
+                                                                 self.panel != "Chain" and self.toggle("Chain")))
+            chips.append(chip)
+        holder.update_idletasks()
+        flow(holder, chips, width=max(160, self.tiles[side][0].winfo_width() - 40), gap=4)
+
+    def dragged_name(self, what):
+        """The few words that follow the pointer while something is dragged."""
+        kind, value = what
+        if kind == "side":
+            sound = self.studio.sound(value)
+            return "?" if self.studio.state.blind else (sound.name if sound else value.upper())
+        if kind in ("design", "sound"):
+            try:
+                return self.studio.store.sound(value).name
+            except Exception:  # noqa: BLE001  a sound gone meanwhile: it is dropped as nothing
+                return "…"
+        return value.name
+
+    def light_targets(self, on):
+        """While something is dragged, both tiles show they take it; afterwards they are drawn as they are."""
+        if on:
+            for side in ("a", "b"):
+                self.tiles[side][0].configure(highlightbackground=SIDE[side])
+        else:
+            self.draw()
+
+    def dropped(self, side, what):
+        """Something was let go over a tile."""
+        studio = self.studio
+        kind, value = what
+        if kind == "side":
+            if value != side and studio.sound(value) is not None and not studio.state.blind:
+                studio.copy_over(studio.sound(value), side)
+        elif kind == "design":
+            studio.copy_over(studio.store.sound(value), side)
+        elif kind == "sound":
+            studio.put(side, studio.store.sound(value))
+        elif kind == "asset":
+            studio.select(side)
+            studio.use_asset(value, has_cab=getattr(value, "has_cab", None),
+                             version=None if value.kind == "ir" else value.capture_version or self.capture_version)
+
+    def phrase_words(self):
+        """What the phrase strip says while the pointer rests on it."""
+        studio = self.studio
+        if not studio.phrase:
+            return "No phrase: record one with the dot, or choose one in the Phrase panel"
+        item = next((item for item in studio.recorded_phrases() if item["id"] == studio.phrase[0]), None)
+        parts = [item.get("instrument") if item and item.get("instrument") != studio.state.instrument else None,
+                 item.get("setting") if item else None]
+        whole = studio.phrase_whole
+        loop = f" · loop {whole[1] / RATE:.1f}–{whole[2] / RATE:.1f} s of {len(whole[0]) / RATE:.1f} s" if whole else ""
+        return " · ".join(["Phrase", *filter(None, parts)]) + loop
+
+    def record_words(self):
+        why = self.unable("record")
+        if why:
+            return why
+        setting = self.remembered_setting()
+        return (f"Record {RECORD_SECONDS:g} s on {setting}" if setting
+                else "Record a phrase: choose the pickup setting in the Phrase panel")
+
+    def remembered_setting(self):
+        """The pickup setting the player last recorded on, on this instrument, or None."""
+        return (self.studio.desk_session.get("settings") or {}).get(self.studio.state.instrument)
+
+    def record_now(self):
+        """The dot by the phrase: record on the setting last used. With none yet, the Phrase panel opens, where
+        it is chosen."""
+        if self.unable("record"):
+            self.studio.say(self.unable("record"))
+            return
+        setting = self.remembered_setting()
+        if setting is None:
+            if self.panel != "Phrase":
+                self.toggle("Phrase")
+            self.studio.say("Choose the pickup setting, then record.")
+            return
+        self.studio.record(setting, RECORD_SECONDS, gesture=self.record_gesture)
 
     def paint_line(self, state):
         """The status line in one of three looks: a fault in its own colour; what was just said, plain; and,
@@ -483,7 +664,7 @@ class Desk:
         setup = suggested_setup(sound.origin.get("guitar_setup"), self.studio.state.instrument)
         parts = [setup] if setup else []
         if side == "b":
-            differs = against(sound, self.studio.sound("a"), "A")
+            differs = against(sound, self.studio.sound("a"), "A", blocks=False)     # the blocks are outlined
             if differs:
                 parts.insert(0, differs)
         origin = sound.origin.get("kind")
@@ -493,9 +674,7 @@ class Desk:
         elif origin == "revised" and request and request != COPY_REQUEST:      # a copy says nothing new
             parts.append("Revised: " + request[:60])
         if self.studio.unheard(sound):
-            parts.append("could not be listened to")
-        elif summary(sound.heard):
-            parts.append("heard as " + summary(sound.heard))       # words inferred from what was measured
+            parts.append("could not be listened to")      # what was heard is on the scales above
         if sound.knobs:
             parts.append("shaped")
         if sound.saved:
@@ -528,8 +707,9 @@ class Desk:
         found = None if studio.state.blind else studio.round()
         # The chips are made again only when what they show has changed: a chip that is replaced between the
         # press and the release of a click loses the click.
-        key = found and (found["id"], found.get("next"), found.get("previous"), studio.state.b,
-                         on_b and (summary(on_b.heard), studio.unheard(on_b)))
+        key = found and (found["id"], found.get("next"), found.get("previous"), studio.state.b, studio.ear.hearing,
+                         tuple((summary(sound.heard), bool(studio.unheard(sound))) for sound in
+                               (studio.store.sound(item["sound"]) for item in found["candidates"])))
         if key == self.strip_key:
             return
         self.strip_key = None               # until they are drawn whole: a fault on the way is met again, not hidden
@@ -546,18 +726,23 @@ class Desk:
         for place, candidate in enumerate(found["candidates"]):
             sound = studio.store.sound(candidate["sound"])
             chosen = candidate["sound"] == studio.state.b
-            chip = tk.Label(self.chips, text=f"{place + 1}  {sound.name}", padx=10, pady=5, cursor="hand2",
+            pip = ("!" if studio.unheard(sound) else "◐" if studio.ear.hearing == sound.id
+                   else "●" if summary(sound.heard) else "○")
+            chip = tk.Label(self.chips, text=f"{pip} {place + 1}  {sound.name}", padx=10, pady=5, cursor="hand2",
                             font=(FONT, 9, "bold" if chosen else "normal"),
                             bg=mix(SIDE["b"], DARK, .3) if chosen else TILE, fg=INK if chosen else SOFT)
             chip.pack(side="left", padx=(0, 5))
-            chip.bind("<ButtonRelease-1>", lambda _, place=place: studio.step(place))
+            chip.bind("<ButtonRelease-1>", self.drags.click(lambda place=place: studio.step(place)))
+            self.drags.source(chip, lambda event, sound=sound: ("design", sound.id), self.dragged_name)
+            named(chip, lambda sound=sound: aim_against(found["aim"], None if studio.unheard(sound) else sound.heard,
+                                                       studio.unheard(sound)))
             if chosen:
                 aim = found["aim"]
                 song = aim.get("song")
                 part = f"{song.get('title')}{' · ' + song['part'] if song.get('part') else ''} · " if song else ""
-                self.strip_note.configure(text=f"{candidate['differs']}\n{part}"
-                                               + aim_against(aim, None if studio.unheard(sound) else sound.heard,
-                                                             studio.unheard(sound)))
+                missed = misses(aim, None if studio.unheard(sound) else sound.heard)
+                self.strip_note.configure(text=f"{part}{candidate['differs']}"
+                                               + (f" · misses the aim on {', '.join(missed)}" if missed else ""))
         ready = bool(found.get("next"))
         # Free when they are ready; a call to the assistant of about a minute when they are not: the chip says so.
         more = tk.Label(self.chips, text="›  next three" if ready else "Three more · about a minute", padx=10, pady=5,
@@ -600,7 +785,7 @@ class Desk:
 
         before, self.instrument_shown = self.instrument_shown, self.studio.state.instrument
         self.chooser.refresh()
-        self.record_setting = None          # a pickup setting of the instrument before
+        self.record_setting = self.remembered_setting()      # the one last used on this instrument, if any
         if before is None:
             return                          # the desk is opening: nothing was on show for another instrument
         gestures = modules.modules.get("lab.learner.gestures")      # nothing to stop if it was never used
@@ -786,7 +971,8 @@ class Desk:
             canvas.create_text(x, y, text=text, anchor=anchor, fill=SUBTLE if key in usable else DIM, font=(FONT, 8))
         radius = 6
         x, y = pad_point(point[across], point[up], size)
-        dot = canvas.create_oval(x - radius, y - radius, x + radius, y + radius, fill=ACCENT, outline="")
+        dot = canvas.create_oval(x - radius, y - radius, x + radius, y + radius, fill=SIDE[self.studio.state.side],
+                                 outline="")
         note = label(self.tray, size=9, color=SUBTLE)
         note.pack(fill="x", pady=(0, 8))
 
@@ -1179,7 +1365,11 @@ class Desk:
         actions = tk.Frame(self.tray, bg=DARK)
         actions.pack(fill="x", pady=(6, 0))
         if kind == "ir":
-            button(actions, "Put in B's cab", use).pack(side="left")
+            side = self.studio.state.side.upper()
+            button(actions, f"Put in {side}'s cab", use).pack(side="left")
+            # An IR dragged onto a tile goes into that sound's cab.
+            self.drags.source(box, lambda event: ("asset", rows[box.nearest(event.y)]) if rows else None,
+                              self.dragged_name)
         else:
             versions = tk.Frame(self.tray, bg=DARK)
             versions.pack(fill="x", pady=(6, 0))
@@ -1191,7 +1381,8 @@ class Desk:
                 chip.pack(side="left", padx=(6, 0))
                 chip.bind("<ButtonRelease-1>", lambda _, value=value: (setattr(self, "capture_version", value),
                                                                        self.fill_panel()))
-            button(actions, "Instead of B's amp", lambda: self.try_capture(chosen(), False)).pack(side="left")
+            side = self.studio.state.side.upper()
+            button(actions, f"Instead of {side}'s amp", lambda: self.try_capture(chosen(), False)).pack(side="left")
             button(actions, "Instead of amp and cab", lambda: self.try_capture(chosen(), True)).pack(
                 side="left", padx=6)
 
@@ -1237,6 +1428,9 @@ class Desk:
         box.pack(fill="both", expand=True)
         for _, name, kind, saved in rows:
             box.insert("end", f"{name}  ·  {kind}" + ("  ★" if saved else ""))
+        # A row dragged onto a tile goes on that side, as the buttons under the list do.
+        self.drags.source(box, lambda event: ("sound", rows[box.nearest(event.y)][0]) if rows else None,
+                          self.dragged_name)
 
         def put(side):
             chosen = box.curselection()
@@ -1319,8 +1513,6 @@ class Desk:
         label(self.into, f"Record a phrase on the {self.studio.state.instrument}", size=10, bold=True).pack(
             fill="x", pady=(12, 0))
         label(self.into, "Pickup setting", size=9, color=SUBTLE).pack(fill="x", pady=(4, 2))
-        from lab.tools.common import flow
-
         grid = tk.Frame(self.into, bg=DARK)
         grid.pack(fill="x")
         chips = []
@@ -1328,8 +1520,7 @@ class Desk:
             chosen = setting == self.record_setting
             chip = tk.Label(grid, text=setting, bg=TILE if chosen else DARK, fg=INK if chosen else SOFT, font=(FONT, 8),
                             padx=6, pady=2, cursor="hand2")
-            chip.bind("<ButtonRelease-1>", lambda _, setting=setting: (setattr(self, "record_setting", setting),
-                                                                       self.fill_panel()))
+            chip.bind("<ButtonRelease-1>", lambda _, setting=setting: self.choose_setting(setting))
             chips.append(chip)
         flow(grid, chips, width=400)        # as many to a row as fit the panel, however long the names
         # What is played decides what a take measures as much as the pickup does, so pickup settings are compared
@@ -1351,6 +1542,14 @@ class Desk:
                     lambda: self.record_setting and self.studio.record(self.record_setting, RECORD_SECONDS,
                                                                        gesture=self.record_gesture))
         go.pack(anchor="w", pady=(4, 0))
+
+    def choose_setting(self, setting):
+        """The pickup setting the next take is played on: kept for this instrument, for the dot by the phrase."""
+        self.record_setting = setting
+        settings = dict(self.studio.desk_session.get("settings") or {})
+        settings[self.studio.state.instrument] = setting
+        self.studio.remember(settings=settings)
+        self.fill_panel()
 
     def choose_gesture(self, gesture):
         """Mark the next take as this gesture, or, pressed again, as none."""

@@ -13,12 +13,12 @@ signals (`probe.late_energy_db`), and only otherwise from what followed the phra
 import math
 
 # The three qualities a round aims for, as the designer and listening both name them (`lab.sound.design.AIM`,
-# `lab.hearing.measure.WORDS`), and what they are called where a short name is wanted.
-QUALITIES = (("distortion", "gain"), ("brightness", "bright"), ("tail", "tail"))
+# `lab.hearing.measure.WORDS`), with the name each is shown under.
+QUALITIES = (("distortion", "distortion"), ("brightness", "brightness"), ("tail", "tail"))
 
 
 def misses(aim, heard):
-    """The qualities (their short names) where what was heard is not the word the round aimed for. Only words
+    """The qualities (by the names they are shown under) where what was heard is not the word the round aimed for. Only words
     both have count: a quality either leaves out is not a miss."""
     found = []
     for key, short in QUALITIES:
@@ -43,12 +43,12 @@ def aim_against(aim, heard, unheard=None):
     return f"{line} · heard as {summary(heard)}" + (f" · misses on {', '.join(missed)}" if missed else "")
 
 
-def against(sound, other, other_letter):
+def against(sound, other, other_letter, *, blocks=True):
     """What `sound` has that `other` has not, in a few words, for its tile: blocks added or taken out, blocks
     whose settings differ, and Shape knobs that stand elsewhere. "" when they are the same, or there is no other.
 
     Said of the chain as it is written and of the knobs as they stand, not of what was heard: that is the
-    Difference panel's."""
+    Difference panel's. With `blocks` False, only the knobs: the tile outlines the blocks that differ."""
     from collections import Counter
 
     from lab.sound import knobs
@@ -56,6 +56,8 @@ def against(sound, other, other_letter):
     if sound is None or other is None or sound.id == other.id:
         return ""
     parts = []
+    if not blocks:
+        sound, other = _knobs_only(sound), _knobs_only(other)
     mine = Counter(block.name for _, _, block in sound.chain.blocks)
     theirs = Counter(block.name for _, _, block in other.chain.blocks)
     parts += [f"+ {name}" for name in (mine - theirs)]
@@ -73,6 +75,15 @@ def against(sound, other, other_letter):
         return ""
     shown = parts[:3] + ([f"{len(parts) - 3} more"] if len(parts) > 3 else [])
     return f"against {other_letter}: " + ", ".join(shown)
+
+
+def _knobs_only(sound):
+    """A stand-in for a sound with no blocks, so that only its knobs are compared."""
+    from types import SimpleNamespace
+
+    from lab.sound.chain import Chain
+
+    return SimpleNamespace(id=sound.id, chain=Chain(), knobs=sound.knobs)
 
 
 def number(record, path):

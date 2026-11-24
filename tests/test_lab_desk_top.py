@@ -254,11 +254,11 @@ class FollowingTheInstrumentTest(DeskCase):
         self.assertEqual(studio.phrase[0], "three")     # the last one recorded on it
         self.assertEqual(studio.state.status, "Now on the Les Paul. The phrase is the last one recorded on it (Neck).")
         self.assertEqual(studio.guitar.setting(), "Neck")
-        self.assertEqual(desk.phrase_link.cget("text"), "Phrase · Neck")       # the instrument is at the top left
+        self.assertTrue(desk.phrase_words().startswith("Phrase · Neck · loop"))     # the instrument is at the top left
         desk.choose_instrument("Bass")                  # nothing recorded on it: the phrase stays, and that is said
         self.pump()
         self.assertEqual(studio.phrase[0], "three")
-        self.assertEqual(desk.phrase_link.cget("text"), "Phrase · Les Paul · Neck")     # another's: it names whose
+        self.assertTrue(desk.phrase_words().startswith("Phrase · Les Paul · Neck"))     # another's: it names whose
         self.assertEqual(studio.state.status, "Now on the Bass. No phrase is recorded on it yet: the phrase is still the Les Paul's.")
         # A phrase of another instrument says nothing of this one's pickup settings: the designer is not told one.
         self.assertIsNone(studio.guitar.setting())
@@ -288,9 +288,12 @@ class NarrowDeskTest(DeskCase):
         row = desk.guitar.master
         save, = [child for child in row.winfo_children() if child.winfo_class() == "Button"
                  and child.cget("text") == "Save to QC"]
-        for stays in (desk.guitar, desk.loop, desk.copy_link, desk.blind_link, desk.undo_link, save):
+        for stays in (desk.guitar, desk.loop, desk.record_symbol, save):
             self.assertTrue(stays.winfo_ismapped() and inside(stays, row), stays.cget("text"))
             self.assertGreaterEqual(stays.winfo_width(), stays.winfo_reqwidth(), stays.cget("text"))
+        self.assertGreater(desk.phrase_strip.winfo_width(), 40)        # the phrase is drawn narrower, not dropped
+        for stays in (desk.copy_link, desk.blind_link, desk.undo_link):     # between the tiles
+            self.assertTrue(stays.winfo_ismapped() and inside(stays, self.root))
         for side in ("a", "b"):
             tile, name = desk.tiles[side][:2]
             self.assertTrue(inside(name, tile), side)

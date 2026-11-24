@@ -212,7 +212,7 @@ class QuietDeskTest(unittest.TestCase):
         self.desk.save()
         self.assertEqual(self.desk.save_name.get(), "Hiwatt")
 
-    def test_a_new_take_shows_on_the_phrase_link(self):
+    def test_a_new_take_is_named_on_the_phrase_strip(self):
         import json
 
         import numpy as np
@@ -226,7 +226,7 @@ class QuietDeskTest(unittest.TestCase):
                                                       "recorded": "2026-11-20T12:00:00+00:00"}), encoding="utf-8")
         self.studio.phrase = ("new", np.zeros((48000, 1)))
         self.studio.set(status="Recorded.")
-        self.assertIn("Bridge", self.desk.phrase_link["text"])
+        self.assertIn("Bridge", self.desk.phrase_words())
 
 
 if __name__ == "__main__":
