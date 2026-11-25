@@ -142,7 +142,7 @@ class Requests:
         stop = self.signal(quietly)
         if not quietly:
             studio.toward[stop] = "b"
-            studio.begin(stop, saying or f"New round for “{text[:60]}” · about a minute…")
+            studio.begin(stop, saying or f"“{text[:60]}”…")
         future = self.design(design.round_of_three, studio.assistant, text, studio._instrument(), earlier=earlier,
                               by=by, cancel=stop, assets_known=studio._assets(),
                               listening=None if quietly else studio._listening())
@@ -177,7 +177,7 @@ class Requests:
             if after:
                 studio.rounds.follow(after, record["id"])
             if quietly:
-                studio.say("Three more designs are ready, informed by what was heard: click › next three.")
+                studio._set()                   # the chip says so: "› next three", lit
                 return
             if stop is not self.latest:
                 # A newer request is on its way or already answered: this one is kept, not put on show.
@@ -187,7 +187,7 @@ class Requests:
             on_show = {"round": record["id"], "song": song_name(song) if song else None}
             if studio.state.revision == revision:
                 studio.put("b", studio.store.sound(record["candidates"][0]["sound"]), **on_show)
-                studio.say(f"1 of {len(designs)} is on B · {designs[0][0].name}")
+                studio.say("")                  # the chips and the tile show it
             else:
                 studio._set(**on_show)
                 studio.say(f"{len(designs)} designs are ready. B changed meanwhile, so it was left alone.")
@@ -210,8 +210,7 @@ class Requests:
             studio.go_round(found["next"])
             return
         if self.preparing == found["id"]:
-            studio.say("Three more are on their way.")
-            return
+            return                              # the working line says so
         earlier = []
         for candidate in found["candidates"]:
             sound = studio.store.sound(candidate["sound"])

@@ -307,9 +307,9 @@ class SimAudio:
         self.last_note = None       # when they stopped, if they ever played
         self.watching = None        # the `SimStrings` open, as the driver holds one stream
 
-    def strings(self, channel):
+    def strings(self, channels):
         self.release()
-        self.watching = SimStrings(self, channel)
+        self.watching = SimStrings(self, channels)
         return self.watching
 
     def release(self):
@@ -377,12 +377,13 @@ class SimAudio:
                     and value >= .999 else sound + echo
         return sound
 
-    def record(self, seconds, channels, *, cancel=None, started=None, enough=None):
+    def record(self, seconds, channels, *, cancel=None, started=None, enough=None, keep=False):
         """A plucked note, as if the player had played one: as long as asked, or, given `enough`, until it is set
-        (half a second at the least)."""
+        (half a second at the least). `keep` when it is cut from the watch already open."""
         import time as clock
 
-        self.release()
+        if not keep:
+            self.release()
         if started is not None:
             started()
         if enough is not None:
@@ -403,8 +404,17 @@ class SimStrings:
     """The dry guitar watched on the simulated unit (`lab.hearing.audio.Strings`): quiet unless `strum` says the
     player is playing, and quiet for an hour when nothing was ever played."""
 
-    def __init__(self, audio, channel):
-        self.audio, self.channel = audio, channel
+    def __init__(self, audio, channels):
+        self.audio, self.channels = audio, tuple(channels)
+        self.takes = 0                  # takes cut from this watch, for tests
+
+    def take(self, seconds, *, cancel=None, started=None, enough=None):
+        """As `Strings.take`: a plucked note from `PREROLL` before it was asked for until `enough`."""
+        from lab.hearing.audio import PREROLL
+
+        self.takes += 1
+        audio = self.audio.record(seconds, self.channels, cancel=cancel, started=started, enough=enough, keep=True)
+        return np.concatenate([np.zeros((round(PREROLL * 48000), len(self.channels)), dtype=np.float32), audio])
 
     def quiet_for(self):
         import time

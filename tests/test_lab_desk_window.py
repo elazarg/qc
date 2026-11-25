@@ -443,7 +443,9 @@ class DrawingTest(DeskCase):
         self.desk.mute_or_hear()
         self.assertEqual(self.desk.line["text"], "The Guitar Learner is using the input.")
         self.studio.release_audio("learner")
-        self.assertEqual(str(self.desk.guitar["fg"]), desk_module.INK)
+        self.assertEqual(str(self.desk.guitar["fg"]), desk_module.FAULT)     # muted, the rare state, in red
+        self.desk.mute_or_hear()
+        self.assertEqual(str(self.desk.guitar["fg"]), desk_module.INK)       # heard, the resting state, plain
 
     def test_the_guitar_panel_opens_at_once_and_is_drawn_again_when_the_profile_arrives(self):
         for name, setting in (("one", "Bridge · Series"), ("two", "Neck · Series")):
@@ -486,7 +488,7 @@ class GuitarPanelTest(DeskCase):
         self.assertFalse({"Guitar Learner", "Teach a control", "Input calibration"} & set(buttons))
         said = self.panel_text()
         self.assertIn("What the Charvel puts out", said)
-        self.assertIn("Record a phrase on the Charvel", said)
+        self.assertNotIn(desk_module.GLYPH["record"], buttons)          # takes are recorded in the Phrase panel
         # How long gestures stay on is behind the "?" beside the button, not a paragraph in the panel.
         seconds = f"{gestures.ARM_SECONDS:.0f} s"
         self.assertFalse(any(seconds in text for text in said))
@@ -543,6 +545,10 @@ class GuitarPanelTest(DeskCase):
 
         self.open()
         self.desk.toggle("Phrase")
+        self.assertFalse(set(GESTURES) & set(self.panel_text()))           # rarely needed: on request
+        self.assertIn("What is played ▾", self.panel_text())
+        self.desk.show_gestures = True                                      # as a click on it does
+        self.desk.fill_panel()
         self.assertTrue(set(GESTURES) <= set(self.panel_text()))           # offered as chips, in the panel
         self.desk.record_setting = "Bridge · Series"
         self.desk.choose_gesture(GESTURES[1])

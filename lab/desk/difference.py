@@ -43,12 +43,13 @@ def aim_against(aim, heard, unheard=None):
     return f"{line} · heard as {summary(heard)}" + (f" · misses on {', '.join(missed)}" if missed else "")
 
 
-def against(sound, other, other_letter, *, blocks=True):
+def against(sound, other, other_letter, *, blocks=True, named=True):
     """What `sound` has that `other` has not, in a few words, for its tile: blocks added or taken out, blocks
     whose settings differ, and Shape knobs that stand elsewhere. "" when they are the same, or there is no other.
 
     Said of the chain as it is written and of the knobs as they stand, not of what was heard: that is the
-    Difference panel's. With `blocks` False, only the knobs: the tile outlines the blocks that differ."""
+    Difference panel's. With `blocks` False, only the knobs: the tile outlines the blocks that differ. With
+    `named` False, without "against A:" in front: B's tile stands beside A's."""
     from collections import Counter
 
     from lab.sound import knobs
@@ -74,7 +75,7 @@ def against(sound, other, other_letter, *, blocks=True):
     if not parts:
         return ""
     shown = parts[:3] + ([f"{len(parts) - 3} more"] if len(parts) > 3 else [])
-    return f"against {other_letter}: " + ", ".join(shown)
+    return (f"against {other_letter}: " if named else "") + ", ".join(shown)
 
 
 def _knobs_only(sound):

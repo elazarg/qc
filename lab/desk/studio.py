@@ -1120,7 +1120,7 @@ class Studio:
         self.begin("assets", "Reading the IRs and captures on the Quad Cortex…")
 
         def read(records):
-            self._set(status=f"{len(records)} IRs and captures on the unit.")
+            self._set()
             if done:
                 done(records)
 
@@ -1256,8 +1256,7 @@ class Studio:
         if self.blind_swapped:
             self._set(a=self.state.b, b=self.state.a, revision=self.state.revision + 1)
             self._show()
-        self._set(blind=True, status="Names hidden: mark one with the heart or the cross, or press the eye again "
-                                     "to see which was which.")
+        self._set(blind=True, status="")    # the names are "?" and the eye is struck through
 
     def reveal(self, said=""):
         """End a blind comparison: say which was which, and put A and B back on their own sides if they were
@@ -1411,10 +1410,13 @@ class Studio:
         which refuses one in which nothing came in or which clipped."""
         if self._input_held():
             return
-        self.stop()
+        # While the guitar plays through the selected sound, the take is cut from the input already open (from a
+        # moment before it was asked for) and the guitar goes on; otherwise the input is opened for it.
+        if self.sounding != (self.state.side, "guitar") or self.state.mode != "guitar":
+            self.stop()
+            self.ear.lent()
         side = self.state.side if self.sound(self.state.side) is not None and self.state.shown else None
         heard_through = self.sound(side) if side else None
-        self.ear.lent()
         self.recording = (None, seconds)
         self.begin("record", "Opening the input…")
 

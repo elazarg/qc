@@ -469,6 +469,23 @@ class StringsTest(EngineCase):
         self.engine.quiet()
         self.assertIsNone(self.engine.audio.watching)
 
+    def test_a_take_while_the_guitar_plays_is_cut_from_the_open_input_and_the_guitar_goes_on(self):
+        import threading
+
+        from lab.hearing.audio import PREROLL
+
+        self.engine.show(one_row(PLEXI, V30), one_row(HIWATT, GREENBACK))
+        self.engine.play("b", "guitar", strings=True)
+        watching = self.engine.audio.watching
+        enough = threading.Event()
+        enough.set()
+        take = self.engine.record(45., "b", enough=enough)
+        self.assertEqual(watching.takes, 1)
+        self.assertIs(self.engine.audio.watching, watching)                # not closed and opened again
+        self.assertEqual(self.engine.mode, "guitar")                       # and the guitar was never cut
+        self.assertGreaterEqual(len(take), round((PREROLL + .5) * 48000))
+        self.assertEqual(take.shape[1], 3)
+
     def test_without_asking_the_strings_are_not_watched(self):
         self.engine.show(one_row(PLEXI, V30), None)
         self.engine.play("a", "guitar")

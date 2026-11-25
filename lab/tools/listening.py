@@ -104,8 +104,7 @@ class ListeningTool(Tool):
         if not saved and paths and all(Path(path).exists() for path in paths):
             self.load(paths)
         elif not saved:
-            self.export.show(True)
-            self.say("Choose your Spotify export: the zip, or its streaming-history files.")
+            self.export.show(True)          # the chooser, open, says what it wants
 
     def remembered(self):
         try:

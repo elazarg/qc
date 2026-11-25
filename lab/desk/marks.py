@@ -64,12 +64,13 @@ class Marks:
             self.taste = None
 
     def taste_lines(self):
-        """What the player's choices so far say, in measured quantities, or that there is not enough yet."""
+        """What the player's choices so far say, in measured quantities, or how far they are from saying
+        anything; nothing before the first choice."""
         studio = self.studio
         from lab.player import taste
 
         model = self.taste or taste.load(studio.folder)
-        return taste.describe(model) if model else ["No choices yet: marks and A/B choices teach it."]
+        return taste.describe(model) if model else []
 
     # ---- songs ----
 

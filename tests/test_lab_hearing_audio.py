@@ -74,6 +74,32 @@ class WaveTest(unittest.TestCase):
         self.assertEqual((audio.db(0.), audio.power_db(0.)), (-200., -70.))
 
 
+class StringsTakeTest(unittest.TestCase):
+    def test_a_take_from_the_open_input_starts_a_moment_before_it_was_asked_for(self):
+        import threading
+        import time
+
+        watch = audio.Strings(object(), (1, 3, 4))
+        before = np.full((24000, 3), .1, dtype=np.float32)
+        for _ in range(3):                                   # a second and a half played before ● was pressed
+            watch._process(before, len(before), None, None)
+        enough, found = threading.Event(), []
+        worker = threading.Thread(target=lambda: found.append(watch.take(45., enough=enough)))
+        worker.start()
+        while not watch.wanted:
+            time.sleep(.001)
+        after = np.full((4800, 3), .2, dtype=np.float32)
+        for _ in range(5):                                   # half a second after
+            watch._process(after, len(after), None, None)
+        enough.set()
+        worker.join(5)
+        take = found[0]
+        self.assertEqual(len(take), round((audio.PREROLL + .5) * RATE))
+        self.assertTrue(np.all(take[:round(audio.PREROLL * RATE)] == np.float32(.1)))    # the start is kept
+        self.assertTrue(np.all(take[round(audio.PREROLL * RATE):] == np.float32(.2)))
+        self.assertIsNone(watch.blocks)
+
+
 class LoopTest(unittest.TestCase):
     def play(self, loop, frames):
         out = np.ones((frames, 2), dtype=np.float32)

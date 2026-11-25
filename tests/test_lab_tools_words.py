@@ -240,7 +240,7 @@ class ToolsWordsTest(DeskCase):
         self.assertEqual(bench.none_earlier.cget("text"), "None yet.")
         pod = self.tool("pod")
         self.assertFalse(pod.list.winfo_viewable())                 # no backup read: its choice, and nothing else
-        self.assertEqual(pod.status.get(), "Choose your POD Go backup.")
+        self.assertEqual(pod.status.get(), "")                      # the open choice says what it wants
         songs = self.tool("listening")
         self.assertFalse(songs.list.winfo_viewable())
         songs.show({"summary": {"songs": [{"artist": "Rush", "title": "Limelight", "chosen": 4, "days": 3,

@@ -52,6 +52,7 @@ class GuitarPanelTest(DeskCase):
         self.assertEqual(len(charts), 1)
         self.assertEqual(len(charts[0].find_withtag("held")), 2)
         self.assertFalse(any(text.startswith("Bridge · Series: in this take") for text in texts(self.desk.tray)))
+        self.root.update()                                  # a click reaches only a widget on the window
         opener = [widget for widget in every(self.desk.tray) if widget.winfo_class() == "Label"
                   and widget.cget("text") == "In words ▾"][0]
         opener.event_generate("<ButtonRelease-1>")

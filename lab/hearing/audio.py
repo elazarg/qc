@@ -40,26 +40,75 @@ def _note_in(block):
     return db(float(np.sqrt(np.mean(np.square(block, dtype=np.float64))))) > NOTE_DB if len(block) else False
 
 
-class Strings:
-    """The dry guitar on one USB channel, watched while the guitar plays through the unit: when a note was last
-    played. The stream holds the driver, so it is stopped before anything else uses it."""
+PREROLL = 1.             # a take recorded while the guitar plays starts this long before it was asked for
 
-    def __init__(self, audio, channel):
-        self.audio, self.channel = audio, channel
+
+class Strings:
+    """The guitar's inputs, watched while it plays through the unit: (dry, wet left, wet right) USB channels.
+    The dry one says when a note was last played; the last `PREROLL` seconds of all of them are kept, so that a
+    take (`take`) starts before the player asked for it, with nothing lost to opening a stream. The stream holds
+    the driver, so it is stopped before anything else uses it."""
+
+    def __init__(self, audio, channels):
+        self.audio, self.channels = audio, tuple(channels)
         self.last_note = time.monotonic()       # quiet is counted from when watching began
         self.stream = None
+        self.ring = np.zeros((round(PREROLL * RATE), len(self.channels)), dtype=np.float32)
+        self.at = 0                             # where the next block goes in the ring
+        self.wanted = False                     # a take was asked for: the audio thread begins it at its next block
+        self.blocks = None                      # the take, while one is recorded
+        self.issues = []
 
     def _process(self, indata, frames, timing, status):
+        if status:
+            self.issues.append(str(status))
         if _note_in(indata[:, 0]):
             self.last_note = time.monotonic()
+        if self.wanted:
+            self.wanted = False
+            self.blocks = [np.roll(self.ring, -self.at, axis=0)]        # the last moments, oldest first
+        if self.blocks is not None:
+            self.blocks.append(indata.copy())
+        count = min(frames, len(self.ring))
+        end = self.at + count
+        if end <= len(self.ring):
+            self.ring[self.at:end] = indata[-count:]
+        else:
+            split = len(self.ring) - self.at
+            self.ring[self.at:] = indata[-count:][:split]
+            self.ring[:end - len(self.ring)] = indata[-count:][split:]
+        self.at = end % len(self.ring)
 
     def start(self):
         sd = self.audio.sd
-        self.stream = sd.InputStream(device=self.audio.device, samplerate=RATE, channels=1, dtype="float32",
-                                     latency="high", extra_settings=sd.AsioSettings([self.channel - 1]),
+        self.stream = sd.InputStream(device=self.audio.device, samplerate=RATE, channels=len(self.channels),
+                                     dtype="float32", latency="high",
+                                     extra_settings=sd.AsioSettings([channel - 1 for channel in self.channels]),
                                      callback=self._process)
         self.stream.start()
         return self
+
+    def take(self, seconds, *, cancel=None, started=None, enough=None):
+        """Record from the open stream, from `PREROLL` before now, until `enough` is set or `seconds` have been
+        recorded; as `Audio.record`, with its columns in the order of the channels watched."""
+        self.issues, self.blocks, self.wanted = [], None, True
+        try:
+            while True:
+                taken = sum(len(block) for block in self.blocks or ()) - len(self.ring)
+                if self.blocks is not None and started is not None:
+                    started()
+                    started = None
+                if cancel is not None and cancel.is_set():
+                    raise Cancelled("The recording was stopped.")
+                if (enough is not None and enough.is_set() and self.blocks is not None) or taken >= seconds * RATE:
+                    break
+                time.sleep(.05)
+            blocks, self.blocks = self.blocks, None
+        finally:
+            self.wanted, self.blocks = False, None
+        if self.issues:
+            raise RuntimeError("The recording dropped audio (" + self.issues[0] + "). Record it again.")
+        return np.concatenate(blocks)[:round((PREROLL + seconds) * RATE)]
 
     def quiet_for(self):
         """Seconds since the last note, or since watching began."""
@@ -137,10 +186,10 @@ class Audio:
     interrupt = None
     watching = None         # the `Strings` open: any other stream closes it first
 
-    def strings(self, channel):
-        """Watch the dry guitar on `channel` (`Strings`)."""
+    def strings(self, channels):
+        """Watch the guitar's inputs, (dry, wet left, wet right) USB channels (`Strings`)."""
         self.release()
-        self.watching = Strings(self, channel).start()
+        self.watching = Strings(self, channels).start()
         return self.watching
 
     def release(self):
@@ -177,7 +226,7 @@ class Audio:
         sd = self.sd
         self.release()
         # With the guitar live, the dry guitar is read beside the return: the first note played ends the replay.
-        watched = USB_PAIR + ([self.interrupt - 1] if self.interrupt else [])
+        watched = USB_PAIR + ([self.interrupt - 1] if self.interrupt and self.interrupt - 1 not in USB_PAIR else [])
 
         def process(indata, outdata, frames, timing, status):
             cursor = state["cursor"]

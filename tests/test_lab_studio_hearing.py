@@ -355,7 +355,9 @@ class RecordingTest(StudioCase):
         self.assertTrue((folder / "wet.wav").is_file(), "the wet take")
         info = json.loads((folder / "phrase.json").read_text(encoding="utf-8"))
         self.assertEqual(info["wet"]["name"], "Hiwatt")
-        self.assertEqual(len(self.studio.phrase[1]), 48000)
+        # Recorded while the guitar played through B: cut from the open input, from a second before it was asked.
+        self.assertEqual(len(self.studio.phrase[1]), 96000)
+        self.assertEqual(self.studio.state.mode, "guitar")
 
 
 if __name__ == "__main__":

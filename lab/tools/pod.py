@@ -70,8 +70,7 @@ class PodTool(Tool):
         if path and Path(path).is_file():
             self.load(path)
         else:
-            self.backup.show(True)
-            self.say("Choose your POD Go backup.")
+            self.backup.show(True)          # the chooser, open, says what it wants
 
     def remembered(self):
         try:

@@ -170,7 +170,8 @@ class ChooserTest(DeskCase):
         self.assertEqual(studio.state.status, "Now on the Les Paul.")
         said = self.texts(desk.tray)                    # the open panel, drawn for it at once
         self.assertIn("What the Les Paul puts out", said)
-        self.assertIn("Record a phrase on the Les Paul", said)
+        desk.toggle("Phrase")                           # where takes are recorded
+        said = self.texts(desk.tray)
         self.assertTrue({"Bridge", "Both", "Neck"} <= set(said))                # its own pickup settings
         self.assertFalse(any("Outer coils" in text for text in said))
         self.assertIsNone(desk.record_setting)

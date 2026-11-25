@@ -76,6 +76,20 @@ sizes. Nothing was tried on the real unit.
   out of the comparison of settings), and ● pressed again stops the take and keeps it: a take is as long as
   it was played, 45 s at most, not 8 s. The strip fills as the take grows. Not done: ⇄ (alternate A and B at
   each pass). The player also found the desk still wordy and the app in need of a wider clean-up.
+- **After the second trial (2026-11-25):** the guitar heard is the resting state and is not marked (no lit
+  speaker, no "● guitar" on the tile); muted, the speaker is struck through in red. A take made while the
+  guitar plays through the selected sound is cut from the input already open, from a second before ● was
+  pressed, and the guitar goes on: nothing is lost to opening the input. First clean-up pass, measured by
+  `tests/gallery.py`, which now writes every word each screen shows to `gallery/words.txt` (4287 words on
+  37 screens before, 3215 after): an old status line goes once anything happens on the desk; "Ready.",
+  "1 of 3 is on B", "Three more designs are ready…", the blind sentence and the IR count are not said, since
+  the screen shows them; the design's explanation is on the chip's hover; "· about a minute", "against A:",
+  "shaped" and "Hidden while you compare" are gone from the tiles and chips; the Difference panel says
+  "B: Shape knobs not measured where they stand" instead of two sentences; History says nothing about taste
+  before the first choice. I1 in part: takes are recorded in one place, the Phrase panel (● first, the pickup
+  setting, and what is played on request) and the dot under the tiles; the Guitar panel no longer repeats it.
+  Left for the next pass: the side tools' section sentences, the learning screen's instructions, and the
+  sound check's six-second take (a measurement window, the player's call).
 
 Waiting, and why:
 

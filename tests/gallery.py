@@ -87,6 +87,7 @@ class Gallery:
         self.root = tk.Tk()
         self.desk = Desk(self.root, self.studio)
         self.taken = []
+        self.words = []             # (screen, the words it shows), at the size the desk opens with
         self.pump()
 
     def pump(self, seconds=60):
@@ -105,6 +106,8 @@ class Gallery:
                 self.root.update()
                 self.root.update()
                 picture.save(self.root, str(self.out / f"{name}-{width}.png"))
+                if (width, height) == support.DEFAULT_SIZE:
+                    self.words.append((name, shown_words(self.root)))
             self.root.geometry("{}x{}".format(*support.DEFAULT_SIZE))
             self.root.update()
             self.taken.append(name)
@@ -210,11 +213,49 @@ class Gallery:
                 break
 
 
+def shown_words(root):
+    """The words a screen shows, in the order they are laid out: every mapped label, button and line of text
+    on a canvas that lies inside the window. Symbols of the icon font are left out; they are not words."""
+    found = []
+
+    def visible(widget):
+        return widget.winfo_ismapped() and widget.winfo_width() > 1 and widget.winfo_rooty() < (
+            root.winfo_rooty() + root.winfo_height())
+
+    def walk(widget):
+        for child in widget.winfo_children():
+            if not visible(child):
+                continue
+            kind = child.winfo_class()
+            text = ""
+            if kind in ("Label", "Button", "Checkbutton", "Radiobutton"):
+                text = str(child.cget("text"))
+            elif kind == "Canvas":
+                text = " ".join(str(child.itemcget(item, "text")) for item in child.find_all()
+                                if child.type(item) == "text")
+            elif kind == "Entry":
+                text = str(child.get())
+            text = "".join(ch for ch in text if not "" <= ch <= "").strip()
+            if text:
+                found.append((child.winfo_rooty(), child.winfo_rootx(), " ".join(text.split())))
+            walk(child)
+
+    walk(root)
+    return [text for _, _, text in sorted(found)]
+
+
 def main(arguments):
     out = Path(arguments[0]) if arguments else HERE.parent / "gallery"
     gallery = Gallery(out)
     gallery.run()
-    print(f"{len(gallery.taken)} screens, {len(gallery.taken) * len(SIZES)} pictures in {out}")
+    lines = []
+    for name, said in gallery.words:
+        count = sum(len(text.split()) for text in said)
+        lines += [f"== {name} ({count} words)", *said, ""]
+    (out / "words.txt").write_text("\n".join(lines), encoding="utf-8")
+    total = sum(sum(len(text.split()) for text in said) for _, said in gallery.words)
+    print(f"{len(gallery.taken)} screens, {len(gallery.taken) * len(SIZES)} pictures in {out}; "
+          f"{total} words on them (words.txt)")
 
 
 if __name__ == "__main__":

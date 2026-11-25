@@ -32,7 +32,7 @@ class StudioTest(StudioCase):
         state = self.studio.state
         self.assertEqual(self.studio.sound("b").name, "Fuzz")
         self.assertEqual(state.shown, "pair")
-        self.assertEqual(state.status, "1 of 3 is on B · Fuzz")
+        self.assertEqual(state.status, "")                         # the chips and the tile show it
         found = self.studio.round()
         self.assertEqual(measured_words(found["aim"]), "saturated, balanced, ambient")     # under the round's chips
         self.assertEqual(len(found["candidates"]), 3)
@@ -140,7 +140,7 @@ class StudioTest(StudioCase):
         found = self.studio.round()
         self.assertTrue(found.get("next"))
         self.assertEqual(self.studio.sound("b").name, "One")       # Prepared, not put on show.
-        self.assertIn("Three more designs are ready", self.studio.state.status)
+        self.assertNotIn("ready", self.studio.state.status)          # the chip says so: › next three
         self.assertEqual(self.studio.round(found["next"])["by"], "app")
         self.studio.round_forward()
         settle(self.studio, 30)

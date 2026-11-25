@@ -156,7 +156,7 @@ class WhatBHasTest(DeskCase):
         self.studio.copy_to_a()
         self.put("b", shaped)
         caption = self.desk.tiles["b"][2].cget("text")
-        self.assertTrue(caption.startswith("against A: "), caption)
+        self.assertTrue(caption.startswith("Brightness +0.15"), caption)     # beside A's tile: no "against A"
         self.assertNotIn("a copy to compare against", self.desk.tiles["a"][2].cget("text"))
 
 

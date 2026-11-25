@@ -9,7 +9,7 @@ import threading
 import tkinter as tk
 import unittest
 
-from lab.desk.theme import FAULT, GLYPH, INK, SUBTLE
+from lab.desk.theme import FAULT, GLYPH, INK
 from lab.qc.assets import Asset
 from lab.sound.sounds import Sound
 
@@ -176,10 +176,14 @@ class PanelsThatOverflowTest(DeskCase):
             self.resize(size)
             self.assertTrue(self.reachable("Nano Cortex sheet"), size)
 
-    def test_the_guitar_panel_scrolls_to_its_record_button(self):
+    def test_takes_are_recorded_in_one_place_and_the_phrase_panel_reaches_its_record_dot(self):
         self.desk.toggle("Guitar")
         self.pump()
         self.desk.fill_panel()
+        self.assertFalse([widget for widget in every(self.desk.tray) if widget.winfo_class() == "Button"
+                          and widget.cget("text") == GLYPH["record"]])
+        self.desk.toggle("Phrase")
+        self.pump()
         for size in (DEFAULT_SIZE, SMALLEST_SIZE):
             self.resize(size)
             self.assertTrue(self.reachable(GLYPH["record"]), size)
@@ -289,16 +293,16 @@ class TeachAClassicalTest(DeskCase):
 
 class StatusLineTest(DeskCase):
     """F9: the status line went stale and nothing marked it ("Ready." through a minute's request, "5 IRs and
-    captures on the unit." through nine tools); a fault looked like any other remark."""
+    captures on the unit." through nine tools); a fault looked like any other remark. Dimming it was not enough
+    (the player found the desk wordy): it goes."""
 
-    def test_the_line_dims_once_something_happened_since_and_a_fault_has_its_own_colour(self):
+    def test_the_line_goes_once_something_happened_since_and_a_fault_has_its_own_colour(self):
         self.put("a", Sound("Lead", chain(PLEXI, V30), {"kind": "designed"}))
         self.put("b", Sound("Rhythm", chain(PLEXI, V30), {"kind": "designed"}))
         self.studio.say("Saved · Tone Lab 3 · Rhythm")
         self.assertEqual(str(self.desk.line.cget("fg")), INK)
         self.studio.select("a")
-        self.assertEqual(self.desk.line.cget("text"), "Saved · Tone Lab 3 · Rhythm")
-        self.assertEqual(str(self.desk.line.cget("fg")), SUBTLE)
+        self.assertEqual(self.desk.line.cget("text"), "")
         self.studio.fault("The unit did not answer.")
         self.assertEqual(str(self.desk.line.cget("fg")), FAULT)
         self.studio.say("Undone.")

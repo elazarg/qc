@@ -42,7 +42,7 @@ from lab.desk.phrase_strip import PhraseStrip
 from lab.desk.scales import Scales
 from lab.desk.search import DeskSearch, search_line
 from lab.tools.common import flow
-from lab.desk.difference import against, aim_against, misses
+from lab.desk.difference import against, aim_against
 from lab.desk.studio import COPY_REQUEST
 from lab.desk.hints import hint, named
 from lab.desk.pictures import learning_symbol
@@ -190,6 +190,7 @@ class Desk:
         self.strip_key = self.scene_key = None      # the same for the round's chips and the scene chips
         self.dragging = False           # something in the panel is being dragged: the panel is left as it is
         self.expanded = set()           # blocks whose named settings are shown in the Chain panel
+        self.show_gestures = False      # what is played, offered for the next take in the Phrase panel
         self.show_nano = False
         self.show_measured = False      # whether the Chain panel lists what was measured, line by line
         self.all_takes = False          # whether the Phrase panel lists every take, or the newest eight
@@ -508,7 +509,7 @@ class Desk:
             sound = sounds[side]
             hidden = state.blind and sound is not None
             name.configure(text="?" if hidden else (sound.name if sound else "Empty"))
-            caption.configure(text="Hidden while you compare" if hidden else self.caption(sound, side))
+            caption.configure(text="" if hidden else self.caption(sound, side))
             selected = state.side == side
             on_air = state.mode and selected
             # The tile first: everything on it takes its colour, the letter and the marks included.
@@ -527,9 +528,11 @@ class Desk:
                 marks.pack_forget()
             elif not marks.winfo_manager():
                 marks.pack(side="right")
-            # Lit once the unit confirmed it plays; until then, that it is on its way.
-            air.configure(text=(f"● {state.mode}" if studio.sounding == (side, state.mode) else "○ getting ready")
-                          if on_air else "")
+            # The guitar heard is the resting state and is not marked; the phrase playing is, and a sound still on
+            # its way to the unit says so.
+            ready = studio.sounding == (side, state.mode)
+            air.configure(text="" if not on_air or (ready and state.mode == "guitar")
+                          else "○ getting ready" if not ready else "● phrase")
             # The chain's blocks, and the aim against what was heard: not while names are hidden, since they
             # would tell which is which.
             self.draw_blocks(side, None if hidden else sound, None if hidden else sounds["b" if side == "a" else "a"])
@@ -538,10 +541,13 @@ class Desk:
         self.paint_line(state)
         # A control that cannot act now is dimmed, and says why while the pointer rests on it; pressing it says
         # so too. While something else has the audio input, the two play buttons are dimmed the same way.
-        for widget, mode in ((self.guitar, "guitar"), (self.once, "once"), (self.loop, "phrase")):
+        # The phrase's transport is lit while it plays. The guitar heard is the resting state, so the speaker is
+        # plain then; muted, which is rare, it is struck through in red.
+        for widget, mode in ((self.once, "once"), (self.loop, "phrase")):
             widget.configure(bg=mix(LIVE, TILE, .4) if state.mode == mode else TILE,
                              fg=DIM if self.unable(mode) else INK)
-        self.guitar.configure(text=GLYPH["heard"] if studio.live else GLYPH["muted"])
+        self.guitar.configure(text=GLYPH["heard"] if studio.live else GLYPH["muted"],
+                              fg=DIM if self.unable("guitar") else INK if studio.live else FAULT)
         self.save_button.configure(fg=DIM if self.unable("save") else INK)
         self.copy_link.configure(fg=DIM if self.unable("copy") else SOFT)
         self.blind_link.configure(fg=DIM if self.unable("blind") else SIDE["b"] if state.blind else SOFT,
@@ -695,15 +701,13 @@ class Desk:
         self.studio.record(self.record_setting, gesture=self.record_gesture)
 
     def paint_line(self, state):
-        """The status line in one of three looks: a fault in its own colour; what was just said, plain; and,
-        once something has happened on the desk since it was said, dimmed, so that an old remark does not read
-        as news."""
+        """The status line: a fault in its own colour, what was just said plain; once something has happened on
+        the desk since it was said, it goes, so that an old remark does not stay to be read as news."""
         moment = (state.a, state.b, state.side, state.mode, state.scene, state.round, state.blind, state.instrument)
         if state.status != self.line_said:
             self.line_said, self.line_moment = state.status, moment
         old = moment != self.line_moment
-        color = FAULT if state.status_kind == "fault" else SUBTLE if old else INK
-        self.line.configure(text=state.status, fg=color)
+        self.line.configure(text="" if old else state.status, fg=FAULT if state.status_kind == "fault" else INK)
 
     def follow_width(self, width):
         """The lines under the tiles wrap at the width their column has now, not at a width fixed for the
@@ -741,6 +745,7 @@ class Desk:
                                                      json.dumps(sound.knobs, sort_keys=True), tuple(sound.marks)))
         return (self.panel, state.side, state.round, state.blind, state.scene, state.song, state.instrument,
                 tuple(sides), self.show_nano, self.show_measured, tuple(sorted(self.expanded)), studio.phrase_key(),
+                self.show_gestures,
                 tuple(sorted(studio.hearing_base)), studio.profile_version if self.panel == "Guitar" else None,
                 "record" in studio.doing)
 
@@ -753,7 +758,7 @@ class Desk:
         setup = suggested_setup(sound.origin.get("guitar_setup"), self.studio.state.instrument)
         parts = [setup] if setup else []
         if side == "b":
-            differs = against(sound, self.studio.sound("a"), "A", blocks=False)     # the blocks are outlined
+            differs = against(sound, self.studio.sound("a"), "A", blocks=False, named=False)   # the blocks are outlined
             if differs:
                 parts.insert(0, differs)
         origin = sound.origin.get("kind")
@@ -764,8 +769,6 @@ class Desk:
             parts.append("Revised: " + request[:60])
         if self.studio.unheard(sound):
             parts.append("could not be listened to")      # what was heard is on the scales above
-        if sound.knobs:
-            parts.append("shaped")
         if sound.saved:
             parts.append(f"saved as {sound.saved['name']}")
         return " · ".join(parts)
@@ -829,18 +832,16 @@ class Desk:
             chip.bind("<ButtonRelease-1>", self.drags.click(lambda place=place: studio.step(place)))
             chip.bind("<MouseWheel>", self.wheel_round)
             self.drags.source(chip, lambda event, sound=sound: ("design", sound.id), self.dragged_name)
-            named(chip, lambda sound=sound: aim_against(found["aim"], None if studio.unheard(sound) else sound.heard,
-                                                       studio.unheard(sound)))
-            if chosen:
-                aim = found["aim"]
-                song = aim.get("song")
-                part = f"{song.get('title')}{' · ' + song['part'] if song.get('part') else ''} · " if song else ""
-                missed = misses(aim, None if studio.unheard(sound) else sound.heard)
-                self.strip_note.configure(text=f"{part}{candidate['differs']}"
-                                               + (f" · misses the aim on {', '.join(missed)}" if missed else ""))
+            # What the designer did, and the aim against what was heard, on hover: the tile's scales show it too.
+            named(chip, lambda sound=sound, candidate=candidate: "\n".join(filter(None, (
+                candidate["differs"], aim_against(found["aim"], None if studio.unheard(sound) else sound.heard,
+                                                  studio.unheard(sound))))))
+            song = found["aim"].get("song")
+            if chosen and song:                 # the song and its part are names: said in the open
+                self.strip_note.configure(text=f"{song.get('title')}{' · ' + song['part'] if song.get('part') else ''}")
         ready = bool(found.get("next"))
         # Free when they are ready; a call to the assistant of about a minute when they are not: the chip says so.
-        more = tk.Label(self.chips, text="›  next three" if ready else "Three more · about a minute", padx=10, pady=5,
+        more = tk.Label(self.chips, text="›  next three" if ready else "Three more", padx=10, pady=5,
                         cursor="hand2", font=(FONT, 9, "bold" if ready else "normal"), bg=PAPER,
                         fg=ACCENT if ready else SOFT)
         more.bind("<ButtonRelease-1>", lambda _: studio.round_forward())
@@ -1762,13 +1763,19 @@ class Desk:
             self.studio.save(name, sound_id=target[0], knob_values=target[1])
 
     def recording_controls(self):
-        """Record a phrase: the pickup setting it is played on, then Record (eight seconds, from the guitar)."""
+        """Record a take: the record dot, the pickup setting it is played on, and, on request, what is played."""
         instrument = self.studio.store.instrument(self.studio.state.instrument) or {}
         settings = [f"{position} · {wiring}".rstrip(" ·") for position in instrument.get("settings") or ["Pickup"]
                     for wiring in (instrument.get("wiring") or [""])]
-        label(self.into, f"Record a phrase on the {self.studio.state.instrument}", size=10, bold=True).pack(
-            fill="x", pady=(12, 0))
-        label(self.into, "Pickup setting", size=9, color=SUBTLE).pack(fill="x", pady=(4, 2))
+        # The same record dot as under the tiles: a take starts at once, with the setting chosen below if one is,
+        # and the dot pressed again stops it and keeps it.
+        top = tk.Frame(self.into, bg=DARK)
+        top.pack(fill="x", pady=(12, 2))
+        go = button(top, GLYPH["record"], self.record_now)
+        go.configure(font=icon_font(13), padx=12, fg=RECORDING if "record" in self.studio.doing else INK)
+        named(go, self.record_words)
+        go.pack(side="left")
+        label(top, "Pickup setting", size=9, color=SUBTLE).pack(side="left", padx=(10, 0))
         grid = tk.Frame(self.into, bg=DARK)
         grid.pack(fill="x")
         chips = []
@@ -1783,23 +1790,23 @@ class Desk:
         # only on takes marked as the same gesture (`lab.hearing.profile`). Choosing one is optional.
         from lab.hearing.profile import GESTURES
 
+        # Rarely needed, so disclosed on request (and open while one is chosen).
+        open_ = self.show_gestures or self.record_gesture is not None
         played = tk.Frame(self.into, bg=DARK)
         played.pack(fill="x", pady=(6, 2))
-        label(played, "What is played", size=9, color=SUBTLE).pack(side="left")
+        opener = tk.Label(played, text="What is played " + ("▴" if open_ else "▾"), bg=DARK, fg=SUBTLE,
+                          font=(FONT, 9), cursor="hand2")
+        opener.pack(side="left")
+        opener.bind("<ButtonRelease-1>", lambda _: (setattr(self, "show_gestures", not self.show_gestures),
+                                                     self.fill_panel()))
         hint(played, "Pickup settings are compared only on takes of the same thing. To compare them, play the same "
                      "thing on each setting and mark it here; otherwise leave it.").pack(side="left")
-        for gesture in GESTURES:
+        for gesture in GESTURES if open_ else ():
             chosen = gesture == self.record_gesture
             chip = tk.Label(self.into, text=gesture, bg=CHOSEN if chosen else DARK, fg=INK if chosen else SOFT,
                             font=(FONT, 9), padx=6, pady=2, cursor="hand2", anchor="w")
             chip.pack(fill="x", pady=1)
             chip.bind("<ButtonRelease-1>", lambda _, gesture=gesture: self.choose_gesture(gesture))
-        # The same record dot as under the tiles: a take starts at once, with the setting chosen above if one is,
-        # and the dot pressed again stops it and keeps it.
-        go = button(self.into, GLYPH["record"], self.record_now)
-        go.configure(font=icon_font(13), padx=12, fg=RECORDING if "record" in self.studio.doing else INK)
-        named(go, self.record_words)
-        go.pack(anchor="w", pady=(4, 0))
 
     def choose_setting(self, setting):
         """The pickup setting the next take is played on: kept for this instrument, for the dot by the phrase."""
@@ -1821,8 +1828,8 @@ class Desk:
         self.studio.use_phrase(item["id"], whole, start, end)
 
     def panel_guitar(self):
-        """Gesture listening, what the instrument puts out, and recording a take. (Learning the guitar is a screen
-        of its own, behind the learning symbol at the top left.)"""
+        """Gesture listening and what the instrument puts out. Takes are recorded in one place, the Phrase panel
+        and its dot. (Learning the guitar is a screen of its own, behind the learning symbol at the top left.)"""
         from lab.learner import gestures
 
         instrument = self.studio.state.instrument
@@ -1858,7 +1865,6 @@ class Desk:
                 lines = []
         for line in lines:
             label(self.into, line, size=9, wrap=400).pack(fill="x", pady=2)
-        self.recording_controls()
 
     def panel_more(self):
         """The side tools, and measuring the USB round trip."""

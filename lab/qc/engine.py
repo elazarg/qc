@@ -223,13 +223,17 @@ class Engine:
         self.active, self.mode = side, mode
         return {"side": side, "mode": mode}
 
-    def _dry(self):
-        """The USB channel the dry guitar arrives on (it depends on the unit's USB Dry/Wet setting), read once."""
+    def _inputs(self):
+        """The USB channels of the guitar, (dry, wet left, wet right): they depend on the unit's USB Dry/Wet
+        setting, read once."""
         if self.dry_channel is None:
             from lab.qc.device import recording_channels
 
-            self.dry_channel = recording_channels(self.unit.device, self.physical_input)[0]
+            self.dry_channel = tuple(recording_channels(self.unit.device, self.physical_input))
         return self.dry_channel
+
+    def _dry(self):
+        return self._inputs()[0]
 
     def _strings(self, mode):
         """Watch the dry guitar while the guitar plays and that was asked for; otherwise free the driver. A watch
@@ -238,7 +242,7 @@ class Engine:
             self.audio.release()
         elif self.audio.watching is None:
             try:
-                self.audio.strings(self._dry())
+                self.audio.strings(self._inputs())
             except Exception:  # noqa: BLE001  the guitar plays on; `watch` says nothing of the strings
                 self.audio.release()
 
@@ -508,6 +512,13 @@ class Engine:
         `progress("open")` says when the input is open."""
         from lab.qc.device import recording_channels
 
+        started = (lambda: progress("open")) if progress else None
+        watching = self.audio.watching
+        if (watching is not None and self.mode == "guitar" and side == self.active
+                and tuple(watching.channels) == tuple(self._inputs())):
+            # The guitar already plays through this side and its inputs are open: the take is cut from them,
+            # starting a moment before it was asked for, so that nothing is lost to opening the input.
+            return watching.take(seconds, cancel=stop, enough=enough, started=started)
         self.quiet()
         # Which USB channels carry the dry input depends on the unit's USB Dry/Wet setting: read before anything
         # is connected.
@@ -517,7 +528,6 @@ class Engine:
                 self.play(side, "guitar")
                 if knobs:
                     self.turn(side, knobs)       # the wet take is the sound as shaped, as it is named
-            return self.audio.record(seconds, channels, cancel=stop, enough=enough,
-                                     started=(lambda: progress("open")) if progress else None)
+            return self.audio.record(seconds, channels, cancel=stop, enough=enough, started=started)
         finally:
             self.quiet()

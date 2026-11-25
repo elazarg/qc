@@ -467,22 +467,23 @@ class ShapeTest(FlowCase):
         self.assertEqual(sent[-1], ("turn", ("b", {key: .7})))
 
 
-    def test_difference_says_which_side_is_not_measured_and_what_will_bring_it(self):
+    def test_difference_says_which_side_is_not_measured(self):
         self.studio.idle_seconds = 30.
         self.a_round()
         self.studio.copy_to_a()
         self.settle()
         lines = self.studio.difference()
         self.assertEqual(len(lines), 2)
-        self.assertIn("A has not been listened to as it is set now", lines[0])
+        self.assertEqual(lines[0], "A: not measured as it is set now")
         self.studio.idle_seconds = 0.
         self.settle()
         self.studio.settle_seconds = 0.
         self.studio.ask("brighter")                       # on the simulated unit this measures as too little
-        self.assertIn("B's Shape knobs have not been measured where they stand", self.studio.difference()[0])
+        self.assertEqual(self.studio.difference()[0], "B: Shape knobs not measured where they stand")
         self.settle(30)
-        self.assertIn("corrected", " ".join(self.studio.difference()))
-        self.assertIn("turn one", self.studio.difference()[0])
+        # Corrected after they were measured: what was measured is not what plays now.
+        self.assertIsNotNone(self.studio.sound("b").heard["shaped"]["corrected"])
+        self.assertEqual(self.studio.difference()[0], "B: Shape knobs not measured where they stand")
 
 
 class RoundsTest(FlowCase):
@@ -814,7 +815,7 @@ class LinesTest(FlowCase):
         self.studio.copy_to_a()
         self.settle()
         self.studio.blind()
-        self.assertIn("see which was which", self.studio.state.status)
+        self.assertEqual(self.studio.state.status, "")    # the "?" names and the struck-through eye say it
         source = Path(studio_module.__file__).read_text(encoding="utf-8")
         for words in ("press N", "Z undoes", "press X", "the 0 key"):
             self.assertNotIn(words, source)
