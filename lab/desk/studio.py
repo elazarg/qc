@@ -114,6 +114,7 @@ class Studio:
         self.jobs = []                    # (future, done, failed, the activity it ends)
         self.progress = []                # (handler, value) reported by the unit's worker, handled by `poll`
         self.doing = {}                   # what is going on, by key, oldest first: the working line shows the newest
+        self.toward = {}                  # the side a request or a revision under way will put its sound on, by key
         self.ear = Listening(self)        # listening while the unit is free, and whether a measurement holds
         self.asking = Requests(self)      # the requests with the assistant
         self.guitar = Guitar(self)        # the takes, and what the instrument puts out
@@ -436,6 +437,17 @@ class Studio:
             self._show()
 
     # ---- work done elsewhere ----
+
+    def worked_on(self):
+        """The sides whose tile something is being done for now: a request or a revision on its way to it, or a
+        silent listen to the sound on it."""
+        for key in [key for key in self.toward if key not in self.doing]:
+            del self.toward[key]
+        sides = set(self.toward.values())
+        hearing = self.ear.hearing
+        if hearing:
+            sides |= {side for side in ("a", "b") if getattr(self.state, side) == hearing}
+        return sides
 
     def later(self, future, done, failed=None, doing=None):
         """Handle a future's result on the window's thread. `doing` is the activity that ends with it."""

@@ -56,7 +56,7 @@ class Scales(tk.Canvas):
         said = []
         for row, (key, short) in enumerate(QUALITIES):
             y = row * ROW + ROW / 2 + 1
-            self.create_text(0, y, text=short, anchor="w", fill=SUBTLE, font=(FONT, 8))
+            self.create_text(0, y, text=short, anchor="w", fill=SUBTLE, font=(FONT, 9))
             self.create_line(left, y, right, y, fill=RULE, width=2)
             at = place(key, aim.get(key))
             if at is not None:

@@ -16,7 +16,7 @@ def draw_harmonics(canvas, harmonics, *, width, color):
     """One bar per harmonic, the 2nd to the 10th, rising from the floor to its level against the tone."""
     canvas.delete("all")
     canvas.configure(height=HEIGHT)
-    canvas.create_text(0, 0, text="Harmonics against the tone", anchor="nw", fill=SUBTLE, font=(FONT, 8))
+    canvas.create_text(0, 0, text="Harmonics against the tone", anchor="nw", fill=SUBTLE, font=(FONT, 9))
     bottom = HEIGHT - FOOT
     canvas.create_line(0, bottom, width, bottom, fill=RULE)
     step = width / max(len(harmonics), 1)
@@ -25,8 +25,8 @@ def draw_harmonics(canvas, harmonics, *, width, color):
         top = bottom - (max(FLOOR, min(0., value)) - FLOOR) / -FLOOR * (bottom - HEAD)
         if top < bottom - .5:
             canvas.create_rectangle(x - step * .3, top, x + step * .3, bottom, fill=color, width=0, tags="harmonic")
-        canvas.create_text(x, HEIGHT, text=str(index + 2), anchor="s", fill=DIM, font=(FONT, 8))
-    canvas.create_text(width, 0, text=f"{FLOOR:g} to 0 dB", anchor="ne", fill=DIM, font=(FONT, 8))
+        canvas.create_text(x, HEIGHT, text=str(index + 2), anchor="s", fill=DIM, font=(FONT, 9))
+    canvas.create_text(width, 0, text=f"{FLOOR:g} to 0 dB", anchor="ne", fill=DIM, font=(FONT, 9))
 
 
 def harmonics_words(harmonics):
@@ -40,7 +40,7 @@ def draw_bands(canvas, bands, *, width, color):
     canvas.delete("all")
     canvas.configure(height=HEIGHT)
     canvas.create_text(0, 0, text="Level by band against your dry guitar", anchor="nw", fill=SUBTLE,
-                       font=(FONT, 8))
+                       font=(FONT, 9))
     centre = HEAD + (HEIGHT - HEAD - FOOT) / 2
     reach = max(12., max((abs(value) for value in bands.values()), default=0.))
     canvas.create_line(0, centre, width, centre, fill=RULE)
@@ -50,8 +50,8 @@ def draw_bands(canvas, bands, *, width, color):
         y = centre - value / reach * (centre - HEAD)
         if abs(y - centre) >= .5:
             canvas.create_rectangle(x - step * .3, centre, x + step * .3, y, fill=color, width=0, tags="band")
-        canvas.create_text(x, HEIGHT, text=name, anchor="s", fill=DIM, font=(FONT, 8))
-    canvas.create_text(width, 0, text=f"±{reach:.0f} dB", anchor="ne", fill=DIM, font=(FONT, 8))
+        canvas.create_text(x, HEIGHT, text=name, anchor="s", fill=DIM, font=(FONT, 9))
+    canvas.create_text(width, 0, text=f"±{reach:.0f} dB", anchor="ne", fill=DIM, font=(FONT, 9))
 
 
 def bands_words(bands):

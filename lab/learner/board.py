@@ -112,7 +112,7 @@ class Dial(tk.Canvas):
             self.create_line(x+inner*dx, y+inner*dy, x+39*dx, y+39*dy,
                              fill=ACCENT if n <= value else LINE, width=1)
             if n % 5 == 0:
-                self.create_text(x+47*dx, y+46*dy, text=str(n), fill=MUTED, font=(FONT, 7))
+                self.create_text(x+47*dx, y+46*dy, text=str(n), fill=MUTED, font=(FONT, 9))
         self.create_oval(x-28, y-28, x+28, y+28, fill="#988d7e", outline="#d0c3b2")
         for n in range(34):
             angle = n * math.tau / 34
@@ -122,7 +122,7 @@ class Dial(tk.Canvas):
         angle = math.radians(140 + 26 * value)
         dx, dy = math.cos(angle), math.sin(angle)
         self.create_line(x+14*dx, y+14*dy, x+21*dx, y+21*dy, fill="#3f493e", width=3, capstyle="round")
-        self.create_text(x, y, text=setting(value), fill="#282726", font=(FONT, 15, "bold"))
+        self.create_text(x, y, text=setting(value), fill="#282726", font=(FONT, 14, "bold"))
 
 
 class GuitarBoard(tk.Frame):
@@ -137,7 +137,7 @@ class GuitarBoard(tk.Frame):
                        for layout, (filename, _) in PHOTO.items()}
         head = tk.Frame(self, background=PANEL)
         head.pack(fill="x")
-        word(head, "Charvel DK24", size=11, bold=True).pack(side="left")
+        word(head, "Charvel DK24", size=10, bold=True).pack(side="left")
         self.layout_buttons = []
         for key, label in reversed(tuple(zip(LAYOUTS_SHOWN, LAYOUT_LABELS))):
             btn = button(head, label, lambda picked=key: self.on_layout(picked), compact=True)
@@ -245,7 +245,7 @@ class GuitarBoard(tk.Frame):
         y = (canvas.winfo_height() - photo.height()) / (2 if canvas.winfo_height() >= photo.height() else 1)
         canvas.create_image(x, y, anchor="nw", image=photo)
         canvas.create_text(canvas.winfo_width()-7, canvas.winfo_height()-6, anchor="se",
-                           text="Charvel catalog reference", fill=DIM, font=(FONT, 8))
+                           text="Charvel catalog reference", fill=DIM, font=(FONT, 9))
         self.hotspots = {key: (x + px, y + py) for key, (px, py) in PHOTO[layout][1].items()}
         for key, (a, b) in self.hotspots.items():
             radius = 13 if key in self.dials else 11

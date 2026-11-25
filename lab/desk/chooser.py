@@ -34,7 +34,7 @@ class InstrumentChooser(tk.Frame):
         self.picture.pack(side="left")
         self.name = tk.Label(self, bg=TILE, fg=INK, font=(FONT, 12, "bold"), padx=8)
         self.name.pack(side="left")
-        self.arrow = tk.Label(self, text="▾", bg=TILE, fg=SOFT, font=(FONT, 13))
+        self.arrow = tk.Label(self, text="▾", bg=TILE, fg=SOFT, font=(FONT, 12))
         self.arrow.pack(side="left")
         for widget in (self, self.picture, self.name, self.arrow):
             widget.bind("<ButtonRelease-1>", lambda _: self.toggle())
@@ -104,7 +104,7 @@ class InstrumentChooser(tk.Frame):
             picture = tk.Label(row, image=images[0], bg=TILE, borderwidth=0)
             picture.pack(side="left", padx=(9, 0), pady=5)
             title = tk.Label(row, text=name, bg=TILE, fg=INK if chosen else SOFT, anchor="w", padx=12,
-                             font=(FONT, 11, "bold" if chosen else "normal"))
+                             font=(FONT, 10, "bold" if chosen else "normal"))
             title.pack(side="left", fill="x", expand=True)
             parts = (row, picture, title)
             self.rows[name], self.row_images[name] = row, images

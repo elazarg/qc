@@ -31,7 +31,8 @@ sizes. Nothing was tried on the real unit.
   part's offset such as "Solo +2 dB", is behind a `?` in the line).
 - **Looks:** V1 (the accent is lilac, no longer B's peach), V2 (one look for "chosen" on the desk, in the tools
   and on the learning screen: a lighter tile, `theme.CHOSEN`, with bright ink; the accent fills only what is
-  done, such as "Listen live"), V3 (the dimmest text is 5:1 on the panels), V4 (a
+  done, such as "Listen live"), V3, V5 (text in 9, 10, 12 and 14 points, 34 for the tiles' letters, held by a
+  test; a tile too short for its letter at 34 draws it at 14 rather than cutting it off) (the dimmest text is 5:1 on the panels), V4 (a
   one-pixel rule round the tiles and the buttons), V6 (Shape's knobs are tracks with a mark where each rests,
   a bar to where it stands in the side's colour, and the position), L3
   (the rows under the tiles keep their room; the tiles give way), L5 in part (the `?` and the round's ‹ are
@@ -54,6 +55,10 @@ sizes. Nothing was tried on the real unit.
   "In words ▾". Chain's measurements are two charts in the side's colour, the harmonics of a tone by order
   and the level by band against the dry guitar, with the figures on hover and the sentences behind
   "In words ▾". T3: the Tone field opens from beside Shape's pad ("Tone field ›"), and stays in More.
+  The rest of N3: the edge of the tile a request, a revision or a silent listen is for breathes until it is
+  done. L1 in part: the tiles carry the chain and what differs (A3), so they say more than a name. T1 and T2
+  in part: the learning screen shares the chosen look and the accent's meaning (V2), and the tools speak on
+  the desk's line (R8).
 
 Waiting, and why:
 
@@ -62,8 +67,12 @@ Waiting, and why:
   what the engine does or what the player is used to.
 - **The player's call:** I1–I3 and I5 (merging Phrase and Guitar, one place for the guitar's setting,
   renaming Sounds and the tools). The usage log now records the desk, so these can be argued from use.
-- **Not started:** L1–L2, L4, V5, T1–T2, the rest of N3 (progress for a listen or a request beyond the
-  seconds) and rings on what is being worked on. The learning screen's own status line (R8) stays: that screen hides the desk's.
+- **Left as it is, with the reason:** L2 (one width for every panel): a panel whose width followed its
+  content would move the tiles under the pointer each time one is opened, which L3 was about; every panel is
+  tested to fit or scroll at both sizes instead.
+- **Also the player's call:** L4 (the learning symbol at the top left) goes with I1 and I2, where learning the
+  guitar should open from; and the learning screen's own status line, which stays because that screen hides
+  the desk's. The learning screen's own status line (R8) stays: that screen hides the desk's.
 
 Findings are numbered so that they can be picked up one at a time. Each says what was seen, where, and what
 would mend it inside the rules of the design in `AGENTS.md` (one window, few words, no shortcuts, side

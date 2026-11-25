@@ -233,7 +233,7 @@ class GuitarLearner:
         self.chooser = tk.Frame(stage, background=PANEL, padx=14, pady=10)
         head = tk.Frame(self.chooser, background=PANEL)
         head.pack(fill="x", pady=(0, 8))
-        word(head, "Use a take or a WAV", size=11, bold=True).pack(side="left")
+        word(head, "Use a take or a WAV", size=10, bold=True).pack(side="left")
         button(head, "Back to the guitar", self.toggle_takes, compact=True).pack(side="right")
         other = tk.Frame(self.chooser, background=PANEL)
         other.pack(side="right", fill="y", padx=(14, 0))

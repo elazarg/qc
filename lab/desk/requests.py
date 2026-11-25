@@ -141,6 +141,7 @@ class Requests:
         quietly = by == "app"
         stop = self.signal(quietly)
         if not quietly:
+            studio.toward[stop] = "b"
             studio.begin(stop, saying or f"New round for “{text[:60]}” · about a minute…")
         future = self.design(design.round_of_three, studio.assistant, text, studio._instrument(), earlier=earlier,
                               by=by, cancel=stop, assets_known=studio._assets(),
@@ -228,6 +229,7 @@ class Requests:
         side has not changed meanwhile."""
         studio = self.studio
         stop = self.signal()
+        studio.toward[stop] = side
         studio.begin(stop, f"Revising {side.upper()} · “{text[:60]}”…")
         future = self.design(design.revise, studio.assistant, sound, text, studio._instrument(), cancel=stop,
                               assets_known=studio._assets())

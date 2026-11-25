@@ -36,7 +36,7 @@ def draw(canvas, summary, *, width, chosen=None):
     canvas.configure(height=height)
     typical = x_of(TYPICAL_PEAK_DB, width)
     canvas.create_line(typical, TOP - 2, typical, height - BOTTOM + 2, fill=DIM, dash=(3, 3), tags="typical")
-    canvas.create_text(typical, 2, text="the humbucker presets assume", anchor="n", fill=DIM, font=(FONT, 8))
+    canvas.create_text(typical, 2, text="the humbucker presets assume", anchor="n", fill=DIM, font=(FONT, 9))
     for row, (setting, item) in enumerate(summary.items()):
         y = TOP + row * ROW + ROW / 2
         canvas.create_text(0, y, text=setting, anchor="w", fill=INK if setting == chosen else SUBTLE, font=(FONT, 9))
@@ -55,7 +55,7 @@ def draw(canvas, summary, *, width, chosen=None):
             canvas.create_line(x, y + 3, x, y + 9, fill=DIM, width=2, tags="noise")
         canvas.create_text(width, y, text=f"{level:g} dBFS", anchor="e", fill=SUBTLE, font=(FONT, 9))
     for value in (LOWEST, -36., -24., -12., HIGHEST):
-        canvas.create_text(x_of(value, width), height - 2, text=f"{value:g}", anchor="s", fill=DIM, font=(FONT, 8))
+        canvas.create_text(x_of(value, width), height - 2, text=f"{value:g}", anchor="s", fill=DIM, font=(FONT, 9))
 
 
 def words(summary):

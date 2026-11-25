@@ -179,11 +179,11 @@ def draw_bands(chart, values, *, width, height):
         y = centre - value / scale * (centre - 14)
         chart.create_rectangle(x - step * .28, centre, x + step * .28, y, fill=TONE_B if value > 0 else TONE_A,
                                outline="")
-        chart.create_text(x, height - 8, text=name + (" Hz" if index == len(values) - 1 else ""), font=(FONT, 8),
+        chart.create_text(x, height - 8, text=name + (" Hz" if index == len(values) - 1 else ""), font=(FONT, 9),
                           fill=SUBTLE)
-    chart.create_text(4, 3, anchor="nw", text="▲ more in B", font=(FONT, 8), fill=TONE_B)
-    chart.create_text(84, 3, anchor="nw", text="▼ more in A", font=(FONT, 8), fill=TONE_A)
-    chart.create_text(width - 4, 3, anchor="ne", text=f"±{scale:.0f} dB", font=(FONT, 8), fill=SUBTLE)
+    chart.create_text(4, 3, anchor="nw", text="▲ more in B", font=(FONT, 9), fill=TONE_B)
+    chart.create_text(84, 3, anchor="nw", text="▼ more in A", font=(FONT, 9), fill=TONE_A)
+    chart.create_text(width - 4, 3, anchor="ne", text=f"±{scale:.0f} dB", font=(FONT, 9), fill=SUBTLE)
 
 
 # ---- the tool ----

@@ -34,7 +34,7 @@ class LearningScreen:
         head.pack(fill="x", pady=(0, 10))
         self.tabs = {}
         for title in (LEARNER, TEACH, IDLE):
-            tab = tk.Label(head, text=title, font=(FONT, 11), padx=12, pady=5, cursor="hand2")
+            tab = tk.Label(head, text=title, font=(FONT, 10), padx=12, pady=5, cursor="hand2")
             tab.bind("<ButtonRelease-1>", lambda _, title=title: self.choose(title))
             self.tabs[title] = tab
         self.why = tk.Label(head, bg=PAPER, fg=SUBTLE, font=(FONT, 9), anchor="w", padx=10)
@@ -120,7 +120,7 @@ class LearningScreen:
         for name, tab in self.tabs.items():
             chosen = name == title
             tab.configure(bg=CHOSEN if chosen else DARK, fg=INK if chosen else SOFT,
-                          font=(FONT, 11, "bold" if chosen else "normal"))
+                          font=(FONT, 10, "bold" if chosen else "normal"))
 
     def board_setup(self, guitar):
         learner = self.learner

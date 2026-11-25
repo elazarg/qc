@@ -54,6 +54,7 @@ PANELS = ("Shape", "Chain", "Difference", "Phrase", "Sounds", "History", "Guitar
 SIDED = ("Shape", "Chain", "Sounds")       # panels that act on or show the sound on the selected side
 SCROLLED = ("Chain", "Difference", "Phrase", "Guitar", "More")      # panels built into a part that scrolls
 RECORD_SECONDS = 8.
+BADGE, BADGE_SMALL = 34, 14         # a tile's letter, with room and without
 # What the ask line takes besides a request for a sound, said behind its "?".
 CONVENTIONS = ("The exact name of one of your presets brings it in. A remark in players' words (“a bit tighter”, "
                "“fizzy”) moves the Shape knobs at once, and Next under the line offers the remedy after it. "
@@ -307,7 +308,7 @@ class Desk:
         self.side.pack_propagate(False)
         head = tk.Frame(self.side, bg=DARK)
         head.pack(fill="x", pady=(0, 6))
-        self.side_title = label(head, size=11, bold=True)
+        self.side_title = label(head, size=10, bold=True)
         self.side_title.pack(side="left")
         link(head, "‹ Back", self.back, color=ACCENT).pack(side="right")
 
@@ -327,7 +328,7 @@ class Desk:
             # At the top: whether it plays, and the player's marks, a heart and a cross, filled when given.
             top = tk.Frame(tile, bg=DARK)
             top.pack(side="top", fill="x")
-            air = label(top, size=8, color=LIVE, bold=True)
+            air = label(top, size=9, color=LIVE, bold=True)
             air.pack(side="left")
             marks = tk.Frame(top, bg=DARK)
             marks.pack(side="right")
@@ -337,7 +338,7 @@ class Desk:
                 chip.pack(side="left")
                 chip.bind("<ButtonRelease-1>", lambda _, side=side, word=word: self.studio.mark(word, side))
                 named(chip, "Keep" if word == "keeper" else "Not this")
-            badge = label(tile, side.upper(), size=34, color=SIDE[side], bold=True)
+            badge = label(tile, side.upper(), size=BADGE, color=SIDE[side], bold=True)
             name = label(tile, size=14, bold=True, wrap=320)
             blocks = tk.Frame(tile, bg=DARK)
             scales = Scales(tile)
@@ -349,6 +350,7 @@ class Desk:
             name.pack(side="bottom", fill="x")
             badge.pack(side="bottom", fill="x")
             self.scales[side], self.blocks[side] = scales, blocks
+            tile.bind("<Configure>", lambda _: self.root.after_idle(self.fit_badges), add="+")
             for widget in (tile, badge, name, caption, air, top, scales):
                 widget.bind("<ButtonRelease-1>", self.drags.click(lambda side=side: self.studio.select(side)))
             for widget in (tile, badge, name, caption):
@@ -425,7 +427,7 @@ class Desk:
         # Naming a save, in place: shown when Save to QC is pressed.
         self.save_row = tk.Frame(main, bg=PAPER)
         label(self.save_row, "Save as", size=9, color=SOFT).pack(side="left")
-        self.save_name = tk.Entry(self.save_row, font=(FONT, 11), bg=TILE, fg=INK, relief="flat", insertbackground=INK,
+        self.save_name = tk.Entry(self.save_row, font=(FONT, 10), bg=TILE, fg=INK, relief="flat", insertbackground=INK,
                                   width=26)
         self.save_name.pack(side="left", padx=8, ipady=4)
         self.save_name.bind("<Return>", lambda _: self.saved())
@@ -607,7 +609,7 @@ class Desk:
         for r, column, block in sound.chain.blocks:
             differs = other is not None and theirs.get((r, column)) != block
             chip = tk.Label(holder, text=block.name if len(block.name) <= 22 else block.name[:21] + "…",
-                            font=(FONT, 8), bg=TILE, fg=INK if differs else SOFT, padx=5, pady=1, cursor="hand2",
+                            font=(FONT, 9), bg=TILE, fg=INK if differs else SOFT, padx=5, pady=1, cursor="hand2",
                             highlightthickness=1, highlightbackground=SIDE[side] if differs else TILE)
             chip.bind("<ButtonRelease-1>", lambda _, side=side: (self.studio.select(side),
                                                                  self.panel != "Chain" and self.toggle("Chain")))
@@ -811,7 +813,7 @@ class Desk:
             self.strip_key = key
             return
         if found.get("previous"):
-            back = tk.Label(self.chips, text="‹", padx=10, pady=2, cursor="hand2", font=(FONT, 13), bg=PAPER, fg=SOFT)
+            back = tk.Label(self.chips, text="‹", padx=10, pady=2, cursor="hand2", font=(FONT, 12), bg=PAPER, fg=SOFT)
             back.bind("<ButtonRelease-1>", lambda _: studio.round_back())
         for place, candidate in enumerate(found["candidates"]):
             sound = studio.store.sound(candidate["sound"])
@@ -841,6 +843,42 @@ class Desk:
         more.bind("<ButtonRelease-1>", lambda _: studio.round_forward())
         self.flow_chips()
         self.strip_key = key
+
+    def fit_badges(self):
+        """A tile's letter is drawn large while the tile has the room, and smaller when it has not (a small window
+        with a panel open and a long caption): it is packed last, so it would otherwise be cut off first."""
+        import tkinter.font
+
+        try:
+            big = tkinter.font.Font(font=(FONT, BADGE, "bold")).metrics("linespace")
+            for side in ("a", "b"):
+                tile, badge = self.tiles[side][0], self.tiles[side][5]
+                needed = tile.winfo_reqheight() - badge.winfo_reqheight() + big
+                size = BADGE if tile.winfo_height() >= needed else BADGE_SMALL
+                if getattr(badge, "size", BADGE) != size:
+                    badge.size = size
+                    badge.configure(font=(FONT, size, "bold"))
+        except tk.TclError:
+            pass                            # the window is going
+
+    def breathe(self, now=None):
+        """The edge of a tile something is being done for (a request, a revision, a listen) breathes, brighter and
+        dimmer twice a second and a little, so that what is being worked on is seen without a word. Called by the
+        clock; a tile at rest has its edge as `paint` gives it."""
+        import time
+
+        if self.drags.ghost is not None:
+            return                          # while something is dragged both tiles are lit as targets
+        working = self.studio.worked_on()
+        lit = int((now if now is not None else time.monotonic()) / .6) % 2 == 0
+        for side in ("a", "b"):
+            tile = self.tiles[side][0]
+            if side in working:
+                wanted = SIDE[side] if lit else mix(SIDE[side], DARK, .3)
+            else:
+                wanted = SIDE[side] if self.studio.state.side == side else RULE
+            if str(tile.cget("highlightbackground")) != wanted:
+                tile.configure(highlightbackground=wanted)
 
     def wheel_round(self, event):
         """The wheel over the round's chips steps through its designs: away from you to the next, towards you to
@@ -1006,11 +1044,11 @@ class Desk:
             child.destroy()
         head = tk.Frame(self.tray, bg=DARK)
         head.pack(fill="x", pady=(0, 6))
-        label(head, self.panel, size=11, bold=True).pack(side="left")
+        label(head, self.panel, size=10, bold=True).pack(side="left")
         # A panel that changes or shows one sound says whose, in that side's colour.
         if self.panel in SIDED:
             side = self.studio.state.side
-            label(head, f"  {side.upper()}", size=11, bold=True, color=SIDE[side]).pack(side="left")
+            label(head, f"  {side.upper()}", size=10, bold=True, color=SIDE[side]).pack(side="left")
         # A panel whose length depends on what it shows (the measurements, the takes, what the guitar puts out)
         # scrolls when it is taller than the window leaves room for. The others keep a list that takes the room
         # that is left, with their buttons under it, and scroll inside the list.
@@ -1082,7 +1120,7 @@ class Desk:
                                         ("bright", size - 6, size / 2 - 4, "se", across),
                                         ("rough", size / 2 + 6, 6, "nw", up),
                                         ("round", size / 2 + 6, size - 6, "sw", up)):
-            canvas.create_text(x, y, text=text, anchor=anchor, fill=SUBTLE if key in usable else DIM, font=(FONT, 8))
+            canvas.create_text(x, y, text=text, anchor=anchor, fill=SUBTLE if key in usable else DIM, font=(FONT, 9))
         radius = 6
         x, y = pad_point(point[across], point[up], size)
         dot = canvas.create_oval(x - radius, y - radius, x + radius, y + radius, fill=SIDE[self.studio.state.side],
@@ -1148,7 +1186,7 @@ class Desk:
             if not row.blocks:
                 continue
             label(self.into, f"Row {r + 1}" + (f" · split at {row.split[0] + 1}, joined at {row.split[1] + 1}"
-                                                 if row.split else ""), size=8, color=DIM).pack(fill="x", pady=(4, 0))
+                                                 if row.split else ""), size=9, color=DIM).pack(fill="x", pady=(4, 0))
             for column, block in row.blocks:
                 line = tk.Frame(self.into, bg=DARK)
                 line.pack(fill="x")
@@ -1162,14 +1200,14 @@ class Desk:
                     place = (r, column)
                     opened = place in self.expanded
                     toggle = tk.Label(line, text="named settings ▴" if opened else "named settings ▾", bg=DARK,
-                                      fg=ACCENT, font=(FONT, 8), cursor="hand2")
+                                      fg=ACCENT, font=(FONT, 9), cursor="hand2")
                     toggle.pack(side="right")
                     toggle.bind("<ButtonRelease-1>", lambda _, place=place: self.expand(place))
                     if opened:
                         choices = tk.Frame(self.into, bg=DARK)
                         choices.pack(fill="x", padx=(12, 0), pady=(0, 4))
                         for name in names:
-                            chip = tk.Label(choices, text=name, bg=TILE, fg=SOFT, font=(FONT, 8), padx=6, pady=2,
+                            chip = tk.Label(choices, text=name, bg=TILE, fg=SOFT, font=(FONT, 9), padx=6, pady=2,
                                             cursor="hand2")
                             chip.pack(side="left", padx=(0, 4), pady=2)
                             chip.bind("<ButtonRelease-1>", lambda _, r=r, column=column, name=name:
@@ -1413,7 +1451,7 @@ class Desk:
         scenes.pack(fill="x", pady=(2, 2))
         for index, scene in enumerate(("Default scene", *SCENE_LETTERS)):
             lit = scene == self.reference_scene
-            chip = tk.Label(scenes, text=scene, bg=CHOSEN if lit else DARK, fg=INK if lit else SOFT, font=(FONT, 8),
+            chip = tk.Label(scenes, text=scene, bg=CHOSEN if lit else DARK, fg=INK if lit else SOFT, font=(FONT, 9),
                             padx=6, pady=2, cursor="hand2")
             chip.grid(row=0, column=index, padx=(0, 2))
             chip.bind("<ButtonRelease-1>", lambda _, scene=scene: (setattr(self, "reference_scene", scene),
@@ -1691,7 +1729,7 @@ class Desk:
         chips = []
         for setting in settings:
             chosen = setting == self.record_setting
-            chip = tk.Label(grid, text=setting, bg=CHOSEN if chosen else DARK, fg=INK if chosen else SOFT, font=(FONT, 8),
+            chip = tk.Label(grid, text=setting, bg=CHOSEN if chosen else DARK, fg=INK if chosen else SOFT, font=(FONT, 9),
                             padx=6, pady=2, cursor="hand2")
             chip.bind("<ButtonRelease-1>", lambda _, setting=setting: self.choose_setting(setting))
             chips.append(chip)
@@ -1708,7 +1746,7 @@ class Desk:
         for gesture in GESTURES:
             chosen = gesture == self.record_gesture
             chip = tk.Label(self.into, text=gesture, bg=CHOSEN if chosen else DARK, fg=INK if chosen else SOFT,
-                            font=(FONT, 8), padx=6, pady=2, cursor="hand2", anchor="w")
+                            font=(FONT, 9), padx=6, pady=2, cursor="hand2", anchor="w")
             chip.pack(fill="x", pady=1)
             chip.bind("<ButtonRelease-1>", lambda _, gesture=gesture: self.choose_gesture(gesture))
         # Until a pickup setting is chosen the button is dimmed and says why on hover; it never reads as a
@@ -1848,6 +1886,7 @@ class Desk:
                 self.studio.play(mode)
             self.follow_gestures()
             self.phrase_strip.place_head()
+            self.breathe()
             self.show_working()
             self.show_placeholder()
             self.come_forward()

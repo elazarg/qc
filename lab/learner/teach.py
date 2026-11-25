@@ -69,7 +69,7 @@ def label(parent, text=None, *, variable=None, size=10, strong=False, color=TEXT
 
 
 def entry(parent, variable, *, width=24):
-    return tk.Entry(parent, textvariable=variable, width=width, font=(FONT, 11),
+    return tk.Entry(parent, textvariable=variable, width=width, font=(FONT, 10),
                     background=RECESS, foreground=TEXT, insertbackground=TEXT, relief="flat",
                     highlightthickness=1, highlightbackground=LINE, highlightcolor=ACCENT,
                     selectbackground="#3e4c68", selectforeground=TEXT)
@@ -232,7 +232,7 @@ class TeachPanel:
         panel.grid(row=0, column=column, sticky="nsew", padx=(0, 0 if column == 2 else 10))
         head = tk.Frame(panel, background=PANEL)
         head.pack(fill="x")
-        label(head, title, size=11, strong=True).pack(side="left")
+        label(head, title, size=10, strong=True).pack(side="left")
         panel.hint = hint(head, note)
         panel.hint.pack(side="left")
         return panel

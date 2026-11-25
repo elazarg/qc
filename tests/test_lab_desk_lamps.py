@@ -117,5 +117,84 @@ class TakesTest(DeskCase):
         self.assertEqual([item["id"] for item in self.studio.recorded_phrases()], ["first"])
 
 
+class WorkedOnTest(DeskCase):
+    def test_the_edge_of_the_tile_a_request_is_for_breathes_and_rests_when_it_is_done(self):
+        self.put("a", Sound("Lead", chain(PLEXI, V30), {"kind": "designed"}))
+        self.put("b", Sound("Rhythm", chain(PLEXI, V30), {"kind": "designed"}))
+        self.studio.select("a")
+        key = object()
+        self.studio.toward[key] = "b"
+        self.studio.begin(key, "Revising B…")
+        self.assertEqual(self.studio.worked_on(), {"b"})
+        tile = self.desk.tiles["b"][0]
+        self.desk.breathe(now=0.)
+        bright = str(tile.cget("highlightbackground"))
+        self.desk.breathe(now=.7)
+        self.assertNotEqual(str(tile.cget("highlightbackground")), bright)
+        self.assertEqual(bright, SIDE["b"])
+        self.assertEqual(str(self.desk.tiles["a"][0].cget("highlightbackground")), SIDE["a"])   # selected, at rest
+        self.studio.end(key)
+        self.assertEqual(self.studio.worked_on(), set())
+        self.desk.breathe(now=.7)
+        from lab.desk.theme import RULE
+
+        self.assertEqual(str(tile.cget("highlightbackground")), RULE)
+
+
+class LetterFitsTest(DeskCase):
+    def test_a_tiles_letter_is_never_cut_off_and_is_large_again_when_there_is_room(self):
+        from support import DEFAULT_SIZE, SMALLEST_SIZE, inside
+        from lab.desk.window import BADGE
+
+        from unittest import mock
+
+        from test_lab_desk_symbols import three
+
+        self.script.answers.append(three())
+        self.studio.ask("make a classic rock crunch")
+        self.pump()
+        self.studio.copy_to_a()
+        self.studio.turn({"brightness": .3, "tightness": .2, "body": .1})
+        heard = {"distortion": "crunch", "brightness": "bright", "tail": "dry"}
+        for side in ("a", "b"):
+            sound = self.studio.sound(side)
+            sound.heard = heard
+            self.studio.store.save(sound)
+        mock.patch.object(self.studio, "unheard", return_value=None).start()
+        self.addCleanup(mock.patch.stopall)
+        self.studio.say("A status that is long enough to take two lines of the column under the tiles when a "
+                        "panel is open in the smallest window the desk allows.")
+        self.desk.toggle("Phrase")
+        for size in (SMALLEST_SIZE, DEFAULT_SIZE):
+            self.resize(size)
+            self.desk.fit_badges()
+            self.root.update()
+            for side in ("a", "b"):
+                tile, badge = self.desk.tiles[side][0], self.desk.tiles[side][5]
+                self.assertTrue(inside(badge, tile), (size, side))
+                self.assertGreaterEqual(badge.winfo_height(), badge.winfo_reqheight(), (size, side))
+        self.desk.toggle("Phrase")
+        self.desk.fit_badges()
+        self.root.update()
+        self.assertEqual(getattr(self.desk.tiles["b"][5], "size", BADGE), BADGE)
+
+
+class TypeScaleTest(unittest.TestCase):
+    def test_text_is_set_in_four_sizes_and_never_under_nine_points(self):
+        import re
+        from pathlib import Path
+
+        lab = Path(__file__).resolve().parent.parent / "lab"
+        found = set()
+        for folder in ("desk", "tools", "learner"):
+            for path in (lab / folder).glob("*.py"):
+                if path.name == "theme.py":         # the icon font's size is a symbol's, not text's
+                    continue
+                text = path.read_text(encoding="utf-8")
+                found |= {(path.name, int(size)) for size in re.findall(r"\(FONT, (\d+)", text)}
+                found |= {(path.name, int(size)) for size in re.findall(r"[(,]\s*size=(\d+)", text)}
+        self.assertEqual({(name, size) for name, size in found if size not in (9, 10, 12, 14, 34)}, set())
+
+
 if __name__ == "__main__":
     unittest.main()
