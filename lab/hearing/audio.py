@@ -209,9 +209,10 @@ class Audio:
             raise RuntimeError("The replay was interrupted or dropped audio. Check the ASIO driver.")
         return result[PAD:]
 
-    def record(self, seconds, channels, *, cancel=None, started=None):
-        """Record the unit's inputs (1-based ASIO channels) for a number of seconds. `started` is called once the
-        driver delivers the first audio. A take with dropped audio, or shorter than asked, raises."""
+    def record(self, seconds, channels, *, cancel=None, started=None, enough=None):
+        """Record the unit's inputs (1-based ASIO channels) for a number of seconds at most: `enough`, once set,
+        ends the take there and keeps what was recorded. `started` is called once the driver delivers the first
+        audio. A take with dropped audio, or one the driver ended short, raises."""
         samples = np.zeros((round(RATE * seconds), len(channels)), dtype=np.float32)
         state = {"cursor": 0, "issues": [], "told": False}
         sd = self.sd
@@ -235,12 +236,17 @@ class Audio:
                 if cancel is not None and cancel.is_set():
                     stream.abort()
                     raise Cancelled("The recording was stopped.")
+                if enough is not None and enough.is_set():
+                    stream.abort()
+                    break
                 if started is not None and not state["told"] and state["cursor"] > 0:
                     state["told"] = True
                     started()
                 sd.sleep(50)
         if state["issues"]:
             raise RuntimeError("The recording dropped audio (" + state["issues"][0] + "). Record it again.")
+        if enough is not None and enough.is_set():
+            return samples[:state["cursor"]]
         if state["cursor"] < len(samples):
             raise RuntimeError(f"The recording stopped after {state['cursor'] / RATE:.1f} s of {seconds:g} s. "
                                "Record it again.")
@@ -271,28 +277,30 @@ def onset(returned, sent_at=RATE // 10):
 
 
 class Loop:
-    """A phrase played round and round into USB 5. The audio itself runs on the driver's own thread; `start` and
+    """A phrase played round and round into USB 5, or once through (`once`), then silence. The audio itself runs on the driver's own thread; `start` and
     `stop` may be called from any."""
 
-    def __init__(self, audio, dry):
+    def __init__(self, audio, dry, *, once=False):
         if dry.ndim != 2 or dry.shape[1] != 1 or not .001 <= float(np.max(np.abs(dry))) < .999:
             raise ValueError("Loop a mono phrase that is neither silent nor clipped.")
-        self.audio = audio
+        self.audio, self.once = audio, once
         riff = np.pad(dry[:, 0].astype(np.float32), (0, RATE // 2))
         fade = np.linspace(0, 1, min(RATE // 100, len(dry) // 2), dtype=np.float32)   # 10 ms, or half a short phrase
         if len(fade):
             riff[:len(fade)] *= fade
             riff[len(dry) - len(fade):len(dry)] *= fade[::-1]
         self.riff, self.cursor, self.stream = riff, 0, None
+        self.over = False           # played once through, when `once`
 
     def _process(self, indata, outdata, frames, timing, status):
         outdata.fill(0)
         written = 0
-        while written < frames:
+        while written < frames and not self.over:
             count = min(frames - written, len(self.riff) - self.cursor)
             outdata[written:written + count, 0] = self.riff[self.cursor:self.cursor + count]
             self.cursor = (self.cursor + count) % len(self.riff)
             written += count
+            self.over = self.once and self.cursor == 0
 
     def start(self):
         sd = getattr(self.audio, "sd", None)

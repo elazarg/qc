@@ -61,8 +61,8 @@ sizes. Nothing was tried on the real unit.
   the desk's line (R8).
 - **D1, built on the simulated unit and not yet heard on the real one:** the guitar is live whenever A or B
   is ready and nothing else has the unit; it comes back by itself after a listen, a save, a recording, a
-  tool's measurement and the Guitar Learner. The word Guitar is gone: one symbol pauses the guitar (lit while
-  it plays) and plays it again. While it plays, the engine watches the dry guitar on its USB channel; silent
+  tool's measurement and the Guitar Learner. The word Guitar is gone: a speaker mutes the guitar (lit while
+  it plays) and brings it back; ▶ is never used for it, since ▶ means the phrase. While it plays, the engine watches the dry guitar on its USB channel; silent
   listening starts once the strings have been quiet for `idle_seconds` (3 s; a pause under a second between
   notes is not quiet), and a note played during a listen's replay ends it and the guitar is heard again. A
   preset chosen by hand on the unit is left alone until a tile is clicked; a play that fails pauses the
@@ -70,10 +70,16 @@ sizes. Nothing was tried on the real unit.
   tells a note from the guitar's own noise, how long the silence is while a listen builds its chain (the
   replay is the only part a note can end), and whether the driver takes the watch beside the unit's own
   routing without a click.
+- **D2 in part, and D5, after the player's first trial (2026-11-25):** ▶ plays the phrase once through the
+  selected sound and gives the guitar back; ⟳ repeats it. ● records at once, without a detour through the
+  Phrase panel (the pickup setting last chosen is noted if there is one; a take without one is kept and left
+  out of the comparison of settings), and ● pressed again stops the take and keeps it: a take is as long as
+  it was played, 45 s at most, not 8 s. The strip fills as the take grows. Not done: ⇄ (alternate A and B at
+  each pass). The player also found the desk still wordy and the app in need of a wider clean-up.
 
 Waiting, and why:
 
-- **On the unit, with the player:** D1 as above, D2 (play once, alternate A and B), G3 (flipping A and B
+- **On the unit, with the player:** D1 as above, the rest of D2 (alternate A and B), G3 (flipping A and B
   with no hand), D3 (A as "before" by itself, which changes what A means). These change what the engine does
   or what the player is used to.
 - **The player's call:** I1–I3 and I5 (merging Phrase and Guitar, one place for the guitar's setting,

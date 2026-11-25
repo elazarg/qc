@@ -153,8 +153,8 @@ class Gallery:
             # set as the studio sets it while a real take is recorded.)
             from time import monotonic
 
-            studio.doing["record"] = "Recording 8 s · play now (you hear B)…"
-            studio.recording = (monotonic() - 4., 8.)
+            studio.doing["record"] = "Recording · play"
+            studio.recording = (monotonic() - 12., 45.)
             studio._set()
 
         self.shoot("recording", recording, settle=False)

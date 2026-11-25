@@ -67,13 +67,13 @@ class UsageTest(DeskCase):
         self.put("b", Sound("Rhythm", chain(PLEXI, GREENBACK), {"kind": "designed"}))
         self.desk.toggle("Shape")
         self.studio.ask("muddy")
-        self.desk.pause_or_play()
-        self.desk.pause_or_play()
+        self.desk.mute_or_hear()
+        self.desk.mute_or_hear()
         self.studio.undo()
         self.desk.toggle("Chain")
         rows = [json.loads(line) for line in (self.home / "ui-usage.jsonl").read_text(encoding="utf-8").splitlines()]
         self.assertEqual([(row["event"], row["view"]) for row in rows],
-                         [("open", "Shape"), ("ask", "remark"), ("pause", "guitar"), ("play", "guitar"),
+                         [("open", "Shape"), ("ask", "remark"), ("mute", "guitar"), ("play", "guitar"),
                           ("undo", "Tightness on B"), ("close", "Shape"), ("open", "Chain")])
         self.assertEqual(rows[3]["side"], "b")
 

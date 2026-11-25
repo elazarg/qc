@@ -63,6 +63,7 @@ from lab.desk.requests import Requests, Rounds, reads_as_change, song_name
 GETTING_READY = "Getting ready. It plays as soon as it is."
 COPY_REQUEST = "a copy to compare against"     # what a copy of B on A is, in its origin
 PHRASE_SECONDS = 3.5    # the part of a take that loops, until its edges are dragged
+TAKE_SECONDS = 45.      # a take the player has not ended by then ends by itself
 RATE = 48000
 # Who may hold the audio input outside the engine, as the desk names them.
 HOLDERS = {"learner": "The Guitar Learner", "gestures": "Gesture listening"}
@@ -70,6 +71,9 @@ HOLDERS = {"learner": "The Guitar Learner", "gestures": "Gesture listening"}
 # audio driver, and gestures are for playing the sound on show. (The Guitar Learner records the dry guitar alone.)
 GUITAR_GOES_ON = frozenset({"gestures"})
 STRINGS_QUIET = 1.      # the strings count as quiet once no note has been played for this long (seconds)
+# What plays: the guitar ("guitar"), or the phrase round and round ("phrase") or once through ("once").
+PHRASE_MODES = ("phrase", "once")
+ONCE_TAIL = .8          # a pass played once is heard out this long after the phrase, for its echoes to ring
 
 
 @dataclass(frozen=True)
@@ -170,7 +174,7 @@ class Studio:
             changes.setdefault("status_kind", "")      # a new status is plain unless it says it is a fault
         before = self.state
         self.state = replace(self.state, **changes, working=self._working())
-        if self.state.mode != "phrase":
+        if self.state.mode not in PHRASE_MODES:
             self.loop_since = None
         if self.state.mode is None:
             self.sounding = None
@@ -491,6 +495,9 @@ class Studio:
         if self.state.working != self._working():
             self._set()
         now = time.monotonic()
+        if (self.state.mode == "once" and self.loop_since and self.phrase
+                and now - self.loop_since[1] > len(self.phrase[1]) / RATE + ONCE_TAIL):
+            self.stop()                     # played once through: the guitar is heard again, unless it is muted
         self.guitar_back()
         self.ear.use_free_unit(now)
         if self.retry_open_at is not None and now >= self.retry_open_at:
@@ -548,7 +555,7 @@ class Studio:
     def pause(self):
         """The player pauses the guitar (to tune, to talk, to use the unit by hand): nothing plays until they play
         again."""
-        self._used("pause", "guitar")
+        self._used("mute", "guitar")
         self.live = False
         self.stop()
 
@@ -711,9 +718,11 @@ class Studio:
         if sound is None:
             self.say(f"Nothing is on {side.upper()} yet.")
             return
-        if mode == "phrase" and self.phrase is None:
+        if mode in PHRASE_MODES and self.phrase is None:
             self.say("Record or choose a phrase first.")
             return
+        if mode == "once" and self.state.mode != "once":
+            self.loop_since = None              # a pass played once starts at the beginning
         if self.state.mode is None:
             planned = self._audition(self.sound("a"), self.sound("b"))
             if (planned != self.prepared_audition and planned != self.refused_audition
@@ -721,7 +730,7 @@ class Studio:
                 self._set(mode=mode, side=side)
                 self._show()
                 return
-        phrase = self.phrase[1] if mode == "phrase" else None
+        phrase = self.phrase[1] if mode in PHRASE_MODES else None
         if interrupted:
             # Stopping the listen dropped what waited behind it, so the scene is asked for again (the knobs and
             # the levels are, below).
@@ -742,7 +751,7 @@ class Studio:
             self.sounding = (side, mode)
             if mode == "guitar":
                 self.watched_at = 0.        # asked at once how long the strings have been quiet
-            if mode == "phrase" and (self.loop_since is None or self.loop_since[0] != self.phrase_key()):
+            if mode in PHRASE_MODES and (self.loop_since is None or self.loop_since[0] != self.phrase_key()):
                 self.loop_since = (self.phrase_key(), time.monotonic())     # the loop starts again with a new phrase
             if sound.knobs:
                 self.later(self.host.call("turn", side, sound.knobs), lambda moves: None)
@@ -1393,12 +1402,13 @@ class Studio:
             self.play("phrase")          # the new take, or the new part of it, replaces the one looping
         self._set()
 
-    def record(self, setting, seconds=8., gesture=None):
-        """Record a phrase on the current instrument, noting the pickup setting it was played on: the dry input and,
-        when a sound is on show, the selected sound's stereo return as it was heard while playing. `gesture` says
-        what was played ("open strings strummed once…": `lab.hearing.profile.GESTURES`, or the player's own words):
-        two pickup settings are compared only on takes of the same gesture. The take is kept by
-        `lab.tools.phrases.keep`, which refuses one in which nothing came in or which clipped."""
+    def record(self, setting=None, seconds=TAKE_SECONDS, gesture=None):
+        """Record a take on the current instrument until `finish_recording` (or `seconds` at most), noting the
+        pickup setting it was played on when it is known: the dry input and, when a sound is on show, the selected
+        sound's stereo return as it was heard while playing. `gesture` says what was played ("open strings
+        strummed once…": `lab.hearing.profile.GESTURES`, or the player's own words): two pickup settings are
+        compared only on takes of the same gesture and setting. The take is kept by `lab.tools.phrases.keep`,
+        which refuses one in which nothing came in or which clipped."""
         if self._input_held():
             return
         self.stop()
@@ -1406,15 +1416,14 @@ class Studio:
         heard_through = self.sound(side) if side else None
         self.ear.lent()
         self.recording = (None, seconds)
-        self.begin("record", "Opening the input… wait for “play now”.")
+        self.begin("record", "Opening the input…")
 
         def opened(_):
             if "record" in self.doing:
                 import time
 
                 self.recording = (time.monotonic(), seconds)
-                self.begin("record", f"Recording {seconds:g} s · play now"
-                           + (f" (you hear {side.upper()})" if side else "") + "…")
+                self.begin("record", "Recording · play")
 
         def recorded(audio):
             from lab.tools import phrases
@@ -1427,9 +1436,7 @@ class Studio:
                 return
             self.guitar.version += 1            # the guitar's profile has a new take to take in
             self.use_phrase(info["id"], dry.copy(), 0, len(dry))
-            self._set(status=f"Recorded {info['seconds']:g} s on {setting}"
-                             + (f" ({gesture})" if gesture else "") + f", peaking at {level:.0f} dBFS. "
-                             "It is now the phrase.")
+            self._set(status=f"Recorded {info['seconds']:.0f} s · peak {level:.0f} dBFS")
 
         def failed(error):
             if getattr(error, "kind", "") != "Stopped":
@@ -1438,6 +1445,11 @@ class Studio:
         self.later(self.host.call("record", seconds, side, dict(heard_through.knobs) if heard_through else None,
                                   progress=lambda value: self.progress.append((opened, value))), recorded, failed,
                    doing="record")
+
+    def finish_recording(self):
+        """End the take being recorded where it is, and keep it."""
+        if "record" in self.doing:
+            self.host.enough()
 
     # ---- songs ----
 

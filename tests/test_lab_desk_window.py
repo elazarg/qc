@@ -437,10 +437,10 @@ class DrawingTest(DeskCase):
         self.studio.hold_audio("learner")
         self.assertEqual(str(self.desk.loop["fg"]), desk_module.DIM)
         self.assertEqual(str(self.desk.guitar["fg"]), desk_module.INK)       # pausing is never refused
-        self.desk.pause_or_play()
+        self.desk.mute_or_hear()
         self.assertFalse(self.studio.live)
         self.assertEqual(str(self.desk.guitar["fg"]), desk_module.DIM)
-        self.desk.pause_or_play()
+        self.desk.mute_or_hear()
         self.assertEqual(self.desk.line["text"], "The Guitar Learner is using the input.")
         self.studio.release_audio("learner")
         self.assertEqual(str(self.desk.guitar["fg"]), desk_module.INK)
@@ -547,8 +547,8 @@ class GuitarPanelTest(DeskCase):
         self.desk.record_setting = "Bridge · Series"
         self.desk.choose_gesture(GESTURES[1])
         with mock.patch.object(self.studio, "record") as record:
-            self.buttons()["Record 8 s"].invoke()
-        record.assert_called_once_with("Bridge · Series", 8., gesture=GESTURES[1])
+            self.buttons()[desk_module.GLYPH["record"]].invoke()
+        record.assert_called_once_with("Bridge · Series", gesture=GESTURES[1])
         self.desk.choose_gesture(GESTURES[1])             # pressed again: no gesture
         self.assertIsNone(self.desk.record_gesture)
 

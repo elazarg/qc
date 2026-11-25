@@ -29,6 +29,7 @@ from lab.qc.rig import Rig
 from lab.qc.unit import CEILING_DB, same_slot
 
 USB_IN = 12
+PHRASE_MODES = ("phrase", "once")   # the phrase round and round, or once through; "guitar" is the guitar input
 PREVIEW_DB = -12.     # the level of a sound nobody has measured yet
 MUTE, VOLUME = catalog.LANE_MUTE, catalog.LANE_VOLUME
 
@@ -177,7 +178,7 @@ class Engine:
             raise
 
     def _play(self, side, mode, phrase):
-        port = USB_IN if mode == "phrase" else self.physical_input
+        port = USB_IN if mode in PHRASE_MODES else self.physical_input
         held = self.unit.read()
         if self.shown[0] == "recall":
             # One sound on its own preset, played with its own routing: a preset spread over several rows whole.
@@ -242,21 +243,23 @@ class Engine:
                 self.audio.release()
 
     def _loop(self, mode, phrase):
-        """Keep the phrase looping while switching sides; start it again when the phrase itself changed."""
+        """Keep the phrase going while switching sides, round and round ("phrase") or once through ("once"); start
+        it again when the phrase itself or the way it plays changed, or when a pass played once is over."""
         import numpy as np
 
-        if mode == "phrase" and phrase is not None:
+        once = mode == "once"
+        if mode in PHRASE_MODES and phrase is not None:
             same = (self.loop is not None and self.loop_phrase is not None and self.loop_phrase.shape == phrase.shape
-                    and np.array_equal(self.loop_phrase, phrase))
+                    and np.array_equal(self.loop_phrase, phrase) and self.loop.once == once and not self.loop.over)
             if not same:
                 from lab.hearing.audio import Loop
 
                 if self.loop is not None:
                     self.loop.stop()
                 self.loop = self.loop_phrase = None       # nothing cached if the new one fails to start
-                self.loop = Loop(self.audio, phrase).start()
+                self.loop = Loop(self.audio, phrase, once=once).start()
                 self.loop_phrase = phrase
-        if mode != "phrase" and self.loop is not None:
+        if mode not in PHRASE_MODES and self.loop is not None:
             self.loop.stop()
             self.loop = self.loop_phrase = None
 
@@ -498,10 +501,11 @@ class Engine:
         return {"channels": tuple(channels), "preset": self.unit.name(), "scene": self.unit.scene(),
                 "position": position, "firmware": self.unit.firmware, "ours": bool(ours)}
 
-    def record(self, seconds, side=None, knobs=None, *, stop=None, progress=None):
-        """Record the guitar: its dry input, as it reaches the unit before any processing, and the processed stereo
-        return. With `side`, the player hears (and the wet take holds) that side's sound while playing. Returns
-        the audio as (dry, wet left, wet right) columns. `progress("open")` says when the input is open."""
+    def record(self, seconds, side=None, knobs=None, *, stop=None, progress=None, enough=None):
+        """Record the guitar for `seconds` at most, or until `enough` is set: its dry input, as it reaches the unit
+        before any processing, and the processed stereo return. With `side`, the player hears (and the wet take
+        holds) that side's sound while playing. Returns the audio as (dry, wet left, wet right) columns.
+        `progress("open")` says when the input is open."""
         from lab.qc.device import recording_channels
 
         self.quiet()
@@ -513,7 +517,7 @@ class Engine:
                 self.play(side, "guitar")
                 if knobs:
                     self.turn(side, knobs)       # the wet take is the sound as shaped, as it is named
-            return self.audio.record(seconds, channels, cancel=stop,
+            return self.audio.record(seconds, channels, cancel=stop, enough=enough,
                                      started=(lambda: progress("open")) if progress else None)
         finally:
             self.quiet()

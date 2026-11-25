@@ -42,7 +42,8 @@ GLYPH = {
     "loop": "",
     "record": "",
     "search": "",                          # a magnifying glass, before a line that filters a list
-    "pause": "", "play": "",    # the guitar paused, or to be played again
+    "heard": "", "muted": "",    # the guitar heard through the selected sound, or muted
+    "once": "",                         # play the phrase once through
 }
 
 

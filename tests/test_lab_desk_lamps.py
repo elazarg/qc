@@ -56,29 +56,63 @@ class FootswitchTest(DeskCase):
 
 
 class RecordingLampTest(DeskCase):
-    def test_while_a_take_is_recorded_the_dot_is_lit_and_the_strip_drains(self):
+    def test_while_a_take_is_recorded_the_dot_is_lit_and_the_strip_fills(self):
         self.root.update()
         strip = self.desk.phrase_strip
         self.studio.doing["record"] = "Opening the input…"
-        self.studio.recording = (None, 8.)
+        self.studio.recording = (None, 40.)
         self.studio._set()
         self.root.update()
         self.assertNotEqual(str(self.desk.record_symbol.cget("fg")), RECORDING)   # half lit while it opens
         self.assertTrue(strip.find_withtag("recording"))
-        self.assertFalse(strip.find_withtag("left"))
-        self.studio.recording = (time.monotonic() - 4., 8.)
+        self.assertFalse(strip.find_withtag("taken"))
+        self.studio.recording = (time.monotonic() - 10., 40.)
         self.studio._set()
         self.root.update()
         self.assertEqual(str(self.desk.record_symbol.cget("fg")), RECORDING)
-        left, _, right, _ = strip.coords(strip.find_withtag("left")[0])
+        left, _, right, _ = strip.coords(strip.find_withtag("taken")[0])
         width = max(strip.winfo_width(), 40)
-        self.assertAlmostEqual(left / width, .5, delta=.05)                  # half of it still to come
-        self.assertEqual(right, width)
+        self.assertEqual(left, 0)
+        self.assertAlmostEqual(right / width, .25, delta=.05)               # a quarter of the longest take
         del self.studio.doing["record"]
         self.studio._set()
         self.root.update()
         self.assertEqual(str(self.desk.record_symbol.cget("fg")), SOFT)
         self.assertFalse(strip.find_withtag("recording"))
+
+
+class TransportTest(DeskCase):
+    """The symbols mean what they mean in any player: ▶ plays the phrase once, ⟳ repeats it, ● records until it
+    is pressed again and keeps the take; the live guitar is a speaker, never ▶."""
+
+    def test_play_goes_through_the_phrase_once_and_the_guitar_is_heard_again(self):
+        from support import settle_until
+
+        short = phrase(1.)
+        self.studio.use_phrase("short", short, 0, len(short))
+        self.put("b", Sound("Lead", chain(PLEXI, V30), {"kind": "designed"}))
+        self.desk.toggle_play("once")
+        settle_until(self.studio, lambda: self.studio.sounding == ("b", "once"), 10, root=self.root)
+        self.assertEqual(str(self.desk.once.cget("bg")) != str(self.desk.loop.cget("bg")), True)   # ▶ lit
+        settle_until(self.studio, lambda: self.studio.sounding == ("b", "guitar"), 10, root=self.root)
+
+    def test_the_record_dot_records_until_pressed_again_and_keeps_the_take(self):
+        from support import settle_until
+
+        self.put("b", Sound("Lead", chain(PLEXI, V30), {"kind": "designed"}))
+        before = self.studio.phrase
+        self.desk.record_now()
+        settle_until(self.studio, lambda: self.studio.recording and self.studio.recording[0] is not None, 10,
+                     root=self.root)
+        self.assertEqual(self.desk.record_words(), "Stop and keep the take")
+        time.sleep(1.2)
+        self.desk.record_now()
+        settle_until(self.studio, lambda: "record" not in self.studio.doing, 10, root=self.root)
+        self.assertNotEqual(self.studio.phrase[0], before[0])
+        took = self.studio.recorded_phrases()[0]
+        self.assertGreater(took["seconds"], 1.)
+        self.assertLess(took["seconds"], 5.)                                # as long as it was played, not 8 s
+        self.assertEqual(self.studio.state.status_kind, "")
 
 
 class PlayheadTest(DeskCase):

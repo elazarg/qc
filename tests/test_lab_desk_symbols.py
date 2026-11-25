@@ -156,10 +156,10 @@ class DimmedTest(DeskCase):
         self.assertEqual(str(desk.guitar.cget("fg")), INK)
         self.assertEqual(str(desk.loop.cget("fg")), DIM)              # no phrase
         self.assertEqual(self.words(desk.loop), ["Record or choose a phrase first"])
-        self.assertEqual(self.words(desk.guitar), ["Pause the guitar"])          # live by itself
-        desk.pause_or_play()
-        self.assertEqual(self.words(desk.guitar), ["Play the guitar through the selected sound"])
-        self.assertEqual(desk.guitar.cget("text"), GLYPH["play"])
+        self.assertEqual(self.words(desk.guitar), ["Mute the guitar"])          # live by itself
+        desk.mute_or_hear()
+        self.assertEqual(self.words(desk.guitar), ["Hear the guitar through the selected sound"])
+        self.assertEqual(desk.guitar.cget("text"), GLYPH["muted"])
 
 
 class MarksTest(DeskCase):
@@ -177,8 +177,6 @@ class MarksTest(DeskCase):
 
 class PhraseStripTest(DeskCase):
     def test_the_phrase_is_drawn_and_a_line_shows_where_the_loop_is_while_it_plays(self):
-        from lab.desk.window import RECORD_SECONDS
-
         whole = phrase(4.)
         self.studio.use_phrase("p", whole, 0, len(whole) // 2)
         self.put("b", Sound("Work", chain(PLEXI, V30), {"kind": "designed"}))
@@ -191,20 +189,19 @@ class PhraseStripTest(DeskCase):
         strip.since -= .5
         strip.place_head()
         self.assertGreater(strip.coords(strip.head)[0], first)
-        self.studio.stop()
+        self.studio.pause()
         self.pump()
         self.assertIsNone(strip.head)
-        self.assertEqual(RECORD_SECONDS, 8.)
 
-    def test_the_dot_records_on_the_setting_last_chosen_and_without_one_opens_the_phrase_panel(self):
+    def test_the_dot_records_at_once_with_the_setting_last_chosen_if_any(self):
         desk = self.desk
         with mock.patch.object(self.studio, "record") as record:
             desk.record_now()
-            record.assert_not_called()
-            self.assertEqual(desk.panel, "Phrase")
+            self.assertIsNone(desk.panel)                               # no detour through a panel
             desk.choose_setting("Bridge · Series")
             desk.record_now()
-        record.assert_called_once_with("Bridge · Series", 8., gesture=None)
+        self.assertEqual(record.call_args_list, [mock.call(None, gesture=None),
+                                                 mock.call("Bridge · Series", gesture=None)])
         self.assertEqual(self.studio.desk_session["settings"], {"Charvel": "Bridge · Series"})
         self.desk.choose_instrument("Les Paul")
         self.assertIsNone(desk.record_setting)                         # this one has none yet

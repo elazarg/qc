@@ -53,7 +53,7 @@ class Guitar:
         return tuple((item["id"], item["setting"], studio.folder / "phrases" / item["id"] / "dry.wav",
                       item.get("gesture") or None)
                      for item in self.recorded()
-                     if item.get("instrument") == instrument and item.get("setting", "unknown") != "unknown")
+                     if item.get("instrument") == instrument and item.get("setting") not in (None, "unknown"))
 
     # ---- what the instrument puts out ----
 

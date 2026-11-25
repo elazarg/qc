@@ -171,7 +171,6 @@ class TakesTest(FlowCase):
         self.assertEqual(self.studio.phrase[0], item["id"])
         on_disk = json.loads((self.folder / "phrases" / item["id"] / "phrase.json").read_text(encoding="utf-8"))
         self.assertEqual(on_disk["gesture"], profile_module.GESTURES[0])
-        self.assertIn(f"({profile_module.GESTURES[0]})", self.studio.state.status)
         self.assertNotIn("gesture", self.record("Neck · Series"))              # none given: none written
 
     def test_a_take_that_is_not_kept_says_why(self):
@@ -349,7 +348,7 @@ class RecordingTest(StudioCase):
         self.studio.listeners.append(lambda state: said.append(state.working))
         self.studio.record("Neck", 1.)
         self.settle()
-        self.assertIn("play now", " | ".join(said))
+        self.assertIn("Recording · play", " | ".join(said))
         phrase_id = self.studio.phrase[0]
         folder = self.folder / "phrases" / phrase_id
         self.assertTrue((folder / "dry.wav").is_file(), "the dry take")

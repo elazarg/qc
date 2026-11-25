@@ -377,11 +377,23 @@ class SimAudio:
                     and value >= .999 else sound + echo
         return sound
 
-    def record(self, seconds, channels, *, cancel=None, started=None):
-        """A plucked note, as if the player had played one."""
+    def record(self, seconds, channels, *, cancel=None, started=None, enough=None):
+        """A plucked note, as if the player had played one: as long as asked, or, given `enough`, until it is set
+        (half a second at the least)."""
+        import time as clock
+
         self.release()
         if started is not None:
             started()
+        if enough is not None:
+            began = clock.monotonic()
+            while not enough.is_set() and clock.monotonic() - began < seconds:
+                if cancel is not None and cancel.is_set():
+                    from lab.hearing.audio import Cancelled
+
+                    raise Cancelled("The recording was stopped.")
+                clock.sleep(.01)
+            seconds = min(seconds, max(.5, clock.monotonic() - began))
         time = np.arange(round(48000 * seconds)) / 48000
         note = .2 * np.sin(2 * np.pi * 196 * time) * np.exp(-2 * time)
         return np.repeat(note[:, None], len(channels), axis=1).astype(np.float32)

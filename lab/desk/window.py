@@ -54,7 +54,6 @@ from lab.desk.theme import (ACCENT, CHOSEN, DARK, DIM, FAULT, FONT, GLYPH, INK, 
 PANELS = ("Shape", "Chain", "Difference", "Phrase", "Sounds", "History", "Guitar", "More")
 SIDED = ("Shape", "Chain", "Sounds")       # panels that act on or show the sound on the selected side
 SCROLLED = ("Chain", "Difference", "Phrase", "Guitar", "More")      # panels built into a part that scrolls
-RECORD_SECONDS = 8.
 BADGE, BADGE_SMALL = 34, 14         # a tile's letter, with room and without
 # What the ask line takes besides a request for a sound, said behind its "?".
 CONVENTIONS = ("The exact name of one of your presets brings it in. A remark in players' words (“a bit tighter”, "
@@ -97,7 +96,7 @@ def take_words(item, instrument):
     """A take as its row in the Phrase panel: the pickup setting, how long, what was played, and when; the
     instrument too when it is not the one chosen now."""
     seconds = item.get("seconds")
-    parts = [str(item.get("setting") or "setting not noted"),
+    parts = [str(item.get("setting") or ""),
              f"{float(seconds):.0f} s" if isinstance(seconds, (int, float)) else "",
              str(item.get("gesture") or "")[:40],
              str(item.get("recorded", ""))[5:16].replace("T", " ")]
@@ -401,17 +400,21 @@ class Desk:
         self.save_button = button(row, "Save to QC", self.save)
         self.save_button.pack(side="right", padx=(8, 0))
         named(self.save_button, lambda: self.unable("save") or "Save the selected sound to the Tone Lab setlist")
-        # The guitar is heard whenever A or B is ready (`Studio.live`): one symbol pauses it, and plays it again.
-        # It is lit while the guitar plays.
-        self.guitar = button(row, GLYPH["pause"], self.pause_or_play)
+        # The guitar is heard whenever A or B is ready (`Studio.live`): a speaker, lit while the guitar plays,
+        # mutes it and brings it back. Then the phrase's transport, as in any player: once through, and round.
+        self.guitar = button(row, GLYPH["heard"], self.mute_or_hear)
         self.guitar.configure(font=icon_font(13), padx=12)
         self.guitar.pack(side="left")
-        named(self.guitar, lambda: self.unable("guitar") or ("Pause the guitar" if self.studio.live
-                                                             else "Play the guitar through the selected sound"))
+        named(self.guitar, lambda: self.unable("guitar") or ("Mute the guitar" if self.studio.live
+                                                             else "Hear the guitar through the selected sound"))
+        self.once = button(row, GLYPH["once"], lambda: self.toggle_play("once"))
+        self.once.configure(font=icon_font(13), padx=12)
+        self.once.pack(side="left", padx=(8, 0))
+        named(self.once, lambda: self.unable("once") or "Play the phrase once through the selected sound")
         self.loop = button(row, GLYPH["loop"], lambda: self.toggle_play("phrase"))
         self.loop.configure(font=icon_font(13), padx=12)
         self.loop.pack(side="left", padx=(2, 0))
-        named(self.loop, lambda: self.unable("phrase") or "Loop the phrase through the selected sound")
+        named(self.loop, lambda: self.unable("phrase") or "Repeat the phrase through the selected sound")
         # The phrase itself: its shape, the part that loops and where the loop is now. A click opens the Phrase
         # panel; the dot beside it records a new one on the pickup setting last used.
         self.record_symbol = tk.Label(row, text=GLYPH["record"], font=icon_font(13), bg=PAPER, fg=SOFT,
@@ -535,10 +538,10 @@ class Desk:
         self.paint_line(state)
         # A control that cannot act now is dimmed, and says why while the pointer rests on it; pressing it says
         # so too. While something else has the audio input, the two play buttons are dimmed the same way.
-        for widget, mode in ((self.guitar, "guitar"), (self.loop, "phrase")):
+        for widget, mode in ((self.guitar, "guitar"), (self.once, "once"), (self.loop, "phrase")):
             widget.configure(bg=mix(LIVE, TILE, .4) if state.mode == mode else TILE,
                              fg=DIM if self.unable(mode) else INK)
-        self.guitar.configure(text=GLYPH["pause"] if studio.live else GLYPH["play"])
+        self.guitar.configure(text=GLYPH["heard"] if studio.live else GLYPH["muted"])
         self.save_button.configure(fg=DIM if self.unable("save") else INK)
         self.copy_link.configure(fg=DIM if self.unable("copy") else SOFT)
         self.blind_link.configure(fg=DIM if self.unable("blind") else SIDE["b"] if state.blind else SOFT,
@@ -552,7 +555,7 @@ class Desk:
                 self.level_row.pack(side="bottom", fill="x", pady=(6, 0), after=self.scene_row)
         elif self.level_row.winfo_manager():
             self.level_row.pack_forget()
-        since = studio.loop_since[1] if studio.loop_since and state.mode == "phrase" else None
+        since = studio.loop_since[1] if studio.loop_since and state.mode in ("phrase", "once") else None
         # While a take is recorded the dot is a lamp: half lit while the input opens, lit while it records.
         taking = studio.recording if "record" in studio.doing and studio.recording else None
         self.phrase_strip.show(studio.phrase_whole if studio.phrase else None, since, taking)
@@ -568,14 +571,14 @@ class Desk:
         while it cannot, and says this while the pointer rests on it."""
         studio, state = self.studio, self.studio.state
         a, b, chosen = studio.sound("a"), studio.sound("b"), studio.sound(state.side)
-        if what == "guitar" and studio.live:            # pausing it is never refused, once there is a sound
+        if what == "guitar" and studio.live:            # muting it is never refused, once there is a sound
             return "Nothing is on A or B yet" if a is None and b is None else ""
-        if what in ("guitar", "phrase", "record") and studio.audio_held_by \
+        if what in ("guitar", "phrase", "once", "record") and studio.audio_held_by \
                 and not (what == "guitar" and studio.audio_held_by == "gestures"):
             return studio.held_words()
-        if what in ("guitar", "phrase") and a is None and b is None:
+        if what in ("guitar", "phrase", "once") and a is None and b is None:
             return "Nothing is on A or B yet"
-        if what == "phrase" and studio.phrase is None:
+        if what in ("phrase", "once") and studio.phrase is None:
             return "Record or choose a phrase first"
         if what == "save" and chosen is None:
             return f"Nothing is on {state.side.upper()} to save"
@@ -669,30 +672,27 @@ class Desk:
         return " · ".join(["Phrase", *filter(None, parts)]) + loop
 
     def record_words(self):
+        if "record" in self.studio.doing:
+            return "Stop and keep the take"
         why = self.unable("record")
         if why:
             return why
-        setting = self.remembered_setting()
-        return (f"Record {RECORD_SECONDS:g} s on {setting}" if setting
-                else "Record a phrase: choose the pickup setting in the Phrase panel")
+        return "Record a take" + (f" · {self.record_setting}" if self.record_setting else "")
 
     def remembered_setting(self):
         """The pickup setting the player last recorded on, on this instrument, or None."""
         return (self.studio.desk_session.get("settings") or {}).get(self.studio.state.instrument)
 
     def record_now(self):
-        """The dot by the phrase: record on the setting last used. With none yet, the Phrase panel opens, where
-        it is chosen."""
+        """The record dot: start a take at once, noting the pickup setting last chosen for this instrument (if
+        one was); pressed again, stop it there and keep it."""
+        if "record" in self.studio.doing:
+            self.studio.finish_recording()
+            return
         if self.unable("record"):
             self.studio.say(self.unable("record"))
             return
-        setting = self.remembered_setting()
-        if setting is None:
-            if self.panel != "Phrase":
-                self.toggle("Phrase")
-            self.studio.say("Choose the pickup setting, then record.")
-            return
-        self.studio.record(setting, RECORD_SECONDS, gesture=self.record_gesture)
+        self.studio.record(self.record_setting, gesture=self.record_gesture)
 
     def paint_line(self, state):
         """The status line in one of three looks: a fault in its own colour; what was just said, plain; and,
@@ -741,7 +741,8 @@ class Desk:
                                                      json.dumps(sound.knobs, sort_keys=True), tuple(sound.marks)))
         return (self.panel, state.side, state.round, state.blind, state.scene, state.song, state.instrument,
                 tuple(sides), self.show_nano, self.show_measured, tuple(sorted(self.expanded)), studio.phrase_key(),
-                tuple(sorted(studio.hearing_base)), studio.profile_version if self.panel == "Guitar" else None)
+                tuple(sorted(studio.hearing_base)), studio.profile_version if self.panel == "Guitar" else None,
+                "record" in studio.doing)
 
     def caption(self, sound, side="b"):
         """The line under a sound's name. On B, first, what B has that A has not: what the player listens for."""
@@ -1693,8 +1694,8 @@ class Desk:
 
     # ---- actions ----
 
-    def pause_or_play(self):
-        """The guitar's symbol was pressed: pause the guitar, or play it again."""
+    def mute_or_hear(self):
+        """The speaker was pressed: mute the guitar, or hear it again."""
         self.play_when_free = None
         if self.studio.live:
             self.studio.pause()
@@ -1702,14 +1703,14 @@ class Desk:
             self.studio.play("guitar")
 
     def toggle_play(self, mode):
-        """The phrase's symbol was pressed: loop the phrase, or stop it when it is what plays (the guitar is heard
-        again then, unless it is paused). While something else has the audio input (`Studio.audio_held_by`), the
-        studio says who instead of starting."""
+        """▶ ("once") or ⟳ ("phrase") was pressed: play the phrase once or round and round, or stop it when that is
+        what plays (the guitar is heard again then, unless it is muted). While something else has the audio input
+        (`Studio.audio_held_by`), the studio says who instead of starting."""
         self.play_when_free = None
         if self.studio.state.mode == mode:
             self.studio.stop()
             return
-        if mode == "phrase":
+        if mode in ("phrase", "once"):
             # The phrase loop and gesture listening would both want the audio driver.
             from lab.learner import gestures
 
@@ -1793,14 +1794,11 @@ class Desk:
                             font=(FONT, 9), padx=6, pady=2, cursor="hand2", anchor="w")
             chip.pack(fill="x", pady=1)
             chip.bind("<ButtonRelease-1>", lambda _, gesture=gesture: self.choose_gesture(gesture))
-        # Until a pickup setting is chosen the button is dimmed and says why on hover; it never reads as a
-        # sentence that looks ready to press.
-        go = button(self.into, f"Record {RECORD_SECONDS:g} s",
-                    lambda: self.record_setting and self.studio.record(self.record_setting, RECORD_SECONDS,
-                                                                       gesture=self.record_gesture))
-        if not self.record_setting:
-            go.configure(state="disabled", disabledforeground=DIM, cursor="arrow")
-            named(go, "Choose the pickup setting first")
+        # The same record dot as under the tiles: a take starts at once, with the setting chosen above if one is,
+        # and the dot pressed again stops it and keeps it.
+        go = button(self.into, GLYPH["record"], self.record_now)
+        go.configure(font=icon_font(13), padx=12, fg=RECORDING if "record" in self.studio.doing else INK)
+        named(go, self.record_words)
         go.pack(anchor="w", pady=(4, 0))
 
     def choose_setting(self, setting):
@@ -1809,7 +1807,8 @@ class Desk:
         settings = dict(self.studio.desk_session.get("settings") or {})
         settings[self.studio.state.instrument] = setting
         self.studio.remember(settings=settings)
-        self.fill_panel()
+        if self.panel:
+            self.fill_panel()
 
     def choose_gesture(self, gesture):
         """Mark the next take as this gesture, or, pressed again, as none."""

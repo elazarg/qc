@@ -34,8 +34,8 @@ def sound(*models, **settings):
 
 
 class Phrase:
-    def __init__(self, audio, dry):
-        self.started = True
+    def __init__(self, audio, dry, once=False):
+        self.started, self.once, self.over = True, once, False
 
     def start(self):
         return self
@@ -253,8 +253,8 @@ class Loops:
         loops = self
 
         class Loop:
-            def __init__(self, audio, dry):
-                self.dry, self.running = dry, False
+            def __init__(self, audio, dry, once=False):
+                self.dry, self.running, self.once, self.over = dry, False, once, False
 
             def start(self):
                 if loops.fail:

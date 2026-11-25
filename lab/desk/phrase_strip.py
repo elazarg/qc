@@ -2,8 +2,8 @@
 loops, a line where the loop is now. A click opens the Phrase panel, where the loop's edges are dragged.
 
 While a take is recorded the strip is the recording's: edged in the colour of recording while the input opens,
-then filled with that colour, which drains from left to right over the seconds the recording lasts. A count can
-be followed while playing; a sentence cannot be read.
+then filled with that colour from the left as the take grows, across the longest a take can be. It can be
+followed while playing; a sentence cannot be read.
 
 Where the loop is now is worked out from when it started and how long it is, not read from the audio driver:
 the line follows it closely enough to see where in the phrase a sound changes, and starts again with the loop.
@@ -31,7 +31,7 @@ class PhraseStrip(tk.Canvas):
         self.taking = None          # while a take is recorded: (when it began, or None while the input opens; seconds)
         self.drawn_for = None       # what the strip was last drawn for
         self.head = None            # the line where the loop is now
-        self.left = None            # the part of the recording still to come
+        self.taken = None           # the part of the take recorded so far
         self.bind("<Configure>", lambda _: self.redraw())
         self.bind("<ButtonRelease-1>", lambda _: open_panel())
 
@@ -51,7 +51,7 @@ class PhraseStrip(tk.Canvas):
         if self.drawn_for != key:
             self.drawn_for = key
             self.delete("all")
-            self.head = self.left = None
+            self.head = self.taken = None
             if self.taking is not None:
                 self.create_rectangle(1, 1, width - 1, HEIGHT - 1, outline=RECORDING, width=2, tags="recording")
             elif self.audio is None or not len(self.audio):
@@ -73,14 +73,15 @@ class PhraseStrip(tk.Canvas):
             self.create_line(x, middle - value, x, middle + value, fill=SOFT)
 
     def place_head(self, width=None):
-        """Move the line to where the loop is now, and drain the recording, by the clock; or take them away."""
+        """Move the line to where the loop is now, and grow the take being recorded, by the clock; or take them
+        away."""
         width = width or max(self.winfo_width(), 40)
         if self.taking is not None and self.taking[0] is not None:
             began, seconds = self.taking
             done = min(1., (time.monotonic() - began) / max(seconds, .1))
-            if self.left is None:
-                self.left = self.create_rectangle(0, 0, 0, HEIGHT, fill=RECORDING, width=0, tags="left")
-            self.coords(self.left, done * width, 0, width, HEIGHT)
+            if self.taken is None:
+                self.taken = self.create_rectangle(0, 0, 0, HEIGHT, fill=RECORDING, width=0, tags="taken")
+            self.coords(self.taken, 0, 0, done * width, HEIGHT)
         if self.audio is None or self.since is None or self.taking is not None:
             if self.head is not None:
                 self.delete(self.head)

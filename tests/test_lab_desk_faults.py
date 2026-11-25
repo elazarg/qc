@@ -9,7 +9,7 @@ import threading
 import tkinter as tk
 import unittest
 
-from lab.desk.theme import FAULT, INK, SUBTLE
+from lab.desk.theme import FAULT, GLYPH, INK, SUBTLE
 from lab.qc.assets import Asset
 from lab.sound.sounds import Sound
 
@@ -182,19 +182,14 @@ class PanelsThatOverflowTest(DeskCase):
         self.desk.fill_panel()
         for size in (DEFAULT_SIZE, SMALLEST_SIZE):
             self.resize(size)
-            self.assertTrue(self.reachable("Record 8 s"), size)
+            self.assertTrue(self.reachable(GLYPH["record"]), size)
 
-    def test_record_is_dimmed_until_a_pickup_setting_is_chosen(self):
+    def test_record_in_the_panel_is_ready_without_a_pickup_setting(self):
         self.desk.toggle("Phrase")
         self.desk.record_setting = None
         self.desk.fill_panel()
         record = [widget for widget in every(self.desk.tray) if widget.winfo_class() == "Button"
-                  and widget.cget("text") == "Record 8 s"]
-        self.assertEqual(str(record[0].cget("state")), "disabled")
-        self.desk.choose_setting("Neck · Series")
-        self.desk.fill_panel()
-        record = [widget for widget in every(self.desk.tray) if widget.winfo_class() == "Button"
-                  and widget.cget("text") == "Record 8 s"]
+                  and widget.cget("text") == GLYPH["record"]]
         self.assertEqual(str(record[0].cget("state")), "normal")
 
 

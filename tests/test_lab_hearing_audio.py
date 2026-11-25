@@ -90,6 +90,15 @@ class LoopTest(unittest.TestCase):
         self.assertTrue(np.array_equal(out[length:length + 1000, 0], out[:1000, 0]))
         self.assertAlmostEqual(float(np.abs(out[:, 0]).max()), .25, delta=.01)
 
+    def test_a_phrase_played_once_goes_through_once_and_then_is_silent(self):
+        dry = (tone()[:1000] * .5)[:, None].astype(np.float32)
+        loop = audio.Loop(object(), dry, once=True)
+        length = len(loop.riff)
+        out = np.concatenate([self.play(loop, 4096) for _ in range(8)])
+        self.assertTrue(loop.over)
+        self.assertGreater(float(np.abs(out[:1000, 0]).max()), .1)
+        self.assertEqual(float(np.abs(out[length:, 0]).max()), 0.)
+
     def test_a_phrase_shorter_than_its_fades_still_loops(self):
         # C4: under 480 samples the fade-out could not be laid over the phrase and the loop raised.
         loop = audio.Loop(object(), (tone()[:300] * .5)[:, None].astype(np.float32))

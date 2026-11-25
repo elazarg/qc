@@ -83,7 +83,7 @@ def _engine(simulated, folder, physical_input):
     return Engine(unit, Slots(unit, folder), audio, physical_input=physical_input), context
 
 
-def _serve(commands, replies, stop, stopped_before, simulated, folder, physical_input):
+def _serve(commands, replies, stop, stopped_before, simulated, folder, physical_input, enough):
     from lab.hearing.audio import Cancelled, Played
 
     try:
@@ -109,6 +109,9 @@ def _serve(commands, replies, stop, stopped_before, simulated, folder, physical_
             try:
                 if name in ("show", "hear", "hear_shaped", "record"):
                     options = {**options, "stop": stop}
+                if name == "record":                # `Host.enough` ends this take and keeps it
+                    enough.clear()
+                    options = {**options, "enough": enough}
                 if "." in name:
                     # A side tool's own operation, `lab.tools.x.function(engine, ...)`, run where the unit is held.
                     from importlib import import_module
@@ -151,17 +154,17 @@ class Host:
             from queue import Queue
 
             self.commands, self.replies, self.stop_flag = Queue(), Queue(), threading.Event()
-            self.stopped_before = _Number()
+            self.stopped_before, self.enough_flag = _Number(), threading.Event()
             self.worker = threading.Thread(target=_serve, daemon=True,
                                            args=(self.commands, self.replies, self.stop_flag, self.stopped_before,
-                                                 simulated, str(folder), physical_input))
+                                                 simulated, str(folder), physical_input, self.enough_flag))
         else:
             context = multiprocessing.get_context("spawn")
             self.commands, self.replies, self.stop_flag = context.Queue(), context.Queue(), context.Event()
-            self.stopped_before = context.Value("q", 0, lock=False)
+            self.stopped_before, self.enough_flag = context.Value("q", 0, lock=False), context.Event()
             self.worker = context.Process(target=_serve, daemon=True,
                                           args=(self.commands, self.replies, self.stop_flag, self.stopped_before,
-                                                simulated, str(folder), physical_input))
+                                                simulated, str(folder), physical_input, self.enough_flag))
         self.worker.start()
         self.ready = Future()
         self.reader = threading.Thread(target=self._read, daemon=True)
@@ -227,6 +230,10 @@ class Host:
                 options = {**options, "_progress": True}
         self.commands.put((ticket, name, args, options))
         return future
+
+    def enough(self):
+        """End the take being recorded where it is, and keep it."""
+        self.enough_flag.set()
 
     def stop(self):
         """End the running command at its next safe point, and drop the ones sent before now that have not begun.
