@@ -67,6 +67,7 @@ WINDOW_WIDE = {
     "desk/chooser.py": [("<ButtonPress-1>", "a press anywhere but on the instrument chooser or in its list puts "
                                             "the list away")],
     "desk/hints.py": [("<ButtonPress-1>", "a press anywhere takes away the words a click on a ? left on show")],
+    "desk/search.py": [("<ButtonPress-1>", "a press outside the search drop-down and its icon closes it")],
     "desk/window.py": [("<Destroy>", "the desk's clock is stopped when the window goes")],
 }
 # The pointer resting on something (<Enter> and <Leave>), by file, and what it does: it never does more than show.

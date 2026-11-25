@@ -40,6 +40,7 @@ from lab.desk.drag import Drags
 from lab.desk.knob_track import KnobTrack
 from lab.desk.phrase_strip import PhraseStrip
 from lab.desk.scales import Scales
+from lab.desk.search import DeskSearch, search_line
 from lab.tools.common import flow
 from lab.desk.difference import against, aim_against, misses
 from lab.desk.studio import COPY_REQUEST
@@ -105,17 +106,6 @@ def take_words(item, instrument):
     return " · ".join(part for part in parts if part)
 
 
-def search_line(parent, query):
-    """A line to type words into that filter a list, behind a magnifying glass, holding `query` to begin with.
-    Returns the frame, to be packed, and the entry."""
-    frame = tk.Frame(parent, bg=TILE)
-    tk.Label(frame, text=GLYPH["search"], font=icon_font(10), bg=TILE, fg=SUBTLE, padx=6).pack(side="left")
-    entry = tk.Entry(frame, font=(FONT, 10), bg=TILE, fg=INK, relief="flat", insertbackground=INK)
-    entry.insert(0, query)
-    entry.pack(side="left", fill="x", expand=True, ipady=4)
-    return frame, entry
-
-
 def link(parent, text, action, *, color=SOFT):
     """Words that are clicked."""
     found = tk.Label(parent, text=text, bg=parent["bg"], fg=color, font=(FONT, 9), cursor="hand2", padx=8)
@@ -123,13 +113,8 @@ def link(parent, text, action, *, color=SOFT):
     return found
 
 
-def history_rows(folder, query=""):
-    """Every sound kept, as the rows of the History panel: grouped under the request it came from (a revision
-    under the request of the sound it was made from), the newest request first and the newest sound first in
-    it. Rows are (id, text); a request's heading has no id. A sound shows the player's marks (♥ keep, ✕ not this)
-    and ★ when saved on the unit. With `query`, only sounds whose name or request has every word of it.
-
-    Read from the files as they are, without building the chains: the list is long and is drawn often."""
+def history_groups(folder):
+    """Sound metadata grouped by its first request, most recent groups and members first."""
     records = {}
     for path in (Path(folder) / "sounds").glob("*.json"):
         try:
@@ -153,21 +138,29 @@ def history_rows(folder, query=""):
     for record in records.values():
         origin = first(record)["origin"]
         request = str(origin.get("request") or "").strip()
+        record["request"] = request
+        record["revision"] = record["origin"].get("from") in records
         heading = (f"“{request[:60]}{'…' if len(request) > 60 else ''}”" if request else
                    "From the unit" if origin.get("kind") in ("preset", "imported") else "Other sounds")
         groups.setdefault(heading, []).append(record)
+    return [(heading, sorted(members, key=lambda record: record["created"], reverse=True))
+            for heading, members in sorted(groups.items(), key=lambda item: max(r["created"] for r in item[1]),
+                                           reverse=True)]
+
+
+def history_rows(folder, query=""):
+    """Rows of the History panel, with the request headings, marks and optional text filter."""
     words = query.casefold().split()
     rows = []
-    for heading, members in sorted(groups.items(), key=lambda item: max(record["created"] for record in item[1]),
-                                   reverse=True):
-        members = [record for record in members if all(word in f"{heading} {record['name']}".casefold()
+    for heading, members in history_groups(folder):
+        members = [record for record in members if all(word in f"{heading} {record['request']} {record['name']}".casefold()
                                                        for word in words)]
         if not members:
             continue
         rows.append((None, heading))
-        for record in sorted(members, key=lambda record: record["created"], reverse=True):
+        for record in members:
             marks = record["marks"]
-            rows.append((record["id"], "    " + ("↳ " if record["origin"].get("from") in records else "")
+            rows.append((record["id"], "    " + ("↳ " if record["revision"] else "")
                          + record["name"] + ("  ♥" if "keeper" in marks else "") + ("  ✕" if "not this" in marks else "")
                          + ("  ★" if record["saved"] else "")))
     return rows
@@ -287,10 +280,11 @@ class Desk:
         self.names.pack(side="right")
         self.openers = {}               # the panels' names, by name: the open one is lit
         for name in PANELS[::-1]:
-            opener = tk.Label(self.names, text=name, bg=PAPER, fg=SUBTLE, font=(FONT, 10), cursor="hand2", padx=8)
+            opener = tk.Label(self.names, text=name, bg=PAPER, fg=SUBTLE, font=(FONT, 10), cursor="hand2", padx=6)
             opener.pack(side="right")
             opener.bind("<ButtonRelease-1>", lambda _, name=name: self.toggle(name))
             self.openers[name] = opener
+        self.search = DeskSearch(top, self.studio, self.search_items, self.open_search_hit)
 
         body = self.body = tk.Frame(page, bg=PAPER)
         body.pack(fill="both", expand=True, pady=(12, 0))
@@ -487,6 +481,7 @@ class Desk:
 
     def paint(self):
         studio, state = self.studio, self.studio.state
+        self.search.follow()
         sounds = {side: studio.sound(side) for side in ("a", "b")}
         if state.instrument != self.instrument_shown:
             self.instrument_changed()
@@ -955,6 +950,8 @@ class Desk:
             self.learning.follow()
             return self.learning
         self.chooser.close()
+        self.search.close()
+        self.search.icon.place_forget()
         self.body.pack_forget()
         self.names.pack_forget()
         self.learning.frame.pack(fill="both", expand=True, pady=(12, 0))
@@ -971,6 +968,7 @@ class Desk:
         self.learning_on = False
         self.learn_symbol.configure(image=self.symbols[False], bg=PAPER, highlightbackground=RULE)
         self.names.pack(side="right")
+        self.search.show_icon()
         self.body.pack(fill="both", expand=True, pady=(12, 0))
         self.draw()
 
@@ -1590,6 +1588,36 @@ class Desk:
     def read_directory(self):
         self.studio.read_directory(lambda entries: self.refill("Sounds"))
 
+    def search_items(self):
+        from lab.qc.library import cached, place
+
+        items = []
+        for row in cached(self.studio.folder) or ():
+            try:
+                name, slot = row["name"], row["slot"]
+                location = f"{row['setlist']} {place(slot['position'])}"
+                items.append((name, f"Preset · {location}", f"{name} {location}".casefold(), ("preset", slot, name)))
+            except (KeyError, TypeError, AttributeError):
+                continue
+        for _, members in history_groups(self.studio.folder):
+            for record in members:
+                name, request = record["name"], record["request"]
+                origin = record["origin"]
+                text = f"{name} {request} {origin.get('request') or ''} {origin.get('song') or ''}".casefold()
+                items.append((name, "Sound · History", text, ("sound", record["id"])))
+        return items
+
+    def open_search_hit(self, target):
+        if target[0] == "preset":
+            self.studio.work_on(*target[1:], side="b")
+            return
+        try:
+            sound = self.studio.store.sound(target[1])
+        except (OSError, ValueError) as error:
+            self.studio.say(f"This sound could not be opened. {error}")
+            return
+        self.studio.put("b", sound, status=f"{sound.name} on B.")
+
     def work_on(self, box, rows):
         chosen = box.curselection()
         if not chosen:
@@ -1920,6 +1948,7 @@ class Desk:
         if self.closing:
             return
         self.closing = True
+        self.search.close()
         if self.seat is not None:
             self.seat.leaving = True        # which ends its recording or listening and gives the input back
         self.studio.begin("close", "Giving the Quad Cortex back…")

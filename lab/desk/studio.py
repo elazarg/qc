@@ -1213,13 +1213,18 @@ class Studio:
 
     # ---- presets on the unit ----
 
-    def work_on(self, slot, name, *, note=""):
-        """Bring a preset saved on the unit in: it goes on A as it is, and a copy on B to change."""
+    def work_on(self, slot, name, *, note="", side=None):
+        """Bring a preset onto one side, or onto A with a copy on B to change."""
+        revision = self.state.revision
         self.begin("read", f"Reading {name}…")
 
         def read(result):
             chain, held_name = result
             original = Sound(held_name, chain, {"kind": "preset", "slot": slot})
+            if side is not None:
+                if self.state.revision == revision:
+                    self.put(side, original, status=f"{held_name} on {side.upper()}.")
+                return
             copy = Sound(held_name, chain, {"kind": "revised", "from": original.id}, parent=original.id)
             self.store.save(original)
             self.store.save(copy)

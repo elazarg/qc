@@ -21,6 +21,59 @@ from support import DELAY, PLEXI, V30, DeskCase, chain
 
 
 class ToolsTest(DeskCase):
+    def test_desk_search_matches_requests_and_puts_the_result_on_b(self):
+        a = Sound("Reference", chain(PLEXI, V30), {"kind": "designed"})
+        b = Sound("Studio lead", chain(gain_db=-5.), {"kind": "designed", "request": "Comfortably Numb outro"})
+        self.put("a", a)
+        self.studio.store.save(b)
+        search = self.desk.search
+        search.toggle()
+        search.query.set("numb outro")
+        self.pump()
+        self.assertEqual(len(search.shown), 1)
+        self.assertEqual(self.studio.state.a, a.id)
+        self.assertIsNone(self.studio.state.b)
+        search.box.update_idletasks()
+        row = search.box.bbox(0)
+        search.box.event_generate("<ButtonRelease-1>", x=5, y=row[1] + 4)
+        self.pump()
+        self.assertIsNone(search.panel)
+        self.assertEqual((self.studio.state.a, self.studio.state.b), (a.id, b.id))
+
+    def test_desk_search_uses_cached_preset_slots_and_dismisses_without_loading(self):
+        (self.home / "directory.json").write_text(json.dumps({"presets": [
+            {"name": "Stage lead", "setlist": "My Presets",
+             "slot": {"folder_key": "1_q", "position": 0, "is_factory": False}}
+        ]}), encoding="utf-8")
+        search = self.desk.search
+        search.toggle()
+        search.query.set("My Presets 1A")
+        self.pump()
+        self.assertEqual([item[0] for item in search.shown], ["Stage lead"])
+        self.desk.body.event_generate("<ButtonPress-1>", x=5, y=5)
+        self.assertIsNone(search.panel)
+        self.assertIsNone(self.studio.state.b)
+
+    def test_desk_search_puts_a_quad_cortex_preset_on_b_without_replacing_a(self):
+        from lab.qc.sim import FACTORY
+
+        a = Sound("Reference", chain(PLEXI, V30), {"kind": "designed"})
+        self.put("a", a)
+        (self.home / "directory.json").write_text(json.dumps({"presets": [
+            {"name": "Brit 2203", "setlist": "Factory Library",
+             "slot": {"folder_key": FACTORY, "position": 0, "is_factory": True}}
+        ]}), encoding="utf-8")
+        search = self.desk.search
+        search.toggle()
+        search.query.set("brit")
+        self.pump()
+        search.box.update_idletasks()
+        row = search.box.bbox(0)
+        search.box.event_generate("<ButtonRelease-1>", x=5, y=row[1] + 4)
+        self.pump()
+        self.assertEqual(self.studio.state.a, a.id)
+        self.assertEqual(self.studio.sound("b").name, "Brit 2203")
+
     def look(self):
         """The engine's own state, read where it is held."""
         import lab.tools.probe as probe

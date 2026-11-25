@@ -10,6 +10,8 @@ Everything happens in the one window: no other windows, no dialogs, no keyboard 
 
 **The top row** is there on every screen. At its left, the instrument you are playing: a tile with its picture and name. Click it and choose another from the list beneath; the whole app follows at once (the Guitar and Phrase panels, what the designer is told, gestures, and the phrase, when one was recorded on that instrument). Left of it, the learning symbol.
 
+**Search** opens from the magnifying glass at the top center of the desk. Type a preset name, setlist or slot, or words from a History sound's name, song or request. Click a result to put it on B while keeping A, or click outside to close the list.
+
 **Learning the guitar** is a screen of its own: the learning symbol puts it in the place of everything below the top row, and brings the desk back as it was when pressed again. It has two views. The **Guitar Learner** (for a guitar it has a photograph of: the Charvel) records or opens a dry clip, shows what it makes of it, and tags it with the controls set on the photograph. **Teach a control** (any instrument) teaches two settings of one control, checks a fresh take, and maps a return gesture to a Shape knob.
 
 The desk shows what is done with a thing, not a paragraph about it: what is worth knowing once is behind a **?** beside it, shown while the pointer rests there, or after a click until the next. A symbol says its name while the pointer rests on it, and a control that cannot act now is dimmed and says why.

@@ -131,6 +131,12 @@ class Gallery:
         self.pump()
         studio.assistant.run = self.script
         self.shoot("round")
+        def search():
+            desk.search.open()
+            desk.search.query.set("Comfortably")
+
+        self.shoot("search", search)
+        desk.search.close()
         self.shoot("copied-to-a", studio.copy_to_a)
         self.shoot("second-design", lambda: studio.step(1))
         self.shoot("guitar-on-b", lambda: desk.toggle_play("guitar"))
