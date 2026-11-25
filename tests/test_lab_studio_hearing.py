@@ -60,7 +60,7 @@ class DifferenceTest(unittest.TestCase):
         measured = {"intermod_db": -20., "level_wobble": 9., "pitch_wobble": 4., "even_odd_db": 12.,
                     "decay_rt60_s": 1.4, "late_energy_db": -20.}
         self.assertEqual(difference(record(probe=unmeasured), record(probe=measured)),
-                         ["Listening heard no clear difference between A and B."])
+                         ["No clear difference measured."])
         both = " ".join(difference(record(probe={**measured, "intermod_db": -40., "decay_rt60_s": .4,
                                                  "level_wobble": 1., "even_odd_db": 0.}), record(probe=measured)))
         for said in ("Two notes together: B is 20 dB rougher", "lean 12 dB more to the even",
@@ -75,7 +75,7 @@ class DifferenceTest(unittest.TestCase):
 
     def test_a_record_with_nothing_but_words_says_nothing_and_does_not_fail(self):
         self.assertEqual(difference({"distortion": "clean"}, {"distortion": "crunch", "probe": None}),
-                         ["Listening heard no clear difference between A and B."])
+                         ["No clear difference measured."])
 
 
 class ChecksTest(unittest.TestCase):
@@ -85,8 +85,7 @@ class ChecksTest(unittest.TestCase):
                  "drive": {"measure": "distortion_db", "change": 6., "sign": 1, "verdict": "as intended",
                            "units": "dB", "proxy": False}}
         line = _checked_words(found, {"sustain", "drive"}, None)
-        self.assertIn("Sustain did what it says (compression +0.120; judged by the measure of another quality, "
-                      "compression)", line)
+        self.assertIn("Sustain did what it says (compression +0.120; judged by compression)", line)
         self.assertEqual(line.count("judged by"), 1)
 
 
@@ -212,20 +211,20 @@ class WordsTest(FlowCase):
             self.studio.ask("muddy")
             said.append(self.studio.state.status)
             offered.append(self.studio.next_remedy())
-            if "last thing players try" in said[-1]:
+            if "Nothing more to try" in said[-1]:
                 break
         knobs = dict(self.studio.sound("b").knobs)
-        self.assertIn("That was the last thing players try for “muddy”", said[-1])
+        self.assertIn("Nothing more to try for “muddy”", said[-1])
         self.assertGreater(len(said), 1)                  # a remedy or more came first
         self.assertIsNone(offered[-2])                    # and the one before it offered no next one
         self.studio.ask("muddy")                          # said yet again: the same, and still no call
-        self.assertIn("last thing players try", self.studio.state.status)
+        self.assertIn("Nothing more to try", self.studio.state.status)
         self.assertEqual((len(self.script.asked), self.studio.cancellable(), self.studio.state.working),
                          (asked, False, ""))
         self.assertEqual(self.studio.sound("b").knobs, knobs)               # the last remedy stays on
-        # The line says how to ask on purpose, and what it suggests does go to the assistant.
+        # The line says how to ask on purpose, and a request of that kind does go to the assistant.
+        self.assertIn("say what to change and what to keep", self.studio.state.status)
         example = "less mud in the palm mutes, same gain"
-        self.assertIn(example, self.studio.state.status)
         self.assertIsNone(words.read(example))
         self.assertTrue(reads_as_change(example))
 

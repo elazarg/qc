@@ -252,7 +252,7 @@ class TeachWindowTest(unittest.TestCase):
             self.assertTrue(settle(self.seat, lambda: self.panel.recording and self.panel.recording["ready"].is_set(),
                                    root=self.root))
             self.seat.tick()
-            self.assertEqual(self.panel.source_text.get(), "Recording. Play your notes, then press Stop.")
+            self.assertEqual(self.panel.source_text.get(), "Recording · play")
             self.assertEqual(self.seat.studio.audio_held_by, "learner")
             self.panel.record_dry("example")
             self.assertTrue(settle(self.seat, lambda: self.panel.recording is None and self.seat.job is None,

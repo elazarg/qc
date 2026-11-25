@@ -129,7 +129,7 @@ class ListeningTest(FlowCase):
         self.assertIn("probe", a.heard or {})
         self.assertIn("probe", b.heard or {})
         self.assertEqual([name for name, _ in sent].count("hear"), 1)        # one chain, heard once for both
-        self.assertEqual(self.studio.difference(), ["Listening heard no clear difference between A and B."])
+        self.assertEqual(self.studio.difference(), ["No clear difference measured."])
         self.assertEqual(self.studio.state.shown, "pair")                   # and A and B are ready again
 
     def test_what_arrived_while_the_guitar_was_played_is_listened_to_once_the_strings_are_quiet(self):
@@ -232,7 +232,7 @@ class ListeningTest(FlowCase):
         self.settle()
         self.poll_for(.3)
         self.assertNotIn("hear", [name for name, _ in sent])
-        self.assertIn("leaves it alone", self.studio.state.status)
+        self.assertIn("Another preset is selected", self.studio.state.status)
         self.assertIsNone(self.studio.state.mode)        # the guitar does not come back by itself
         self.studio.select("b")                           # a click on a tile comes back to the desk's sounds
         self.until(lambda: self.studio.sounding == ("b", "guitar"))
@@ -810,7 +810,7 @@ class LinesTest(FlowCase):
         self.a_round()
         with patch("lab.knowledge.named_settings", return_value={"Hot": {"GAIN": 9.0}}):
             self.studio.named(0, 0, "Hot")
-        self.assertIn("Undo takes it back", self.studio.state.status)
+        self.assertIn("Hot", self.studio.state.status)
         self.settle()
         self.studio.copy_to_a()
         self.settle()

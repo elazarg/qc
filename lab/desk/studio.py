@@ -490,8 +490,8 @@ class Studio:
             # A file of the player's that could not be read (a slip in a hand edit) was set aside, not written over.
             spare = self.store.aside[self.aside_said]
             self.aside_said += 1
-            self._set(status=f"{spare.name.removesuffix('.bad')} could not be read, so it was set aside as "
-                             f"{spare.name} in the data folder and the app's own is used until it is mended.")
+            self._set(status=f"{spare.name.removesuffix('.bad')} could not be read: kept as {spare.name} in the "
+                             "data folder; the app's own is used meanwhile.")
         if self.state.working != self._working():
             self._set()
         now = time.monotonic()
@@ -525,9 +525,8 @@ class Studio:
         self.strings_heard = None if quiet_for is None else (quiet_for, time.monotonic())
         if result.get("moved") and self.state.mode:
             self.ear.left_alone()
-            self._set(mode=None, shown=None, status="Another preset was chosen on the Quad Cortex, so Tone Lab "
-                                                    "stopped sending sound and leaves it alone. Click A or B to "
-                                                    "come back.")
+            self._set(mode=None, shown=None, status="Another preset is selected on the Quad Cortex. Click A or "
+                                                    "B to come back.")
 
     def strings_quiet(self, now):
         """How long the strings have been quiet while the guitar plays, in seconds: 0 while the unit last said they
@@ -586,7 +585,7 @@ class Studio:
                 note += " " + self.notice
                 self.notice = ""
             note += self._stale_words()
-            self._set(status="Ready." + note)
+            self._set(status=note.strip())
             if self.listening is not None:
                 self.later(self.host.call("lab.tools.levels.install", self.listening), lambda levels: None)
             if self.restored:
@@ -1002,7 +1001,7 @@ class Studio:
                                                    "request": f"{block.name}: {setting}"},
                      parent=sound.id, knobs=dict(sound.knobs), explanation=sound.explanation)
         self.put(side, copy)
-        self.say(f"{block.name} set to its named setting {setting}. Undo takes it back.")
+        self.say(f"{block.name}: {setting}.")
 
     def difference(self):
         """What listening heard differ between A and B, in plain words, when both were heard as they play now."""
@@ -1051,9 +1050,8 @@ class Studio:
             elif ways and again:
                 # Every remedy this chain can perform was tried, and the last one is still on. Nothing is sent
                 # to the assistant for a word said once more: that is asked for on purpose.
-                self.say(f"That was the last thing players try for “{reading.said.lower()}” that this chain can do; "
-                         "it is still on. To have the assistant rework the sound instead, ask in more words: what "
-                         "to change and what to keep (for example “less mud in the palm mutes, same gain”).")
+                self.say(f"Nothing more to try for “{reading.said.lower()}” on this chain. For a rework, say what to "
+                         "change and what to keep.")
                 return
         if moves is None and sound:
             moves = knobs.direction(text)
@@ -1158,7 +1156,7 @@ class Studio:
         copy = Sound(sound.name, chain, {**sound.origin, "kind": "revised", "from": sound.id, "request": what},
                      parent=sound.id, explanation=sound.explanation, sources=list(sound.sources), knobs=dict(sound.knobs))
         self.put(side, copy)
-        self.say(what + " Undo takes it back.")
+        self.say(what)
 
     def add_parallel_space(self):
         from lab.sound.layers import parallel_space
@@ -1176,7 +1174,7 @@ class Studio:
                                         "request": "Added parallel stereo echoes and plate"}, parent=sound.id,
                      explanation=sound.explanation, sources=list(sound.sources), knobs=dict(sound.knobs))
         self.put(side, copy)
-        self.say("Added parallel stereo echoes and plate. Undo takes it back.")
+        self.say("Added parallel stereo echoes and plate.")
 
     def _instrument(self):
         return self.store.instrument(self.state.instrument)

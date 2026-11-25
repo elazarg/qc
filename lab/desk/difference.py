@@ -163,4 +163,4 @@ def difference(ha, hb):
     if wobble is not None and abs(wobble) >= 3:
         lines.append(f"A held note's level swings {number(hb, 'probe.level_wobble'):.0f}% on B, "
                      f"{number(ha, 'probe.level_wobble'):.0f}% on A.")
-    return lines or ["Listening heard no clear difference between A and B."]
+    return lines or ["No clear difference measured."]

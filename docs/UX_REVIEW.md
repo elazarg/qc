@@ -88,8 +88,17 @@ sizes. Nothing was tried on the real unit.
   "B: Shape knobs not measured where they stand" instead of two sentences; History says nothing about taste
   before the first choice. I1 in part: takes are recorded in one place, the Phrase panel (● first, the pickup
   setting, and what is played on request) and the dot under the tiles; the Guitar panel no longer repeats it.
-  Left for the next pass: the side tools' section sentences, the learning screen's instructions, and the
-  sound check's six-second take (a measurement window, the player's call).
+  Second pass (3134 words on the pictured screens; most of it is in lines the pictures do not catch): the
+  learning screen drops "No examples yet", "Live estimate is off.", the next-step sentences and the second
+  "Learn two settings"; a dimmed control there says why on hover; what to record next on the Guitar
+  Learner is behind a "?" by its title, and an empty clip says nothing. The long results are one line:
+  a knob check reads "Brightness did little here (spectral centre …), turned further to +0.48"; the moved
+  preset, a file set aside, the end of the remedies, the instrument's phrase, a preset left selected and
+  gestures on each say what happened in a few words; "Undo takes it back." is not said (↶ is there). The
+  tools: no "Play a song through Quad Cortex Out 1/2." (the section's "?" says it), "Today 3 of 80 · 2
+  yours" for the assistant, "Capture V1 V2 ?" for the capture version, and the chain names a row only when
+  there are several or it splits. Left: the sound check's six-second take (a measurement window, the
+  player's call).
 
 Waiting, and why:
 

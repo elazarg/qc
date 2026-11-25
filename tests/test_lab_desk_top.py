@@ -253,14 +253,14 @@ class FollowingTheInstrumentTest(DeskCase):
         desk.choose_instrument("Les Paul")
         self.pump()
         self.assertEqual(studio.phrase[0], "three")     # the last one recorded on it
-        self.assertEqual(studio.state.status, "Now on the Les Paul. The phrase is the last one recorded on it (Neck).")
+        self.assertEqual(studio.state.status, "Phrase: the Les Paul's last (Neck).")
         self.assertEqual(studio.guitar.setting(), "Neck")
         self.assertTrue(desk.phrase_words().startswith("Phrase · Neck · loop"))     # the instrument is at the top left
         desk.choose_instrument("Bass")                  # nothing recorded on it: the phrase stays, and that is said
         self.pump()
         self.assertEqual(studio.phrase[0], "three")
         self.assertTrue(desk.phrase_words().startswith("Phrase · Les Paul · Neck"))     # another's: it names whose
-        self.assertEqual(studio.state.status, "Now on the Bass. No phrase is recorded on it yet: the phrase is still the Les Paul's.")
+        self.assertEqual(studio.state.status, "No phrase on the Bass yet: still the Les Paul's.")
         # A phrase of another instrument says nothing of this one's pickup settings: the designer is not told one.
         self.assertIsNone(studio.guitar.setting())
         desk.choose_instrument("Les Paul")              # back on the instrument of the phrase in use: it stays

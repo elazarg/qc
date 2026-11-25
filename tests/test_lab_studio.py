@@ -241,7 +241,7 @@ class StudioTest(StudioCase):
         self.assertEqual(sound.knobs, {"brightness": .48})
         status = self.studio.state.status
         self.assertIn("Brightness did little here (spectral centre", status)
-        self.assertIn("so it was turned further, from +0.30 to +0.48, once", status)
+        self.assertIn("turned further to +0.48", status)
         self.assertIsNone(self.studio.shaping)           # the correction is not checked again: no loop
         self.assertEqual(self.studio.state.shown, "pair")  # A and B are back on the unit
 

@@ -103,8 +103,7 @@ def today_line(folder, today=None):
     today = today or datetime.now().date().isoformat()
     entry = next((row for row in daily(folder, today=today) if row["day"] == today), None)
     used = entry["calls"] if entry else 0
-    return f"Today: {used} of {DAILY} calls to the assistant" + (
-        f" ({entry['player']} yours, {entry['app']} the app's own)" if entry else "")
+    return f"Today {used} of {DAILY}" + (f" · {entry['player']} yours" if entry else "")
 
 
 # ---- feedback ----

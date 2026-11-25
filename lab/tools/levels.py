@@ -381,7 +381,7 @@ class LevelsTool(Tool):
                         "itself whenever it plays. " + DIGITAL_NOTE)
         row = tk.Frame(match, bg=match["bg"])
         row.pack(fill="x")
-        caption(row, "Bring them to the").pack(side="left")
+        caption(row, "Level to").pack(side="left")
         self.anchor = tk.StringVar(master=self.frame, value="Quietest")
         Chips(row, self.anchor, ("Quietest", "First", "Music"), width=188).pack(side="left", padx=(4, 0))
         row = tk.Frame(match, bg=match["bg"])
@@ -433,8 +433,7 @@ class LevelsTool(Tool):
         self.manual.configure(text="Matched" if not match else "Manual")
         reference = self.studio.media_reference
         self.music_note.configure(text=(f"Music reference {reference['lufs']:.1f} LUFS" if reference["endpoint"]
-                                        != media.SPOTIFY_NORMAL["endpoint"] else "Spotify Normal · −14 LUFS target") if reference else
-                                  "Play a song through Quad Cortex Out 1/2.")
+                                        != media.SPOTIFY_NORMAL["endpoint"] else "Spotify Normal · −14 LUFS target") if reference else "")
         if reference:
             self.clear_music.pack(side="left")
         else:

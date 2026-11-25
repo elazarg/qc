@@ -169,12 +169,15 @@ class GuitarLearner:
 
         self.title = tk.StringVar(master=self.frame)
         self.guidance = tk.StringVar(master=self.frame)
-        word(panel, variable=self.title, size=12, bold=True).pack(fill="x", pady=(8, 2))
-        self.guidance_line = word(panel, variable=self.guidance, color=MUTED, size=9, wrap=WRAP)
-        self.guidance_line.pack(fill="x", pady=(0, 6))
+        heading = tk.Frame(panel, background=PANEL)
+        heading.pack(fill="x", pady=(8, 6))
+        word(heading, variable=self.title, size=12, bold=True).pack(side="left")
+        # What to record next, while there is nothing on show to tag: behind a "?" beside the title.
+        self.guidance_hint = hint(heading, "")
+        self.guidance.trace_add("write", lambda *_: self.place_guidance())
 
-        self.source_title = tk.StringVar(master=self.frame, value="No recording selected")
-        self.source_detail = tk.StringVar(master=self.frame, value="Dry input")
+        self.source_title = tk.StringVar(master=self.frame, value="")
+        self.source_detail = tk.StringVar(master=self.frame, value="")
         self.clip = tk.Frame(panel, background=BG, padx=8, pady=6)
         self.clip.pack(fill="x")
         word(self.clip, variable=self.source_title, bold=True, size=9, wrap=WRAP - 20).pack(fill="x")
@@ -371,8 +374,8 @@ class GuitarLearner:
         if self.source is not None and self.source.kind == "saved-excerpt":
             self.source = self.excerpt = self.full_excerpt = None
             self.wave_peaks = ()
-            self.source_title.set("No recording selected")
-            self.source_detail.set("Dry input")
+            self.source_title.set("")
+            self.source_detail.set("")
             self.draw_wave()
         self.board.show(layout)
         self.work("Reading labeled recordings…", evaluate, lambda result: self.loaded(result, use_last=True),
@@ -387,6 +390,14 @@ class GuitarLearner:
         self.status.set(message)
         self.refresh_dataset()
         self.sync()
+
+    def place_guidance(self):
+        words = self.guidance.get()
+        self.guidance_hint.say(words)
+        if words and not self.guidance_hint.winfo_manager():
+            self.guidance_hint.pack(side="left")
+        elif not words:
+            self.guidance_hint.pack_forget()
 
     def sync(self):
         idle = self.job is None and self.stop is None
@@ -537,8 +548,8 @@ class GuitarLearner:
     def display_source(self):
         self.whole_button.pack_forget()
         if self.source is None:
-            self.source_title.set("No recording selected")
-            self.source_detail.set("Dry input")
+            self.source_title.set("")
+            self.source_detail.set("")
             return
         self.source_title.set(self.source.label)
         excerpt = self.excerpt
@@ -835,7 +846,7 @@ class GuitarLearner:
         state = self.live_state or {}
         self.whole_button.pack_forget()
         self.source_title.set("Recent dry guitar")
-        self.source_detail.set("Rolling audio · Keep a clip to save it")
+        self.source_detail.set("Rolling audio")
         estimate = state.get("estimate")
         if estimate and estimate["match"] != "none":
             self.show_guess(estimate)

@@ -29,7 +29,7 @@ from scipy.io import wavfile
 
 from lab.hearing import audio
 from lab.desk import theme as palette
-from lab.desk.hints import hint
+from lab.desk.hints import hint, named
 from lab.sound.knobs import KNOBS
 from lab.learner import folders, gestures as guitar_gestures, inputs, taught, takes
 from lab.learner.taught import CONTROLS, HINTS
@@ -97,10 +97,10 @@ class TeachPanel:
         self.start_seconds, self.end_seconds = tk.StringVar(master=self.root), tk.StringVar(master=self.root)
         self.profile_text = tk.StringVar(master=self.root)
         self.latest_text, self.source_text = tk.StringVar(master=self.root), tk.StringVar(master=self.root)
-        self.progress_text, self.next_step = tk.StringVar(master=self.root), tk.StringVar(master=self.root)
+        self.progress_text = tk.StringVar(master=self.root)
         self.status = tk.StringVar(master=self.root)
         self.estimate_text = tk.StringVar(master=self.root)
-        self.live_text = tk.StringVar(master=self.root, value="Live estimate is off.")
+        self.live_text = tk.StringVar(master=self.root, value="")
         self.live_action = tk.StringVar(master=self.root)
         self.observe, self.arm = tk.BooleanVar(master=self.root), tk.BooleanVar(master=self.root)
         self.home, self.excursion = tk.StringVar(master=self.root), tk.StringVar(master=self.root)
@@ -143,7 +143,6 @@ class TeachPanel:
         self.train = button(actions, "Learn settings", self.fit_profile, compact=True)
         flow(actions, (self.record, self.train), width=COLUMN)
         label(training, variable=self.progress_text, strong=True, size=9, wrap=COLUMN).pack(anchor="w", pady=(8, 0))
-        label(training, variable=self.next_step, color=MUTED, size=9, wrap=COLUMN).pack(anchor="w", pady=(3, 0))
         label(training, variable=self.source_text, color=ACCENT, size=9, wrap=COLUMN).pack(anchor="w", pady=(3, 0))
         label(training, variable=self.profile_text, color=ACCENT, size=9, wrap=COLUMN).pack(anchor="w", pady=(4, 0))
 
@@ -213,7 +212,24 @@ class TeachPanel:
         self.arm_box.pack_configure(side="left")
         hint(arming, f"Tick this before Show estimate. The mapped knob is armed for {guitar_gestures.ARM_SECONDS:.0f} "
                      "seconds, and for as long again after each gesture.").pack(side="left")
+        # A control that cannot act now is dimmed and says why while the pointer rests on it.
+        for widget in (self.train, self.record_test, self.inspect_take, self.observe_box, self.map_save):
+            named(widget, lambda widget=widget: self.why_not(widget))
         wheel(self.scroller)
+
+    def why_not(self, widget):
+        """Why a dimmed control cannot act now, or nothing while it can."""
+        if str(widget.cget("state")) != "disabled":
+            return ""
+        if not self.idle():
+            return "Finish what is running first."
+        if widget is self.train:
+            return "Record two settings first."
+        if self.profile is None:
+            return "Learn two settings first."
+        if widget is self.inspect_take:
+            return "No dry take yet."
+        return ""
 
     def place_status(self):
         """Show the line that says what was last done here while it says something, above the three parts."""
@@ -318,7 +334,7 @@ class TeachPanel:
         self.loaded_selection = selected
         self.observe.set(False)
         self.arm.set(False)
-        self.live_text.set("Live estimate is off.")
+        self.live_text.set("")
         self.live_action.set("")
         self.status.set("")
         self.examples, self.mapping, self.profile = [], None, None
@@ -367,17 +383,7 @@ class TeachPanel:
         if self.examples:
             self.progress_text.set("  ·  ".join(f"{name} ×{count}" for name, count in self.counts.values()))
         else:
-            self.progress_text.set("No examples yet")
-        if not self.counts:
-            next_step = f"Start with {offered[0]} or any setting you use."
-        elif len(self.counts) == 1:
-            other = suggestions[0] if suggestions else "another one"
-            next_step = f"Record a different setting, such as {other}. Repeat the same notes."
-        elif self.profile is None or self.examples_changed:
-            next_step = "Choose Learn settings, or record more examples first."
-        else:
-            next_step = "Record a fresh take and check which setting Tone Lab hears."
-        self.next_step.set(next_step)
+            self.progress_text.set("")
         if not self.example_label.get().strip():
             self.example_label.set(self.suggested_setting())
         self.set_buttons()
@@ -501,7 +507,7 @@ class TeachPanel:
                 said.set("Recording cancelled.")
                 self.set_buttons()
                 return False
-            text = "Connecting to Quad Cortex. Wait for Recording before playing."
+            text = "Opening the input…"
             if self.seat.job is None and not guitar_gestures.running():
                 channel, host, guitar = self.seat.input_channel, self.seat.host, recording["guitar"]
                 stop, ready = recording["stop"], recording["ready"]
@@ -518,11 +524,11 @@ class TeachPanel:
                     return False
                 recording["started"] = True
         elif recording["stop"].is_set():
-            text = "Saving the dry recording…"
+            text = "Saving…"
         elif recording["ready"].is_set():
-            text = "Recording. Play your notes, then press Stop."
+            text = "Recording · play"
         else:
-            text = "Connecting to Quad Cortex. Wait for Recording before playing."
+            text = "Opening the input…"
         if text != recording["said"]:
             recording["said"] = text
             said.set(text)
@@ -642,7 +648,7 @@ class TeachPanel:
                 self.profile = profile
                 self.examples_changed = False
                 self.refresh_profile()
-                self.status.set("Settings learned. Record a fresh check at one of the settings you taught.")
+                self.status.set("")
 
         self.run("Learning these settings…", lambda: taught.fit(*selected), finish)
 
@@ -658,7 +664,7 @@ class TeachPanel:
         else:
             self.mapping = mapping
             self.arm.set(False)
-            self.status.set("Mapping saved. Check a dry take to rehearse it without turning a control.")
+            self.status.set("Mapping saved.")
             self.set_buttons()
 
     def change_observe(self):
@@ -666,7 +672,7 @@ class TeachPanel:
         if not self.observe.get():
             guitar_gestures.stop()
             if not self.live_running:
-                self.live_text.set("Live estimate is off.")
+                self.live_text.set("")
                 self.live_action.set("")
             else:
                 self.live_action.set("Closing the dry input…")
@@ -712,7 +718,7 @@ class TeachPanel:
         elif kind == "guitar-stopped":
             self.live_running = False
             self.observe.set(False)
-            self.live_text.set("Live estimate is off.")
+            self.live_text.set("")
             self.live_action.set(f"Stopped: {event['error']}" if event.get("error") else "")
             self.set_buttons()
 
@@ -721,10 +727,7 @@ class TeachPanel:
     def clear_inspection(self):
         self.result_audio = None
         self.result_intervals = []
-        if self.profile is None:
-            self.estimate_text.set("Learn two settings to enable a check.")
-        else:
-            self.estimate_text.set("Play the same notes at a setting you taught for a fresh check.")
+        self.estimate_text.set("")
         self.timeline.delete(0, "end")
 
     def inspect(self, *, current=True):
@@ -751,7 +754,7 @@ class TeachPanel:
         def finish(result):
             if self.profile is profile:
                 self.show_analysis(*result)
-                self.status.set("Dry check complete.")
+                self.status.set("")
 
         self.run("Analyzing the dry signal…", lambda: taught.check(profile, mapping, examples, source), finish)
 

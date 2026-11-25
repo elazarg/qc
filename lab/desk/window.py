@@ -915,10 +915,9 @@ class Desk:
         if on_it and (current is None or current.get("instrument") != name):
             self.choose_recorded(on_it[0])
             setting = on_it[0].get("setting")
-            studio.say(f"Now on the {name}. The phrase is the last one recorded on it" + (f" ({setting})." if setting else "."))
+            studio.say(f"Phrase: the {name}'s last" + (f" ({setting})." if setting else "."))
         elif current is not None and current.get("instrument") not in (None, name):
-            studio.say(f"Now on the {name}. No phrase is recorded on it yet: the phrase is still the "
-                       f"{current['instrument']}'s.")
+            studio.say(f"No phrase on the {name} yet: still the {current['instrument']}'s.")
         else:
             studio.say(f"Now on the {name}.")
 
@@ -1189,11 +1188,13 @@ class Desk:
         from lab.knowledge import named_settings
         from lab.sound.sounds import settings as stated
 
+        used = [row for row in sound.chain.rows if row.blocks]
         for r, row in enumerate(sound.chain.rows):
             if not row.blocks:
                 continue
-            label(self.into, f"Row {r + 1}" + (f" · split at {row.split[0] + 1}, joined at {row.split[1] + 1}"
-                                                 if row.split else ""), size=9, color=DIM).pack(fill="x", pady=(4, 0))
+            if len(used) > 1 or row.split:          # a single plain row needs no name
+                label(self.into, f"Row {r + 1}" + (f" · split at {row.split[0] + 1}, joined at {row.split[1] + 1}"
+                                                     if row.split else ""), size=9, color=DIM).pack(fill="x", pady=(4, 0))
             for column, block in row.blocks:
                 line = tk.Frame(self.into, bg=DARK)
                 line.pack(fill="x")
@@ -1506,8 +1507,7 @@ class Desk:
             return
         slot, name, _ = row
         if not send(studio, "lab.tools.library.leave", slot, renders=True, working=f"Selecting {name}…",
-                    done=lambda record: studio.say(f"{record['name']} is selected and stays selected when the app "
-                                                   "closes."),
+                    done=lambda record: studio.say(f"{record['name']} stays selected."),
                     failed=lambda error: studio.say(str(error))):
             studio.say(studio.held_words())
 
@@ -1571,7 +1571,7 @@ class Desk:
         else:
             versions = tk.Frame(self.tray, bg=DARK)
             versions.pack(fill="x", pady=(6, 0))
-            label(versions, "If the unit does not say, the capture is", size=9, color=SUBTLE).pack(side="left")
+            label(versions, "Capture", size=9, color=SUBTLE).pack(side="left")
             for value in (1, 2):
                 chosen_version = value == self.capture_version
                 chip = tk.Label(versions, text=f"V{value}", bg=CHOSEN if chosen_version else DARK,
@@ -1579,6 +1579,7 @@ class Desk:
                 chip.pack(side="left", padx=(6, 0))
                 chip.bind("<ButtonRelease-1>", lambda _, value=value: (setattr(self, "capture_version", value),
                                                                        self.fill_panel()))
+            hint(versions, "The version a capture is taken to be when the unit does not say.").pack(side="left")
             side = self.studio.state.side.upper()
             button(actions, f"Instead of {side}'s amp", lambda: self.try_capture(chosen(), False)).pack(side="left")
             button(actions, "Instead of amp and cab", lambda: self.try_capture(chosen(), True)).pack(
@@ -1894,8 +1895,7 @@ class Desk:
         else:
             try:                                        # refused, with the reason, on a simulated unit
                 gestures.start(self.learner_seat())
-                self.studio.say(f"Gestures on for {gestures.ARM_SECONDS:.0f} s: play, and the taught control turns "
-                                "its knob on the sound on show.")
+                self.studio.say(f"Gestures on for {gestures.ARM_SECONDS:.0f} s.")
             except ValueError as error:
                 self.studio.say(f"Gestures: {error}")
         self.refill("Guitar")

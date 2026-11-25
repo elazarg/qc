@@ -221,8 +221,8 @@ class Listening:
             if result.get("ours"):          # on a slot the app works in or put up itself
                 self.looked = True
             else:
-                self.turned_away("Moved", "Another preset is selected on the Quad Cortex, so Tone Lab leaves it "
-                                           "alone and listens to nothing. Click A or B to come back.")
+                self.turned_away("Moved", "Another preset is selected on the Quad Cortex. Click A or B to come "
+                                           "back.")
 
         def failed(error):
             self.looking = False
@@ -498,14 +498,13 @@ def _checked_words(found, turned, correction):
             unmeasured.append(title)
             continue
         # A knob without a measure of its own is judged by another quality's, and the line says so.
-        proxy = f"; judged by the measure of another quality, {knobs.PROXY[key]}" if entry.get("proxy") else ""
+        proxy = f"; judged by {knobs.PROXY[key]}" if entry.get("proxy") else ""
         part = f"{title} {VERDICT.get(entry['verdict'], entry['verdict'])} ({_measured(entry)}{proxy})"
         if correction and correction[0] == key:
             _, old, new = correction
-            part += (f", so it was turned {'further' if abs(new) > abs(old) else 'back'}, from {old:+.2f} to "
-                     f"{new:+.2f}, once")
+            part += f", turned {'further' if abs(new) > abs(old) else 'back'} to {new:+.2f}"
         parts.append(part)
-    line = ("; ".join(parts) + ".") if parts else "Listening measures none of the knobs just turned."
+    line = ("; ".join(parts) + ".") if parts else "Not measured."
     if unmeasured:
-        line += f" Listening cannot measure {', '.join(unmeasured)}."
+        line += f" {', '.join(unmeasured)}: not measured."
     return line

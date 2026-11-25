@@ -618,7 +618,7 @@ class FoldedIntoTheDeskTest(DeskCase):
         box.selection_set(0)
         self.press("Leave it on the unit")
         self.pump()
-        self.assertEqual(self.studio.state.status, "Brit 2203 is selected and stays selected when the app closes.")
+        self.assertEqual(self.studio.state.status, "Brit 2203 stays selected.")
         self.assertEqual((self.studio.state.mode, self.studio.state.shown), (None, None))
 
     def test_a_and_b_are_measured_against_each_other_from_the_difference_panel(self):

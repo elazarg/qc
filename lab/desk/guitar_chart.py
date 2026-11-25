@@ -36,7 +36,7 @@ def draw(canvas, summary, *, width, chosen=None):
     canvas.configure(height=height)
     typical = x_of(TYPICAL_PEAK_DB, width)
     canvas.create_line(typical, TOP - 2, typical, height - BOTTOM + 2, fill=DIM, dash=(3, 3), tags="typical")
-    canvas.create_text(typical, 2, text="the humbucker presets assume", anchor="n", fill=DIM, font=(FONT, 9))
+    canvas.create_text(typical, 2, text="presets assume", anchor="n", fill=DIM, font=(FONT, 9))
     for row, (setting, item) in enumerate(summary.items()):
         y = TOP + row * ROW + ROW / 2
         canvas.create_text(0, y, text=setting, anchor="w", fill=INK if setting == chosen else SUBTLE, font=(FONT, 9))
