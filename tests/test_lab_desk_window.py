@@ -431,12 +431,16 @@ class DrawingTest(DeskCase):
         self.desk.toggle("Chain")
         self.assertTrue(any("Nothing came back." in text for text in self.panel_text()))
 
-    def test_the_two_buttons_say_who_has_the_input(self):
+    def test_the_play_symbols_say_who_has_the_input_and_the_guitar_can_always_be_paused(self):
         self.open()
         self.a_round()
         self.studio.hold_audio("learner")
+        self.assertEqual(str(self.desk.loop["fg"]), desk_module.DIM)
+        self.assertEqual(str(self.desk.guitar["fg"]), desk_module.INK)       # pausing is never refused
+        self.desk.pause_or_play()
+        self.assertFalse(self.studio.live)
         self.assertEqual(str(self.desk.guitar["fg"]), desk_module.DIM)
-        self.desk.toggle_play("guitar")
+        self.desk.pause_or_play()
         self.assertEqual(self.desk.line["text"], "The Guitar Learner is using the input.")
         self.studio.release_audio("learner")
         self.assertEqual(str(self.desk.guitar["fg"]), desk_module.INK)

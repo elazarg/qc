@@ -25,8 +25,51 @@ PAD = RATE // 4          # silence sent before a phrase, so the stream is settle
 USB_PAIR = [4, 5]        # ASIO channels of USB 5/6
 
 
+NOTE_DB = -45.           # the dry guitar above this RMS level over a block (dBFS) is taken for a note being played
+
+
 class Cancelled(RuntimeError):
     """A replay was ended early because the unit was wanted elsewhere."""
+
+
+class Played(Cancelled):
+    """A silent replay was ended because the guitar was played: the player comes first."""
+
+
+def _note_in(block):
+    return db(float(np.sqrt(np.mean(np.square(block, dtype=np.float64))))) > NOTE_DB if len(block) else False
+
+
+class Strings:
+    """The dry guitar on one USB channel, watched while the guitar plays through the unit: when a note was last
+    played. The stream holds the driver, so it is stopped before anything else uses it."""
+
+    def __init__(self, audio, channel):
+        self.audio, self.channel = audio, channel
+        self.last_note = time.monotonic()       # quiet is counted from when watching began
+        self.stream = None
+
+    def _process(self, indata, frames, timing, status):
+        if _note_in(indata[:, 0]):
+            self.last_note = time.monotonic()
+
+    def start(self):
+        sd = self.audio.sd
+        self.stream = sd.InputStream(device=self.audio.device, samplerate=RATE, channels=1, dtype="float32",
+                                     latency="high", extra_settings=sd.AsioSettings([self.channel - 1]),
+                                     callback=self._process)
+        self.stream.start()
+        return self
+
+    def quiet_for(self):
+        """Seconds since the last note, or since watching began."""
+        return time.monotonic() - self.last_note
+
+    def stop(self):
+        if self.stream is not None:
+            self.stream.abort()
+            self.stream.close()
+            self.stream = None
 
 
 def read_wave(path):
@@ -89,6 +132,23 @@ class Audio:
                                "audio programs.")
         self._driver = sounddevice, found[0][0]
 
+    # The dry guitar's USB channel while a replay is made with the guitar live: a note on it ends the replay
+    # (`Played`). None when nothing is to end it.
+    interrupt = None
+    watching = None         # the `Strings` open: any other stream closes it first
+
+    def strings(self, channel):
+        """Watch the dry guitar on `channel` (`Strings`)."""
+        self.release()
+        self.watching = Strings(self, channel).start()
+        return self.watching
+
+    def release(self):
+        """Close the watch on the dry guitar, if one is open: only one stream can hold the driver."""
+        if self.watching is not None:
+            watching, self.watching = self.watching, None
+            watching.stop()
+
     @property
     def sd(self):
         if self._driver is None:
@@ -113,8 +173,11 @@ class Audio:
         playback = np.zeros((PAD + len(dry) + round(RATE * tail), 2), dtype=np.float32)
         playback[PAD:PAD + len(dry), 0] = dry[:, 0]
         result = np.zeros_like(playback)
-        state = {"cursor": 0, "issues": []}
+        state = {"cursor": 0, "issues": [], "played": False}
         sd = self.sd
+        self.release()
+        # With the guitar live, the dry guitar is read beside the return: the first note played ends the replay.
+        watched = USB_PAIR + ([self.interrupt - 1] if self.interrupt else [])
 
         def process(indata, outdata, frames, timing, status):
             cursor = state["cursor"]
@@ -123,16 +186,21 @@ class Audio:
             count = min(frames, len(playback) - cursor)
             outdata.fill(0)
             outdata[:count] = playback[cursor:cursor + count]
-            result[cursor:cursor + count] = indata[:count]
+            result[cursor:cursor + count] = indata[:count, :2]
+            if len(watched) > 2 and _note_in(indata[:, 2]):
+                state["played"] = True
             state["cursor"] = cursor + count
             if state["cursor"] == len(playback):
                 raise sd.CallbackStop
 
-        with sd.Stream(device=self.device, samplerate=RATE, dtype="float32", channels=(2, 2),
-                       extra_settings=(sd.AsioSettings(USB_PAIR), sd.AsioSettings(USB_PAIR)),
+        with sd.Stream(device=self.device, samplerate=RATE, dtype="float32", channels=(len(watched), 2),
+                       extra_settings=(sd.AsioSettings(watched), sd.AsioSettings(USB_PAIR)),
                        callback=process) as stream:
             deadline = time.monotonic() + len(playback) / RATE + 5
             while stream.active and time.monotonic() < deadline:
+                if state["played"]:
+                    stream.abort()
+                    raise Played("The guitar was played.")
                 if cancel is not None and cancel.is_set():
                     stream.abort()
                     raise Cancelled("The replay was stopped.")
@@ -147,6 +215,7 @@ class Audio:
         samples = np.zeros((round(RATE * seconds), len(channels)), dtype=np.float32)
         state = {"cursor": 0, "issues": [], "told": False}
         sd = self.sd
+        self.release()
 
         def process(indata, frames, timing, status):
             cursor = state["cursor"]
@@ -227,6 +296,7 @@ class Loop:
 
     def start(self):
         sd = getattr(self.audio, "sd", None)
+        self.audio.release()
         if sd is None:          # the simulated unit has no audio driver: the loop is silent
             return self
         self.stream = sd.Stream(device=self.audio.device, samplerate=RATE, dtype="float32", channels=(2, 2),

@@ -69,6 +69,7 @@ HOLDERS = {"learner": "The Guitar Learner", "gestures": "Gesture listening"}
 # Holders beside whom the guitar may still be heard through the unit: that route is made on the unit and opens no
 # audio driver, and gestures are for playing the sound on show. (The Guitar Learner records the dry guitar alone.)
 GUITAR_GOES_ON = frozenset({"gestures"})
+STRINGS_QUIET = 1.      # the strings count as quiet once no note has been played for this long (seconds)
 
 
 @dataclass(frozen=True)
@@ -111,6 +112,10 @@ class Studio:
         self.blind_swapped = False        # A and B were swapped for the blind comparison on show
         self.loop_since = None            # (phrase key, when it began to loop) while the phrase plays
         self.sounding = None              # (side, mode) the unit confirmed it plays, until it stops
+        # The guitar is heard through the selected sound whenever A or B is ready and nothing else has the unit
+        # (`guitar_back`); the player pauses it, and a failure to play pauses it too.
+        self.live = True
+        self.strings_heard = None         # (seconds the strings had been quiet, when the unit said so), or None
         self.jobs = []                    # (future, done, failed, the activity it ends)
         self.progress = []                # (handler, value) reported by the unit's worker, handled by `poll`
         self.doing = {}                   # what is going on, by key, oldest first: the working line shows the newest
@@ -486,6 +491,7 @@ class Studio:
         if self.state.working != self._working():
             self._set()
         now = time.monotonic()
+        self.guitar_back()
         self.ear.use_free_unit(now)
         if self.retry_open_at is not None and now >= self.retry_open_at:
             self.retry_open_at = None
@@ -508,11 +514,43 @@ class Studio:
             self.fault(str(error))
 
     def _watched(self, result):
+        quiet_for = result.get("quiet_for")
+        self.strings_heard = None if quiet_for is None else (quiet_for, time.monotonic())
         if result.get("moved") and self.state.mode:
             self.ear.left_alone()
             self._set(mode=None, shown=None, status="Another preset was chosen on the Quad Cortex, so Tone Lab "
-                                                    "stopped sending sound and leaves it alone. Press Guitar or "
-                                                    "Phrase to come back.")
+                                                    "stopped sending sound and leaves it alone. Click A or B to "
+                                                    "come back.")
+
+    def strings_quiet(self, now):
+        """How long the strings have been quiet while the guitar plays, in seconds: 0 while the unit last said they
+        sounded within `STRINGS_QUIET` (a pause between notes is not quiet); None when it has not said (the
+        guitar is not playing, or its dry input could not be watched)."""
+        if self.state.mode != "guitar" or self.strings_heard is None:
+            return None
+        quiet_for, at = self.strings_heard
+        return quiet_for + (now - at) if quiet_for >= STRINGS_QUIET else 0.
+
+    def guitar_back(self):
+        """While the guitar is live (`live`), it plays through the selected sound whenever nothing else has the
+        unit: after a silent listen, a save, a recording or a tool's measurement, and once A and B are first
+        ready. Not while the player has chosen a preset of their own on the unit, nor while the Guitar Learner
+        has the input."""
+        if not (self.live and self.opened and self.state.mode is None and self.state.shown is not None
+                and self.ear.hearing is None and not self.ear.looking and not self.ear.away
+                and self.showing is None and not self.host.busy and self.host.failed is None
+                and self.audio_held_by in (None, *GUITAR_GOES_ON) and "record" not in self.doing
+                and self.sound(self.state.side) is not None):
+            return
+        self.ear.borrowed = False           # playing makes A and B ready again on the unit, knobs as they stand
+        self.play("guitar", by_itself=True)
+
+    def pause(self):
+        """The player pauses the guitar (to tune, to talk, to use the unit by hand): nothing plays until they play
+        again."""
+        self._used("pause", "guitar")
+        self.live = False
+        self.stop()
 
     def _used(self, event, what):
         """Note in the usage log what the player did on the desk (`lab.tools.usage`): which panels are opened,
@@ -637,21 +675,28 @@ class Studio:
                 self.refused_audition = planned
                 self._show(native=True)
                 return
-            # Nothing is ready, so nothing plays: the desk must not say it does.
+            # Nothing is ready, so nothing plays: the desk must not say it does, nor try again by itself.
+            self.live = False
             self._set(mode=None, status=str(error), status_kind="fault")
 
         self.later(self.host.call("show", *(chain for chain, _, _ in planned)), shown, failed, doing=key)
 
-    def play(self, mode, side=None):
+    def play(self, mode, side=None, by_itself=False):
+        """Play the guitar ("guitar") or the phrase ("phrase") through the sound on a side. `by_itself` when the
+        guitar comes back without the player asking (`guitar_back`)."""
         side = side or self.state.side
         if self._input_held(mode):
             return
         if self.sound("a") is None and self.sound("b") is None:
             self.say("Nothing is on A or B yet.")
             return
-        self.ear.came_back()
-        if mode != self.state.mode:
-            self._used("play", mode)
+        if mode == "guitar":
+            self.live = True
+        self.strings_heard = None
+        if not by_itself:
+            self.ear.came_back()
+            if mode != self.state.mode:
+                self._used("play", mode)
         # A silent listen has the unit: the player comes first, and it is listened to again later.
         interrupted = self.ear.hearing is not None
         if interrupted:
@@ -695,6 +740,8 @@ class Studio:
                 sound.played = True
                 self.store.save(sound)
             self.sounding = (side, mode)
+            if mode == "guitar":
+                self.watched_at = 0.        # asked at once how long the strings have been quiet
             if mode == "phrase" and (self.loop_since is None or self.loop_since[0] != self.phrase_key()):
                 self.loop_since = (self.phrase_key(), time.monotonic())     # the loop starts again with a new phrase
             if sound.knobs:
@@ -711,10 +758,14 @@ class Studio:
         def failed(error):
             # Nothing plays: the desk must not go on saying it does. A play that Stop dropped, or that a newer
             # one has replaced, has nothing to say.
+            # The guitar is paused then, so that it is not tried again and again.
             if ticket == self.plays and getattr(error, "kind", "") != "Stopped":
+                self.live = False
                 self._set(mode=None, status=str(error), status_kind="fault")
 
-        self.later(self.host.call("play", side, mode, phrase), playing, failed)
+        # The dry guitar is watched while it plays, for when the strings are quiet: not beside gesture listening,
+        # which reads the dry input itself.
+        self.later(self.host.call("play", side, mode, phrase, strings=self.audio_held_by is None), playing, failed)
 
     def _match_levels(self):
         """Play A and B equally loud, when both have been measured: the louder is turned down to the quieter.
@@ -796,8 +847,10 @@ class Studio:
         return [(scene, sound.chain.labels[scene]) for scene in range(count)] if count > 1 else []
 
     def select(self, side):
-        if self.state.mode:
-            self.play(self.state.mode, side)
+        """Hear the sound on a side. After the player chose a preset of their own on the unit, this is the way back
+        to the desk's sounds."""
+        if self.state.mode or (self.live and self.ear.away):
+            self.play(self.state.mode or "guitar", side)
         else:
             self._set(side=side)
 
@@ -907,7 +960,7 @@ class Studio:
             self.say("Nothing shaped to compare with.")
             return
         if not self.state.shown:
-            self.say("A and B are not ready on the Quad Cortex yet: press Guitar or Phrase first.")
+            self.say("A and B are not ready on the Quad Cortex yet: try again once they are.")
             return
         without = side not in self.hearing_base
         self.hearing_base ^= {side}

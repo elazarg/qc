@@ -63,6 +63,7 @@ class MainFlowTest(StudioCase):
         self.assertEqual(studio.state.shown, "pair")
 
         # Play A, then B, with the guitar: both sit on one preset, and only the input moves.
+        self.host.call("lab.qc.sim.strum", True).result(10)        # the player plays
         heard_on = {}
         for side, row in (("a", 0), ("b", 2)):
             studio.play("guitar", side)
@@ -87,8 +88,9 @@ class MainFlowTest(StudioCase):
         self.assertGreater(self.held().block(2, 0).display(GAIN), 6.2)      # turned on the unit while it plays
         self.assertNotIn("shaped", studio.sound("b").heard)                 # and not listened to while playing
 
-        # When the playing stops, the turn is checked by listening: it did what it was meant to.
-        studio.stop()
+        # When the strings are quiet, the turn is checked by listening: it did what it was meant to.
+        self.host.call("lab.qc.sim.strum", False).result(10)
+        self.until(lambda: "shaped" in (studio.sound("b").heard or {}), 30)
         self.settle(30)
         b = studio.sound("b")
         shaped = b.heard["shaped"]

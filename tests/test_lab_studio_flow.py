@@ -132,17 +132,51 @@ class ListeningTest(FlowCase):
         self.assertEqual(self.studio.difference(), ["Listening heard no clear difference between A and B."])
         self.assertEqual(self.studio.state.shown, "pair")                   # and A and B are ready again
 
-    def test_what_arrived_while_the_guitar_played_is_listened_to_after_stop(self):
+    def test_what_arrived_while_the_guitar_was_played_is_listened_to_once_the_strings_are_quiet(self):
         self.a_round()
-        self.studio.play("guitar")
-        self.settle()
+        self.host.call("lab.qc.sim.strum", True).result(10)
+        self.until(lambda: self.studio.state.mode == "guitar")              # the guitar is live by itself
         self.a_round("Four", "Five", "Six", request="make a plexi lead")
+        self.poll_for(.5)
         heard = [self.studio.store.sound(item["sound"]).heard for item in self.studio.round()["candidates"]]
-        self.assertFalse(any(heard))                                        # never while something plays
-        self.studio.stop()
+        self.assertFalse(any(heard))                                        # never while the strings sound
+        self.assertEqual(self.studio.state.mode, "guitar")
+        self.host.call("lab.qc.sim.strum", False).result(10)
+        self.until(lambda: all("probe" in (self.studio.store.sound(item["sound"]).heard or {})
+                               for item in self.studio.round()["candidates"]), 20)
+        self.until(lambda: self.studio.state.mode == "guitar")              # and the guitar is back after it
+
+    def test_a_note_played_during_a_silent_listen_ends_it_and_the_guitar_is_heard_again(self):
+        from lab.hearing.audio import Played
+
+        original, played = engine_module.Engine.hear, []
+
+        def hear(engine, chain, dry, scene=0, *, stop=None, interrupt=False):
+            if interrupt and not played:
+                played.append(chain.digest())
+                raise Played("The guitar was played.")
+            return original(engine, chain, dry, scene, stop=stop, interrupt=interrupt)
+
+        self.patch_engine("hear", hear)
+        self.studio.put("b", Sound("Plexi", one_row(PLEXI, V30), {"kind": "designed"}))
+        self.until(lambda: played and self.studio.sounding == ("b", "guitar"))
+        self.assertEqual(self.studio.state.status_kind, "")                 # said nothing: the guitar plays
+        self.assertEqual(self.log(), "")
+        self.until(lambda: "probe" in (self.studio.sound("b").heard or {}), 20)     # listened to later
+
+    def test_a_paused_guitar_stays_paused_and_listening_goes_on_meanwhile(self):
+        self.studio.idle_seconds = 30.
+        self.studio.put("b", Sound("Plexi", one_row(PLEXI, V30), {"kind": "designed"}))
+        self.until(lambda: self.studio.sounding == ("b", "guitar"))
+        self.studio.pause()
+        self.studio.idle_seconds = 0.
+        self.until(lambda: "probe" in (self.studio.sound("b").heard or {}))
         self.settle()
-        heard = [self.studio.store.sound(item["sound"]).heard for item in self.studio.round()["candidates"]]
-        self.assertTrue(all("probe" in (record or {}) for record in heard))
+        self.assertIsNone(self.studio.state.mode)
+        self.studio.select("a")
+        self.assertIsNone(self.studio.state.mode)                           # a click on a tile does not play
+        self.studio.play("guitar")
+        self.assertTrue(self.studio.live)
 
     def test_listening_waits_until_the_unit_has_been_left_alone_for_a_moment(self):
         self.studio.idle_seconds = 30.
@@ -199,11 +233,10 @@ class ListeningTest(FlowCase):
         self.poll_for(.3)
         self.assertNotIn("hear", [name for name, _ in sent])
         self.assertIn("leaves it alone", self.studio.state.status)
-        self.studio.play("guitar")                        # coming back to the desk's sounds
-        self.settle()
-        self.studio.stop()
-        self.settle()
-        self.assertIn("probe", self.studio.sound("b").heard or {})
+        self.assertIsNone(self.studio.state.mode)        # the guitar does not come back by itself
+        self.studio.select("b")                           # a click on a tile comes back to the desk's sounds
+        self.until(lambda: self.studio.sounding == ("b", "guitar"))
+        self.until(lambda: "probe" in (self.studio.sound("b").heard or {}), 20)
 
 
 class UnheardTest(FlowCase):
@@ -213,7 +246,7 @@ class UnheardTest(FlowCase):
         calls, failing = [], []
         original = engine_module.Engine.hear
 
-        def hear(engine, chain, dry, scene=0, *, stop=None):
+        def hear(engine, chain, dry, scene=0, *, stop=None, interrupt=False):
             calls.append(chain.digest())
             if not failing:
                 failing.append(chain.digest())
@@ -244,7 +277,7 @@ class UnheardTest(FlowCase):
     def test_a_listen_the_unit_turned_away_says_nothing_about_the_sound(self):
         from lab.qc.slots import Unsaved
 
-        def hear(engine, chain, dry, scene=0, *, stop=None):
+        def hear(engine, chain, dry, scene=0, *, stop=None, interrupt=False):
             raise Unsaved("The preset on the Quad Cortex has unsaved changes.")
 
         self.patch_engine("hear", hear)
@@ -321,7 +354,7 @@ class PlayTest(FlowCase):
         self.a_round()
         self.studio.play("guitar")
         said = self.studio.state.status
-        self.studio.stop()                                # with the play and its levels still waiting
+        self.studio.pause()                               # with the play and its levels still waiting
         self.settle()
         self.assertIsNone(self.studio.state.mode)
         self.assertEqual(self.studio.state.status_kind, "")         # the buttons show it stopped: nothing is said
@@ -345,7 +378,7 @@ class PlayTest(FlowCase):
         original = engine_module.Engine.hear
         listening = threading.Event()
 
-        def slow(engine, chain, dry, scene=0, *, stop=None):
+        def slow(engine, chain, dry, scene=0, *, stop=None, interrupt=False):
             listening.set()
             for _ in range(160):                          # eight seconds, unless stopped
                 if stop is not None and stop.is_set():
@@ -366,16 +399,14 @@ class PlayTest(FlowCase):
         self.assertEqual(self.log(), "")                                    # stopping it is no fault
         self.assertIsNone(self.studio.sound("b").heard)                     # and says nothing about the sound
         setattr(engine_module.Engine, "hear", original)
-        self.studio.stop()
-        self.settle()
-        self.assertIn("probe", self.studio.sound("b").heard)                # listened to once the unit is free
+        self.until(lambda: "probe" in (self.studio.sound("b").heard or {}), 20)    # listened to once it is quiet
 
 
     def test_guitar_pressed_during_a_listen_plays_although_other_work_waited_behind_the_listen(self):
         original = engine_module.Engine.hear
         listening = threading.Event()
 
-        def slow(engine, chain, dry, scene=0, *, stop=None):
+        def slow(engine, chain, dry, scene=0, *, stop=None, interrupt=False):
             listening.set()
             for _ in range(160):
                 if stop is not None and stop.is_set():

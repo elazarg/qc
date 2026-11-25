@@ -156,7 +156,10 @@ class DimmedTest(DeskCase):
         self.assertEqual(str(desk.guitar.cget("fg")), INK)
         self.assertEqual(str(desk.loop.cget("fg")), DIM)              # no phrase
         self.assertEqual(self.words(desk.loop), ["Record or choose a phrase first"])
+        self.assertEqual(self.words(desk.guitar), ["Pause the guitar"])          # live by itself
+        desk.pause_or_play()
         self.assertEqual(self.words(desk.guitar), ["Play the guitar through the selected sound"])
+        self.assertEqual(desk.guitar.cget("text"), GLYPH["play"])
 
 
 class MarksTest(DeskCase):

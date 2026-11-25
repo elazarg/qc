@@ -59,12 +59,23 @@ sizes. Nothing was tried on the real unit.
   done. L1 in part: the tiles carry the chain and what differs (A3), so they say more than a name. T1 and T2
   in part: the learning screen shares the chosen look and the accent's meaning (V2), and the tools speak on
   the desk's line (R8).
+- **D1, built on the simulated unit and not yet heard on the real one:** the guitar is live whenever A or B
+  is ready and nothing else has the unit; it comes back by itself after a listen, a save, a recording, a
+  tool's measurement and the Guitar Learner. The word Guitar is gone: one symbol pauses the guitar (lit while
+  it plays) and plays it again. While it plays, the engine watches the dry guitar on its USB channel; silent
+  listening starts once the strings have been quiet for `idle_seconds` (3 s; a pause under a second between
+  notes is not quiet), and a note played during a listen's replay ends it and the guitar is heard again. A
+  preset chosen by hand on the unit is left alone until a tile is clicked; a play that fails pauses the
+  guitar rather than trying again. To try on the unit: whether the dry channel's level (`NOTE_DB`, -45 dBFS)
+  tells a note from the guitar's own noise, how long the silence is while a listen builds its chain (the
+  replay is the only part a note can end), and whether the driver takes the watch beside the unit's own
+  routing without a click.
 
 Waiting, and why:
 
-- **On the unit, with the player:** D1 (the guitar live by default), D2 (play once, alternate A and B), G3
-  (flipping A and B with no hand), D3 (A as "before" by itself, which changes what A means). These change
-  what the engine does or what the player is used to.
+- **On the unit, with the player:** D1 as above, D2 (play once, alternate A and B), G3 (flipping A and B
+  with no hand), D3 (A as "before" by itself, which changes what A means). These change what the engine does
+  or what the player is used to.
 - **The player's call:** I1–I3 and I5 (merging Phrase and Guitar, one place for the guitar's setting,
   renaming Sounds and the tools). The usage log now records the desk, so these can be argued from use.
 - **Left as it is, with the reason:** L2 (one width for every panel): a panel whose width followed its

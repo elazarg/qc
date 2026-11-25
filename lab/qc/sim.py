@@ -299,15 +299,34 @@ class SimAudio:
     """
 
     LATENCY = 96   # samples
+    interrupt = None    # as `Audio.interrupt`
 
     def __init__(self, unit):
         self.unit = unit
+        self.playing = False        # the player is playing the guitar (`strum`)
+        self.last_note = None       # when they stopped, if they ever played
+        self.watching = None        # the `SimStrings` open, as the driver holds one stream
+
+    def strings(self, channel):
+        self.release()
+        self.watching = SimStrings(self, channel)
+        return self.watching
+
+    def release(self):
+        if self.watching is not None:
+            watching, self.watching = self.watching, None
+            watching.stop()
 
     def reamp(self, dry, *, tail=2., cancel=None):
         if cancel is not None and cancel.is_set():      # as the real driver: the unit is wanted elsewhere
             from lab.hearing.audio import Cancelled
 
             raise Cancelled("The replay was stopped.")
+        self.release()                                   # as the real driver: one stream at a time
+        if self.interrupt and self.playing:
+            from lab.hearing.audio import Played
+
+            raise Played("The guitar was played.")
         rate = 48000
         signal = np.concatenate([dry[:, 0].astype(np.float64), np.zeros(round(tail * rate))])
         out = np.zeros_like(signal)
@@ -360,11 +379,42 @@ class SimAudio:
 
     def record(self, seconds, channels, *, cancel=None, started=None):
         """A plucked note, as if the player had played one."""
+        self.release()
         if started is not None:
             started()
         time = np.arange(round(48000 * seconds)) / 48000
         note = .2 * np.sin(2 * np.pi * 196 * time) * np.exp(-2 * time)
         return np.repeat(note[:, None], len(channels), axis=1).astype(np.float32)
+
+
+class SimStrings:
+    """The dry guitar watched on the simulated unit (`lab.hearing.audio.Strings`): quiet unless `strum` says the
+    player is playing, and quiet for an hour when nothing was ever played."""
+
+    def __init__(self, audio, channel):
+        self.audio, self.channel = audio, channel
+
+    def quiet_for(self):
+        import time
+
+        if self.audio.playing:
+            return 0.
+        last = self.audio.last_note
+        return 3600. if last is None else time.monotonic() - last
+
+    def stop(self):
+        pass
+
+
+def strum(engine, playing=True, stop=None):
+    """The player starts (or stops) playing the guitar on the simulated unit: a host command for tests,
+    `host.call("lab.qc.sim.strum", True)`."""
+    import time
+
+    if engine.audio.playing and not playing:
+        engine.audio.last_note = time.monotonic()
+    engine.audio.playing = playing
+    return playing
 
 
 def _open(self, handshake=True):

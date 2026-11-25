@@ -78,6 +78,8 @@ class Engine:
         self.borrowed = None
         self.offset = None
         self.asked, self.peak_limits, self.listening = {}, {}, None
+        self.watch_strings = False              # the dry guitar is watched while the guitar plays (`play`)
+        self.dry_channel = None                 # the USB channel of the dry guitar, once read
 
     # ---- the session ----
 
@@ -154,8 +156,12 @@ class Engine:
 
     # ---- playing ----
 
-    def play(self, side, mode, phrase=None):
-        """Hear one side: from the guitar (`mode` "guitar") or from the recorded phrase ("phrase")."""
+    def play(self, side, mode, phrase=None, strings=None):
+        """Hear one side: from the guitar (`mode` "guitar") or from the recorded phrase ("phrase"). With `strings`,
+        the dry guitar is watched while the guitar plays, so that `watch` can say how long the strings have been
+        quiet; it holds until a play says otherwise."""
+        if strings is not None:
+            self.watch_strings = strings
         if self.shown is not None and self.shown[0] == "pair" and not self._on_shown():
             self.shown = None           # the unit is elsewhere: the prepared A/B rows are not there to route
         if self.shown is None:
@@ -185,6 +191,7 @@ class Engine:
             self.unit.apply(wanted, current=held)
             self._keep_scene()
             self._loop(mode, phrase)
+            self._strings(mode)
             self.active, self.mode = side, mode
             return {"side": side, "mode": mode}
         wanted = held
@@ -211,8 +218,28 @@ class Engine:
         self.unit.apply(wanted, current=held)
         self._keep_scene()
         self._loop(mode, phrase)
+        self._strings(mode)
         self.active, self.mode = side, mode
         return {"side": side, "mode": mode}
+
+    def _dry(self):
+        """The USB channel the dry guitar arrives on (it depends on the unit's USB Dry/Wet setting), read once."""
+        if self.dry_channel is None:
+            from lab.qc.device import recording_channels
+
+            self.dry_channel = recording_channels(self.unit.device, self.physical_input)[0]
+        return self.dry_channel
+
+    def _strings(self, mode):
+        """Watch the dry guitar while the guitar plays and that was asked for; otherwise free the driver. A watch
+        that cannot open (another program holds the driver) leaves the guitar playing, unwatched."""
+        if mode != "guitar" or not self.watch_strings:
+            self.audio.release()
+        elif self.audio.watching is None:
+            try:
+                self.audio.strings(self._dry())
+            except Exception:  # noqa: BLE001  the guitar plays on; `watch` says nothing of the strings
+                self.audio.release()
 
     def _loop(self, mode, phrase):
         """Keep the phrase looping while switching sides; start it again when the phrase itself changed."""
@@ -239,16 +266,18 @@ class Engine:
 
     def watch(self):
         """While something plays: if the player chose another preset on the unit, stop sending audio at once and
-        leave that preset alone. Returns {"moved": True} when that happened."""
-        if self.mode is None:
-            return {"moved": False}
-        if self._on_ours():
-            return {"moved": False}
+        leave that preset alone. Returns {"moved": True} when that happened, and with it "quiet_for": the seconds
+        since a note was last played on the dry guitar, while it is watched (else None)."""
+        watching = self.audio.watching if self.mode == "guitar" else None
+        quiet_for = watching.quiet_for() if watching is not None else None
+        if self.mode is None or self._on_ours():
+            return {"moved": False, "quiet_for": quiet_for}
         if self.loop is not None:
             self.loop.stop()
             self.loop = self.loop_phrase = None
+        self.audio.release()
         self.mode, self.shown = None, None
-        return {"moved": True}
+        return {"moved": True, "quiet_for": None}
 
     def _recall_side(self, side):
         chain = self.sides[side]
@@ -274,6 +303,7 @@ class Engine:
 
     def quiet(self):
         """Disconnect every input, keeping the place in the phrase."""
+        self.audio.release()
         if self.loop is not None:
             self.loop.stop()
             self.loop = self.loop_phrase = None
@@ -358,37 +388,43 @@ class Engine:
         self.offset = calibrate(self.rig, self.audio, self.slots.folder)
         return self.offset
 
-    def hear(self, chain, dry, scene=0, *, stop=None):
-        """What `chain` does to the phrase in `scene`, measured silently. Whatever was playing stops."""
+    def hear(self, chain, dry, scene=0, *, stop=None, interrupt=False):
+        """What `chain` does to the phrase in `scene`, measured silently. Whatever was playing stops. With
+        `interrupt` (the guitar was live), a note played on the dry guitar during a replay ends it (`Played`)."""
+        channel = self._dry() if interrupt else None
         self.quiet()
         self.shown = None               # the unit is borrowed: A and B must be made ready again, also after a failure
         if self.offset is None:
             self.measure_round_trip()
-        return self._listen(chain, dry, stop, scene)
+        return self._listen(chain, dry, stop, scene, channel)
 
-    def _listen(self, chain, dry, stop, scene):
+    def _listen(self, chain, dry, stop, scene, interrupt=None):
         """Listen once; when the test click says the USB round trip is no longer what was measured (another buffer
         size, another driver), measure it again and listen once more."""
+        self.audio.interrupt = interrupt
         try:
             return listen(self.rig, self.audio, chain, dry, self.offset, stop=stop, scene=scene)
         except RoundTripChanged:
             self.measure_round_trip()
             return listen(self.rig, self.audio, chain, dry, self.offset, stop=stop, scene=scene)
+        finally:
+            self.audio.interrupt = None
 
-    def hear_shaped(self, chain, knobs, dry, scene=0, *, stop=None):
+    def hear_shaped(self, chain, knobs, dry, scene=0, *, stop=None, interrupt=False):
         """What `chain` with its Shape knobs at `knobs` does to the phrase, measured silently, as `hear` does.
 
         As `save` does, the knobs are applied to the chain as the unit holds it once built, where every value is
         stated; the shaped chain is then listened to like any other (built once and cached)."""
         from lab.sound.knobs import apply as with_knobs
 
+        channel = self._dry() if interrupt else None
         self.quiet()
         self.shown = None
         if self.offset is None:
             self.measure_round_trip()
         slot, held = self.rig.ready(chain, stop=stop)
         shaped = with_knobs(held, knobs) if knobs else held      # as the desk turns them: every scene moved
-        return self._listen(shaped, dry, stop, scene)
+        return self._listen(shaped, dry, stop, scene, channel)
 
     def read(self, slot):
         """The chain and name of a preset saved on the unit."""

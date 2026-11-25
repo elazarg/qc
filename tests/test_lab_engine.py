@@ -417,7 +417,7 @@ class MovedAwayTest(EngineCase):
         self.engine.show(one_row(PLEXI, V30), one_row(HIWATT, GREENBACK))
         self.engine.play("a", "phrase", note())
         self.device.player_selects(MY_PRESETS, 9)
-        self.assertEqual(self.engine.watch(), {"moved": True})
+        self.assertEqual(self.engine.watch(), {"moved": True, "quiet_for": None})
         self.assertFalse(loops.made[0].running)
         self.engine.scene(3)
         self.assertEqual(self.device.scene, 0)
@@ -445,6 +445,45 @@ class MovedAwayTest(EngineCase):
         self.engine.close()
         self.assertEqual(self.unit.position()["position"], slot["position"])
         self.assertTrue(self.device.dirty)
+
+
+class StringsTest(EngineCase):
+    """The guitar is live whenever A or B is ready: the dry guitar is watched while it plays, so that the desk
+    listens only while the strings are quiet, and a note played during a listen ends it."""
+
+    def test_while_the_guitar_plays_the_unit_says_how_long_the_strings_have_been_quiet(self):
+        from lab.qc.sim import strum
+
+        self.engine.show(one_row(PLEXI, V30), one_row(HIWATT, GREENBACK))
+        self.engine.play("b", "guitar", strings=True)
+        self.assertGreater(self.engine.watch()["quiet_for"], 60)          # never played
+        strum(self.engine, True)
+        self.assertEqual(self.engine.watch()["quiet_for"], 0.)
+        strum(self.engine, False)
+        self.assertLess(self.engine.watch()["quiet_for"], 1.)
+        self.engine.play("a", "phrase", note())                            # the loop takes the driver
+        self.assertIsNone(self.engine.audio.watching)
+        self.assertIsNone(self.engine.watch()["quiet_for"])
+        self.engine.play("a", "guitar")                                    # watched again, as asked before
+        self.assertIsNotNone(self.engine.audio.watching)
+        self.engine.quiet()
+        self.assertIsNone(self.engine.audio.watching)
+
+    def test_without_asking_the_strings_are_not_watched(self):
+        self.engine.show(one_row(PLEXI, V30), None)
+        self.engine.play("a", "guitar")
+        self.assertEqual(self.engine.watch(), {"moved": False, "quiet_for": None})
+
+    def test_a_note_played_during_a_listen_ends_it_only_when_the_guitar_was_live(self):
+        from lab.hearing.audio import Played
+        from lab.qc.sim import strum
+
+        strum(self.engine, True)
+        heard = self.engine.hear(one_row(PLEXI, V30), note())              # nothing to end it
+        self.assertIsNotNone(heard)
+        with self.assertRaises(Played):
+            self.engine.hear(one_row(HIWATT, GREENBACK), note(), interrupt=True)
+        self.assertIsNone(self.engine.audio.interrupt)
 
 
 class PhraseLoopTest(EngineCase):

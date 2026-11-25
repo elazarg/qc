@@ -32,7 +32,7 @@ import traceback
 
 
 # Outcomes that are part of ordinary use, not faults: said on the line, never logged with a trace.
-EXPECTED = frozenset({"Stopped", "Moved", "Unsaved", "Refused", "NotOurs", "EditorActive"})
+EXPECTED = frozenset({"Stopped", "Played", "Moved", "Unsaved", "Refused", "NotOurs", "EditorActive"})
 
 
 class Fault(RuntimeError):
@@ -84,7 +84,7 @@ def _engine(simulated, folder, physical_input):
 
 
 def _serve(commands, replies, stop, stopped_before, simulated, folder, physical_input):
-    from lab.hearing.audio import Cancelled
+    from lab.hearing.audio import Cancelled, Played
 
     try:
         engine, context = _engine(simulated, folder, physical_input)
@@ -121,8 +121,10 @@ def _serve(commands, replies, stop, stopped_before, simulated, folder, physical_
                     result = getattr(engine, name)(*args, **options)
                 replies.put((ticket, True, result))
             except Exception as error:  # noqa: BLE001
-                # A replay the audio driver ended because of a stop is a stop like one between two writes.
-                kind = "Stopped" if isinstance(error, Cancelled) else type(error).__name__
+                # A replay the audio driver ended because of a stop is a stop like one between two writes; one the
+                # guitar's first note ended is "Played".
+                kind = ("Played" if isinstance(error, Played) else "Stopped" if isinstance(error, Cancelled)
+                        else type(error).__name__)
                 replies.put((ticket, False, (kind, str(error) or kind, traceback.format_exc())))
     finally:
         try:

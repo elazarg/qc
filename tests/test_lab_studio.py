@@ -250,14 +250,15 @@ class StudioTest(StudioCase):
         self.studio.ask("make a classic rock crunch")
         settle(self.studio, 20)
         self.studio.settle_seconds = 0.
+        self.host.call("lab.qc.sim.strum", True).result(10)        # the player plays
         self.studio.play("guitar")
         settle(self.studio)
         self.studio.ask("more gain")
         settle(self.studio)
-        self.assertNotIn("shaped", self.studio.sound("b").heard)   # never while playing
+        self.assertNotIn("shaped", self.studio.sound("b").heard)   # never while the strings sound
         self.assertIsNotNone(self.studio.shaping)
-        self.studio.stop()
-        settle(self.studio, 30)
+        self.host.call("lab.qc.sim.strum", False).result(10)
+        self.until(lambda: "shaped" in (self.studio.sound("b").heard or {}), 30)
         sound = self.studio.sound("b")
         self.assertEqual(sound.heard["shaped"]["check"]["drive"]["verdict"], "as intended")
         self.assertIsNone(sound.heard["shaped"]["corrected"])
@@ -455,12 +456,12 @@ class JobsTest(StudioCase):
 class UndoTest(StudioCase):
     """(review 2026-11-20)"""
 
-    def test_undo_after_stopping_does_not_start_playing_again_and_puts_the_knob_back(self):
+    def test_undo_after_pausing_does_not_start_playing_again_and_puts_the_knob_back(self):
         self.put_two()
         self.studio.play("guitar")
         self.settle()
         self.studio.turn({"drive": .4})
-        self.studio.stop()
+        self.studio.pause()
         self.settle()
         self.studio.undo()
         self.settle()

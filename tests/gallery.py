@@ -139,7 +139,7 @@ class Gallery:
         desk.search.close()
         self.shoot("copied-to-a", studio.copy_to_a)
         self.shoot("second-design", lambda: studio.step(1))
-        self.shoot("guitar-on-b", lambda: desk.toggle_play("guitar"))
+        self.shoot("guitar-on-b", lambda: desk.studio.play("guitar"))
         self.shoot("phrase-on-b", lambda: desk.toggle_play("phrase"))
         studio.stop()
         self.shoot("saving", desk.save)

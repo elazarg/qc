@@ -6,11 +6,12 @@ scene (which matters only when the sound's scenes differ). `playing_as` says wha
 every question of whether a measurement holds is answered by comparing with it: `heard` (the record without the
 knobs), `evidence` (the record as the sound plays now, knobs included), `unheard` (why a listen failed).
 
-What is listened to, and when (`use_free_unit`, called from the studio's `poll`). While nothing plays, nobody
-else has the audio input and the unit has nothing to do:
+What is listened to, and when (`use_free_unit`, called from the studio's `poll`). While nothing plays, or the
+guitar plays and its strings are quiet, nobody else has the audio input and the unit has nothing to do (a note
+played during a listen ends it, and the guitar is heard again at once):
 
 1. knobs turned on a sound, once they have stood still for `settle_seconds`, are checked (`check_shaping`);
-2. once the unit has been left alone for `idle_seconds`: the sounds on A and B, then the designs of the round on
+2. once the unit has been left alone (or the strings quiet) for `idle_seconds`: the sounds on A and B, then the designs of the round on
    show, each that has not been heard as it plays now; then those heard with an earlier layout of the test
    signals;
 3. A and B are made ready again if listening used the unit, and three more designs are prepared.
@@ -26,7 +27,9 @@ import time
 from lab.sound import knobs
 
 SETTLE_SECONDS = 4.     # a turn is checked by listening once no knob has moved for this long
-IDLE_SECONDS = 2.       # silent listening starts once the unit has been left alone for this long
+# Silent listening starts once the unit has been left alone for this long: nothing playing, or the guitar playing
+# and its strings quiet.
+IDLE_SECONDS = 3.
 # The one correction a check may make to a knob, as a factor on its position: further when it did too little,
 # back when it did the opposite of what it is for.
 CORRECTION = {"too small": 1.6, "opposite": .5}
@@ -35,7 +38,8 @@ VERDICT = {"as intended": "did what it says", "too small": "did little here", "o
 CORRECTION_LIMIT = .4   # never more than this much of a knob's travel
 # Why a silent listen can end without saying anything about the sound it was listening to: it was stopped, or the
 # unit was not the app's to use just then.
-NOT_THE_SOUND = frozenset({"Stopped", "Moved", "Unsaved", "NotOurs", "EditorActive", "WorkerGone"})
+NOT_THE_SOUND = frozenset({"Stopped", "Played", "Moved", "Unsaved", "NotOurs", "EditorActive", "WorkerGone"})
+STOPPED = frozenset({"Stopped", "Played"})      # stopped by the player: by pressing something, or by playing
 
 
 class Listening:
@@ -44,7 +48,7 @@ class Listening:
         self.shaping = None               # (sound id, knobs turned, when) waiting to be checked by listening
         self.settle_seconds = SETTLE_SECONDS
         self.idle_seconds = IDLE_SECONDS
-        self.free_since = None            # since when the unit has been left alone
+        self.free_since = None          # since when the unit has been left alone
         self.hearing = None               # the sound a silent listen in flight is for
         self.listen_after = 0.            # no silent listen before this (after one the unit turned away)
         self.looking = False              # asking the unit what it is on, before borrowing it
@@ -56,6 +60,12 @@ class Listening:
 
     # ---- what the studio tells it ----
 
+    def leave_guitar(self):
+        """A silent listen takes the unit while the guitar is live and the strings are quiet: the guitar is
+        disconnected for it, and comes back after it (`Studio.guitar_back`), or at the first note played."""
+        if self.studio.state.mode == "guitar":
+            self.studio._set(mode=None)
+
     def lent(self):
         """Something is using the unit that takes A and B off it (a listen, a recording, a measurement)."""
         self.borrowed = True
@@ -66,7 +76,7 @@ class Listening:
         self.listen_after = 0.
 
     def came_back(self):
-        """The player pressed Guitar or Phrase: the unit is theirs to play the desk's sounds on again."""
+        """The player played, or clicked a tile: the unit is theirs to play the desk's sounds on again."""
         self.away, self.listen_after = False, 0.
 
     def left_alone(self):
@@ -163,12 +173,15 @@ class Listening:
         studio = self.studio
         if self.hearing is not None or self.looking:
             return                                  # the studio's own listening: the quiet stretch goes on
-        if not (studio.opened and not studio.state.mode and studio.audio_held_by is None and studio.phrase is not None
-                and not studio.host.busy and studio.host.failed is None):
+        quiet = studio.strings_quiet(now)
+        if not (studio.opened and (not studio.state.mode or quiet) and studio.audio_held_by is None
+                and studio.phrase is not None and not studio.host.busy and studio.host.failed is None):
             self.free_since, self.looked = None, False
             return
         if self.free_since is None:
             self.free_since = now
+        if quiet:                                   # the guitar plays: left alone since the last note
+            self.free_since = max(self.free_since, now - quiet)
         if self.away or now < self.listen_after:
             return
         if studio.media_reference is not None and now - self.free_since >= min(self.idle_seconds, .25):
@@ -212,7 +225,7 @@ class Listening:
                 self.looked = True
             else:
                 self.turned_away("Moved", "Another preset is selected on the Quad Cortex, so Tone Lab leaves it "
-                                           "alone and listens to nothing. Press Guitar or Phrase to come back.")
+                                           "alone and listens to nothing. Click A or B to come back.")
 
         def failed(error):
             self.looking = False
@@ -242,6 +255,7 @@ class Listening:
         phrase_key, digest, scene = self.playing_as(sound)
         record = {"phrase": phrase_key, "digest": digest, "scene": scene, "knobs": dict(sound.knobs), "short": True}
         self.hearing, self.borrowed = sound.id, True
+        self.leave_guitar()
         studio.begin("level measurement", "Checking audition level…")
 
         def received(result):
@@ -259,7 +273,7 @@ class Listening:
             kind = getattr(error, "kind", "")
             if kind not in NOT_THE_SOUND:
                 received({"failed": True})
-            elif kind != "Stopped":
+            elif kind not in STOPPED:
                 self.turned_away(kind, error)
 
         studio.later(studio.host.call("lab.tools.levels.audition_reading", sound.chain, sound.knobs, studio.phrase[1], scene),
@@ -269,10 +283,12 @@ class Listening:
         """The unit was not the app's to listen with. After the player chose another preset there, nothing is
         listened to until they come back; otherwise it is tried again after `wait` seconds."""
         studio = self.studio
+        changes = {}
         if kind == "Moved":
             self.away = True
+            changes["mode"] = None          # nothing of the desk's plays on a preset the player chose
         self.listen_after = time.monotonic() + wait
-        studio._set(status=str(error))
+        studio._set(status=str(error), **changes)
 
     def next_to_hear(self):
         """The next sound to listen to: the sounds on A and B first, then the designs of the round on show. One
@@ -313,6 +329,7 @@ class Listening:
         phrase_key, digest, scene = self.playing_as(sound)
         sound_id, name = sound.id, "a sound" if studio.state.blind else sound.name
         self.hearing, self.borrowed = sound_id, True
+        self.leave_guitar()
         studio.begin("listen", f"Listening to {name}, silently…")
 
         def heard(result):
@@ -333,7 +350,7 @@ class Listening:
             kind = getattr(error, "kind", "")
             if kind in NOT_THE_SOUND:
                 # Nothing was learned about the sound: it is listened to again later.
-                if kind != "Stopped":
+                if kind not in STOPPED:
                     self.turned_away(kind, error)
                 if dropped is not None:
                     dropped()
@@ -344,7 +361,8 @@ class Listening:
             studio.store.save(fresh)
             studio.fault(f"Could not listen to {name}: {error}")
 
-        studio.later(studio.host.call("hear", sound.chain, studio.phrase[1], scene), heard, failed, doing="listen")
+        studio.later(studio.host.call("hear", sound.chain, studio.phrase[1], scene, interrupt=studio.live), heard,
+                     failed, doing="listen")
 
     # ---- knobs that check themselves ----
 
@@ -399,6 +417,7 @@ class Listening:
         phrase_key, _, scene = self.playing_as(sound)
         name = "a sound" if studio.state.blind else sound.name
         self.hearing, self.borrowed = sound_id, True
+        self.leave_guitar()
         studio.begin("listen", f"Listening to {name} as shaped, silently…")
 
         def heard(result):
@@ -428,7 +447,7 @@ class Listening:
         def failed(error):
             self.hearing = None
             kind = getattr(error, "kind", "")
-            if kind == "Stopped":
+            if kind in STOPPED:
                 self.check_later(sound_id, turned)     # the player's own playing stopped it: checked afterwards
                 return
             if kind in NOT_THE_SOUND:
@@ -436,8 +455,8 @@ class Listening:
             else:
                 studio.fault(f"Could not listen to the shaped sound: {error}")
 
-        studio.later(studio.host.call("hear_shaped", sound.chain, values, inputs[1], scene), heard, failed,
-                   doing="listen")
+        studio.later(studio.host.call("hear_shaped", sound.chain, values, inputs[1], scene, interrupt=studio.live),
+                     heard, failed, doing="listen")
 
 
 def _earlier_tests(heard):

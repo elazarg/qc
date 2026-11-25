@@ -401,9 +401,13 @@ class Desk:
         self.save_button = button(row, "Save to QC", self.save)
         self.save_button.pack(side="right", padx=(8, 0))
         named(self.save_button, lambda: self.unable("save") or "Save the selected sound to the Tone Lab setlist")
-        self.guitar = button(row, "Guitar", lambda: self.toggle_play("guitar"))
+        # The guitar is heard whenever A or B is ready (`Studio.live`): one symbol pauses it, and plays it again.
+        # It is lit while the guitar plays.
+        self.guitar = button(row, GLYPH["pause"], self.pause_or_play)
+        self.guitar.configure(font=icon_font(13), padx=12)
         self.guitar.pack(side="left")
-        named(self.guitar, lambda: self.unable("guitar") or "Play the guitar through the selected sound")
+        named(self.guitar, lambda: self.unable("guitar") or ("Pause the guitar" if self.studio.live
+                                                             else "Play the guitar through the selected sound"))
         self.loop = button(row, GLYPH["loop"], lambda: self.toggle_play("phrase"))
         self.loop.configure(font=icon_font(13), padx=12)
         self.loop.pack(side="left", padx=(2, 0))
@@ -534,6 +538,7 @@ class Desk:
         for widget, mode in ((self.guitar, "guitar"), (self.loop, "phrase")):
             widget.configure(bg=mix(LIVE, TILE, .4) if state.mode == mode else TILE,
                              fg=DIM if self.unable(mode) else INK)
+        self.guitar.configure(text=GLYPH["pause"] if studio.live else GLYPH["play"])
         self.save_button.configure(fg=DIM if self.unable("save") else INK)
         self.copy_link.configure(fg=DIM if self.unable("copy") else SOFT)
         self.blind_link.configure(fg=DIM if self.unable("blind") else SIDE["b"] if state.blind else SOFT,
@@ -563,6 +568,8 @@ class Desk:
         while it cannot, and says this while the pointer rests on it."""
         studio, state = self.studio, self.studio.state
         a, b, chosen = studio.sound("a"), studio.sound("b"), studio.sound(state.side)
+        if what == "guitar" and studio.live:            # pausing it is never refused, once there is a sound
+            return "Nothing is on A or B yet" if a is None and b is None else ""
         if what in ("guitar", "phrase", "record") and studio.audio_held_by \
                 and not (what == "guitar" and studio.audio_held_by == "gestures"):
             return studio.held_words()
@@ -1686,9 +1693,18 @@ class Desk:
 
     # ---- actions ----
 
+    def pause_or_play(self):
+        """The guitar's symbol was pressed: pause the guitar, or play it again."""
+        self.play_when_free = None
+        if self.studio.live:
+            self.studio.pause()
+        else:
+            self.studio.play("guitar")
+
     def toggle_play(self, mode):
-        """Guitar or Phrase was pressed: start it, or stop it when it is what plays. While something else has the
-        audio input (`Studio.audio_held_by`), the studio says who instead of starting."""
+        """The phrase's symbol was pressed: loop the phrase, or stop it when it is what plays (the guitar is heard
+        again then, unless it is paused). While something else has the audio input (`Studio.audio_held_by`), the
+        studio says who instead of starting."""
         self.play_when_free = None
         if self.studio.state.mode == mode:
             self.studio.stop()
