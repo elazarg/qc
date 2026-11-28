@@ -9,12 +9,12 @@ What the dot stands for is listening's word for the sound, an inference from wha
 import tkinter as tk
 
 from lab.desk.difference import QUALITIES
-from lab.desk.theme import DIM, FONT, RULE, SUBTLE
+from lab.desk.theme import DIM, FONT, SUBTLE, mix
 from lab.hearing.measure import WORDS
 
-ROW = 15            # pixels a quality takes, top to bottom
+ROW = 22            # pixels a quality takes, top to bottom
 NAME = 64           # pixels for its name, at the left
-RADIUS = 4
+RADIUS = 5
 
 
 def place(key, word):
@@ -52,12 +52,12 @@ class Scales(tk.Canvas):
             return
         self.configure(height=len(QUALITIES) * ROW + 2)
         width = max(self.winfo_width(), 120)
-        left, right = NAME, min(width - 8, NAME + 260)
+        left, right = NAME, width - RADIUS - 3
         said = []
         for row, (key, short) in enumerate(QUALITIES):
             y = row * ROW + ROW / 2 + 1
             self.create_text(0, y, text=short, anchor="w", fill=SUBTLE, font=(FONT, 9))
-            self.create_line(left, y, right, y, fill=RULE, width=2)
+            self.create_line(left, y, right, y, fill=mix(SUBTLE, self.master["bg"], .22), width=4, capstyle="round")
             at = place(key, aim.get(key))
             if at is not None:
                 x = left + at * (right - left)

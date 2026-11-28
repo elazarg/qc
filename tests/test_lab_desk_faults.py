@@ -201,15 +201,46 @@ class TileOnAirTest(DeskCase):
     """F5: the tile's letter kept a dark box behind it while the tile was on air."""
 
     def test_everything_on_a_tile_on_air_has_the_tiles_colour(self):
+        from support import phrase
+
         self.put("b", Sound("Plexi", chain(PLEXI, V30), {"kind": "designed"}))
         self.studio.play("guitar", "b")
         self.pump()
         tile = self.desk.tiles["b"][0]
+        self.assertEqual(tile.cget("bg"), self.desk.tiles["a"][0].cget("bg"))   # the guitar heard: not marked
+        self.studio.use_phrase("short", phrase(1.), 0, len(phrase(1.)))
+        self.studio.play("phrase", "b")
+        self.pump()
         self.assertNotEqual(tile.cget("bg"), self.desk.tiles["a"][0].cget("bg"))
         blocks = every(self.desk.blocks["b"])               # the chain's blocks are chips of their own colour
         for widget in every(tile):
             if widget.winfo_class() == "Label" and widget.winfo_manager() and widget not in blocks:
                 self.assertEqual(widget.cget("bg"), tile.cget("bg"), widget.cget("text"))
+
+
+class ChainSymbolsTest(DeskCase):
+    def test_a_tiles_chain_is_a_row_of_symbols_that_say_their_names(self):
+        from lab.desk.theme import block_glyph
+
+        self.put("a", Sound("Plexi", chain(PLEXI, V30), {"kind": "designed"}))
+        self.put("b", Sound("Plexi", chain(PLEXI, V30), {"kind": "designed"}))
+        self.root.update()
+        symbols = [chip for chip in self.desk.blocks["b"].winfo_children() if hasattr(chip, "block")]
+        self.assertEqual(len(symbols), 2)
+        self.assertEqual([chip.cget("text") for chip in symbols], [block_glyph(block) for _, _, block
+                                                                   in self.studio.sound("b").chain.blocks])
+        self.assertNotEqual(symbols[0].cget("text"), symbols[1].cget("text"))      # the amp is not the cab
+        self.assertEqual([chip.block for chip in symbols], [block.name for _, _, block
+                                                            in self.studio.sound("b").chain.blocks])
+
+    def test_hiding_the_names_clears_the_chain_without_a_fault_in_drawing(self):
+        self.put("a", Sound("Plexi", chain(PLEXI, V30), {"kind": "designed"}))
+        self.put("b", Sound("Echo", chain(PLEXI, V30, DELAY), {"kind": "designed"}))
+        self.root.update()
+        self.studio.blind()
+        self.root.update()
+        self.assertNotIn("went wrong", self.desk.line.cget("text"))
+        self.assertEqual(self.desk.blocks["b"].winfo_children(), [])
 
 
 class ListsCutShortTest(DeskCase):

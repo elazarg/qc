@@ -9,7 +9,7 @@ import hidden_tk  # noqa: E402,F401  (keeps every window off the screen)
 import time
 import unittest
 
-from lab.desk.theme import FAULT, RECORDING, SIDE, SOFT
+from lab.desk.theme import FAULT, RECORDING, SIDE, SOFT, TILE
 from lab.desk.window import take_words
 from lab.sound.chain import Chain
 from lab.sound.sounds import Sound
@@ -63,13 +63,14 @@ class RecordingLampTest(DeskCase):
         self.studio.recording = (None, 40.)
         self.studio._set()
         self.root.update()
-        self.assertNotEqual(str(self.desk.record_symbol.cget("fg")), RECORDING)   # half lit while it opens
+        opening = str(self.desk.record_symbol.cget("bg"))                         # half lit while it opens
+        self.assertNotEqual(opening, TILE)
         self.assertTrue(strip.find_withtag("recording"))
         self.assertFalse(strip.find_withtag("taken"))
         self.studio.recording = (time.monotonic() - 10., 40.)
         self.studio._set()
         self.root.update()
-        self.assertEqual(str(self.desk.record_symbol.cget("fg")), RECORDING)
+        self.assertNotIn(str(self.desk.record_symbol.cget("bg")), (TILE, opening))  # lit while it records
         left, _, right, _ = strip.coords(strip.find_withtag("taken")[0])
         width = max(strip.winfo_width(), 40)
         self.assertEqual(left, 0)
@@ -77,7 +78,8 @@ class RecordingLampTest(DeskCase):
         del self.studio.doing["record"]
         self.studio._set()
         self.root.update()
-        self.assertEqual(str(self.desk.record_symbol.cget("fg")), SOFT)
+        self.assertEqual(str(self.desk.record_symbol.cget("bg")), TILE)
+        self.assertEqual(str(self.desk.record_symbol.cget("fg")), RECORDING)    # the red dot: ready to record
         self.assertFalse(strip.find_withtag("recording"))
 
 
@@ -178,8 +180,6 @@ class WorkedOnTest(DeskCase):
 class LetterFitsTest(DeskCase):
     def test_a_tiles_letter_is_never_cut_off_and_is_large_again_when_there_is_room(self):
         from support import DEFAULT_SIZE, SMALLEST_SIZE, inside
-        from lab.desk.window import BADGE
-
         from unittest import mock
 
         from test_lab_desk_symbols import three
@@ -201,16 +201,12 @@ class LetterFitsTest(DeskCase):
         self.desk.toggle("Phrase")
         for size in (SMALLEST_SIZE, DEFAULT_SIZE):
             self.resize(size)
-            self.desk.fit_badges()
             self.root.update()
             for side in ("a", "b"):
                 tile, badge = self.desk.tiles[side][0], self.desk.tiles[side][5]
                 self.assertTrue(inside(badge, tile), (size, side))
                 self.assertGreaterEqual(badge.winfo_height(), badge.winfo_reqheight(), (size, side))
         self.desk.toggle("Phrase")
-        self.desk.fit_badges()
-        self.root.update()
-        self.assertEqual(getattr(self.desk.tiles["b"][5], "size", BADGE), BADGE)
 
 
 class TypeScaleTest(unittest.TestCase):

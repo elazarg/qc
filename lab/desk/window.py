@@ -49,12 +49,12 @@ from lab.desk.pictures import learning_symbol
 from lab.desk.studio import RATE, Studio
 from lab.learner.seat import LearnerSeat  # noqa: F401  (the desk makes one; tests import it from here)
 from lab.desk.theme import (ACCENT, CHOSEN, DARK, DIM, FAULT, FONT, GLYPH, INK, LIVE, PAPER, RECORDING, RULE, SIDE, SOFT,
-                            SUBTLE, TILE, icon_font, mix)
+                            SUBTLE, TILE, block_glyph, icon_font, mix)
 
 PANELS = ("Shape", "Chain", "Difference", "Phrase", "Sounds", "History", "Guitar", "More")
 SIDED = ("Shape", "Chain", "Sounds")       # panels that act on or show the sound on the selected side
 SCROLLED = ("Chain", "Difference", "Phrase", "Guitar", "More")      # panels built into a part that scrolls
-BADGE, BADGE_SMALL = 34, 14         # a tile's letter, with room and without
+BADGE = 26                          # a tile's letter
 # What the ask line takes besides a request for a sound, said behind its "?".
 CONVENTIONS = ("The exact name of one of your presets brings it in. A remark in players' words (“a bit tighter”, "
                "“fizzy”) moves the Shape knobs at once, and Next under the line offers the remedy after it. "
@@ -319,11 +319,17 @@ class Desk:
             tile = tk.Frame(pair, bg=DARK, padx=16, pady=13, highlightthickness=2, highlightbackground=RULE,
                             cursor="hand2")
             tile.grid(row=0, column=column, sticky="nsew")
-            # At the top: whether it plays, and the player's marks, a heart and a cross, filled when given.
-            top = tk.Frame(tile, bg=DARK)
+            # What the tile shows is one block, in the middle of the tile however tall it is: the letter, with
+            # whether it plays and the player's marks (a heart and a cross, filled when given) on its line; the
+            # name; the chain; the aim against what was heard.
+            inner = tk.Frame(tile, bg=DARK)
+            inner.pack(expand=True, fill="x")
+            top = tk.Frame(inner, bg=DARK)
             top.pack(side="top", fill="x")
+            badge = label(top, side.upper(), size=BADGE, color=SIDE[side], bold=True)
+            badge.pack(side="left")
             air = label(top, size=9, color=LIVE, bold=True)
-            air.pack(side="left")
+            air.pack(side="left", padx=(10, 0))
             marks = tk.Frame(top, bg=DARK)
             marks.pack(side="right")
             for word in ("keeper", "not this"):
@@ -332,22 +338,19 @@ class Desk:
                 chip.pack(side="left")
                 chip.bind("<ButtonRelease-1>", lambda _, side=side, word=word: self.studio.mark(word, side))
                 named(chip, "Keep" if word == "keeper" else "Not this")
-            badge = label(tile, side.upper(), size=BADGE, color=SIDE[side], bold=True)
-            name = label(tile, size=14, bold=True, wrap=320)
-            blocks = tk.Frame(tile, bg=DARK)
-            scales = Scales(tile)
+            name = label(inner, size=14, bold=True, wrap=320)
+            blocks = tk.Frame(inner, bg=DARK)
+            scales = Scales(inner)
             named(scales, lambda scales=scales: scales.words)
-            caption = label(tile, size=9, color=SUBTLE, wrap=320)
-            caption.pack(side="bottom", fill="x")
-            scales.pack(side="bottom", fill="x", pady=(6, 2))
-            blocks.pack(side="bottom", fill="x", pady=(4, 0))
-            name.pack(side="bottom", fill="x")
-            badge.pack(side="bottom", fill="x")
+            caption = label(inner, size=9, color=SUBTLE, wrap=320)
+            name.pack(side="top", fill="x", pady=(4, 0))
+            blocks.pack(side="top", fill="x", pady=(8, 0))
+            scales.pack(side="top", fill="x", pady=(10, 2))
+            caption.pack(side="top", fill="x")
             self.scales[side], self.blocks[side] = scales, blocks
-            tile.bind("<Configure>", lambda _: self.root.after_idle(self.fit_badges), add="+")
-            for widget in (tile, badge, name, caption, air, top, scales):
+            for widget in (tile, inner, badge, name, caption, air, top, scales):
                 widget.bind("<ButtonRelease-1>", self.drags.click(lambda side=side: self.studio.select(side)))
-            for widget in (tile, badge, name, caption):
+            for widget in (tile, inner, badge, name, caption):
                 self.drags.source(widget, lambda event, side=side: ("side", side) if self.studio.sound(side)
                                   else None, self.dragged_name)
             # A name or a caption longer than the tile is wide goes on to the next line, however wide the tile is.
@@ -417,11 +420,10 @@ class Desk:
         self.loop.pack(side="left", padx=(2, 0))
         named(self.loop, lambda: self.unable("phrase") or "Repeat the phrase through the selected sound")
         # The phrase itself: its shape, the part that loops and where the loop is now. A click opens the Phrase
-        # panel; the dot beside it records a new one on the pickup setting last used.
-        self.record_symbol = tk.Label(row, text=GLYPH["record"], font=icon_font(13), bg=PAPER, fg=SOFT,
-                                      cursor="hand2", padx=6)
-        self.record_symbol.pack(side="right")
-        self.record_symbol.bind("<ButtonRelease-1>", lambda _: self.record_now())
+        # panel; ● before it records a new one on the pickup setting last used.
+        self.record_symbol = button(row, GLYPH["record"], self.record_now)
+        self.record_symbol.configure(font=icon_font(13), padx=12, fg=RECORDING)
+        self.record_symbol.pack(side="left", padx=(8, 0))
         named(self.record_symbol, self.record_words)
         self.phrase_strip = PhraseStrip(row, open_panel=lambda: self.toggle("Phrase"))
         self.phrase_strip.pack(side="left", fill="x", expand=True, padx=(10, 2))
@@ -512,10 +514,12 @@ class Desk:
             caption.configure(text="" if hidden else self.caption(sound, side))
             selected = state.side == side
             on_air = state.mode and selected
-            # The tile first: everything on it takes its colour, the letter and the marks included.
+            # The tile first: everything on it takes its colour. The guitar heard is the resting state and leaves the
+            # tile as it is; the phrase playing through it tints it.
             tile.configure(highlightbackground=SIDE[side] if selected else RULE,
-                           bg=mix(SIDE[side], DARK, .14) if on_air else DARK)
-            for widget in (name, caption, air, marks, badge, air.master, self.blocks[side]):
+                           bg=mix(SIDE[side], DARK, .14) if on_air and state.mode != "guitar" else DARK)
+            for widget in (name, caption, air, marks, badge, air.master, air.master.master, self.blocks[side],
+                           *getattr(self.blocks[side], "chevrons", ())):
                 widget.configure(bg=tile["bg"])
             # The heart and the cross stay while comparing blind (choosing shows the names); a mark already given
             # is not shown then, since it would tell which sound is which. A mark given is drawn filled.
@@ -565,8 +569,9 @@ class Desk:
         # While a take is recorded the dot is a lamp: half lit while the input opens, lit while it records.
         taking = studio.recording if "record" in studio.doing and studio.recording else None
         self.phrase_strip.show(studio.phrase_whole if studio.phrase else None, since, taking)
-        self.record_symbol.configure(fg=(RECORDING if taking[0] is not None else mix(RECORDING, PAPER, .5)) if taking
-                                     else DIM if self.unable("record") else SOFT)
+        self.record_symbol.configure(fg=DIM if self.unable("record") and not taking else RECORDING,
+                                     bg=TILE if not taking else mix(RECORDING, TILE, .45 if taking[0] is not None
+                                                                    else .2))
         self.draw_strip(sounds["b"])
         self.draw_scenes()
         if self.panel and self.hosted is None and not self.dragging and self.drawn_from(sounds) != self.panel_key:
@@ -613,20 +618,28 @@ class Desk:
         self.blocks_key[side] = key
         for child in holder.winfo_children():
             child.destroy()
+        holder.chevrons = []
         if sound is None:
             return
         theirs = {(r, column): block for r, column, block in other.chain.blocks} if other else {}
         chips = []
-        for r, column, block in sound.chain.blocks:
+        for index, (r, column, block) in enumerate(sound.chain.blocks):
+            if index:
+                between = tk.Label(holder, text="›", font=(FONT, 10), bg=holder["bg"], fg=DIM)
+                holder.chevrons.append(between)
+                chips.append(between)
             differs = other is not None and theirs.get((r, column)) != block
-            chip = tk.Label(holder, text=block.name if len(block.name) <= 22 else block.name[:21] + "…",
-                            font=(FONT, 9), bg=TILE, fg=INK if differs else SOFT, padx=5, pady=1, cursor="hand2",
+            # Each block is a symbol of what it does, and says its name while the pointer rests on it.
+            chip = tk.Label(holder, text=block_glyph(block), font=icon_font(13), bg=TILE,
+                            fg=INK if differs else SOFT, width=2, pady=3, cursor="hand2",
                             highlightthickness=1, highlightbackground=SIDE[side] if differs else TILE)
+            chip.block = block.name
+            named(chip, block.name)
             chip.bind("<ButtonRelease-1>", lambda _, side=side: (self.studio.select(side),
                                                                  self.panel != "Chain" and self.toggle("Chain")))
             chips.append(chip)
         holder.update_idletasks()
-        flow(holder, chips, width=max(160, self.tiles[side][0].winfo_width() - 40), gap=4)
+        flow(holder, chips, width=max(160, self.tiles[side][0].winfo_width() - 40), gap=3)
 
     def dragged_name(self, what):
         """The few words that follow the pointer while something is dragged."""
@@ -847,23 +860,6 @@ class Desk:
         more.bind("<ButtonRelease-1>", lambda _: studio.round_forward())
         self.flow_chips()
         self.strip_key = key
-
-    def fit_badges(self):
-        """A tile's letter is drawn large while the tile has the room, and smaller when it has not (a small window
-        with a panel open and a long caption): it is packed last, so it would otherwise be cut off first."""
-        import tkinter.font
-
-        try:
-            big = tkinter.font.Font(font=(FONT, BADGE, "bold")).metrics("linespace")
-            for side in ("a", "b"):
-                tile, badge = self.tiles[side][0], self.tiles[side][5]
-                needed = tile.winfo_reqheight() - badge.winfo_reqheight() + big
-                size = BADGE if tile.winfo_height() >= needed else BADGE_SMALL
-                if getattr(badge, "size", BADGE) != size:
-                    badge.size = size
-                    badge.configure(font=(FONT, size, "bold"))
-        except tk.TclError:
-            pass                            # the window is going
 
     def breathe(self, now=None):
         """The edge of a tile something is being done for (a request, a revision, a listen) breathes, brighter and
@@ -1773,7 +1769,8 @@ class Desk:
         top = tk.Frame(self.into, bg=DARK)
         top.pack(fill="x", pady=(12, 2))
         go = button(top, GLYPH["record"], self.record_now)
-        go.configure(font=icon_font(13), padx=12, fg=RECORDING if "record" in self.studio.doing else INK)
+        go.configure(font=icon_font(13), padx=12, fg=RECORDING,
+                     bg=mix(RECORDING, TILE, .45) if "record" in self.studio.doing else TILE)
         named(go, self.record_words)
         go.pack(side="left")
         label(top, "Pickup setting", size=9, color=SUBTLE).pack(side="left", padx=(10, 0))

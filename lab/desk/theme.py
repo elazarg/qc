@@ -47,6 +47,30 @@ GLYPH = {
 }
 
 
+# A block of a chain as a symbol of what it does, by the start of its category in the unit's catalogue; its
+# name is said on hover. Anything not listed (routing, utilities, loops) is a gear.
+BLOCKS = (
+    ("Guitar Overdrive", ""), ("Bass Overdrive", ""),    # a bolt
+    ("Guitar Amplifier", ""), ("Bass Amplifier", ""),    # an amp's head
+    ("Cabsim", ""), ("IRLoader", ""),                    # a speaker cabinet
+    ("Neural Capture", ""),                                    # a chip
+    ("Delay", ""),                                             # a clock turning back
+    ("Reverb", ""),                                            # a cloud: the room around the sound
+    ("Modulation", ""), ("Morph", ""),                   # a moving wave
+    ("Compressor", ""),                                        # brackets closing in
+    ("Equalizer", ""),                                         # sliders
+    ("Wah", ""), ("Filter", ""),                         # a funnel
+    ("Pitch", ""), ("Synth", ""),                        # a note
+)
+GEAR = ""
+
+
+def block_glyph(block):
+    """The symbol of a block (anything with `.info.category`, or none)."""
+    category = getattr(getattr(block, "info", None), "category", "") or ""
+    return next((glyph for start, glyph in BLOCKS if category.startswith(start)), GEAR)
+
+
 _icons = []
 
 
